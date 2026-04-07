@@ -1,0 +1,54 @@
+{
+  "name": "@treeseed/cli",
+  "version": "0.0.1",
+  "description": "Operator-facing Treeseed CLI package.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/treeseed-ai/cli.git",
+    "directory": "."
+  },
+  "homepage": "https://treeseed.ai",
+  "bugs": {
+    "url": "https://github.com/treeseed-ai/cli/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "setup": "npm install",
+    "setup:ci": "npm ci",
+    "test": "npm run build:dist && node --test ./scripts/*.test.mjs",
+    "build:dist": "node ./scripts/run-ts.mjs ./scripts/build-dist.ts",
+    "prepare": "npm run build:dist",
+    "prepack": "npm run build:dist",
+    "test:scaffold": "node ./scripts/run-ts.mjs ./scripts/test-scaffold.ts",
+    "release:setup": "npm run setup:ci",
+    "release:check-tag": "node ./scripts/run-ts.mjs ./scripts/assert-release-tag-version.ts",
+    "release:verify": "node ./scripts/run-ts.mjs ./scripts/release-verify.ts",
+    "release:publish": "node ./scripts/run-ts.mjs ./scripts/publish-package.ts"
+  },
+  "dependencies": {
+    "@treeseed/agent": "^0.0.1",
+    "@treeseed/core": "^0.0.1",
+    "@treeseed/sdk": "^0.0.1",
+    "esbuild": "^0.25.10",
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0"
+  },
+  "bin": {
+    "treeseed": "./dist/cli/main.js"
+  }
+}
