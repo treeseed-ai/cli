@@ -5,9 +5,9 @@ import {
 	createPersistentDeployTarget,
 	deployTargetLabel,
 	loadDeployState,
-} from './deploy-lib.ts';
-import { renderDeployWorkflow } from './github-automation-lib.ts';
-import { incrementVersion } from './workspace-save-lib.ts';
+} from '../dist/scripts/deploy-lib.js';
+import { renderDeployWorkflow } from '../dist/scripts/github-automation-lib.js';
+import { incrementVersion } from '../dist/scripts/workspace-save-lib.js';
 import { makeTenantRoot } from './cli-test-fixtures.mjs';
 
 test('persistent and branch targets produce distinct labels', () => {
