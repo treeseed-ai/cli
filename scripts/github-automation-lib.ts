@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
 import { resolveTreeseedEnvironmentRegistry } from '@treeseed/core/environment';
-import { corePackageRoot } from './package-tools.ts';
+import { corePackageRoot, loadCliDeployConfig } from './package-tools.ts';
 
 function envOrNull(key) {
 	const value = process.env[key];
@@ -93,7 +92,7 @@ export function resolveGitRepositoryRoot(tenantRoot) {
 }
 
 export function requiredGitHubEnvironment(tenantRoot, { scope = 'prod', purpose = 'save' } = {}) {
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadCliDeployConfig(tenantRoot);
 	const registry = resolveTreeseedEnvironmentRegistry({ deployConfig });
 	const relevant = registry.entries.filter(
 		(entry) =>

@@ -1,24 +1,9 @@
-import { mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
-import { packageRoot } from './package-tools.ts';
-
-const require = createRequire(import.meta.url);
-
-function resolveTreeseedPackageRoot(packageName: string, exportPath: string, fallbackDirName: string) {
-	try {
-		return resolve(dirname(require.resolve(exportPath)), '..');
-	} catch {
-		return resolve(packageRoot, '..', fallbackDirName);
-	}
-}
-
-const sdkPackageRoot = resolveTreeseedPackageRoot('@treeseed/sdk', '@treeseed/sdk', 'sdk');
-const corePackageRoot = resolveTreeseedPackageRoot('@treeseed/core', '@treeseed/core', 'core');
-const agentPackageRoot = resolveTreeseedPackageRoot('@treeseed/agent', '@treeseed/agent', 'agent');
+import { agentPackageRoot, corePackageRoot, packageRoot, sdkPackageRoot } from './package-tools.ts';
 const textExtensions = new Set(['.js', '.ts', '.mjs', '.cjs', '.d.ts', '.json', '.md']);
 const forbiddenPatterns = [
 	/['"`]file:[^'"`\n]+['"`]/,
@@ -93,13 +78,28 @@ function resolveNodeModulesRoot() {
 function mirrorDependencies(tempRoot: string) {
 	const sharedNodeModules = resolveNodeModulesRoot();
 	for (const entry of readdirSync(sharedNodeModules, { withFileTypes: true })) {
-		if (entry.name === '.bin' || entry.name === '@treeseed') {
+		if (entry.name === '.bin') {
+			continue;
+		}
+
+		if (entry.name === '@treeseed') {
+			const sourceScopeRoot = resolve(sharedNodeModules, entry.name);
+			const targetScopeRoot = resolve(tempRoot, 'node_modules', entry.name);
+			mkdirSync(targetScopeRoot, { recursive: true });
+			for (const scopedEntry of readdirSync(sourceScopeRoot, { withFileTypes: true })) {
+				if (scopedEntry.name === 'cli') {
+					continue;
+				}
+
+				const targetPath = resolve(targetScopeRoot, scopedEntry.name);
+				symlinkSync(resolve(sourceScopeRoot, scopedEntry.name), targetPath, scopedEntry.isDirectory() ? 'dir' : 'file');
+			}
 			continue;
 		}
 
 		const targetPath = resolve(tempRoot, 'node_modules', entry.name);
 		mkdirSync(dirname(targetPath), { recursive: true });
-		symlinkSync(resolve(sharedNodeModules, entry.name), targetPath, 'dir');
+		symlinkSync(resolve(sharedNodeModules, entry.name), targetPath, entry.isDirectory() ? 'dir' : 'file');
 	}
 }
 
@@ -120,10 +120,18 @@ function installPackagedPackage(extractRoot: string, tempRoot: string, tarballPa
 	rmSync(resolve(extractRoot, 'package'), { recursive: true, force: true });
 }
 
-run('npm', ['run', 'build:dist']);
+function hasWorkspacePackageSource(root: string) {
+	return root !== packageRoot && existsSync(resolve(root, 'scripts'));
+}
+
+run('npm', ['run', 'build']);
 scanDirectory(resolve(packageRoot, 'dist'));
 run('npm', ['test']);
-run('npm', ['run', 'test:scaffold']);
+if (hasWorkspacePackageSource(sdkPackageRoot) && hasWorkspacePackageSource(corePackageRoot) && hasWorkspacePackageSource(agentPackageRoot)) {
+	run('npm', ['run', 'test:scaffold']);
+} else {
+	console.log('Skipping scaffold verification because local sdk/core/agent package sources are not available.');
+}
 
 const stageRoot = mkdtempSync(join(tmpdir(), 'treeseed-cli-release-'));
 const extractRoot = resolve(stageRoot, 'extract');
@@ -131,16 +139,10 @@ const installRoot = resolve(stageRoot, 'install');
 
 try {
 	mkdirSync(extractRoot, { recursive: true });
-	const sdkTarball = pack(sdkPackageRoot, 'treeseed-sdk.tgz');
-	const coreTarball = pack(corePackageRoot, 'treeseed-core.tgz');
-	const agentTarball = pack(agentPackageRoot, 'treeseed-agent.tgz');
 	const cliTarball = pack(packageRoot, 'treeseed-cli.tgz');
 
-	installPackagedPackage(extractRoot, installRoot, sdkTarball, 'sdk');
-	installPackagedPackage(extractRoot, installRoot, coreTarball, 'core');
-	installPackagedPackage(extractRoot, installRoot, agentTarball, 'agent');
-	installPackagedPackage(extractRoot, installRoot, cliTarball, 'cli');
 	mirrorDependencies(installRoot);
+	installPackagedPackage(extractRoot, installRoot, cliTarball, 'cli');
 	writeFileSync(resolve(installRoot, 'package.json'), `${JSON.stringify({ name: 'treeseed-cli-smoke', private: true, type: 'module' }, null, 2)}\n`, 'utf8');
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', '--help'], installRoot);
 	console.log('CLI packed-install bin smoke passed.');

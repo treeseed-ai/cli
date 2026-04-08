@@ -9,7 +9,6 @@ import {
 	TREESEED_ENVIRONMENT_SCOPES,
 	validateTreeseedEnvironmentValues,
 } from '@treeseed/core/environment';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
 import { loadTreeseedManifest } from '@treeseed/core/tenant-config';
 import {
 	createPersistentDeployTarget,
@@ -19,6 +18,7 @@ import {
 	syncCloudflareSecrets,
 } from './deploy-lib.ts';
 import { maybeResolveGitHubRepositorySlug } from './github-automation-lib.ts';
+import { loadCliDeployConfig, withProcessCwd } from './package-tools.ts';
 
 const MACHINE_CONFIG_RELATIVE_PATH = '.treeseed/config/machine.yaml';
 const MACHINE_KEY_RELATIVE_PATH = '.treeseed/config/machine.key';
@@ -71,9 +71,13 @@ function writeDeploySummary(write, summary) {
 	write(`  KV SESSION: ${summary.sessionKv.id}`);
 }
 
-function loadOptionalTenantConfig() {
+function loadTenantDeployConfig(tenantRoot) {
+	return loadCliDeployConfig(tenantRoot);
+}
+
+function loadOptionalTenantManifest(tenantRoot) {
 	try {
-		return loadTreeseedManifest();
+		return withProcessCwd(tenantRoot, () => loadTreeseedManifest());
 	} catch {
 		return undefined;
 	}
@@ -159,8 +163,8 @@ function decryptValue(payload, key) {
 }
 
 export function loadTreeseedMachineConfig(tenantRoot) {
-	const deployConfig = loadTreeseedDeployConfig();
-	const tenantConfig = loadOptionalTenantConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
+	const tenantConfig = loadOptionalTenantManifest(tenantRoot);
 	const defaults = createDefaultTreeseedMachineConfig({ tenantRoot, deployConfig, tenantConfig });
 	const { configPath } = getTreeseedMachineConfigPaths(tenantRoot);
 
@@ -270,8 +274,8 @@ export function setTreeseedMachineEnvironmentValue(tenantRoot, scope, entry, val
 }
 
 export function collectTreeseedEnvironmentContext(tenantRoot) {
-	const deployConfig = loadTreeseedDeployConfig();
-	const tenantConfig = loadOptionalTenantConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
+	const tenantConfig = loadOptionalTenantManifest(tenantRoot);
 	return resolveTreeseedEnvironmentRegistry({
 		deployConfig,
 		tenantConfig,

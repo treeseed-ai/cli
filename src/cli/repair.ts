@@ -1,6 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
 import {
 	createDefaultTreeseedMachineConfig,
 	ensureTreeseedGitignoreEntries,
@@ -11,6 +10,7 @@ import {
 	writeTreeseedMachineConfig,
 } from '../../scripts/config-runtime-lib.ts';
 import { createPersistentDeployTarget, ensureGeneratedWranglerConfig, loadDeployState } from '../../scripts/deploy-lib.ts';
+import { loadCliDeployConfig } from '../../scripts/package-tools.ts';
 
 export type TreeseedRepairAction = {
 	id: string;
@@ -29,7 +29,7 @@ export function applyTreeseedSafeRepairs(tenantRoot: string): TreeseedRepairActi
 		actions.push({ id: 'env-local', detail: 'Created .env.local from .env.local.example.' });
 	}
 
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadCliDeployConfig(tenantRoot);
 	const { configPath } = getTreeseedMachineConfigPaths(tenantRoot);
 	if (!existsSync(configPath)) {
 		const machineConfig = createDefaultTreeseedMachineConfig({

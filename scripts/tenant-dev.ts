@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { corePackageRoot, packageScriptPath, spawnNodeBinary, wranglerBin } from './package-tools.ts';
+import { corePackageRoot, packageScriptPath, spawnNodeBinary, resolveWranglerBin } from './package-tools.ts';
 import { applyTreeseedEnvironmentToProcess, assertTreeseedCommandEnvironment } from './config-runtime-lib.ts';
 import { ensureGeneratedWranglerConfig } from './deploy-lib.ts';
 import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
@@ -115,7 +115,7 @@ function runTenantBuildCycle({ includePackageBuild = false, includeSdkBuild = fa
 function startWrangler() {
 	const { wranglerPath } = ensureGeneratedWranglerConfig(tenantRoot);
 	const child = spawnNodeBinary(
-		wranglerBin,
+		resolveWranglerBin(),
 		['dev', '--local', '--config', wranglerPath, ...wranglerArgs],
 		{
 			cwd: tenantRoot,

@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
-import { deriveCloudflareWorkerName, loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
-import { wranglerBin } from './package-tools.ts';
+import { deriveCloudflareWorkerName } from '@treeseed/core/deploy/config';
+import { loadCliDeployConfig, resolveWranglerBin } from './package-tools.ts';
 
 const DEFAULT_COMPATIBILITY_DATE = '2026-04-05';
 const DEFAULT_COMPATIBILITY_FLAGS = ['nodejs_compat'];
@@ -47,6 +47,10 @@ function renderTomlString(value) {
 function envOrNull(key) {
 	const value = process.env[key];
 	return typeof value === 'string' && value.length ? value : null;
+}
+
+function loadTenantDeployConfig(tenantRoot) {
+	return loadCliDeployConfig(tenantRoot);
 }
 
 function sanitizeSegment(value) {
@@ -342,7 +346,7 @@ export function buildWranglerConfigContents(tenantRoot, deployConfig, state, opt
 
 export function ensureGeneratedWranglerConfig(tenantRoot, options = {}) {
 	const target = normalizeTarget(options.scope ?? options.target ?? 'prod');
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	const { wranglerPath } = resolveTargetPaths(tenantRoot, target);
 	const manifestFingerprint = stableHash(JSON.stringify({ deployConfig, targetKey: targetKey(target) }));
@@ -361,7 +365,7 @@ export function ensureGeneratedWranglerConfig(tenantRoot, options = {}) {
 }
 
 function runWrangler(args, { cwd, allowFailure = false, json = false, capture = false, env = {}, input } = {}) {
-	const result = spawnSync(process.execPath, [wranglerBin, ...args], {
+	const result = spawnSync(process.execPath, [resolveWranglerBin(), ...args], {
 		stdio: json || capture || input !== undefined ? ['pipe', 'pipe', 'pipe'] : 'inherit',
 		cwd,
 		env: { ...process.env, ...env },
@@ -448,7 +452,7 @@ function missingTurnstileRequirements() {
 }
 
 export function collectMissingDeployInputs(tenantRoot) {
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const missing = [];
 
 	if (isPlaceholderAccountId(deployConfig.cloudflare.accountId)) {
@@ -512,7 +516,7 @@ export async function promptForMissingDeployInputs(tenantRoot) {
 }
 
 export function validateDeployPrerequisites(tenantRoot, { requireRemote = true } = {}) {
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const issues = [];
 
 	if (isPlaceholderAccountId(deployConfig.cloudflare.accountId)) {
@@ -543,7 +547,7 @@ export function validateDeployPrerequisites(tenantRoot, { requireRemote = true }
 }
 
 export function validateDestroyPrerequisites(tenantRoot, { requireRemote = true } = {}) {
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const issues = [];
 
 	if (requireRemote && isPlaceholderAccountId(deployConfig.cloudflare.accountId)) {
@@ -681,7 +685,7 @@ function deleteWorker(tenantRoot, workerName, { env, dryRun, force = false }) {
 
 export function destroyCloudflareResources(tenantRoot, options = {}) {
 	const target = normalizeTarget(options.scope ?? options.target ?? 'prod');
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	state.workerName = targetWorkerName(deployConfig, target);
 
@@ -757,7 +761,7 @@ export function cleanupDestroyedState(tenantRoot, options = {}) {
 
 export function provisionCloudflareResources(tenantRoot, options = {}) {
 	const target = normalizeTarget(options.scope ?? options.target ?? 'prod');
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	state.workerName = targetWorkerName(deployConfig, target);
 
@@ -844,7 +848,7 @@ export function provisionCloudflareResources(tenantRoot, options = {}) {
 
 export function syncCloudflareSecrets(tenantRoot, options = {}) {
 	const target = normalizeTarget(options.scope ?? options.target ?? 'prod');
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	const env = {
 		CLOUDFLARE_ACCOUNT_ID: deployConfig.cloudflare.accountId,
@@ -863,7 +867,7 @@ export function syncCloudflareSecrets(tenantRoot, options = {}) {
 			continue;
 		}
 
-		const result = spawnSync(process.execPath, [wranglerBin, 'secret', 'put', key, '--config', resolveGeneratedWranglerPath(tenantRoot, { target })], {
+		const result = spawnSync(process.execPath, [resolveWranglerBin(), 'secret', 'put', key, '--config', resolveGeneratedWranglerPath(tenantRoot, { target })], {
 			cwd: tenantRoot,
 			input: `${value}\n`,
 			stdio: ['pipe', 'inherit', 'inherit'],
@@ -904,7 +908,7 @@ export function runRemoteD1Migrations(tenantRoot, options = {}) {
 
 export function markDeploymentInitialized(tenantRoot, options = {}) {
 	const target = normalizeTarget(options.scope ?? options.target ?? 'prod');
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	const timestamp = new Date().toISOString();
 	state.readiness.initialized = true;
@@ -917,7 +921,7 @@ export function markDeploymentInitialized(tenantRoot, options = {}) {
 
 export function assertDeploymentInitialized(tenantRoot, options = {}) {
 	const target = normalizeTarget(options.scope ?? options.target ?? 'prod');
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	if (state.readiness?.initialized) {
 		return state;
@@ -930,7 +934,7 @@ export function assertDeploymentInitialized(tenantRoot, options = {}) {
 
 export function finalizeDeploymentState(tenantRoot, options = {}) {
 	const target = normalizeTarget(options.scope ?? options.target ?? 'prod');
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadTenantDeployConfig(tenantRoot);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	state.lastManifestFingerprint = stableHash(JSON.stringify({ deployConfig, targetKey: targetKey(target) }));
 	state.lastDeployedUrl = target.kind === 'branch' ? targetWorkersDevUrl(state.workerName) : deployConfig.siteUrl;

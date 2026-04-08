@@ -14,7 +14,7 @@ import {
 	deleteRemoteBranch,
 	mergeCurrentBranchIntoStaging,
 } from '../../../scripts/git-workflow-lib.ts';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
+import { loadCliDeployConfig } from '../../../scripts/package-tools.ts';
 import { runWorkspaceSavePreflight } from '../../../scripts/save-deploy-preflight-lib.ts';
 import { guidedResult } from './utils.js';
 
@@ -23,7 +23,7 @@ export const handleClose: TreeseedCommandHandler = (_invocation, context) => {
 	const tenantRoot = context.cwd;
 	const featureBranch = assertFeatureBranch(tenantRoot);
 	const previewTarget = createBranchPreviewDeployTarget(featureBranch);
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadCliDeployConfig(tenantRoot);
 	const previewState = loadDeployState(tenantRoot, deployConfig, { target: previewTarget });
 
 	runWorkspaceSavePreflight({ cwd: tenantRoot });

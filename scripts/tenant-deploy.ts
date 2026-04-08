@@ -14,7 +14,7 @@ import {
 	runRemoteD1Migrations,
 } from './deploy-lib.ts';
 import { currentManagedBranch, PRODUCTION_BRANCH, STAGING_BRANCH } from './git-workflow-lib.ts';
-import { packageScriptPath, wranglerBin } from './package-tools.ts';
+import { packageScriptPath, resolveWranglerBin } from './package-tools.ts';
 import { runTenantDeployPreflight } from './save-deploy-preflight-lib.ts';
 
 const tenantRoot = process.cwd();
@@ -121,7 +121,7 @@ function runNodeScript(scriptPath, scriptArgs = [], env = {}) {
 }
 
 function runWranglerDeploy(configPath) {
-	const result = spawnSync(process.execPath, [wranglerBin, 'deploy', '--config', configPath], {
+	const result = spawnSync(process.execPath, [resolveWranglerBin(), 'deploy', '--config', configPath], {
 		stdio: 'inherit',
 		cwd: tenantRoot,
 		env: { ...process.env },

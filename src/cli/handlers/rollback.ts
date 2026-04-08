@@ -10,12 +10,11 @@ import {
 	finalizeDeploymentState,
 	loadDeployState,
 } from '../../../scripts/deploy-lib.ts';
-import { packageScriptPath, wranglerBin } from '../../../scripts/package-tools.ts';
+import { loadCliDeployConfig, packageScriptPath, resolveWranglerBin } from '../../../scripts/package-tools.ts';
 import { run } from '../../../scripts/workspace-tools.ts';
 import { repoRoot } from '../../../scripts/workspace-save-lib.ts';
 import { guidedResult } from './utils.js';
 import { copyTreeseedOperationalState } from '../repair.js';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
 
 function selectRollbackCommit(state: Record<string, unknown>, requested: string | null) {
 	const history = Array.isArray(state.deploymentHistory) ? state.deploymentHistory as Array<Record<string, unknown>> : [];
@@ -71,7 +70,7 @@ export const handleRollback: TreeseedCommandHandler = (invocation, context) => {
 
 	const requestedCommit = typeof invocation.args.to === 'string' ? invocation.args.to : null;
 	const tenantRoot = context.cwd;
-	const deployConfig = loadTreeseedDeployConfig();
+	const deployConfig = loadCliDeployConfig(tenantRoot);
 	const target = createPersistentDeployTarget(scope);
 	const state = loadDeployState(tenantRoot, deployConfig, { target });
 	const rollbackEntry = selectRollbackEntry(state, requestedCommit);
@@ -128,7 +127,7 @@ export const handleRollback: TreeseedCommandHandler = (invocation, context) => {
 			return { exitCode: buildResult.status ?? 1 };
 		}
 
-		const publishResult = context.spawn(process.execPath, [wranglerBin, 'deploy', '--config', wranglerPath], {
+		const publishResult = context.spawn(process.execPath, [resolveWranglerBin(), 'deploy', '--config', wranglerPath], {
 			cwd: tempTenantRoot,
 			env: { ...context.env },
 			stdio: 'inherit',

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { agentPackageRoot, corePackageRoot, packageRoot, packageScriptPath, sdkPackageRoot } from './package-tools.ts';
+import { validateAllTemplateDefinitions } from './template-registry-lib.ts';
 
 const npmCacheDir = process.env.TREESEED_SCAFFOLD_NPM_CACHE_DIR
 	? resolve(process.env.TREESEED_SCAFFOLD_NPM_CACHE_DIR)
@@ -137,8 +138,26 @@ function linkWorkspacePackage(siteRoot, packageName, sourceRoot) {
 	symlinkSync(sourceRoot, resolve(scopeRoot, packageName.split('/')[1]), 'dir');
 }
 
+function resolveSharedNodeModulesRoot() {
+	let current = packageRoot;
+	while (true) {
+		const candidate = resolve(current, 'node_modules');
+		if (existsSync(candidate)) {
+			return candidate;
+		}
+
+		const parent = resolve(current, '..');
+		if (parent === current) {
+			break;
+		}
+		current = parent;
+	}
+
+	throw new Error(`Unable to locate a shared node_modules directory for ${packageRoot}.`);
+}
+
 function mirrorSharedNodeModules(siteRoot) {
-	const sharedNodeModules = resolve(packageRoot, '..', '..', 'node_modules');
+	const sharedNodeModules = resolveSharedNodeModulesRoot();
 	for (const entry of readdirSync(sharedNodeModules, { withFileTypes: true })) {
 		if (entry.name === '.bin' || entry.name === '@treeseed' || entry.name === '@astrojs') {
 			continue;
@@ -194,7 +213,8 @@ function createTarball(root, pkg) {
 }
 
 function scaffoldSite(siteRoot) {
-	runStep(process.execPath, [packageScriptPath('scaffold-site'), siteRoot, '--name', 'Smoke Site', '--site-url', 'https://smoke.example.com', '--contact-email', 'hello@example.com']);
+	validateAllTemplateDefinitions();
+	runStep(process.execPath, [packageScriptPath('scaffold-site'), siteRoot, '--template', 'starter-basic', '--name', 'Smoke Site', '--site-url', 'https://smoke.example.com', '--contact-email', 'hello@example.com']);
 }
 
 function installScaffold(siteRoot, { coreTarballPath, sdkTarballPath, cliTarballPath, agentTarballPath }) {

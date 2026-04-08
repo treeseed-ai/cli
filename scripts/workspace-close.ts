@@ -15,13 +15,13 @@ import {
 	deleteRemoteBranch,
 	mergeCurrentBranchIntoStaging,
 } from './git-workflow-lib.ts';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
+import { loadCliDeployConfig } from './package-tools.ts';
 import { runWorkspaceSavePreflight } from './save-deploy-preflight-lib.ts';
 
 const tenantRoot = process.cwd();
 const featureBranch = assertFeatureBranch(tenantRoot);
 const previewTarget = createBranchPreviewDeployTarget(featureBranch);
-const deployConfig = loadTreeseedDeployConfig();
+const deployConfig = loadCliDeployConfig(tenantRoot);
 const previewState = loadDeployState(tenantRoot, deployConfig, { target: previewTarget });
 
 runWorkspaceSavePreflight({ cwd: tenantRoot });

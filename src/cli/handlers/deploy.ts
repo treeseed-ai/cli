@@ -10,7 +10,7 @@ import {
 	runRemoteD1Migrations,
 } from '../../../scripts/deploy-lib.ts';
 import { currentManagedBranch, PRODUCTION_BRANCH, STAGING_BRANCH } from '../../../scripts/git-workflow-lib.ts';
-import { packageScriptPath, wranglerBin } from '../../../scripts/package-tools.ts';
+import { packageScriptPath, resolveWranglerBin } from '../../../scripts/package-tools.ts';
 import { runTenantDeployPreflight } from '../../../scripts/save-deploy-preflight-lib.ts';
 import { guidedResult } from './utils.js';
 
@@ -104,7 +104,7 @@ export const handleDeploy: TreeseedCommandHandler = (invocation, context) => {
 		if (dryRun) {
 			executedSteps.push('publish');
 		} else {
-			const publishResult = context.spawn(process.execPath, [wranglerBin, 'deploy', '--config', wranglerPath], {
+			const publishResult = context.spawn(process.execPath, [resolveWranglerBin(), 'deploy', '--config', wranglerPath], {
 				cwd: tenantRoot,
 				env: { ...context.env },
 				stdio: 'inherit',

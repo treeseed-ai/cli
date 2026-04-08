@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
 import { getTreeseedMachineConfigPaths } from '../../scripts/config-runtime-lib.ts';
 import {
 	createBranchPreviewDeployTarget,
@@ -8,6 +7,7 @@ import {
 	loadDeployState,
 } from '../../scripts/deploy-lib.ts';
 import { PRODUCTION_BRANCH, STAGING_BRANCH } from '../../scripts/git-workflow-lib.ts';
+import { loadCliDeployConfig } from '../../scripts/package-tools.ts';
 import { collectCliPreflight } from '../../scripts/workspace-preflight-lib.ts';
 import { currentBranch, gitStatusPorcelain, repoRoot } from '../../scripts/workspace-save-lib.ts';
 import { isWorkspaceRoot } from '../../scripts/workspace-tools.ts';
@@ -137,7 +137,7 @@ export function resolveTreeseedWorkflowState(cwd: string): TreeseedWorkflowState
 
 	if (tenantRoot) {
 		try {
-			const deployConfig = loadTreeseedDeployConfig();
+			const deployConfig = loadCliDeployConfig(cwd);
 			for (const scope of ['local', 'staging', 'prod'] as const) {
 				const deployState = loadDeployState(cwd, deployConfig, { target: createPersistentDeployTarget(scope) });
 				state.persistentEnvironments[scope] = {

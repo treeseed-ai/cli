@@ -1,5 +1,5 @@
-import { astroBin, runNodeBinary } from './package-tools.ts';
+import { resolveAstroBin, runNodeBinary } from './package-tools.ts';
 
 const args = process.argv.slice(2);
 
-runNodeBinary(astroBin, args, { cwd: process.cwd() });
+runNodeBinary(resolveAstroBin(), args, { cwd: process.cwd() });

@@ -14,7 +14,7 @@ import {
 	validateDeployPrerequisites,
 } from './deploy-lib.ts';
 import { createFeatureBranchFromStaging, pushBranch } from './git-workflow-lib.ts';
-import { packageScriptPath, wranglerBin } from './package-tools.ts';
+import { packageScriptPath, resolveWranglerBin } from './package-tools.ts';
 
 function parseArgs(argv) {
 	const parsed = {
@@ -53,7 +53,7 @@ function runNodeScript(scriptPath, scriptArgs = [], cwd) {
 }
 
 function runWranglerDeploy(configPath, cwd) {
-	const result = spawnSync(process.execPath, [wranglerBin, 'deploy', '--config', configPath], {
+	const result = spawnSync(process.execPath, [resolveWranglerBin(), 'deploy', '--config', configPath], {
 		stdio: 'inherit',
 		cwd,
 		env: { ...process.env },

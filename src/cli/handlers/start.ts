@@ -15,7 +15,7 @@ import {
 	validateDeployPrerequisites,
 } from '../../../scripts/deploy-lib.ts';
 import { createFeatureBranchFromStaging, pushBranch } from '../../../scripts/git-workflow-lib.ts';
-import { packageScriptPath, wranglerBin } from '../../../scripts/package-tools.ts';
+import { packageScriptPath, resolveWranglerBin } from '../../../scripts/package-tools.ts';
 import { guidedResult } from './utils.js';
 
 export function provisionBranchPreview(branchName: string, context: Parameters<TreeseedCommandHandler>[1], commandName = 'start') {
@@ -40,7 +40,7 @@ export function provisionBranchPreview(branchName: string, context: Parameters<T
 		return { exitCode: buildResult.status ?? 1 };
 	}
 
-	const deployResult = context.spawn(process.execPath, [wranglerBin, 'deploy', '--config', wranglerPath], {
+	const deployResult = context.spawn(process.execPath, [resolveWranglerBin(), 'deploy', '--config', wranglerPath], {
 		cwd: tenantRoot,
 		env: { ...context.env },
 		stdio: 'inherit',

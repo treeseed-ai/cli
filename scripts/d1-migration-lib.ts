@@ -1,12 +1,12 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { wranglerBin } from './package-tools.ts';
+import { resolveWranglerBin } from './package-tools.ts';
 
 const DATABASE_BINDING = 'SITE_DATA_DB';
 
 function runWrangler(args, { cwd, capture = false } = {}) {
-	return spawnSync(process.execPath, [wranglerBin, ...args], {
+	return spawnSync(process.execPath, [resolveWranglerBin(), ...args], {
 		cwd,
 		env: { ...process.env },
 		stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
