@@ -104,10 +104,10 @@ The GitHub Actions workflows under `.github/workflows/` assume this package is t
 Release tags must use this format:
 
 ```text
-treeseed-cli-v<version>
+<version>
 ```
 
-For example, package version `0.0.1` publishes from tag `treeseed-cli-v0.0.1`.
+For example, package version `0.1.0` publishes from tag `0.1.0`.
 
 ## Notes
 
