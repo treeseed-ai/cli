@@ -1,8 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
 import {
 	createBranchPreviewDeployTarget,
 	createPersistentDeployTarget,
@@ -11,40 +8,7 @@ import {
 } from './deploy-lib.ts';
 import { renderDeployWorkflow } from './github-automation-lib.ts';
 import { incrementVersion } from './workspace-save-lib.ts';
-
-function makeTenantRoot() {
-	const root = mkdtempSync(join(tmpdir(), 'treeseed-cli-test-'));
-	writeFileSync(resolve(root, 'treeseed.site.yaml'), [
-		'name: Example',
-		'slug: example',
-		'siteUrl: https://example.com',
-		'contactEmail: hello@example.com',
-		'cloudflare:',
-		'  accountId: acct_123',
-		'  workerName: example',
-		'plugins: []',
-		'providers:',
-		'  forms: store_only',
-		'  agents:',
-		'    execution: stub',
-		'    mutation: local_branch',
-		'    repository: stub',
-		'    verification: stub',
-		'    notification: stub',
-		'    research: stub',
-		'  deploy: cloudflare',
-		'  content:',
-		'    docs: default',
-		'  site: default',
-		'smtp:',
-		'  enabled: false',
-		'turnstile:',
-		'  enabled: false',
-		'',
-	].join('\n'));
-	mkdirSync(resolve(root, 'migrations'), { recursive: true });
-	return root;
-}
+import { makeTenantRoot } from './cli-test-fixtures.mjs';
 
 test('persistent and branch targets produce distinct labels', () => {
 	assert.equal(deployTargetLabel(createPersistentDeployTarget('staging')), 'staging');
@@ -54,10 +18,10 @@ test('persistent and branch targets produce distinct labels', () => {
 test('branch preview state derives branch-specific worker names', () => {
 	const tenantRoot = makeTenantRoot();
 	const deployConfig = {
-		cloudflare: { accountId: 'acct_123', workerName: 'example' },
+		cloudflare: { accountId: 'fixture-cloudflare-account-id', workerName: 'treeseed-working-site' },
 	};
 	const state = loadDeployState(tenantRoot, deployConfig, { target: createBranchPreviewDeployTarget('feature/preview') });
-	assert.match(state.workerName, /^example-feature-preview/);
+	assert.match(state.workerName, /^treeseed-working-site-feature-preview/);
 	assert.equal(state.previewEnabled, true);
 });
 

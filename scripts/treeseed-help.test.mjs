@@ -1,41 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { findCommandSpec, listCommandNames, runTreeseedCli } from '../dist/cli/main.js';
-
-function makeWorkspaceRoot() {
-	const root = mkdtempSync(join(tmpdir(), 'treeseed-help-workspace-'));
-	writeFileSync(resolve(root, 'package.json'), JSON.stringify({
-		name: 'help-test',
-		private: true,
-		workspaces: ['packages/*'],
-	}, null, 2));
-	return root;
-}
-
-function makeTenantWorkspace(branch = 'staging') {
-	const root = makeWorkspaceRoot();
-	mkdirSync(resolve(root, 'packages', 'placeholder'), { recursive: true });
-	writeFileSync(resolve(root, 'packages', 'placeholder', 'package.json'), JSON.stringify({
-		name: '@test/placeholder',
-		version: '0.0.1',
-	}, null, 2));
-	writeFileSync(resolve(root, 'treeseed.site.yaml'), [
-		'name: Test Site',
-		'slug: test-site',
-		'siteUrl: https://example.com',
-		'contactEmail: test@example.com',
-	].join('\n'));
-	spawnSync('git', ['init', '-b', branch], { cwd: root, stdio: 'ignore' });
-	spawnSync('git', ['config', 'user.name', 'Treeseed Test'], { cwd: root, stdio: 'ignore' });
-	spawnSync('git', ['config', 'user.email', 'treeseed@example.com'], { cwd: root, stdio: 'ignore' });
-	spawnSync('git', ['add', '-A'], { cwd: root, stdio: 'ignore' });
-	spawnSync('git', ['commit', '-m', 'init'], { cwd: root, stdio: 'ignore' });
-	return root;
-}
+import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 
 async function runCli(args, options = {}) {
 	const writes = [];
