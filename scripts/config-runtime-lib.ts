@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -22,7 +23,10 @@ import { loadCliDeployConfig, withProcessCwd } from './package-tools.ts';
 
 const MACHINE_CONFIG_RELATIVE_PATH = '.treeseed/config/machine.yaml';
 const MACHINE_KEY_RELATIVE_PATH = '.treeseed/config/machine.key';
+const TEMPLATE_CATALOG_CACHE_RELATIVE_PATH = 'treeseed/cache/template-catalog.json';
 const TENANT_ENVIRONMENT_OVERLAY_PATH = 'src/env.yaml';
+export const DEFAULT_TEMPLATE_CATALOG_URL = 'https://api.treeseed.ai/search/templates';
+export const TREESEED_TEMPLATE_CATALOG_URL_ENV = 'TREESEED_TEMPLATE_CATALOG_URL';
 
 function ensureParent(filePath) {
 	mkdirSync(dirname(filePath), { recursive: true });
@@ -83,6 +87,25 @@ function loadOptionalTenantManifest(tenantRoot) {
 	}
 }
 
+function findNearestTreeseedMachineConfig(startRoot = process.cwd()) {
+	let current = resolve(startRoot);
+
+	while (true) {
+		const configPath = resolve(current, MACHINE_CONFIG_RELATIVE_PATH);
+		if (existsSync(configPath)) {
+			return configPath;
+		}
+
+		const parent = resolve(current, '..');
+		if (parent === current) {
+			break;
+		}
+		current = parent;
+	}
+
+	return null;
+}
+
 export function getTreeseedMachineConfigPaths(tenantRoot) {
 	return {
 		configPath: resolve(tenantRoot, MACHINE_CONFIG_RELATIVE_PATH),
@@ -105,6 +128,9 @@ export function createDefaultTreeseedMachineConfig({ tenantRoot, deployConfig, t
 			sync: {
 				github: true,
 				cloudflare: true,
+			},
+			templates: {
+				catalogEndpoint: DEFAULT_TEMPLATE_CATALOG_URL,
 			},
 		},
 		environments: Object.fromEntries(
@@ -188,6 +214,10 @@ export function loadTreeseedMachineConfig(tenantRoot) {
 				...defaults.settings.sync,
 				...(parsed.settings?.sync ?? {}),
 			},
+			templates: {
+				...(defaults.settings.templates ?? {}),
+				...(parsed.settings?.templates ?? {}),
+			},
 		},
 		environments: Object.fromEntries(
 			TREESEED_ENVIRONMENT_SCOPES.map((scope) => [
@@ -211,6 +241,34 @@ export function writeTreeseedMachineConfig(tenantRoot, config) {
 	const { configPath } = getTreeseedMachineConfigPaths(tenantRoot);
 	ensureParent(configPath);
 	writeFileSync(configPath, stringifyYaml(config), 'utf8');
+}
+
+export function resolveTreeseedTemplateCatalogEndpoint(startRoot = process.cwd(), env = process.env) {
+	const envValue = env[TREESEED_TEMPLATE_CATALOG_URL_ENV];
+	if (typeof envValue === 'string' && envValue.trim().length > 0) {
+		return envValue.trim();
+	}
+
+	const machineConfigPath = findNearestTreeseedMachineConfig(startRoot);
+	if (!machineConfigPath) {
+		return DEFAULT_TEMPLATE_CATALOG_URL;
+	}
+
+	const raw = parseYaml(readFileSync(machineConfigPath, 'utf8')) ?? {};
+	const parsed = raw && typeof raw === 'object' ? raw : {};
+	const configuredEndpoint = parsed.settings?.templates?.catalogEndpoint;
+	return typeof configuredEndpoint === 'string' && configuredEndpoint.trim().length > 0
+		? configuredEndpoint.trim()
+		: DEFAULT_TEMPLATE_CATALOG_URL;
+}
+
+export function resolveTreeseedTemplateCatalogCachePath(startRoot = process.cwd()) {
+	const machineConfigPath = findNearestTreeseedMachineConfig(startRoot);
+	if (machineConfigPath) {
+		return resolve(dirname(dirname(machineConfigPath)), 'cache', 'template-catalog.json');
+	}
+
+	return resolve(tmpdir(), TEMPLATE_CATALOG_CACHE_RELATIVE_PATH);
 }
 
 export function ensureTreeseedGitignoreEntries(tenantRoot) {

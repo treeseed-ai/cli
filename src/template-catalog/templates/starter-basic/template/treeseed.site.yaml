@@ -1,0 +1,26 @@
+name: __SITE_NAME__
+slug: __SITE_SLUG__
+siteUrl: __SITE_URL__
+contactEmail: __CONTACT_EMAIL__
+cloudflare:
+  accountId: replace-with-cloudflare-account-id
+  workerName: __SITE_SLUG__
+plugins:
+  - package: '@treeseed/core/plugin-default'
+providers:
+  forms: store_only
+  agents:
+    execution: stub
+    mutation: local_branch
+    repository: stub
+    verification: stub
+    notification: stub
+    research: stub
+  deploy: cloudflare
+  content:
+    docs: default
+  site: default
+smtp:
+  enabled: false
+turnstile:
+  enabled: false

@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { parse as parseYaml } from 'yaml';
-import { loadTreeseedDeployConfig } from '@treeseed/core/deploy/config';
 
 const require = createRequire(import.meta.url);
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +61,9 @@ function resolveTreeseedPackageRoot(packageName, exportPath?: string, fallbackDi
 
 	try {
 		const resolvedEntry = require.resolve(exportPath ?? packageName);
+		if ((exportPath ?? packageName).endsWith('/package.json')) {
+			return dirname(resolvedEntry);
+		}
 		return resolve(dirname(resolvedEntry), '..');
 	} catch {
 		if (!fallbackDirName) {
@@ -81,7 +83,6 @@ export function resolveWranglerBin() {
 export const corePackageRoot = resolveTreeseedPackageRoot('@treeseed/core', '@treeseed/core/config', 'core');
 export const sdkPackageRoot = resolveTreeseedPackageRoot('@treeseed/sdk', '@treeseed/sdk', 'sdk');
 export const agentPackageRoot = resolveTreeseedPackageRoot('@treeseed/agent', '@treeseed/agent', 'agent');
-export const marketPackageRoot = resolveTreeseedPackageRoot('@treeseed/market', '@treeseed/market/package.json', 'market');
 
 export function loadPackageJson(root = process.cwd()) {
 	const packageJsonPath = resolve(root, 'package.json');
@@ -247,15 +248,12 @@ function parseFallbackDeployConfig(configPath) {
 }
 
 export function loadCliDeployConfig(tenantRoot) {
-	try {
-		return withProcessCwd(tenantRoot, () => loadTreeseedDeployConfig());
-	} catch (error) {
-		const configPath = resolve(tenantRoot, 'treeseed.site.yaml');
-		if (!existsSync(configPath)) {
-			throw error;
-		}
-		return parseFallbackDeployConfig(configPath);
+	const configPath = resolve(tenantRoot, 'treeseed.site.yaml');
+	if (!existsSync(configPath)) {
+		throw new Error(`Unable to resolve Treeseed deploy config at "${configPath}".`);
 	}
+
+	return parseFallbackDeployConfig(configPath);
 }
 
 export function runNodeBinary(binPath, args, options = {}) {

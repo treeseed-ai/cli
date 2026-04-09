@@ -4,7 +4,10 @@ import { syncTemplateProject } from './template-registry-lib.ts';
 
 const args = process.argv.slice(2);
 const check = args.includes('--check');
-const changed = syncTemplateProject(process.cwd(), { check });
+const changed = await syncTemplateProject(process.cwd(), {
+	check,
+	writeWarning: (message) => console.warn(message),
+});
 
 if (check) {
 	if (changed.length === 0) {

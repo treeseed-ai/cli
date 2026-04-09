@@ -1,0 +1,40 @@
+site:
+  name: __SITE_NAME__
+  statement: A Treeseed site generated from the basic starter template.
+  siteUrl: __SITE_URL__
+  githubRepository: __REPOSITORY_URL__
+  discordLink: __DISCORD_URL__
+  headerMenu:
+    - label: Learn
+      items:
+        - label: Handbook
+          href: /knowledge/handbook/
+    - label: Build
+      items:
+        - label: Welcome
+          href: /welcome/
+  footerMenu:
+    - label: Project
+      items:
+        - label: Repository
+          href: __REPOSITORY_URL__
+  forms:
+    apiBaseUrl: /api/form/submit
+  emailNotifications:
+    contactRouting:
+      default:
+        - __CONTACT_EMAIL__
+    subscribeRecipients:
+      - __CONTACT_EMAIL__
+  summary: __SITE_NAME__ is a Treeseed site generated from the basic starter.
+  projectStage: Initial build
+  projectStageDetail: Generated from the Treeseed basic starter template.
+models:
+  pages:
+    defaults:
+      pageLayout: article
+      stage: starter
+      audience: []
+  docs:
+    defaults:
+      tags: []

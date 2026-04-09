@@ -1,7 +1,20 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, relative, resolve } from 'node:path';
+import {
+	RemoteTemplateCatalogClient,
+	type SdkTemplateCatalogEntry,
+	type SdkTemplateCatalogResponse,
+} from '@treeseed/sdk';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { cliPackageVersion, corePackageVersion, marketPackageRoot } from './paths.ts';
+import {
+	resolveTreeseedTemplateCatalogCachePath,
+	resolveTreeseedTemplateCatalogEndpoint,
+} from './config-runtime-lib.ts';
+import {
+	cliPackageVersion,
+	corePackageVersion,
+	localTemplateArtifactsRoot,
+} from './paths.ts';
 
 export const TEMPLATE_CATEGORIES = ['starter', 'example', 'fixture', 'reference-app'] as const;
 
@@ -40,45 +53,7 @@ export interface TemplateManifest {
 	};
 }
 
-export interface TemplateProductDefinition {
-	id: string;
-	displayName: string;
-	description: string;
-	summary: string;
-	status: 'draft' | 'live' | 'archived';
-	featured?: boolean;
-	category: TemplateCategory;
-	audience?: string[];
-	tags?: string[];
-	publisher: {
-		id: string;
-		name: string;
-		url?: string;
-	};
-	publisherVerified?: boolean;
-	templateVersion: string;
-	templateApiVersion: number;
-	minCliVersion: string;
-	minCoreVersion: string;
-	fulfillment: {
-		source: {
-			kind: 'git';
-			repoUrl: string;
-			directory: string;
-			ref: string;
-			integrity?: string;
-		};
-		hooksPolicy: 'builtin_only' | 'trusted_only' | 'disabled';
-		supportsReconcile: boolean;
-	};
-	offer?: {
-		priceModel?: 'free' | 'paid' | 'contact';
-		license?: string;
-		support?: string;
-	};
-	relatedBooks?: string[];
-	relatedKnowledge?: string[];
-	relatedObjectives?: string[];
+export interface TemplateProductDefinition extends SdkTemplateCatalogEntry {
 	contentPath: string;
 	artifactRoot: string;
 	artifactManifestPath: string;
@@ -111,8 +86,17 @@ interface TemplateState {
 	replacements: Record<string, string>;
 }
 
-const marketContentTemplatesRoot = resolve(marketPackageRoot, 'src', 'content', 'templates');
-const marketArtifactsRoot = resolve(marketPackageRoot, 'templates');
+interface TemplateCatalogCache {
+	endpoint: string;
+	fetchedAt: string;
+	items: SdkTemplateCatalogEntry[];
+}
+
+interface TemplateCatalogOptions {
+	cwd?: string;
+	env?: NodeJS.ProcessEnv;
+	writeWarning?: (message: string) => void;
+}
 
 function loadJsonFile<T>(filePath: string): T {
 	return JSON.parse(readFileSync(filePath, 'utf8')) as T;
@@ -122,16 +106,11 @@ function ensureDir(filePath: string) {
 	mkdirSync(dirname(filePath), { recursive: true });
 }
 
-function readFrontmatter(filePath: string) {
-	const raw = readFileSync(filePath, 'utf8');
-	const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-	if (!match) {
-		throw new Error(`Template product is missing frontmatter: ${filePath}`);
-	}
-	return parseYaml(match[1]) as Record<string, unknown>;
-}
-
 function listFiles(root: string): string[] {
+	if (!existsSync(root)) {
+		return [];
+	}
+
 	const files: string[] = [];
 	for (const entry of readdirSync(root, { withFileTypes: true })) {
 		const fullPath = resolve(root, entry.name);
@@ -144,16 +123,24 @@ function listFiles(root: string): string[] {
 	return files;
 }
 
-function listMarkdownFiles(root: string): string[] {
-	if (!existsSync(root)) {
+function listTemplateArtifactIds() {
+	if (!existsSync(localTemplateArtifactsRoot)) {
 		return [];
 	}
-	return listFiles(root).filter((filePath) => filePath.endsWith('.md') || filePath.endsWith('.mdx'));
+
+	return readdirSync(localTemplateArtifactsRoot, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => entry.name)
+		.sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+}
+
+function isTextFile(filePath: string) {
+	return !/\.(png|jpe?g|gif|webp|ico|woff2?|ttf|eot|pdf|zip|gz)$/iu.test(filePath);
 }
 
 function validateTemplateProductShape(product: TemplateProductDefinition) {
 	if (!product.id || !product.displayName || !product.description || !product.summary) {
-		throw new Error(`Template product ${product.contentPath} is missing required identity metadata.`);
+		throw new Error(`Template product ${product.id || '(unknown)'} is missing required identity metadata.`);
 	}
 	if (!TEMPLATE_CATEGORIES.includes(product.category)) {
 		throw new Error(`Template product ${product.id} uses unsupported category "${product.category}".`);
@@ -186,10 +173,6 @@ function validateTemplateManifest(definition: ResolvedTemplateDefinition) {
 	validateTemplatePlaceholders(definition);
 }
 
-function isTextFile(filePath: string) {
-	return !/\.(png|jpe?g|gif|webp|ico|woff2?|ttf|eot|pdf|zip|gz)$/iu.test(filePath);
-}
-
 function validateTemplatePlaceholders(definition: ResolvedTemplateDefinition) {
 	const declaredTokens = new Set(definition.manifest.variables.map((variable) => variable.token));
 	const discoveredTokens = new Set<string>();
@@ -209,74 +192,69 @@ function validateTemplatePlaceholders(definition: ResolvedTemplateDefinition) {
 	}
 }
 
-function parseTemplateProduct(filePath: string): TemplateProductDefinition {
-	const frontmatter = readFrontmatter(filePath);
-	const slug = String(frontmatter.slug ?? '');
-	const fulfillment = (frontmatter.fulfillment ?? {}) as Record<string, unknown>;
-	const source = (fulfillment.source ?? {}) as Record<string, unknown>;
-	const artifactRoot = resolve(marketPackageRoot, String(source.directory ?? ''));
-	const product: TemplateProductDefinition = {
-		id: slug,
-		displayName: String(frontmatter.title ?? ''),
-		description: String(frontmatter.description ?? ''),
-		summary: String(frontmatter.summary ?? ''),
-		status: String(frontmatter.status ?? 'draft') as TemplateProductDefinition['status'],
-		featured: Boolean(frontmatter.featured),
-		category: String(frontmatter.category ?? '') as TemplateCategory,
-		audience: Array.isArray(frontmatter.audience) ? frontmatter.audience.map(String) : [],
-		tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.map(String) : [],
-		publisher: {
-			id: String((frontmatter.publisher as Record<string, unknown> | undefined)?.id ?? ''),
-			name: String((frontmatter.publisher as Record<string, unknown> | undefined)?.name ?? ''),
-			url: typeof (frontmatter.publisher as Record<string, unknown> | undefined)?.url === 'string'
-				? String((frontmatter.publisher as Record<string, unknown>).url)
-				: undefined,
-		},
-		publisherVerified: Boolean(frontmatter.publisherVerified),
-		templateVersion: String(frontmatter.templateVersion ?? ''),
-		templateApiVersion: Number(frontmatter.templateApiVersion ?? 0),
-		minCliVersion: String(frontmatter.minCliVersion ?? ''),
-		minCoreVersion: String(frontmatter.minCoreVersion ?? ''),
-		fulfillment: {
-			source: {
-				kind: 'git',
-				repoUrl: String(source.repoUrl ?? ''),
-				directory: String(source.directory ?? ''),
-				ref: String(source.ref ?? ''),
-				integrity: typeof source.integrity === 'string' ? source.integrity : undefined,
-			},
-			hooksPolicy: String(fulfillment.hooksPolicy ?? 'builtin_only') as TemplateProductDefinition['fulfillment']['hooksPolicy'],
-			supportsReconcile: Boolean(fulfillment.supportsReconcile ?? true),
-		},
-		offer: typeof frontmatter.offer === 'object' && frontmatter.offer !== null
-			? {
-				priceModel: typeof (frontmatter.offer as Record<string, unknown>).priceModel === 'string'
-					? (frontmatter.offer as Record<string, unknown>).priceModel as 'free' | 'paid' | 'contact'
-					: undefined,
-				license: typeof (frontmatter.offer as Record<string, unknown>).license === 'string'
-					? String((frontmatter.offer as Record<string, unknown>).license)
-					: undefined,
-				support: typeof (frontmatter.offer as Record<string, unknown>).support === 'string'
-					? String((frontmatter.offer as Record<string, unknown>).support)
-					: undefined,
-			}
-			: undefined,
-		relatedBooks: Array.isArray(frontmatter.relatedBooks) ? frontmatter.relatedBooks.map(String) : [],
-		relatedKnowledge: Array.isArray(frontmatter.relatedKnowledge) ? frontmatter.relatedKnowledge.map(String) : [],
-		relatedObjectives: Array.isArray(frontmatter.relatedObjectives) ? frontmatter.relatedObjectives.map(String) : [],
-		contentPath: filePath,
+function normalizeTemplateProduct(remoteProduct: SdkTemplateCatalogEntry): TemplateProductDefinition {
+	const artifactRoot = resolve(localTemplateArtifactsRoot, remoteProduct.id);
+	return {
+		...remoteProduct,
+		contentPath: `${remoteProduct.fulfillment.source.repoUrl}#${remoteProduct.id}`,
 		artifactRoot,
 		artifactManifestPath: resolve(artifactRoot, 'template.config.json'),
 		templateRoot: resolve(artifactRoot, 'template'),
 	};
-	validateTemplateProductShape(product);
-	return product;
+}
+
+function readTemplateCatalogCache(cachePath: string) {
+	if (!existsSync(cachePath)) {
+		return null;
+	}
+	return loadJsonFile<TemplateCatalogCache>(cachePath);
+}
+
+function writeTemplateCatalogCache(cachePath: string, endpoint: string, response: SdkTemplateCatalogResponse) {
+	ensureDir(cachePath);
+	const payload: TemplateCatalogCache = {
+		endpoint,
+		fetchedAt: new Date().toISOString(),
+		items: response.items,
+	};
+	writeFileSync(cachePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+async function loadRemoteTemplateCatalog(options: TemplateCatalogOptions = {}) {
+	const cwd = options.cwd ?? process.cwd();
+	const env = options.env ?? process.env;
+	const endpoint = resolveTreeseedTemplateCatalogEndpoint(cwd, env);
+	const cachePath = resolveTreeseedTemplateCatalogCachePath(cwd);
+
+	try {
+		const response = await new RemoteTemplateCatalogClient({ endpoint }).listTemplates();
+		writeTemplateCatalogCache(cachePath, endpoint, response);
+		return {
+			items: response.items,
+			endpoint,
+			usedCache: false,
+		};
+	} catch (error) {
+		const cached = readTemplateCatalogCache(cachePath);
+		if (!cached) {
+			throw error;
+		}
+
+		options.writeWarning?.(
+			`Using cached template catalog from ${cached.fetchedAt} because the remote endpoint could not be reached.`,
+		);
+		return {
+			items: cached.items,
+			endpoint: cached.endpoint,
+			usedCache: true,
+		};
+	}
 }
 
 function loadTemplateState(siteRoot: string): TemplateState {
 	const statePath = resolve(siteRoot, '.treeseed', 'template-state.json');
 	if (!existsSync(statePath)) {
-		throw new Error(`Template state is missing at ${statePath}. This site may not have been created from a market template.`);
+		throw new Error(`Template state is missing at ${statePath}. This site may not have been created from a Treeseed template.`);
 	}
 	return loadJsonFile<TemplateState>(statePath);
 }
@@ -382,9 +360,10 @@ function validateYamlFile(filePath: string) {
 	parseYaml(readFileSync(filePath, 'utf8'));
 }
 
-export function listTemplateProducts() {
-	return listMarkdownFiles(marketContentTemplatesRoot)
-		.map(parseTemplateProduct)
+export async function listTemplateProducts(options: TemplateCatalogOptions = {}) {
+	const remoteCatalog = await loadRemoteTemplateCatalog(options);
+	return remoteCatalog.items
+		.map((entry) => normalizeTemplateProduct(entry))
 		.sort((left, right) => {
 			const featuredDiff = Number(Boolean(right.featured)) - Number(Boolean(left.featured));
 			if (featuredDiff !== 0) {
@@ -394,19 +373,20 @@ export function listTemplateProducts() {
 		});
 }
 
-export function resolveTemplateProduct(id: string) {
-	const product = listTemplateProducts().find((entry) => entry.id === id);
+export async function resolveTemplateProduct(id: string, options: TemplateCatalogOptions = {}) {
+	const product = (await listTemplateProducts(options)).find((entry) => entry.id === id);
 	if (!product) {
-		throw new Error(`Unable to resolve market template product "${id}".`);
+		throw new Error(`Unable to resolve remote template product "${id}".`);
 	}
 	return product;
 }
 
-export function resolveTemplateDefinition(id: string, category?: TemplateCategory): ResolvedTemplateDefinition {
-	const product = resolveTemplateProduct(id);
+export async function resolveTemplateDefinition(id: string, options: TemplateCatalogOptions = {}, category?: TemplateCategory): Promise<ResolvedTemplateDefinition> {
+	const product = await resolveTemplateProduct(id, options);
 	if (category && product.category !== category) {
 		throw new Error(`Unable to resolve template "${id}" in category "${category}".`);
 	}
+	validateTemplateProductShape(product);
 	const manifest = loadJsonFile<TemplateManifest>(product.artifactManifestPath);
 	const definition = {
 		product,
@@ -418,26 +398,26 @@ export function resolveTemplateDefinition(id: string, category?: TemplateCategor
 	return definition;
 }
 
-export function validateTemplateProduct(product: TemplateProductDefinition) {
-	validateTemplateProductShape(product);
-	const definition = resolveTemplateDefinition(product.id);
-	if (definition.manifest.templateApiVersion !== product.templateApiVersion) {
-		throw new Error(`Template product ${product.id} and artifact templateApiVersion do not match.`);
+export async function validateTemplateProduct(product: Pick<TemplateProductDefinition, 'id'>, options: TemplateCatalogOptions = {}) {
+	const definition = await resolveTemplateDefinition(product.id, options);
+	if (definition.manifest.templateApiVersion !== definition.product.templateApiVersion) {
+		throw new Error(`Template product ${definition.product.id} and artifact templateApiVersion do not match.`);
 	}
-	if ((definition.manifest.templateVersion ?? '') && definition.manifest.templateVersion !== product.templateVersion) {
-		throw new Error(`Template product ${product.id} and artifact templateVersion do not match.`);
+	if ((definition.manifest.templateVersion ?? '') && definition.manifest.templateVersion !== definition.product.templateVersion) {
+		throw new Error(`Template product ${definition.product.id} and artifact templateVersion do not match.`);
 	}
-	if (definition.manifest.minCliVersion !== product.minCliVersion) {
-		throw new Error(`Template product ${product.id} and artifact minCliVersion do not match.`);
+	if (definition.manifest.minCliVersion !== definition.product.minCliVersion) {
+		throw new Error(`Template product ${definition.product.id} and artifact minCliVersion do not match.`);
 	}
-	if ((definition.manifest.minCoreVersion ?? '') && definition.manifest.minCoreVersion !== product.minCoreVersion) {
-		throw new Error(`Template product ${product.id} and artifact minCoreVersion do not match.`);
+	if ((definition.manifest.minCoreVersion ?? '') && definition.manifest.minCoreVersion !== definition.product.minCoreVersion) {
+		throw new Error(`Template product ${definition.product.id} and artifact minCoreVersion do not match.`);
 	}
 	return definition;
 }
 
-export function validateAllTemplateDefinitions() {
-	return listTemplateProducts().map(validateTemplateProduct);
+export async function validateAllTemplateDefinitions(options: TemplateCatalogOptions = {}) {
+	const ids = listTemplateArtifactIds();
+	return Promise.all(ids.map((id) => validateTemplateProduct({ id }, options)));
 }
 
 export function buildTemplateReplacements(manifest: TemplateManifest, input: StarterResolutionInput) {
@@ -452,8 +432,8 @@ export function buildTemplateReplacements(manifest: TemplateManifest, input: Sta
 	return replacements;
 }
 
-export function scaffoldTemplateProject(templateId: string, targetRoot: string, input: StarterResolutionInput) {
-	const definition = resolveTemplateDefinition(templateId);
+export async function scaffoldTemplateProject(templateId: string, targetRoot: string, input: StarterResolutionInput, options: TemplateCatalogOptions = {}) {
+	const definition = await resolveTemplateDefinition(templateId, options);
 	const replacements = buildTemplateReplacements(definition.manifest, {
 		...input,
 		target: basename(targetRoot),
@@ -470,10 +450,10 @@ export function scaffoldTemplateProject(templateId: string, targetRoot: string, 
 	return definition.product;
 }
 
-export function syncTemplateProject(siteRoot: string, options: { check?: boolean } = {}) {
+export async function syncTemplateProject(siteRoot: string, options: TemplateCatalogOptions & { check?: boolean } = {}) {
 	const check = options.check === true;
 	const state = loadTemplateState(siteRoot);
-	const definition = resolveTemplateDefinition(state.templateId);
+	const definition = await resolveTemplateDefinition(state.templateId, options);
 	const managedSurface = definition.manifest.managedSurface ?? {};
 	const changes: string[] = [];
 
@@ -523,7 +503,7 @@ export function syncTemplateProject(siteRoot: string, options: { check?: boolean
 	return changes;
 }
 
-export function serializeTemplateRegistryEntry(product: TemplateProductDefinition) {
+export function serializeTemplateRegistryEntry(product: Pick<TemplateProductDefinition, 'id' | 'displayName' | 'description' | 'summary' | 'status' | 'featured' | 'category' | 'tags' | 'publisher' | 'templateVersion' | 'templateApiVersion' | 'minCliVersion' | 'minCoreVersion' | 'fulfillment'>) {
 	return {
 		id: product.id,
 		displayName: product.displayName,
@@ -542,6 +522,6 @@ export function serializeTemplateRegistryEntry(product: TemplateProductDefinitio
 	};
 }
 
-export function exportTemplateCatalogYaml() {
-	return stringifyYaml(listTemplateProducts().map(serializeTemplateRegistryEntry));
+export async function exportTemplateCatalogYaml(options: TemplateCatalogOptions = {}) {
+	return stringifyYaml((await listTemplateProducts(options)).map(serializeTemplateRegistryEntry));
 }

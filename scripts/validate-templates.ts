@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 
-import { listTemplateProducts, validateTemplateProduct } from './template-registry-lib.ts';
+import { validateAllTemplateDefinitions } from './template-registry-lib.ts';
 
-const definitions = listTemplateProducts();
-for (const definition of definitions) {
-	validateTemplateProduct(definition);
-}
+const definitions = await validateAllTemplateDefinitions({
+	writeWarning: (message) => console.warn(message),
+});
 
 console.log(`Validated ${definitions.length} template definition${definitions.length === 1 ? '' : 's'}.`);

@@ -1,0 +1,32 @@
+{
+  "name": "__SITE_SLUG__",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.7.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "npm install",
+    "setup:ci": "npm ci",
+    "config": "treeseed config",
+    "dev": "treeseed dev",
+    "dev:watch": "treeseed dev --watch",
+    "check": "treeseed check",
+    "build": "treeseed build",
+    "deploy": "treeseed deploy",
+    "preview": "treeseed preview",
+    "sync": "treeseed sync",
+    "verify": "npm run check && npm run build"
+  },
+  "dependencies": {
+    "@treeseed/cli": "__CLI_VERSION__",
+    "@treeseed/core": "__CORE_VERSION__",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "typescript": "^5.9.3"
+  }
+}

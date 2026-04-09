@@ -7,6 +7,7 @@ import { packageRoot } from './package-tools.ts';
 const srcRoot = resolve(packageRoot, 'src');
 const scriptsRoot = resolve(packageRoot, 'scripts');
 const distRoot = resolve(packageRoot, 'dist');
+const templateCatalogSourceRoot = resolve(srcRoot, 'template-catalog');
 
 const COPY_EXTENSIONS = new Set(['.d.ts', '.json', '.md']);
 
@@ -70,6 +71,12 @@ function copyAsset(filePath, sourceRoot, outputRoot) {
 	}
 }
 
+function copyAssetTree(sourceRoot, outputRoot) {
+	for (const filePath of walkFiles(sourceRoot)) {
+		copyAsset(filePath, sourceRoot, outputRoot);
+	}
+}
+
 function transpileScript(filePath) {
 	const source = readFileSync(filePath, 'utf8');
 	const relativePath = relative(scriptsRoot, filePath);
@@ -102,9 +109,16 @@ function emitDeclarations() {
 rmSync(distRoot, { recursive: true, force: true });
 
 for (const filePath of walkFiles(srcRoot)) {
+	if (filePath.startsWith(`${templateCatalogSourceRoot}/`)) {
+		continue;
+	}
 	const extension = extname(filePath);
 	if (extension === '.ts') await compileModule(filePath, srcRoot, distRoot);
 	else if (COPY_EXTENSIONS.has(extension)) copyAsset(filePath, srcRoot, distRoot);
+}
+
+if (existsSync(templateCatalogSourceRoot)) {
+	copyAssetTree(templateCatalogSourceRoot, resolve(distRoot, 'template-catalog'));
 }
 
 for (const filePath of walkFiles(scriptsRoot)) {

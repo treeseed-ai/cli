@@ -1,0 +1,55 @@
+{
+  "items": [
+    {
+      "id": "starter-basic",
+      "displayName": "TreeSeed Basic",
+      "description": "Opinionated first-party TreeSeed starter for documentation-first teams.",
+      "summary": "A general-purpose starter for Astro, Cloudflare, docs, and the standard Treeseed workflow.",
+      "status": "live",
+      "featured": true,
+      "category": "starter",
+      "audience": [
+        "maintainers",
+        "teams"
+      ],
+      "tags": [
+        "starter",
+        "astro",
+        "cloudflare",
+        "docs"
+      ],
+      "publisher": {
+        "id": "treeseed",
+        "name": "TreeSeed",
+        "url": "https://treeseed.ai"
+      },
+      "publisherVerified": true,
+      "templateVersion": "1.0.0",
+      "templateApiVersion": 1,
+      "minCliVersion": "0.1.1",
+      "minCoreVersion": "0.1.2",
+      "fulfillment": {
+        "source": {
+          "kind": "git",
+          "repoUrl": "https://github.com/treeseed-ai/market.git",
+          "directory": "templates/starter-basic",
+          "ref": "main",
+          "integrity": "catalog-fixture"
+        },
+        "hooksPolicy": "builtin_only",
+        "supportsReconcile": true
+      },
+      "offer": {
+        "priceModel": "free",
+        "license": "AGPL-3.0-only",
+        "support": "community"
+      },
+      "relatedBooks": [],
+      "relatedKnowledge": [],
+      "relatedObjectives": []
+    }
+  ],
+  "meta": {
+    "source": "fixture"
+  }
+}

@@ -38,14 +38,16 @@ function parseArgs(argv) {
 const options = parseArgs(process.argv.slice(2));
 const targetRoot = resolve(process.cwd(), options.target);
 
-const definition = scaffoldTemplateProject(options.template, targetRoot, {
+const definition = await scaffoldTemplateProject(options.template, targetRoot, {
 	target: options.target,
-  name: options.name,
-  slug: options.slug,
-  siteUrl: options.siteUrl,
-  contactEmail: options.contactEmail,
-  repositoryUrl: options.repositoryUrl,
-  discordUrl: options.discordUrl,
+	name: options.name,
+	slug: options.slug,
+	siteUrl: options.siteUrl,
+	contactEmail: options.contactEmail,
+	repositoryUrl: options.repositoryUrl,
+	discordUrl: options.discordUrl,
+}, {
+	writeWarning: (message) => console.warn(message),
 });
 console.log(`Created Treeseed tenant from ${definition.id} at ${targetRoot}`);
 console.log('Next steps:');

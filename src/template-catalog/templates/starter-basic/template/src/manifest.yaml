@@ -1,0 +1,19 @@
+id: __SITE_SLUG__
+siteConfigPath: ./src/config.yaml
+content:
+  docs: ./src/content/knowledge
+  pages: ./src/content/pages
+  notes: ./src/content/empty
+  questions: ./src/content/empty
+  objectives: ./src/content/empty
+  people: ./src/content/empty
+  agents: ./src/content/empty
+  books: ./src/content/empty
+features:
+  docs: true
+  books: false
+  notes: false
+  questions: false
+  objectives: false
+  agents: false
+  forms: false

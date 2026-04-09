@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "id": "starter-basic",
+  "displayName": "TreeSeed Basic",
+  "description": "Opinionated first-party TreeSeed starter for documentation-first teams.",
+  "category": "starter",
+  "tags": [
+    "starter",
+    "astro",
+    "cloudflare",
+    "docs"
+  ],
+  "templateVersion": "1.0.0",
+  "templateApiVersion": 1,
+  "minCliVersion": "0.1.1",
+  "minCoreVersion": "0.1.2",
+  "variables": [
+    {
+      "name": "Site name",
+      "token": "__SITE_NAME__",
+      "deriveFrom": "name",
+      "required": true
+    },
+    {
+      "name": "Site slug",
+      "token": "__SITE_SLUG__",
+      "deriveFrom": "slug",
+      "required": true
+    },
+    {
+      "name": "Site URL",
+      "token": "__SITE_URL__",
+      "deriveFrom": "siteUrl",
+      "default": "https://example.com",
+      "required": true
+    },
+    {
+      "name": "Contact email",
+      "token": "__CONTACT_EMAIL__",
+      "deriveFrom": "contactEmail",
+      "default": "hello@example.com",
+      "required": true
+    },
+    {
+      "name": "Repository URL",
+      "token": "__REPOSITORY_URL__",
+      "deriveFrom": "repositoryUrl",
+      "default": "https://github.com/example/site"
+    },
+    {
+      "name": "Discord URL",
+      "token": "__DISCORD_URL__",
+      "deriveFrom": "discordUrl",
+      "default": "https://discord.gg/example"
+    },
+    {
+      "name": "CLI version",
+      "token": "__CLI_VERSION__",
+      "deriveFrom": "cliVersion",
+      "required": true
+    },
+    {
+      "name": "Core version",
+      "token": "__CORE_VERSION__",
+      "deriveFrom": "coreVersion",
+      "required": true
+    }
+  ],
+  "managedSurface": {
+    "coreManaged": [
+      "package.json",
+      "astro.config.ts",
+      "tsconfig.json",
+      "treeseed.site.yaml",
+      "src/content.config.ts",
+      "src/config.yaml",
+      "src/manifest.yaml",
+      "src/env.yaml"
+    ],
+    "validatedOnly": [
+      "treeseed.site.yaml",
+      "src/config.yaml",
+      "src/manifest.yaml",
+      "src/env.yaml"
+    ]
+  },
+  "testing": {
+    "buildCommand": "npm run build"
+  }
+}

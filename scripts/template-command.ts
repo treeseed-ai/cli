@@ -3,10 +3,11 @@
 import { listTemplateProducts, resolveTemplateProduct, serializeTemplateRegistryEntry, validateTemplateProduct } from './template-registry-lib.ts';
 
 const [action = 'list', target] = process.argv.slice(2);
+const writeWarning = (message: string) => console.warn(message);
 
 switch (action) {
 	case 'list': {
-		for (const product of listTemplateProducts()) {
+		for (const product of await listTemplateProducts({ writeWarning })) {
 			console.log(`${product.id}\t${product.displayName}\t${product.description}`);
 		}
 		break;
@@ -15,13 +16,15 @@ switch (action) {
 		if (!target) {
 			throw new Error('Usage: treeseed template show <id>');
 		}
-		console.log(JSON.stringify(serializeTemplateRegistryEntry(resolveTemplateProduct(target)), null, 2));
+		console.log(JSON.stringify(serializeTemplateRegistryEntry(await resolveTemplateProduct(target, { writeWarning })), null, 2));
 		break;
 	}
 	case 'validate': {
-		const products = target ? [resolveTemplateProduct(target)] : listTemplateProducts();
+		const products = target
+			? [await resolveTemplateProduct(target, { writeWarning })]
+			: await listTemplateProducts({ writeWarning });
 		for (const product of products) {
-			validateTemplateProduct(product);
+			await validateTemplateProduct(product, { writeWarning });
 			console.log(`validated ${product.id}`);
 		}
 		break;
