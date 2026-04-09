@@ -5,8 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const scriptsRoot = dirname(fileURLToPath(import.meta.url));
-const cliRoot = resolve(scriptsRoot, '..');
-const sharedFixtureRoot = resolve(cliRoot, '.fixtures', 'treeseed-fixtures', 'sites', 'working-site');
+const sdkFixtureRoot = resolve(scriptsRoot, '..', '..', 'sdk', 'src', 'treeseed', 'template-catalog', 'templates', 'starter-basic', 'template');
 
 export function makeWorkspaceRoot() {
 	const root = mkdtempSync(join(tmpdir(), 'treeseed-help-workspace-'));
@@ -20,7 +19,7 @@ export function makeWorkspaceRoot() {
 
 export function makeTenantWorkspace(branch = 'staging') {
 	const root = makeWorkspaceRoot();
-	cpSync(sharedFixtureRoot, root, { recursive: true });
+	cpSync(sdkFixtureRoot, root, { recursive: true });
 	mkdirSync(resolve(root, 'packages', 'placeholder'), { recursive: true });
 	writeFileSync(resolve(root, 'packages', 'placeholder', 'package.json'), JSON.stringify({
 		name: '@test/placeholder',
@@ -31,11 +30,5 @@ export function makeTenantWorkspace(branch = 'staging') {
 	spawnSync('git', ['config', 'user.email', 'treeseed@example.com'], { cwd: root, stdio: 'ignore' });
 	spawnSync('git', ['add', '-A'], { cwd: root, stdio: 'ignore' });
 	spawnSync('git', ['commit', '-m', 'init'], { cwd: root, stdio: 'ignore' });
-	return root;
-}
-
-export function makeTenantRoot() {
-	const root = mkdtempSync(join(tmpdir(), 'treeseed-cli-test-'));
-	cpSync(sharedFixtureRoot, root, { recursive: true });
 	return root;
 }

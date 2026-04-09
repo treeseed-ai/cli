@@ -2,7 +2,7 @@
 
 Operator-facing Treeseed CLI package.
 
-This package publishes the `treeseed` binary. It provides the unified TypeScript command interface for Treeseed workspace setup, branch workflow, deployment, validation, and release automation.
+This package publishes the `treeseed` binary. The authoritative command contract, parser/help/runtime behavior, handlers, and command-support scripts live in `@treeseed/sdk`. `@treeseed/cli` is the thin distribution wrapper that exposes that SDK-owned surface as an installable binary package.
 
 ## Requirements
 
@@ -58,7 +58,7 @@ treeseed status --json
 
 ## Maintainer Workflow
 
-All package maintenance commands are npm-based and run from the `cli/` package root.
+All package maintenance commands are npm-based and run from the `cli/` package root. This package only verifies the binary wrapper and packaged artifact shape; the underlying command/runtime behavior is validated in `@treeseed/sdk`.
 
 Install dependencies:
 
@@ -88,8 +88,8 @@ The release verification flow is intentionally stricter than a normal test run:
 
 1. Build `dist`
 2. Validate publishable output for forbidden workspace references
-3. Run the CLI test suite
-4. Run scaffold verification
+3. Assert the published artifact only contains the thin wrapper entrypoints
+4. Run the CLI wrapper test suite
 5. Pack the CLI tarball
 6. Smoke-test the packed install by running `treeseed --help` from the packed artifact
 
@@ -112,4 +112,4 @@ For example, package version `0.1.0` publishes from tag `0.1.0`.
 ## Notes
 
 - `package-lock.json` should be committed and kept current so `npm ci` remains reproducible in CI and release jobs.
-- The README intentionally documents the command surface at a high level. The canonical source of command usage and options is the CLI help output generated from `src/cli/registry.ts`.
+- The README intentionally documents the command surface at a high level. The canonical source of command usage and options is the SDK-owned CLI help/runtime exported by `@treeseed/sdk`.

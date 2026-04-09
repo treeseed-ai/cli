@@ -1,54 +1,31 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { build } from 'esbuild';
 import ts from 'typescript';
 import { packageRoot } from './package-tools.ts';
 
 const srcRoot = resolve(packageRoot, 'src');
-const scriptsRoot = resolve(packageRoot, 'scripts');
 const distRoot = resolve(packageRoot, 'dist');
-const templateCatalogSourceRoot = resolve(srcRoot, 'template-catalog');
-
-const COPY_EXTENSIONS = new Set(['.d.ts', '.json', '.md']);
-
-function walkFiles(root) {
-	const files = [];
-	for (const entry of readdirSync(root, { withFileTypes: true })) {
-		const fullPath = join(root, entry.name);
-		if (entry.isDirectory()) files.push(...walkFiles(fullPath));
-		else files.push(fullPath);
-	}
-	return files;
-}
+const publishableSourceFiles = [
+	resolve(srcRoot, 'index.ts'),
+	resolve(srcRoot, 'cli', 'main.ts'),
+	resolve(srcRoot, 'cli', 'runtime.ts'),
+	resolve(srcRoot, 'cli', 'help.ts'),
+	resolve(srcRoot, 'cli', 'parser.ts'),
+	resolve(srcRoot, 'cli', 'registry.ts'),
+	resolve(srcRoot, 'cli', 'types.ts'),
+];
 
 function ensureDir(filePath) {
 	mkdirSync(dirname(filePath), { recursive: true });
 }
 
-function rewriteRuntimeSpecifiers(contents, outputFile = null) {
-	let rewritten = contents
-		.replace(/(['"`])(\.[^'"`\n]+)\.(mjs|ts)\1/g, '$1$2.js$1')
-		.replace(/(['"`])\.\.\/src\//g, '$1../');
-
-	if (!outputFile || outputFile.includes(`${resolve(distRoot, 'scripts')}`)) {
-		return rewritten;
-	}
-
-	rewritten = rewritten.replace(/(['"`])((?:\.\.\/)+scripts\/([^'"`\n]+))\1/g, (_match, quote, _specifier, scriptPath) => {
-		const targetPath = resolve(distRoot, 'scripts', scriptPath);
-		let relativeSpecifier = relative(dirname(outputFile), targetPath).replaceAll('\\', '/');
-		if (!relativeSpecifier.startsWith('.')) {
-			relativeSpecifier = `./${relativeSpecifier}`;
-		}
-		return `${quote}${relativeSpecifier}${quote}`;
-	});
-
-	return rewritten;
+function rewriteRuntimeSpecifiers(contents) {
+	return contents.replace(/(['"`])(\.[^'"`\n]+)\.(mjs|ts)\1/g, '$1$2.js$1');
 }
 
-async function compileModule(filePath, sourceRoot, outputRoot) {
-	const relativePath = relative(sourceRoot, filePath);
-	const outputFile = resolve(outputRoot, relativePath.replace(/\.(mjs|ts)$/u, '.js'));
+async function compileModule(filePath) {
+	const outputFile = resolve(distRoot, relative(srcRoot, filePath).replace(/\.ts$/u, '.js'));
 	ensureDir(outputFile);
 	await build({
 		entryPoints: [filePath],
@@ -58,72 +35,40 @@ async function compileModule(filePath, sourceRoot, outputRoot) {
 		bundle: false,
 		logLevel: 'silent',
 	});
-	const builtSource = readFileSync(outputFile, 'utf8');
-	writeFileSync(outputFile, rewriteRuntimeSpecifiers(builtSource, outputFile), 'utf8');
-}
-
-function copyAsset(filePath, sourceRoot, outputRoot) {
-	const outputFile = resolve(outputRoot, relative(sourceRoot, filePath));
-	ensureDir(outputFile);
-	copyFileSync(filePath, outputFile);
-	if (outputFile.endsWith('.d.ts')) {
-		writeFileSync(outputFile, rewriteRuntimeSpecifiers(readFileSync(outputFile, 'utf8')), 'utf8');
-	}
-}
-
-function copyAssetTree(sourceRoot, outputRoot) {
-	for (const filePath of walkFiles(sourceRoot)) {
-		copyAsset(filePath, sourceRoot, outputRoot);
-	}
-}
-
-function transpileScript(filePath) {
-	const source = readFileSync(filePath, 'utf8');
-	const relativePath = relative(scriptsRoot, filePath);
-	const outputFile = resolve(distRoot, 'scripts', relativePath.replace(/\.(mjs|ts)$/u, '.js'));
-	const transformed = extname(filePath) === '.ts'
-		? ts.transpileModule(source, {
-				compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-			}).outputText
-		: source;
-	ensureDir(outputFile);
-	writeFileSync(outputFile, rewriteRuntimeSpecifiers(transformed, outputFile), 'utf8');
-	chmodSync(outputFile, 0o755);
+	writeFileSync(outputFile, rewriteRuntimeSpecifiers(readFileSync(outputFile, 'utf8')), 'utf8');
 }
 
 function emitDeclarations() {
-	const configPath = ts.findConfigFile(packageRoot, ts.sys.fileExists, 'tsconfig.json');
-	if (!configPath) throw new Error('Unable to locate tsconfig.json for declaration build.');
-	const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-	const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, packageRoot);
 	const program = ts.createProgram({
-		rootNames: parsed.fileNames,
-		options: { ...parsed.options, declaration: true, emitDeclarationOnly: true, declarationDir: distRoot, noEmit: false },
+		rootNames: publishableSourceFiles,
+		options: {
+			allowImportingTsExtensions: true,
+			target: ts.ScriptTarget.ES2022,
+			module: ts.ModuleKind.ESNext,
+			moduleResolution: ts.ModuleResolutionKind.Bundler,
+			strict: true,
+			noEmit: false,
+			declaration: true,
+			emitDeclarationOnly: true,
+			declarationDir: distRoot,
+			types: ['node'],
+		},
 	});
 	const result = program.emit();
 	if (result.emitSkipped) {
-		throw new Error('Declaration build failed.');
+		const diagnostics = ts.formatDiagnosticsWithColorAndContext(result.diagnostics, {
+			getCanonicalFileName: (fileName) => fileName,
+			getCurrentDirectory: () => process.cwd(),
+			getNewLine: () => '\n',
+		});
+		throw new Error(`Declaration build failed.\n${diagnostics}`);
 	}
 }
 
 rmSync(distRoot, { recursive: true, force: true });
 
-for (const filePath of walkFiles(srcRoot)) {
-	if (filePath.startsWith(`${templateCatalogSourceRoot}/`)) {
-		continue;
-	}
-	const extension = extname(filePath);
-	if (extension === '.ts') await compileModule(filePath, srcRoot, distRoot);
-	else if (COPY_EXTENSIONS.has(extension)) copyAsset(filePath, srcRoot, distRoot);
-}
-
-if (existsSync(templateCatalogSourceRoot)) {
-	copyAssetTree(templateCatalogSourceRoot, resolve(distRoot, 'template-catalog'));
-}
-
-for (const filePath of walkFiles(scriptsRoot)) {
-	const extension = extname(filePath);
-	if (extension === '.ts' || extension === '.ts') transpileScript(filePath);
+for (const filePath of publishableSourceFiles) {
+	await compileModule(filePath);
 }
 
 emitDeclarations();

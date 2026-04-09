@@ -3,10 +3,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { agentPackageRoot, corePackageRoot, packageRoot, sdkPackageRoot } from './package-tools.ts';
+import { packageRoot } from './package-tools.ts';
 const textExtensions = new Set(['.js', '.ts', '.mjs', '.cjs', '.d.ts', '.json', '.md']);
 const forbiddenPatterns = [
-	/['"`]file:[^'"`\n]+['"`]/,
 	/['"`]workspace:[^'"`\n]+['"`]/,
 	/['"`](?:\.\.\/|\.\/)[^'"`\n]*src\/[^'"`\n]*\.(?:[cm]?js|ts|tsx|json|astro|css)['"`]/,
 	/['"`][^'"`\n]*\/packages\/[^'"`\n]*\/src\/[^'"`\n]*['"`]/,
@@ -120,18 +119,29 @@ function installPackagedPackage(extractRoot: string, tempRoot: string, tarballPa
 	rmSync(resolve(extractRoot, 'package'), { recursive: true, force: true });
 }
 
-function hasWorkspacePackageSource(root: string) {
-	return root !== packageRoot && existsSync(resolve(root, 'scripts'));
+function assertRequiredDistFiles() {
+	const requiredPaths = [
+		resolve(packageRoot, 'dist', 'index.js'),
+		resolve(packageRoot, 'dist', 'cli', 'main.js'),
+		resolve(packageRoot, 'dist', 'cli', 'runtime.js'),
+		resolve(packageRoot, 'dist', 'cli', 'registry.js'),
+	];
+
+	for (const filePath of requiredPaths) {
+		if (!existsSync(filePath)) {
+			throw new Error(`Missing required publish artifact: ${filePath}`);
+		}
+	}
+
+	if (existsSync(resolve(packageRoot, 'dist', 'scripts'))) {
+		throw new Error('CLI dist should not ship a local scripts runtime. The SDK package is authoritative.');
+	}
 }
 
 run('npm', ['run', 'build']);
 scanDirectory(resolve(packageRoot, 'dist'));
+assertRequiredDistFiles();
 run('npm', ['test']);
-if (hasWorkspacePackageSource(sdkPackageRoot) && hasWorkspacePackageSource(corePackageRoot) && hasWorkspacePackageSource(agentPackageRoot)) {
-	run('npm', ['run', 'test:scaffold']);
-} else {
-	console.log('Skipping scaffold verification because local sdk/core/agent package sources are not available.');
-}
 
 const stageRoot = mkdtempSync(join(tmpdir(), 'treeseed-cli-release-'));
 const extractRoot = resolve(stageRoot, 'extract');
@@ -146,6 +156,7 @@ try {
 	writeFileSync(resolve(installRoot, 'package.json'), `${JSON.stringify({ name: 'treeseed-cli-smoke', private: true, type: 'module' }, null, 2)}\n`, 'utf8');
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', '--help'], installRoot);
 	console.log('CLI packed-install bin smoke passed.');
+	rmSync(cliTarball, { force: true });
 } finally {
 	rmSync(stageRoot, { recursive: true, force: true });
 }

@@ -1,9 +1,0 @@
-{
-  "extends": "@treeseed/core/tsconfigs/strict",
-  "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "types": ["node"]
-  },
-  "include": ["src/**/*", "astro.config.ts"]
-}

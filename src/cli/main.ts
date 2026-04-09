@@ -2,18 +2,9 @@
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { runTreeseedCli } from './runtime.js';
+import { runTreeseedCli } from '@treeseed/sdk/treeseed-cli';
 
-export { runTreeseedCli, executeTreeseedCommand, createTreeseedCommandContext } from './runtime.js';
-export { renderTreeseedHelp, renderUsage, suggestTreeseedCommands } from './help.js';
-export { findCommandSpec, listCommandNames, TRESEED_COMMAND_SPECS } from './registry.js';
-export { parseTreeseedInvocation, validateTreeseedInvocation } from './parser.js';
-export type {
-	TreeseedCommandContext,
-	TreeseedCommandResult,
-	TreeseedCommandSpec,
-	TreeseedParsedInvocation,
-} from './types.js';
+export * from '@treeseed/sdk/treeseed-cli';
 
 const currentFile = fileURLToPath(import.meta.url);
 const entryFile = resolve(process.argv[1] ?? '');
