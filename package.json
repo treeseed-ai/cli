@@ -43,6 +43,7 @@
   "dependencies": {
     "@treeseed/agent": "^0.1.2",
     "@treeseed/core": "^0.1.2",
+    "@treeseed/market": "^0.1.0",
     "@treeseed/sdk": "^0.1.2",
     "esbuild": "^0.25.10",
     "typescript": "^5.9.3",

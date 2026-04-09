@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
-import { resolveTemplateDefinition, buildTemplateReplacements, validateAllTemplateDefinitions } from './template-registry-lib.ts';
+import { resolve } from 'node:path';
+import { scaffoldTemplateProject } from './template-registry-lib.ts';
 
 function parseArgs(argv) {
   const args = {
@@ -36,35 +35,11 @@ function parseArgs(argv) {
   return args;
 }
 
-function replaceTokens(contents, replacements) {
-  return Object.entries(replacements).reduce(
-    (acc, [token, value]) => acc.replaceAll(token, value),
-    contents,
-  );
-}
-
-function writeTemplateTree(sourceRoot, targetRoot, replacements) {
-  for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
-    const sourcePath = join(sourceRoot, entry.name);
-    const targetPath = join(targetRoot, entry.name);
-
-    if (entry.isDirectory()) {
-      mkdirSync(targetPath, { recursive: true });
-      writeTemplateTree(sourcePath, targetPath, replacements);
-      continue;
-    }
-
-    const raw = readFileSync(sourcePath, 'utf8');
-    writeFileSync(targetPath, replaceTokens(raw, replacements), 'utf8');
-  }
-}
-
-validateAllTemplateDefinitions();
 const options = parseArgs(process.argv.slice(2));
 const targetRoot = resolve(process.cwd(), options.target);
-const definition = resolveTemplateDefinition(options.template, 'starter');
-const replacements = buildTemplateReplacements(definition.manifest, {
-  target: basename(targetRoot),
+
+const definition = scaffoldTemplateProject(options.template, targetRoot, {
+	target: options.target,
   name: options.name,
   slug: options.slug,
   siteUrl: options.siteUrl,
@@ -72,23 +47,11 @@ const replacements = buildTemplateReplacements(definition.manifest, {
   repositoryUrl: options.repositoryUrl,
   discordUrl: options.discordUrl,
 });
-
-if (existsSync(targetRoot) && readdirSync(targetRoot).length > 0) {
-  throw new Error(`Target directory is not empty: ${targetRoot}`);
-}
-
-mkdirSync(targetRoot, { recursive: true });
-writeTemplateTree(definition.templateRoot, targetRoot, replacements);
-console.log(`Created Treeseed tenant from ${definition.manifest.id} at ${targetRoot}`);
+console.log(`Created Treeseed tenant from ${definition.id} at ${targetRoot}`);
 console.log('Next steps:');
 console.log(`  cd ${options.target}`);
 console.log('  npm install');
-console.log('  # set cloudflare.accountId in treeseed.site.yaml (or export CLOUDFLARE_ACCOUNT_ID)');
-console.log('  wrangler login');
+console.log('  treeseed template show starter-basic');
+console.log('  treeseed sync --check');
 console.log('  treeseed config --environment local');
-console.log('  treeseed config --environment staging --environment prod');
-console.log('  treeseed start feature/my-change');
-console.log('  treeseed deploy --environment staging --dry-run');
-console.log('  treeseed save "describe your change"');
-console.log('  treeseed release --patch');
-console.log('  treeseed destroy --environment staging --dry-run');
+console.log('  treeseed dev');

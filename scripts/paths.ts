@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { corePackageRoot, packageRoot } from './package-tools.ts';
+import { corePackageRoot, marketPackageRoot, packageRoot } from './package-tools.ts';
 
 const pathsPackageRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 export const cliPackageRoot = pathsPackageRoot.endsWith('/dist')
 	? resolve(pathsPackageRoot, '..')
 	: pathsPackageRoot;
-export { corePackageRoot, packageRoot };
+export { corePackageRoot, marketPackageRoot, packageRoot };
 export const workspaceRoot = resolve(cliPackageRoot, '..');
 function resolveProjectRoot(localPath: string, workspacePath: string) {
 	return existsSync(localPath) ? localPath : workspacePath;
@@ -26,3 +26,4 @@ export const fixtureMigrationsRoot = resolve(fixtureRoot, 'migrations');
 export const fixtureSrcRoot = resolve(fixtureRoot, 'src');
 export const cliPackageVersion = JSON.parse(readFileSync(resolve(cliPackageRoot, 'package.json'), 'utf8')).version;
 export const corePackageVersion = JSON.parse(readFileSync(resolve(corePackageRoot, 'package.json'), 'utf8')).version;
+export const marketPackageVersion = JSON.parse(readFileSync(resolve(marketPackageRoot, 'package.json'), 'utf8')).version;

@@ -19,6 +19,8 @@ import { handlePromote } from './handlers/promote.js';
 import { handleTeardown } from './handlers/teardown.js';
 import { handleContinue } from './handlers/continue.js';
 import { handleRollback } from './handlers/rollback.js';
+import { handleTemplate } from './handlers/template.js';
+import { handleSync } from './handlers/sync.js';
 
 export const COMMAND_HANDLERS = {
 	init: handleInit,
@@ -41,6 +43,8 @@ export const COMMAND_HANDLERS = {
 	teardown: handleTeardown,
 	continue: handleContinue,
 	rollback: handleRollback,
+	template: handleTemplate,
+	sync: handleSync,
 } as const;
 
 function command(spec: TreeseedCommandSpec): TreeseedCommandSpec {
@@ -248,11 +252,40 @@ export const TRESEED_COMMAND_SPECS: TreeseedCommandSpec[] = [
 		handlerName: 'doctor',
 	}),
 	command({
+		name: 'template',
+		aliases: [],
+		group: 'Utilities',
+		summary: 'List, inspect, and validate market-backed template products.',
+		description: 'Use the canonical market site catalog to list templates, show details for one template, or validate template products.',
+		usage: 'treeseed template [list|show|validate] [id]',
+		arguments: [
+			{ name: 'action', description: 'Template action: list, show, or validate.', required: false },
+			{ name: 'id', description: 'Template id for show or validate.', required: false },
+		],
+		examples: ['treeseed template', 'treeseed template list', 'treeseed template show starter-basic', 'treeseed template validate'],
+		related: ['init', 'sync'],
+		executionMode: 'handler',
+		handlerName: 'template',
+	}),
+	command({
+		name: 'sync',
+		aliases: [],
+		group: 'Validation',
+		summary: 'Validate or reconcile the managed template surface for the current site.',
+		description: 'Use market-site-owned template metadata to check or apply updates to the narrow core-managed scaffold surface.',
+		usage: 'treeseed sync [--check]',
+		options: [{ name: 'check', flags: '--check', description: 'Report managed-surface drift without changing files.', kind: 'boolean' }],
+		examples: ['treeseed sync --check', 'treeseed sync'],
+		related: ['template', 'init', 'doctor'],
+		executionMode: 'handler',
+		handlerName: 'sync',
+	}),
+	command({
 		name: 'init',
 		aliases: [],
 		group: 'Workflow',
 		summary: 'Scaffold a new Treeseed tenant project.',
-		description: 'Create a new Treeseed tenant directory with starter files and recommended next steps.',
+		description: 'Create a new Treeseed tenant directory from a market-site template artifact and print recommended next steps.',
 		usage: 'treeseed init <directory> [--template <starter-id>] [--name <site-name>] [--slug <slug>] [--site-url <url>] [--contact-email <email>] [--repo <url>] [--discord <url>]',
 		arguments: [{ name: 'directory', description: 'Target directory for the new tenant.', required: true }],
 		options: [

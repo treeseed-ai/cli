@@ -4,8 +4,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { agentPackageRoot, corePackageRoot, packageRoot, packageScriptPath, sdkPackageRoot } from './package-tools.ts';
-import { validateAllTemplateDefinitions } from './template-registry-lib.ts';
+import { agentPackageRoot, corePackageRoot, marketPackageRoot, packageRoot, packageScriptPath, sdkPackageRoot } from './package-tools.ts';
+import { listTemplateProducts, validateTemplateProduct } from './template-registry-lib.ts';
 
 const npmCacheDir = process.env.TREESEED_SCAFFOLD_NPM_CACHE_DIR
 	? resolve(process.env.TREESEED_SCAFFOLD_NPM_CACHE_DIR)
@@ -14,6 +14,7 @@ const packageJson = JSON.parse(readFileSync(resolve(corePackageRoot, 'package.js
 const sdkPackageJson = JSON.parse(readFileSync(resolve(sdkPackageRoot, 'package.json'), 'utf8'));
 const cliPackageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
 const agentPackageJson = JSON.parse(readFileSync(resolve(agentPackageRoot, 'package.json'), 'utf8'));
+const marketPackageJson = JSON.parse(readFileSync(resolve(marketPackageRoot, 'package.json'), 'utf8'));
 const workspaceTarballs = (() => {
 	try {
 		return JSON.parse(process.env.TREESEED_WORKSPACE_TARBALLS ?? '{}');
@@ -41,7 +42,12 @@ const externalAgentTarball = process.env.TREESEED_SCAFFOLD_AGENT_TARBALL
 	: typeof workspaceTarballs['@treeseed/agent'] === 'string'
 		? resolve(workspaceTarballs['@treeseed/agent'])
 	: null;
-const reusesExternalTarballs = Boolean(externalCoreTarball || externalSdkTarball || externalCliTarball || externalAgentTarball);
+const externalMarketTarball = process.env.TREESEED_SCAFFOLD_MARKET_TARBALL
+	? resolve(process.env.TREESEED_SCAFFOLD_MARKET_TARBALL)
+	: typeof workspaceTarballs['@treeseed/market'] === 'string'
+		? resolve(workspaceTarballs['@treeseed/market'])
+	: null;
+const reusesExternalTarballs = Boolean(externalCoreTarball || externalSdkTarball || externalCliTarball || externalAgentTarball || externalMarketTarball);
 const scaffoldChecks = new Set(
 	(process.env.TREESEED_SCAFFOLD_CHECKS ?? 'build,deploy')
 		.split(',')
@@ -111,12 +117,13 @@ function createTempSiteRoot() {
 	return mkdtempSync(join(scaffoldTempRoot, 'treeseed-scaffold-'));
 }
 
-function rewriteScaffoldDependency(siteRoot, tarballPath, cliTarballPath) {
+function rewriteScaffoldDependency(siteRoot, tarballPath, cliTarballPath, marketTarballPath) {
 	const packageJsonPath = resolve(siteRoot, 'package.json');
 	const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 	packageJson.dependencies = packageJson.dependencies ?? {};
 	packageJson.dependencies['@treeseed/core'] = tarballPath;
 	packageJson.dependencies['@treeseed/cli'] = cliTarballPath;
+	packageJson.dependencies['@treeseed/market'] = marketTarballPath;
 	writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
 }
 
@@ -193,7 +200,9 @@ function linkTreeseedBins(siteRoot) {
 
 function createTarball(root, pkg) {
 	return withTiming(`${pkg.name} build+pack`, () => {
-		runStep('npm', ['run', 'build:dist'], { cwd: root });
+		if (typeof pkg.scripts?.['build:dist'] === 'string') {
+			runStep('npm', ['run', 'build:dist'], { cwd: root });
+		}
 		const output = runStep('npm', ['pack', '--silent', '--ignore-scripts', '--cache', npmCacheDir], {
 			cwd: root,
 			capture: true,
@@ -213,16 +222,19 @@ function createTarball(root, pkg) {
 }
 
 function scaffoldSite(siteRoot) {
-	validateAllTemplateDefinitions();
+	for (const definition of listTemplateProducts()) {
+		validateTemplateProduct(definition);
+	}
 	runStep(process.execPath, [packageScriptPath('scaffold-site'), siteRoot, '--template', 'starter-basic', '--name', 'Smoke Site', '--site-url', 'https://smoke.example.com', '--contact-email', 'hello@example.com']);
 }
 
-function installScaffold(siteRoot, { coreTarballPath, sdkTarballPath, cliTarballPath, agentTarballPath }) {
-	if (coreTarballPath && sdkTarballPath && cliTarballPath && agentTarballPath) {
+function installScaffold(siteRoot, { coreTarballPath, sdkTarballPath, cliTarballPath, agentTarballPath, marketTarballPath }) {
+	if (coreTarballPath && sdkTarballPath && cliTarballPath && agentTarballPath && marketTarballPath) {
 		linkWorkspacePackage(siteRoot, sdkPackageJson.name, sdkPackageRoot);
 		linkWorkspacePackage(siteRoot, packageJson.name, corePackageRoot);
 		linkWorkspacePackage(siteRoot, cliPackageJson.name, packageRoot);
 		linkWorkspacePackage(siteRoot, agentPackageJson.name, agentPackageRoot);
+		linkWorkspacePackage(siteRoot, marketPackageJson.name, marketPackageRoot);
 		mirrorSharedNodeModules(siteRoot);
 		linkTreeseedBins(siteRoot);
 		return;
@@ -258,6 +270,7 @@ let tarballPath = externalCoreTarball;
 let sdkTarballPath = externalSdkTarball;
 let cliTarballPath = externalCliTarball;
 let agentTarballPath = externalAgentTarball;
+let marketTarballPath = externalMarketTarball;
 
 try {
 	if (!reusesExternalTarballs && resetScaffoldCache) {
@@ -288,11 +301,17 @@ try {
 	} else {
 		logStep(`reusing provided @treeseed/cli tarball: ${cliTarballPath}`);
 	}
+	if (!marketTarballPath) {
+		logStep('building and packing @treeseed/market');
+		marketTarballPath = createTarball(marketPackageRoot, marketPackageJson);
+	} else {
+		logStep(`reusing provided @treeseed/market tarball: ${marketTarballPath}`);
+	}
 	logStep(`scaffolding temporary tenant at ${siteRoot}`);
 	withTiming('scaffold tenant generation', () => {
 		scaffoldSite(siteRoot);
 	});
-	rewriteScaffoldDependency(siteRoot, tarballPath, cliTarballPath);
+	rewriteScaffoldDependency(siteRoot, tarballPath, cliTarballPath, marketTarballPath);
 	logStep(`installing scaffolded tenant dependencies with checks: ${[...scaffoldChecks].join(', ') || 'none'}`);
 	withTiming('scaffold dependency install', () => {
 		installScaffold(siteRoot, {
@@ -300,6 +319,7 @@ try {
 			sdkTarballPath,
 			cliTarballPath,
 			agentTarballPath,
+			marketTarballPath,
 		});
 	});
 	logStep('running scaffold smoke checks');
@@ -313,6 +333,9 @@ try {
 	}
 	if (tarballPath && !externalCoreTarball) {
 		rmSync(tarballPath, { force: true });
+	}
+	if (marketTarballPath && !externalMarketTarball) {
+		rmSync(marketTarballPath, { force: true });
 	}
 	if (!reusesExternalTarballs && resetScaffoldCache) {
 		resetNpmCache();

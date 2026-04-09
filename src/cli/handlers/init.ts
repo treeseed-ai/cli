@@ -18,6 +18,8 @@ export const handleInit: TreeseedCommandHandler = (invocation, context) => {
 		facts: [{ label: 'Directory', value: directory ?? '(current directory)' }],
 		nextSteps: [
 			`cd ${directory}`,
+			'treeseed template show starter-basic',
+			'treeseed sync --check',
 			'treeseed doctor',
 			'treeseed config --environment local',
 			'treeseed dev',
