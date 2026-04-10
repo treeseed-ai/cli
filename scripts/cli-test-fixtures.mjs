@@ -14,6 +14,13 @@ export function makeWorkspaceRoot() {
 		private: true,
 		workspaces: ['packages/*'],
 	}, null, 2));
+	writeFileSync(resolve(root, 'treeseed.site.yaml'), `name: Help Test
+slug: help-test
+siteUrl: https://example.com
+contactEmail: hello@example.com
+cloudflare:
+  accountId: account-123
+`, 'utf8');
 	return root;
 }
 

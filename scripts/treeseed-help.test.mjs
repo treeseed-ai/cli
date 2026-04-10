@@ -123,7 +123,13 @@ test('doctor reports blocking issues with structured json', async () => {
 
 test('setup bootstraps the local workspace and reports next steps', async () => {
 	const workspaceRoot = makeTenantWorkspace('staging');
-	const result = await runCli(['setup', '--json'], { cwd: workspaceRoot });
+	const result = await runCli(['setup', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			GH_TOKEN: 'gh_test',
+			CLOUDFLARE_API_TOKEN: 'cf_test',
+		},
+	});
 	assert.equal(result.exitCode, 0);
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.command, 'setup');
