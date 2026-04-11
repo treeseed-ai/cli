@@ -6,17 +6,25 @@ import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs'
 async function runCli(args, options = {}) {
 	const writes = [];
 	const spawns = [];
-	const exitCode = await runTreeseedCli(args, {
-		cwd: options.cwd ?? process.cwd(),
-		env: { ...process.env, ...(options.env ?? {}) },
-		write(output, stream) {
-			writes.push({ output, stream });
-		},
-		spawn(command, spawnArgs) {
-			spawns.push({ command, args: spawnArgs });
-			return { status: options.spawnStatus ?? 0 };
-		},
-	});
+	const originalHome = process.env.HOME;
+	if (typeof options.env?.HOME === 'string') process.env.HOME = options.env.HOME;
+	let exitCode;
+	try {
+		exitCode = await runTreeseedCli(args, {
+			cwd: options.cwd ?? process.cwd(),
+			env: { ...process.env, ...(options.env ?? {}) },
+			write(output, stream) {
+				writes.push({ output, stream });
+			},
+			spawn(command, spawnArgs) {
+				spawns.push({ command, args: spawnArgs });
+				return { status: options.spawnStatus ?? 0 };
+			},
+		});
+	} finally {
+		if (originalHome === undefined) delete process.env.HOME;
+		else process.env.HOME = originalHome;
+	}
 
 	return {
 		exitCode,
@@ -33,8 +41,9 @@ test('treeseed with no args prints top-level help and exits successfully', async
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /Treeseed CLI/);
 	assert.match(result.output, /Primary Workflow/);
-	assert.match(result.output, /setup/);
-	assert.match(result.output, /work/);
+	assert.match(result.output, /switch/);
+	assert.match(result.output, /stage/);
+	assert.doesNotMatch(result.output, /treeseed ship/);
 });
 
 test('treeseed help entrypoints produce top-level help', async () => {
@@ -49,18 +58,18 @@ test('treeseed help entrypoints produce top-level help', async () => {
 });
 
 test('treeseed command help renders without executing the command', async () => {
-	const helpViaCommand = await runCli(['help', 'deploy']);
-	const helpViaFlag = await runCli(['deploy', '--help']);
+	const helpViaCommand = await runCli(['help', 'stage']);
+	const helpViaFlag = await runCli(['stage', '--help']);
 	assert.equal(helpViaCommand.exitCode, 0);
 	assert.equal(helpViaFlag.exitCode, 0);
-	assert.match(helpViaCommand.output, /deploy  Run phase-2 deploy/);
-	assert.match(helpViaCommand.output, /--environment <scope>/);
+	assert.match(helpViaCommand.output, /stage  Merge the current task/);
+	assert.match(helpViaCommand.output, /<message>/);
 	assert.equal(helpViaCommand.output, helpViaFlag.output);
 	assert.equal(helpViaFlag.spawns.length, 0);
 });
 
 test('major workflow commands have usage, options, and examples in help', async () => {
-	for (const command of ['setup', 'work', 'ship', 'publish', 'promote', 'rollback', 'teardown', 'continue', 'status', 'next', 'doctor']) {
+	for (const command of ['init', 'status', 'config', 'tasks', 'switch', 'save', 'close', 'stage', 'release', 'destroy', 'rollback', 'doctor']) {
 		const result = await runCli(['help', command]);
 		assert.equal(result.exitCode, 0, `help for ${command} should exit successfully`);
 		assert.match(result.output, /Usage/);
@@ -76,6 +85,14 @@ test('unknown command suggests nearest valid commands', async () => {
 	assert.match(result.stderr, /treeseed help/);
 });
 
+test('removed workflow commands are no longer public commands', async () => {
+	for (const command of ['setup', 'work', 'ship', 'prepare', 'publish', 'promote', 'teardown', 'start', 'deploy', 'next', 'continue']) {
+		const result = await runCli(['help', command]);
+		assert.equal(result.exitCode, 1, `${command} should be removed`);
+		assert.match(result.output, new RegExp(`Unknown treeseed command: ${command}`));
+	}
+});
+
 test('workspace-only adapter commands still route correctly when not requesting help', async () => {
 	const workspaceRoot = makeWorkspaceRoot();
 	const result = await runCli(['test:e2e'], { cwd: workspaceRoot });
@@ -84,30 +101,19 @@ test('workspace-only adapter commands still route correctly when not requesting 
 	assert.match(result.spawns[0].args[0], /workspace-command-e2e/);
 });
 
-test('status and next support machine-readable json', async () => {
+test('status and tasks support machine-readable json', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/json-status');
 	const statusResult = await runCli(['status', '--json'], { cwd: workspaceRoot });
-	const nextResult = await runCli(['next', '--json'], { cwd: workspaceRoot });
-	const continueResult = await runCli(['continue', '--json'], { cwd: workspaceRoot });
+	const tasksResult = await runCli(['tasks', '--json'], { cwd: workspaceRoot });
 	assert.equal(statusResult.exitCode, 0);
-	assert.equal(nextResult.exitCode, 0);
-	assert.equal(continueResult.exitCode, 0);
+	assert.equal(tasksResult.exitCode, 0);
 	const statusJson = JSON.parse(statusResult.stdout);
-	const nextJson = JSON.parse(nextResult.stdout);
-	const continueJson = JSON.parse(continueResult.stdout);
+	const tasksJson = JSON.parse(tasksResult.stdout);
 	assert.equal(statusJson.command, 'status');
 	assert.equal(statusJson.ok, true);
 	assert.equal(statusJson.state.branchRole, 'feature');
-	assert.equal(nextJson.command, 'next');
-	assert.ok(Array.isArray(nextJson.recommendations));
-	assert.equal(continueJson.command, 'continue');
-	assert.ok(continueJson.selected);
-});
-
-test('legacy workflow commands steer users toward simplified commands', async () => {
-	const result = await runCli(['help', 'deploy']);
-	assert.equal(result.exitCode, 0);
-	assert.match(result.output, /Prefer `treeseed publish`/);
+	assert.equal(tasksJson.command, 'tasks');
+	assert.ok(Array.isArray(tasksJson.tasks));
 });
 
 test('doctor reports blocking issues with structured json', async () => {
@@ -121,21 +127,32 @@ test('doctor reports blocking issues with structured json', async () => {
 	assert.ok(payload.mustFixNow.some((entry) => /machine config/i.test(entry)));
 });
 
-test('setup bootstraps the local workspace and reports next steps', async () => {
+test('config bootstraps the local workspace and reports next steps', async () => {
 	const workspaceRoot = makeTenantWorkspace('staging');
-	const result = await runCli(['setup', '--json'], {
+	const result = await runCli(['config', '--environment', 'local', '--sync', 'none', '--json'], {
 		cwd: workspaceRoot,
 		env: {
+			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test',
 			CLOUDFLARE_API_TOKEN: 'cf_test',
 		},
 	});
 	assert.equal(result.exitCode, 0);
 	const payload = JSON.parse(result.stdout);
-	assert.equal(payload.command, 'setup');
+	assert.equal(payload.command, 'config');
 	assert.equal(payload.ok, true);
 	assert.ok(Array.isArray(payload.scopes));
 	assert.ok(payload.scopes.includes('local'));
+});
+
+test('config defaults to all environments and supports explicit all', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const defaultResult = await runCli(['config', '--print-env-only', '--json'], { cwd: workspaceRoot, env: { HOME: workspaceRoot } });
+	const explicitResult = await runCli(['config', '--environment', 'all', '--print-env-only', '--json'], { cwd: workspaceRoot, env: { HOME: workspaceRoot } });
+	assert.equal(defaultResult.exitCode, 0);
+	assert.equal(explicitResult.exitCode, 0);
+	assert.deepEqual(JSON.parse(defaultResult.stdout).scopes, ['local', 'staging', 'prod']);
+	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
 });
 
 test('command metadata stays aligned with help coverage', () => {

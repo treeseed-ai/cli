@@ -3,16 +3,15 @@ import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import * as cliExports from '../dist/cli/main.js';
-import * as sdkCliExports from '@treeseed/sdk/treeseed-cli';
 
-test('cli package re-exports the sdk cli runtime', () => {
-	assert.equal(cliExports.runTreeseedCli, sdkCliExports.runTreeseedCli);
-	assert.equal(cliExports.executeTreeseedCommand, sdkCliExports.executeTreeseedCommand);
-	assert.equal(cliExports.renderTreeseedHelp, sdkCliExports.renderTreeseedHelp);
-	assert.equal(cliExports.findCommandSpec, sdkCliExports.findCommandSpec);
+test('cli package exposes its own runtime entrypoints', () => {
+	assert.equal(typeof cliExports.runTreeseedCli, 'function');
+	assert.equal(typeof cliExports.executeTreeseedCommand, 'function');
+	assert.equal(typeof cliExports.renderTreeseedHelp, 'function');
+	assert.equal(typeof cliExports.findCommandSpec, 'function');
 });
 
-test('published dist contains only wrapper-facing entrypoints', () => {
+test('published dist contains the cli runtime surface', () => {
 	const distRoot = resolve(process.cwd(), 'dist');
 	const actualFiles = [];
 	const walk = (root) => {
@@ -29,20 +28,15 @@ test('published dist contains only wrapper-facing entrypoints', () => {
 	walk(distRoot);
 	actualFiles.sort();
 
-	assert.deepEqual(actualFiles, [
-		'cli/help.d.ts',
-		'cli/help.js',
-		'cli/main.d.ts',
+	for (const requiredFile of [
 		'cli/main.js',
-		'cli/parser.d.ts',
-		'cli/parser.js',
-		'cli/registry.d.ts',
-		'cli/registry.js',
-		'cli/runtime.d.ts',
 		'cli/runtime.js',
-		'cli/types.d.ts',
-		'cli/types.js',
-		'index.d.ts',
+		'cli/help.js',
+		'cli/parser.js',
+		'cli/registry.js',
+		'cli/handlers/status.js',
 		'index.js',
-	]);
+	]) {
+		assert.ok(actualFiles.includes(requiredFile), `${requiredFile} should be published`);
+	}
 });

@@ -1,20 +1,26 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { build } from 'esbuild';
 import ts from 'typescript';
 import { packageRoot } from './package-tools.ts';
 
 const srcRoot = resolve(packageRoot, 'src');
 const distRoot = resolve(packageRoot, 'dist');
-const publishableSourceFiles = [
-	resolve(srcRoot, 'index.ts'),
-	resolve(srcRoot, 'cli', 'main.ts'),
-	resolve(srcRoot, 'cli', 'runtime.ts'),
-	resolve(srcRoot, 'cli', 'help.ts'),
-	resolve(srcRoot, 'cli', 'parser.ts'),
-	resolve(srcRoot, 'cli', 'registry.ts'),
-	resolve(srcRoot, 'cli', 'types.ts'),
-];
+
+function walkFiles(root) {
+	const files = [];
+	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		const fullPath = join(root, entry.name);
+		if (entry.isDirectory()) {
+			files.push(...walkFiles(fullPath));
+			continue;
+		}
+		files.push(fullPath);
+	}
+	return files;
+}
+
+const publishableSourceFiles = walkFiles(srcRoot).filter((filePath) => filePath.endsWith('.ts') && !filePath.endsWith('.d.ts'));
 
 function ensureDir(filePath) {
 	mkdirSync(dirname(filePath), { recursive: true });

@@ -11,12 +11,6 @@
     ]
   },
   "include": [
-    "src/index.ts",
-    "src/cli/main.ts",
-    "src/cli/runtime.ts",
-    "src/cli/help.ts",
-    "src/cli/parser.ts",
-    "src/cli/registry.ts",
-    "src/cli/types.ts"
+    "src/**/*.ts"
   ]
 }

@@ -1,0 +1,262 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { getTreeseedMachineConfigPaths, resolveTreeseedRemoteSession } from '@treeseed/sdk/workflow-support';
+import {
+	createBranchPreviewDeployTarget,
+	createPersistentDeployTarget,
+	loadDeployState,
+} from '@treeseed/sdk/workflow-support';
+import { PRODUCTION_BRANCH, STAGING_BRANCH } from '@treeseed/sdk/workflow-support';
+import { loadCliDeployConfig } from '@treeseed/sdk/workflow-support';
+import { collectCliPreflight } from '@treeseed/sdk/workflow-support';
+import { currentBranch, gitStatusPorcelain, repoRoot } from '@treeseed/sdk/workflow-support';
+import { isWorkspaceRoot } from '@treeseed/sdk/workflow-support';
+
+export type TreeseedBranchRole = 'feature' | 'staging' | 'main' | 'detached' | 'none';
+
+export type TreeseedWorkflowRecommendation = {
+	command: string;
+	reason: string;
+};
+
+export type TreeseedWorkflowState = {
+	cwd: string;
+	workspaceRoot: boolean;
+	tenantRoot: boolean;
+	deployConfigPresent: boolean;
+	repoRoot: string | null;
+	branchName: string | null;
+	branchRole: TreeseedBranchRole;
+	environment: 'local' | 'staging' | 'prod' | 'none';
+	dirtyWorktree: boolean;
+	preview: {
+		enabled: boolean;
+		url: string | null;
+		lastDeploymentTimestamp: string | null;
+	};
+	persistentEnvironments: Record<string, {
+		initialized: boolean;
+		lastValidatedAt: string | null;
+		lastDeploymentTimestamp: string | null;
+		lastDeployedUrl: string | null;
+	}>;
+	auth: {
+		gh: boolean;
+		wrangler: boolean;
+		railway: boolean;
+		copilot: boolean;
+		remoteApi: boolean;
+	};
+	managedServices: Record<string, {
+		enabled: boolean;
+		initialized: boolean;
+		lastDeploymentTimestamp: string | null;
+		lastDeployedUrl: string | null;
+		provider: string | null;
+	}>;
+	files: {
+		treeseedConfig: boolean;
+		machineConfig: boolean;
+		machineKey: boolean;
+		envLocal: boolean;
+		devVars: boolean;
+	};
+	releaseReady: boolean;
+	rollbackCandidates: Array<{
+		scope: 'staging' | 'prod';
+		commit: string | null;
+		timestamp: string | null;
+		url: string | null;
+	}>;
+	recommendations: TreeseedWorkflowRecommendation[];
+};
+
+function safeResolveRepoRoot(cwd: string) {
+	try {
+		return repoRoot(cwd);
+	} catch {
+		return null;
+	}
+}
+
+function branchRoleFor(branchName: string | null): TreeseedBranchRole {
+	if (!branchName) return 'none';
+	if (branchName === STAGING_BRANCH) return 'staging';
+	if (branchName === PRODUCTION_BRANCH) return 'main';
+	return 'feature';
+}
+
+function environmentForBranchRole(branchRole: TreeseedBranchRole): TreeseedWorkflowState['environment'] {
+	if (branchRole === 'staging') return 'staging';
+	if (branchRole === 'main') return 'prod';
+	if (branchRole === 'feature') return 'local';
+	return 'none';
+}
+
+function emptyPersistentEnvironments(): TreeseedWorkflowState['persistentEnvironments'] {
+	return {
+		local: { initialized: false, lastValidatedAt: null, lastDeploymentTimestamp: null, lastDeployedUrl: null },
+		staging: { initialized: false, lastValidatedAt: null, lastDeploymentTimestamp: null, lastDeployedUrl: null },
+		prod: { initialized: false, lastValidatedAt: null, lastDeploymentTimestamp: null, lastDeployedUrl: null },
+	};
+}
+
+export function resolveTreeseedWorkflowState(cwd: string): TreeseedWorkflowState {
+	const workspaceRoot = isWorkspaceRoot(cwd);
+	const treeseedConfigPath = resolve(cwd, 'treeseed.site.yaml');
+	const tenantRoot = existsSync(treeseedConfigPath);
+	const root = safeResolveRepoRoot(cwd);
+	const branchName = root ? currentBranch(root) || null : null;
+	const branchRole = branchRoleFor(branchName);
+	const dirtyWorktree = root ? gitStatusPorcelain(root).length > 0 : false;
+	const preflight = collectCliPreflight({ cwd, requireAuth: false });
+	const { configPath, keyPath } = getTreeseedMachineConfigPaths(cwd);
+	const state: TreeseedWorkflowState = {
+		cwd,
+		workspaceRoot,
+		tenantRoot,
+		deployConfigPresent: tenantRoot,
+		repoRoot: root,
+		branchName,
+		branchRole,
+		environment: environmentForBranchRole(branchRole),
+		dirtyWorktree,
+		preview: {
+			enabled: false,
+			url: null,
+			lastDeploymentTimestamp: null,
+		},
+		persistentEnvironments: emptyPersistentEnvironments(),
+		auth: {
+			gh: preflight.checks.auth.gh?.authenticated === true,
+			wrangler: preflight.checks.auth.wrangler?.authenticated === true,
+			railway: preflight.checks.auth.railway?.authenticated === true,
+			copilot: preflight.checks.auth.copilot?.configured === true,
+			remoteApi: Boolean(resolveTreeseedRemoteSession(cwd)),
+		},
+		managedServices: {
+			api: { enabled: false, initialized: false, lastDeploymentTimestamp: null, lastDeployedUrl: null, provider: null },
+			agents: { enabled: false, initialized: false, lastDeploymentTimestamp: null, lastDeployedUrl: null, provider: null },
+			manager: { enabled: false, initialized: false, lastDeploymentTimestamp: null, lastDeployedUrl: null, provider: null },
+			worker: { enabled: false, initialized: false, lastDeploymentTimestamp: null, lastDeployedUrl: null, provider: null },
+			workdayStart: { enabled: false, initialized: false, lastDeploymentTimestamp: null, lastDeployedUrl: null, provider: null },
+			workdayReport: { enabled: false, initialized: false, lastDeploymentTimestamp: null, lastDeployedUrl: null, provider: null },
+		},
+		files: {
+			treeseedConfig: tenantRoot,
+			machineConfig: existsSync(configPath),
+			machineKey: existsSync(keyPath),
+			envLocal: existsSync(resolve(cwd, '.env.local')),
+			devVars: existsSync(resolve(cwd, '.dev.vars')),
+		},
+		releaseReady: branchRole === 'staging' && !dirtyWorktree,
+		rollbackCandidates: [],
+		recommendations: [],
+	};
+
+	if (tenantRoot) {
+		try {
+			const deployConfig = loadCliDeployConfig(cwd);
+			for (const scope of ['local', 'staging', 'prod'] as const) {
+				const deployState = loadDeployState(cwd, deployConfig, { target: createPersistentDeployTarget(scope) });
+				state.persistentEnvironments[scope] = {
+					initialized: deployState.readiness?.initialized === true || scope === 'local',
+					lastValidatedAt: deployState.readiness?.lastValidatedAt ?? deployState.readiness?.initializedAt ?? null,
+					lastDeploymentTimestamp: deployState.lastDeploymentTimestamp ?? null,
+					lastDeployedUrl: deployState.lastDeployedUrl ?? null,
+				};
+				if (scope !== 'local') {
+					const history = Array.isArray((deployState as { deploymentHistory?: unknown[] }).deploymentHistory)
+						? ((deployState as { deploymentHistory?: Array<Record<string, unknown>> }).deploymentHistory ?? [])
+						: [];
+					const latestHistory = history.at(-1) ?? null;
+					state.rollbackCandidates.push({
+						scope,
+						commit: typeof latestHistory?.commit === 'string' ? latestHistory.commit : (deployState.lastDeployedCommit ?? null),
+						timestamp: typeof latestHistory?.timestamp === 'string' ? latestHistory.timestamp : (deployState.lastDeploymentTimestamp ?? null),
+						url: typeof latestHistory?.url === 'string' ? latestHistory.url : (deployState.lastDeployedUrl ?? null),
+					});
+				}
+					for (const serviceKey of ['api', 'agents', 'manager', 'worker', 'workdayStart', 'workdayReport']) {
+						const service = deployState.services?.[serviceKey];
+						if (!service) continue;
+						state.managedServices[serviceKey] = {
+						enabled: service.enabled === true,
+						initialized: service.initialized === true,
+						lastDeploymentTimestamp: service.lastDeploymentTimestamp ?? null,
+						lastDeployedUrl: service.lastDeployedUrl ?? service.publicBaseUrl ?? null,
+						provider: service.provider ?? null,
+					};
+				}
+			}
+
+			if (branchRole === 'feature' && branchName) {
+				const previewState = loadDeployState(cwd, deployConfig, { target: createBranchPreviewDeployTarget(branchName) });
+				state.preview = {
+					enabled: previewState.previewEnabled === true || previewState.readiness?.initialized === true,
+					url: previewState.lastDeployedUrl ?? null,
+					lastDeploymentTimestamp: previewState.lastDeploymentTimestamp ?? null,
+				};
+			}
+		} catch {
+			// Leave deployment state unresolved when the tenant config cannot be loaded yet.
+		}
+	}
+
+	state.recommendations = recommendTreeseedNextSteps(state);
+	return state;
+}
+
+export function recommendTreeseedNextSteps(state: TreeseedWorkflowState): TreeseedWorkflowRecommendation[] {
+	const recommendations: TreeseedWorkflowRecommendation[] = [];
+	if (!state.workspaceRoot) {
+		return [{ command: 'treeseed status', reason: 'Run this command from inside a Treeseed workspace so the CLI can resolve the project root.' }];
+	}
+	if (!state.deployConfigPresent) {
+		return [{ command: 'treeseed init <directory>', reason: 'Create a new Treeseed tenant before configuring or releasing anything.' }];
+	}
+	if (!state.files.machineConfig) {
+		recommendations.push({ command: 'treeseed status', reason: 'Validate tooling, auth, and repository readiness first.' });
+		recommendations.push({ command: 'treeseed config', reason: 'Bootstrap the local machine config and local environment files.' });
+		return recommendations;
+	}
+	if (state.branchRole === 'feature') {
+		if (state.dirtyWorktree) {
+			recommendations.push({ command: 'treeseed save "describe your change"', reason: 'Persist, verify, and push the current task branch before staging or closing it.' });
+		} else {
+			recommendations.push({ command: 'treeseed stage "describe the resolution"', reason: 'Merge this task branch into staging and clean up branch artifacts.' });
+		}
+		if (state.preview.enabled && state.branchName) {
+			recommendations.push({ command: 'treeseed save "describe your change"', reason: 'Save refreshes the branch preview deployment when one is enabled.' });
+		} else {
+			recommendations.push({ command: 'treeseed dev', reason: 'Use the local environment for iterative work on this feature branch.' });
+		}
+		recommendations.push({ command: 'treeseed close "reason"', reason: 'Archive this task without merging if it should be abandoned.' });
+		return recommendations.slice(0, 3);
+	}
+	if (state.branchRole === 'staging') {
+		if (!state.persistentEnvironments.staging.initialized) {
+			recommendations.push({ command: 'treeseed config --environment staging', reason: 'Initialize the staging environment before releasing.' });
+		} else {
+			recommendations.push({ command: 'treeseed release --patch', reason: 'Promote staging into main when the integration branch is ready for production.' });
+			if (state.managedServices.api.enabled || state.managedServices.agents.enabled) {
+				recommendations.push({ command: 'treeseed auth:login', reason: 'Keep the local CLI authenticated to the remote API used by managed services.' });
+			}
+		}
+		return recommendations.slice(0, 3);
+	}
+	if (state.branchRole === 'main') {
+		if (state.dirtyWorktree) {
+			recommendations.push({ command: 'treeseed save --hotfix "describe the hotfix"', reason: 'Only explicit hotfix saves are allowed on main.' });
+		} else if (!state.persistentEnvironments.prod.initialized) {
+			recommendations.push({ command: 'treeseed config --environment prod', reason: 'Initialize production before a release requires it.' });
+		} else {
+			recommendations.push({ command: 'treeseed status', reason: 'Inspect production state and release readiness.' });
+			recommendations.push({ command: 'treeseed rollback prod', reason: 'Roll back production to the previous recorded deployment if needed.' });
+		}
+		return recommendations.slice(0, 3);
+	}
+	recommendations.push({ command: 'treeseed dev', reason: 'Start the local Treeseed development environment.' });
+	recommendations.push({ command: 'treeseed switch feature/my-change', reason: 'Create a task branch from the latest staging commit.' });
+	return recommendations.slice(0, 3);
+}

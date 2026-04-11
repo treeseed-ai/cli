@@ -3,9 +3,13 @@
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { runTreeseedCli } from '@treeseed/sdk/treeseed-cli';
+import { runTreeseedCli } from './runtime.js';
 
-export * from '@treeseed/sdk/treeseed-cli';
+export * from './runtime.js';
+export * from './help.js';
+export * from './parser.js';
+export * from './registry.js';
+export type * from './types.js';
 
 function resolveExecutablePath(path: string) {
 	try {

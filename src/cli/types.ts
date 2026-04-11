@@ -11,4 +11,4 @@ export type {
 	TreeseedParsedInvocation,
 	TreeseedSpawner,
 	TreeseedWriter,
-} from '@treeseed/sdk/operations';
+} from './operations-types.js';

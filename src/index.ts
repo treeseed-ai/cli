@@ -1,1 +1,1 @@
-export * from '@treeseed/sdk/treeseed-cli';
+export * from './cli/main.js';

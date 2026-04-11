@@ -2,7 +2,7 @@
 
 Operator-facing Treeseed CLI package.
 
-This package publishes the `treeseed` binary. The authoritative command contract, parser/help/runtime behavior, handlers, and command-support scripts live in `@treeseed/sdk`. `@treeseed/cli` is the thin distribution wrapper that exposes that SDK-owned surface as an installable binary package.
+This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable workflow and runtime capabilities; `@treeseed/cli` owns argv parsing, command help, terminal formatting, command handlers, and the installable executable surface.
 
 ## Requirements
 
@@ -29,36 +29,37 @@ treeseed --help
 
 The main workflow commands exposed by the current CLI are:
 
-- `treeseed setup`
-- `treeseed work <branch-name> [--preview]`
-- `treeseed ship "<commit message>"`
-- `treeseed publish --environment <local|staging|prod>`
-- `treeseed promote --major|--minor|--patch`
-- `treeseed rollback <staging|prod> [--to <deploy-id|commit>]`
-- `treeseed teardown [--environment <local|staging|prod>]`
 - `treeseed status [--json]`
-- `treeseed next [--json]`
-- `treeseed continue [--json]`
-- `treeseed doctor [--fix] [--json]`
+- `treeseed config`
+- `treeseed tasks [--json]`
+- `treeseed switch <branch-name> [--preview]`
+- `treeseed dev`
+- `treeseed save "<commit message>"`
+- `treeseed stage "<resolution message>"`
+- `treeseed close "<close reason>"`
+- `treeseed release --major|--minor|--patch`
+- `treeseed destroy --environment <local|staging|prod>`
 
-The CLI also keeps compatibility commands such as `init`, `config`, `start`, `deploy`, `save`, `release`, `close`, and `destroy`.
+Support utilities such as `treeseed rollback`, `treeseed doctor`, `treeseed auth:*`, `treeseed template`, `treeseed sync`, `treeseed lint`, `treeseed test`, `treeseed build`, and service helpers remain available.
 
 Use `treeseed help` for the full command list and `treeseed help <command>` for command-specific usage, options, and examples.
 
 ## Common Commands
 
 ```bash
-treeseed setup
-treeseed work feature/search-improvements --preview
-treeseed ship "feat: add search filters"
-treeseed publish --environment staging
-treeseed promote --patch
+treeseed status
+treeseed config
+treeseed switch feature/search-improvements --preview
+treeseed dev
+treeseed save "feat: add search filters"
+treeseed stage "feat: add search filters"
+treeseed release --patch
 treeseed status --json
 ```
 
 ## Maintainer Workflow
 
-All package maintenance commands are npm-based and run from the `cli/` package root. This package only verifies the binary wrapper and packaged artifact shape; the underlying command/runtime behavior is validated in `@treeseed/sdk`.
+All package maintenance commands are npm-based and run from the `cli/` package root. This package verifies the published command surface, parser/help behavior, and packaged artifact shape.
 
 Install dependencies:
 

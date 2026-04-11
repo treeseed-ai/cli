@@ -1,5 +1,56 @@
-export {
-	findCommandSpec,
-	listCommandNames,
-	TRESEED_COMMAND_SPECS,
-} from '@treeseed/sdk/treeseed-cli';
+import {
+	findTreeseedOperation,
+	listTreeseedOperationNames,
+	TRESEED_OPERATION_SPECS,
+} from './operations-registry.js';
+import type { TreeseedCommandSpec } from './operations-types.js';
+import { handleInit } from './handlers/init.js';
+import { handleConfig } from './handlers/config.js';
+import { handleClose } from './handlers/close.js';
+import { handleSave } from './handlers/save.js';
+import { handleRelease } from './handlers/release.js';
+import { handleDestroy } from './handlers/destroy.js';
+import { handleStatus } from './handlers/status.js';
+import { handleDev } from './handlers/dev.js';
+import { handleDoctor } from './handlers/doctor.js';
+import { handleRollback } from './handlers/rollback.js';
+import { handleTemplate } from './handlers/template.js';
+import { handleSync } from './handlers/sync.js';
+import { handleAuthLogin } from './handlers/auth-login.js';
+import { handleAuthLogout } from './handlers/auth-logout.js';
+import { handleAuthWhoAmI } from './handlers/auth-whoami.js';
+import { handleTasks } from './handlers/tasks.js';
+import { handleSwitch } from './handlers/switch.js';
+import { handleStage } from './handlers/stage.js';
+
+export const COMMAND_HANDLERS = {
+	init: handleInit,
+	config: handleConfig,
+	close: handleClose,
+	save: handleSave,
+	release: handleRelease,
+	destroy: handleDestroy,
+	status: handleStatus,
+	dev: handleDev,
+	'dev:watch': handleDev,
+	doctor: handleDoctor,
+	rollback: handleRollback,
+	template: handleTemplate,
+	sync: handleSync,
+	tasks: handleTasks,
+	switch: handleSwitch,
+	stage: handleStage,
+	'auth:login': handleAuthLogin,
+	'auth:logout': handleAuthLogout,
+	'auth:whoami': handleAuthWhoAmI,
+} as const;
+
+export const TRESEED_COMMAND_SPECS: TreeseedCommandSpec[] = TRESEED_OPERATION_SPECS;
+
+export function findCommandSpec(name: string | null | undefined) {
+	return findTreeseedOperation(name);
+}
+
+export function listCommandNames() {
+	return listTreeseedOperationNames();
+}
