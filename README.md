@@ -6,7 +6,7 @@ This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable 
 
 ## Requirements
 
-- Node `>=20`
+- Node `>=22`
 - npm as the canonical package manager for install, CI, and release flows
 
 ## Install

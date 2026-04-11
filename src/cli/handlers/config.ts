@@ -26,6 +26,7 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 			nonInteractive: context.outputFormat === 'json',
 		});
 		const payload = result.payload as Record<string, any>;
+		const toolHealth = payload.toolHealth as Record<string, any> | undefined;
 		const summary = payload.mode === 'print-env-only'
 			? 'Treeseed config environment report completed.'
 			: payload.mode === 'rotate-machine-key'
@@ -41,6 +42,10 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 				{ label: 'Safe repairs', value: Array.isArray(payload.repairs) ? payload.repairs.length : 0 },
 				{ label: 'Machine config', value: payload.configPath },
 				{ label: 'Machine key', value: payload.keyPath },
+				{ label: 'GitHub CLI', value: toolHealth?.githubCli?.available ? 'ready' : 'missing' },
+				{ label: 'gh act', value: toolHealth?.ghActExtension?.available ? 'ready' : 'missing' },
+				{ label: 'Docker', value: toolHealth?.dockerDaemon?.available ? 'ready' : 'missing' },
+				{ label: 'ACT verify', value: toolHealth?.actVerificationReady ? 'ready' : 'not ready' },
 			],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: payload,

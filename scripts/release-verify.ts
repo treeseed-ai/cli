@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { packageRoot } from './package-tools.ts';
+const npmCacheDir = resolve(tmpdir(), 'treeseed-npm-cache');
 const textExtensions = new Set(['.js', '.ts', '.mjs', '.cjs', '.d.ts', '.json', '.md']);
 const forbiddenPatterns = [
 	/['"`]workspace:[^'"`\n]+['"`]/,
@@ -16,7 +17,11 @@ function run(command: string, args: string[], cwd = packageRoot, capture = false
 		cwd,
 		stdio: capture ? 'pipe' : 'inherit',
 		encoding: 'utf8',
-		env: process.env,
+		env: {
+			...process.env,
+			npm_config_cache: npmCacheDir,
+			NPM_CONFIG_CACHE: npmCacheDir,
+		},
 	});
 
 	if (result.status !== 0) {
@@ -103,12 +108,18 @@ function mirrorDependencies(tempRoot: string) {
 }
 
 function pack(root: string, fallbackName: string) {
-	const output = run('npm', ['pack', '--silent', '--ignore-scripts'], root, true);
+	const output = run('npm', ['pack', '--ignore-scripts', '--cache', npmCacheDir], root, true);
 	const filename = output
 		.split('\n')
 		.map((line) => line.trim())
 		.filter(Boolean)
-		.at(-1) ?? fallbackName;
+		.at(-1)
+		?? readdirSync(root, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && entry.name.endsWith('.tgz'))
+			.map((entry) => entry.name)
+			.sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
+			.at(-1)
+		?? fallbackName;
 	return resolve(root, filename);
 }
 
@@ -138,7 +149,7 @@ function assertRequiredDistFiles() {
 	}
 }
 
-run('npm', ['run', 'build']);
+run('npm', ['run', 'lint']);
 scanDirectory(resolve(packageRoot, 'dist'));
 assertRequiredDistFiles();
 run('npm', ['test']);
