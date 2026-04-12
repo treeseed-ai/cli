@@ -285,6 +285,9 @@ export async function executeTreeseedCommand(commandName: string, argv: string[]
 	if (!spec) {
 		return cliOperationsSdk.executeOperation({ commandName, argv }, context);
 	}
+	if (argv.some(isHelpFlag)) {
+		return cliOperationsSdk.executeOperation({ commandName, argv }, context);
+	}
 
 	const resolved = resolveTreeseedCommandCwd(spec, context.cwd);
 	if (commandNeedsProjectRoot(spec) && !resolved.resolvedProjectRoot) {
@@ -307,6 +310,9 @@ export async function runTreeseedCli(argv: string[], overrides: Partial<Treeseed
 	const [firstArg] = argv;
 	const spec = firstArg ? cliOperationsSdk.findOperation(firstArg) : null;
 	if (!spec) {
+		return cliOperationsSdk.run(argv, overrides);
+	}
+	if (argv.slice(1).some(isHelpFlag)) {
 		return cliOperationsSdk.run(argv, overrides);
 	}
 

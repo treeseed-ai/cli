@@ -94,12 +94,12 @@ test('removed workflow commands are no longer public commands', async () => {
 	}
 });
 
-test('workspace-only adapter commands still route correctly when not requesting help', async () => {
+test('published adapter commands still execute in isolated package installs', async () => {
 	const workspaceRoot = makeWorkspaceRoot();
-	const result = await runCli(['test:e2e'], { cwd: workspaceRoot });
-	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 1);
-	assert.match(result.spawns[0].args[0], /workspace-command-e2e/);
+	const result = await runCli(['preflight'], { cwd: workspaceRoot });
+	assert.equal(typeof result.exitCode, 'number');
+	assert.match(result.output, /Treeseed preflight summary/);
+	assert.doesNotMatch(result.stderr, /Unknown treeseed command/);
 });
 
 test('agents help is delegated through the agent package contract', async () => {

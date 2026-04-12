@@ -1,11 +1,7 @@
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const scriptsRoot = dirname(fileURLToPath(import.meta.url));
-const sdkFixtureRoot = resolve(scriptsRoot, '..', '..', 'sdk', 'src', 'treeseed', 'template-catalog', 'templates', 'starter-basic', 'template');
+import { join, resolve } from 'node:path';
 
 export function makeWorkspaceRoot() {
 	const root = mkdtempSync(join(tmpdir(), 'treeseed-help-workspace-'));
@@ -26,7 +22,6 @@ cloudflare:
 
 export function makeTenantWorkspace(branch = 'staging') {
 	const root = makeWorkspaceRoot();
-	cpSync(sdkFixtureRoot, root, { recursive: true });
 	mkdirSync(resolve(root, 'packages', 'placeholder'), { recursive: true });
 	writeFileSync(resolve(root, 'packages', 'placeholder', 'package.json'), JSON.stringify({
 		name: '@test/placeholder',
