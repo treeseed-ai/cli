@@ -68,7 +68,7 @@ export function renderTreeseedHelp(commandName?: string | null) {
 
 		const sections = [
 			'Treeseed CLI',
-			'Unified TypeScript command interface for Treeseed project setup, branch workflow, deployment, and release automation.',
+			'Thin command wrapper over the Treeseed SDK workflow/operations surface plus the agent runtime namespace.',
 			'',
 			'Usage',
 			'  treeseed <command> [args...]',
@@ -106,16 +106,32 @@ export function renderTreeseedHelp(commandName?: string | null) {
 				'  treeseed --help',
 				'  treeseed help stage',
 				'  treeseed stage --help',
+				'  treeseed agents --help',
 			]),
 			'',
 			'Notes',
 			'  - Workspace-only commands must be run inside a Treeseed workspace; the CLI will resolve the project root from ancestor directories when possible.',
 			'  - Use `treeseed status`, `treeseed config`, `treeseed switch`, `treeseed save`, `treeseed stage`, and `treeseed release` for development and release work.',
 			'  - Use `treeseed close "reason"` to archive a task without merging; it creates a deprecated resurrection tag before deleting the branch.',
+			'  - Use `treeseed agents <command>` for agent runtime inspection and execution.',
 			'  - Use `--json` on guidance and main workflow commands when an AI agent or script needs machine-readable output.',
 		];
 
 		return sections.filter(Boolean).join('\n');
+	}
+
+	if (commandName === 'agents') {
+		return [
+			'agents  Run the Treeseed agent runtime namespace.',
+			'',
+			'Usage',
+			'  treeseed agents <command>',
+			'  treeseed agents --help',
+			'',
+			'Notes',
+			'  - Delegates to the `@treeseed/agent` CLI contract.',
+			'  - Use `treeseed agents --help` to list supported agent subcommands.',
+		].join('\n');
 	}
 
 	const spec = findTreeseedOperation(commandName);

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { packageRoot } from './package-tools.ts';
+
 const npmCacheDir = resolve(tmpdir(), 'treeseed-npm-cache');
 const textExtensions = new Set(['.js', '.ts', '.mjs', '.cjs', '.d.ts', '.json', '.md']);
 const forbiddenPatterns = [
@@ -79,8 +80,16 @@ function resolveNodeModulesRoot() {
 	throw new Error(`Unable to locate node_modules for ${packageRoot}.`);
 }
 
+function runtimeDependencyNames() {
+	const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {
+		dependencies?: Record<string, string>;
+	};
+	return new Set(Object.keys(packageJson.dependencies ?? {}));
+}
+
 function mirrorDependencies(tempRoot: string) {
 	const sharedNodeModules = resolveNodeModulesRoot();
+	const runtimeDependencies = runtimeDependencyNames();
 	for (const entry of readdirSync(sharedNodeModules, { withFileTypes: true })) {
 		if (entry.name === '.bin') {
 			continue;
@@ -91,7 +100,7 @@ function mirrorDependencies(tempRoot: string) {
 			const targetScopeRoot = resolve(tempRoot, 'node_modules', entry.name);
 			mkdirSync(targetScopeRoot, { recursive: true });
 			for (const scopedEntry of readdirSync(sourceScopeRoot, { withFileTypes: true })) {
-				if (scopedEntry.name === 'cli') {
+				if (scopedEntry.name === 'cli' || !runtimeDependencies.has(`@treeseed/${scopedEntry.name}`)) {
 					continue;
 				}
 
@@ -149,7 +158,23 @@ function assertRequiredDistFiles() {
 	}
 }
 
+function assertPackageDependencyShape() {
+	const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {
+		dependencies?: Record<string, string>;
+	};
+	const dependencyNames = Object.keys(packageJson.dependencies ?? {}).sort();
+	if (dependencyNames.join(',') !== '@treeseed/agent,@treeseed/sdk') {
+		throw new Error(`CLI runtime dependencies must be exactly @treeseed/agent and @treeseed/sdk. Found: ${dependencyNames.join(', ') || '(none)'}`);
+	}
+
+	const packageLock = readFileSync(resolve(packageRoot, 'package-lock.json'), 'utf8');
+	if (packageLock.includes('"@treeseed/core"')) {
+		throw new Error('CLI package-lock.json still references @treeseed/core.');
+	}
+}
+
 run('npm', ['run', 'lint']);
+assertPackageDependencyShape();
 scanDirectory(resolve(packageRoot, 'dist'));
 assertRequiredDistFiles();
 run('npm', ['test']);
@@ -164,8 +189,12 @@ try {
 
 	mirrorDependencies(installRoot);
 	installPackagedPackage(extractRoot, installRoot, cliTarball, 'cli');
+	if (existsSync(resolve(installRoot, 'node_modules', '@treeseed', 'core'))) {
+		throw new Error('Packed install unexpectedly includes @treeseed/core.');
+	}
 	writeFileSync(resolve(installRoot, 'package.json'), `${JSON.stringify({ name: 'treeseed-cli-smoke', private: true, type: 'module' }, null, 2)}\n`, 'utf8');
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', '--help'], installRoot);
+	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', 'agents', '--help'], installRoot);
 	console.log('CLI packed-install bin smoke passed.');
 	rmSync(cliTarball, { force: true });
 } finally {

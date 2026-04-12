@@ -1,16 +1,38 @@
 import type { TreeseedCommandHandler } from '../types.js';
-import { packageScriptPath } from '@treeseed/sdk/workflow-support';
+import { TreeseedOperationsSdk } from '@treeseed/sdk/operations';
 import { guidedResult } from './utils.js';
 
-export const handleInit: TreeseedCommandHandler = (invocation, context) => {
+const operations = new TreeseedOperationsSdk();
+
+export const handleInit: TreeseedCommandHandler = async (invocation, context) => {
 	const directory = invocation.positionals[0];
-	const result = context.spawn(process.execPath, [packageScriptPath('scaffold-site'), ...invocation.rawArgs], {
+	const result = await operations.execute({
+		operationName: 'init',
+		input: {
+			directory,
+			template: invocation.args.template,
+			name: invocation.args.name,
+			slug: invocation.args.slug,
+			siteUrl: invocation.args.siteUrl,
+			contactEmail: invocation.args.contactEmail,
+			repo: invocation.args.repo,
+			discord: invocation.args.discord,
+		},
+	}, {
 		cwd: context.cwd,
-		env: { ...context.env },
-		stdio: 'inherit',
+		env: context.env,
+		write: context.write,
+		spawn: context.spawn,
+		outputFormat: context.outputFormat,
+		transport: 'cli',
 	});
-	if ((result.status ?? 1) !== 0) {
-		return { exitCode: result.status ?? 1 };
+	if (!result.ok) {
+		return {
+			exitCode: result.exitCode ?? 1,
+			stdout: result.stdout,
+			stderr: result.stderr,
+			report: result.payload as Record<string, unknown> | null,
+		};
 	}
 	return guidedResult({
 		command: 'init',
@@ -26,6 +48,7 @@ export const handleInit: TreeseedCommandHandler = (invocation, context) => {
 		],
 		report: {
 			directory: directory ?? null,
+			template: (result.payload as Record<string, unknown> | null)?.template ?? null,
 		},
 	});
 };

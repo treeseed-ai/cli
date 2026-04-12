@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
 import { findCommandSpec, listCommandNames, runTreeseedCli } from '../dist/cli/main.js';
 import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 
@@ -101,6 +102,14 @@ test('workspace-only adapter commands still route correctly when not requesting 
 	assert.match(result.spawns[0].args[0], /workspace-command-e2e/);
 });
 
+test('agents help is delegated through the agent package contract', async () => {
+	const result = await runCli(['agents', '--help']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /treeseed agents <command>/);
+	assert.match(result.output, /run-agent <slug>/);
+	assert.match(result.output, /release-leases/);
+});
+
 test('status and tasks support machine-readable json', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/json-status');
 	const statusResult = await runCli(['status', '--json'], { cwd: workspaceRoot });
@@ -162,4 +171,8 @@ test('command metadata stays aligned with help coverage', () => {
 		assert.ok(command?.description, `${name} should have description`);
 		assert.ok(command?.executionMode, `${name} should declare an execution mode`);
 	}
+});
+
+test('cli command names are sourced from the sdk operation registry', () => {
+	assert.deepEqual(listCommandNames().sort(), listTreeseedOperationNames().sort());
 });

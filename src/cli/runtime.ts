@@ -1,9 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { packageScriptPath } from '@treeseed/sdk/workflow-support';
-import { findNearestTreeseedRoot, findNearestTreeseedWorkspaceRoot, isWorkspaceRoot } from '@treeseed/sdk/workflow-support';
+import { findNearestTreeseedRoot, findNearestTreeseedWorkspaceRoot } from '@treeseed/sdk/workflow-support';
 import { TreeseedOperationsSdk as SdkOperationsRuntime } from '@treeseed/sdk/operations';
 import type {
-	TreeseedAdapterResolver,
 	TreeseedCommandContext,
 	TreeseedHandlerResolver,
 	TreeseedOperationRequest,
@@ -74,7 +72,6 @@ export function writeTreeseedResult(result: TreeseedOperationResult | { exitCode
 
 export type TreeseedOperationsSdkOptions = {
 	resolveHandler?: TreeseedHandlerResolver;
-	resolveAdapter?: TreeseedAdapterResolver;
 };
 
 export class TreeseedOperationsSdk {
@@ -153,18 +150,15 @@ export class TreeseedOperationsSdk {
 	}
 
 	private executeAdapter(spec: TreeseedOperationSpec, argv: string[], context: TreeseedCommandContext) {
-		const input: Record<string, unknown> = {};
-		if (spec.name === 'preview' || spec.name === 'astro') {
-			input.args = argv;
-		} else if (spec.name === 'cleanup:markdown') {
-			input.targets = argv;
-			input.check = false;
-		} else if (spec.name === 'cleanup:markdown:check') {
-			input.targets = argv;
-			input.check = true;
-		} else if (spec.name === 'auth:check') {
-			input.requireAuth = true;
-		}
+		const invocation = spec.options?.length || spec.arguments?.length
+			? parseTreeseedInvocation(spec, argv)
+			: {
+				commandName: spec.name,
+				args: {},
+				positionals: argv.filter((value) => value !== '--'),
+				rawArgs: argv,
+			};
+		const input = spec.buildAdapterInput?.(invocation, context) ?? {};
 
 		return sdkOperationsRuntime.execute(
 			{ operationName: spec.name, input },
@@ -183,27 +177,26 @@ export class TreeseedOperationsSdk {
 			}, context));
 	}
 
-	private executeAgents(argv: string[], context: TreeseedCommandContext) {
-		if (argv.some(isHelpFlag)) {
-			context.write([
-				'agents  Run the Treeseed agents entrypoint.',
-				'',
-				'Usage',
-				'  treeseed agents [args...]',
-				'',
-				'Notes',
-				'  - Delegates directly to the installed treeseed-agents command.',
-			].join('\n'), 'stdout');
-			return 0;
+	private async executeAgents(argv: string[], context: TreeseedCommandContext) {
+		try {
+			const { runTreeseedAgentCli } = await import('@treeseed/agent/cli');
+			return await runTreeseedAgentCli(argv, {
+				cwd: context.cwd,
+				env: context.env,
+				outputFormat: context.outputFormat,
+				write: context.write,
+			});
+		} catch (error) {
+			return writeTreeseedResult({
+				exitCode: 1,
+				stderr: [error instanceof Error ? error.message : String(error)],
+				report: {
+					command: 'agents',
+					ok: false,
+					error: error instanceof Error ? error.message : String(error),
+				},
+			}, context);
 		}
-
-		const command = process.platform === 'win32' ? 'treeseed-agents.cmd' : 'treeseed-agents';
-		const result = context.spawn(command, argv, {
-			cwd: context.cwd,
-			env: { ...context.env },
-			stdio: 'inherit',
-		});
-		return result.status ?? 1;
 	}
 
 	async executeOperation(request: TreeseedOperationRequest, overrides: Partial<TreeseedCommandContext> = {}) {
@@ -251,14 +244,6 @@ export class TreeseedOperationsSdk {
 	}
 }
 
-function formatWorkspaceError(spec: TreeseedOperationSpec) {
-	return [
-		`Treeseed command \`${spec.name}\` must be run inside a Treeseed workspace.`,
-		`Usage: ${renderUsage(spec)}`,
-		`Run \`treeseed help ${spec.name}\` for details.`,
-	].join('\n');
-}
-
 function formatProjectError(spec: TreeseedOperationSpec) {
 	return [
 		`Treeseed command \`${spec.name}\` must be run inside a Treeseed project.`,
@@ -291,31 +276,8 @@ export function resolveTreeseedCommandCwd(spec: TreeseedOperationSpec, cwd: stri
 	};
 }
 
-function resolveAdapter(spec: TreeseedOperationSpec, cwd: string) {
-	const adapter = spec.adapter;
-	if (!adapter) return { error: `Treeseed command \`${spec.name}\` is missing adapter metadata.` };
-	const resolved = resolveTreeseedCommandCwd(spec, cwd);
-	if (!resolved.resolvedProjectRoot && commandNeedsProjectRoot(spec)) {
-		return { error: formatProjectError(spec) };
-	}
-	if (adapter.requireWorkspaceRoot && !resolved.resolvedWorkspaceRoot) {
-		return { error: formatWorkspaceError(spec) };
-	}
-
-	const scriptName = adapter.workspaceScript || adapter.directScript
-		? (resolved.resolvedWorkspaceRoot && isWorkspaceRoot(resolved.resolvedWorkspaceRoot) ? (adapter.workspaceScript ?? adapter.script) : (adapter.directScript ?? adapter.script))
-		: adapter.script;
-
-	return {
-		scriptPath: packageScriptPath(scriptName),
-		extraArgs: adapter.extraArgs ?? [],
-		rewriteArgs: adapter.rewriteArgs,
-	};
-}
-
 const cliOperationsSdk = new TreeseedOperationsSdk({
 	resolveHandler: (handlerName) => COMMAND_HANDLERS[handlerName as keyof typeof COMMAND_HANDLERS] ?? null,
-	resolveAdapter,
 });
 
 export async function executeTreeseedCommand(commandName: string, argv: string[], context: TreeseedCommandContext) {

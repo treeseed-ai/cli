@@ -11,13 +11,13 @@ This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable 
 
 ## Install
 
-Install the CLI alongside the Treeseed runtime package:
+Install the CLI with its runtime dependencies:
 
 ```bash
-npm install @treeseed/cli @treeseed/core
+npm install @treeseed/cli @treeseed/sdk @treeseed/agent
 ```
 
-`@treeseed/cli` depends on `@treeseed/core`, `@treeseed/sdk`, and `@treeseed/agent` at package runtime. In normal consumer installs, npm resolves those package dependencies automatically.
+`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the `@treeseed/agent` command namespace. In normal consumer installs, npm resolves the runtime dependencies automatically.
 
 After installation, the published binary is available as:
 
@@ -40,7 +40,7 @@ The main workflow commands exposed by the current CLI are:
 - `treeseed release --major|--minor|--patch`
 - `treeseed destroy --environment <local|staging|prod>`
 
-Support utilities such as `treeseed rollback`, `treeseed doctor`, `treeseed auth:*`, `treeseed template`, `treeseed sync`, `treeseed lint`, `treeseed test`, `treeseed build`, and service helpers remain available.
+Support utilities such as `treeseed rollback`, `treeseed doctor`, `treeseed auth:*`, `treeseed template`, `treeseed sync`, `treeseed lint`, `treeseed test`, `treeseed build`, service helpers, and `treeseed agents ...` remain available.
 
 Use `treeseed help` for the full command list and `treeseed help <command>` for command-specific usage, options, and examples.
 
@@ -113,4 +113,4 @@ For example, package version `0.1.0` publishes from tag `0.1.0`.
 ## Notes
 
 - `package-lock.json` should be committed and kept current so `npm ci` remains reproducible in CI and release jobs.
-- The README intentionally documents the command surface at a high level. The canonical source of command usage and options is the SDK-owned CLI help/runtime exported by `@treeseed/sdk`.
+- The README intentionally documents the command surface at a high level. The canonical source of operation identity and semantics is `@treeseed/sdk`, while `@treeseed/cli` owns argv parsing, help rendering, and terminal formatting.

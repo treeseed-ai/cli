@@ -43,7 +43,7 @@
     "release:publish": "node ./scripts/run-ts.mjs ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "^0.4.0",
+    "@treeseed/agent": "^0.4.1",
     "@treeseed/sdk": "^0.4.1"
   },
   "devDependencies": {

@@ -95,7 +95,7 @@ export const handleRollback: TreeseedCommandHandler = (invocation, context) => {
 				{ label: 'Requested commit', value: rollbackCommit },
 				{ label: 'Reason', value: compatibility.reason ?? 'Unknown compatibility boundary' },
 			],
-			nextSteps: ['treeseed status', `treeseed publish --environment ${scope}`],
+			nextSteps: ['treeseed status', `treeseed rollback ${scope}`],
 			report: { scope, rollbackCommit, compatibility, deploymentHistory: state.deploymentHistory ?? [] },
 			exitCode: 1,
 		});
@@ -163,7 +163,7 @@ export const handleRollback: TreeseedCommandHandler = (invocation, context) => {
 			{ label: 'Rolled back commit', value: rollbackCommit },
 			{ label: 'Deployed URL', value: finalizedState?.lastDeployedUrl as string | undefined },
 		],
-		nextSteps: ['treeseed status', `treeseed publish --environment ${scope}`],
+		nextSteps: ['treeseed status', `treeseed rollback ${scope}`],
 		report: {
 			scope,
 			rollbackCommit,
