@@ -44,16 +44,23 @@ function resolveCoreAgentCliEntrypoint(cwd: string) {
 		packageJsonPath = existsSync(siblingPackageJsonPath) ? siblingPackageJsonPath : installedPackageJsonPath;
 	}
 	if (!existsSync(packageJsonPath)) {
-		const resolvedPath = require.resolve('@treeseed/core', { paths: [cwd, process.cwd()] });
-		let currentDir = dirname(resolvedPath);
-		while (!existsSync(resolve(currentDir, 'package.json'))) {
-			const parentDir = dirname(currentDir);
-			if (parentDir === currentDir) {
-				throw new Error('Unable to resolve the installed @treeseed/core package root.');
+		try {
+			const resolvedPath = require.resolve('@treeseed/core', { paths: [cwd] });
+			let currentDir = dirname(resolvedPath);
+			while (!existsSync(resolve(currentDir, 'package.json'))) {
+				const parentDir = dirname(currentDir);
+				if (parentDir === currentDir) {
+					throw new Error('Unable to resolve the installed @treeseed/core package root.');
+				}
+				currentDir = parentDir;
 			}
-			currentDir = parentDir;
+			packageJsonPath = resolve(currentDir, 'package.json');
+		} catch {
+			throw new Error(
+				'Treeseed agent commands require the integrated `@treeseed/core` runtime. '
+				+ 'Install `@treeseed/core` in the current project or run the CLI inside a Treeseed workspace.',
+			);
 		}
-		packageJsonPath = resolve(currentDir, 'package.json');
 	}
 
 	const packageRoot = dirname(packageJsonPath);
@@ -249,6 +256,10 @@ export class TreeseedOperationsSdk {
 		const commandName = request.commandName;
 
 		if (commandName === 'agents') {
+			if (argv.some(isHelpFlag)) {
+				context.write(renderTreeseedHelp('agents'), 'stdout');
+				return 0;
+			}
 			return this.executeAgents(argv, context);
 		}
 

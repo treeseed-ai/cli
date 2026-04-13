@@ -104,12 +104,19 @@ test('published adapter commands still execute in isolated package installs', as
 	assert.doesNotMatch(result.stderr, /Unknown treeseed command/);
 });
 
-test('agents help is delegated through the agent package contract', async () => {
+test('agents help is rendered locally without requiring the core runtime', async () => {
 	const result = await runCli(['agents', '--help']);
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /treeseed agents <command>/);
-	assert.match(result.output, /run-agent <slug>/);
-	assert.match(result.output, /release-leases/);
+	assert.match(result.output, /Delegates to the integrated `@treeseed\/core` agent runtime\./);
+	assert.doesNotMatch(result.output, /run-agent <slug>/);
+	assert.doesNotMatch(result.output, /release-leases/);
+});
+
+test('agent execution reports a clear error when the core runtime is unavailable', async () => {
+	const result = await runCli(['agents', 'start'], { cwd: makeTenantWorkspace('feature/no-core-runtime') });
+	assert.equal(result.exitCode, 1);
+	assert.match(result.stderr, /require the integrated `@treeseed\/core` runtime/);
 });
 
 test('status and tasks support machine-readable json', async () => {

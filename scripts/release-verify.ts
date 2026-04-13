@@ -182,8 +182,8 @@ function assertPackageDependencyShape() {
 		dependencies?: Record<string, string>;
 	};
 	const dependencyNames = Object.keys(packageJson.dependencies ?? {}).sort();
-	if (dependencyNames.join(',') !== '@treeseed/core,@treeseed/sdk') {
-		throw new Error(`CLI runtime dependencies must be exactly @treeseed/core and @treeseed/sdk. Found: ${dependencyNames.join(', ') || '(none)'}`);
+	if (dependencyNames.join(',') !== '@treeseed/sdk') {
+		throw new Error(`CLI runtime dependencies must be exactly @treeseed/sdk. Found: ${dependencyNames.join(', ') || '(none)'}`);
 	}
 
 	const packageLock = readFileSync(resolve(packageRoot, 'package-lock.json'), 'utf8');
@@ -216,9 +216,6 @@ try {
 		installPackagedPackage(extractRoot, installRoot, tarballPath, folderName);
 	}
 	installPackagedPackage(extractRoot, installRoot, cliTarball, 'cli');
-	if (!existsSync(resolve(installRoot, 'node_modules', '@treeseed', 'core'))) {
-		throw new Error('Packed install is missing @treeseed/core.');
-	}
 	writeFileSync(resolve(installRoot, 'package.json'), `${JSON.stringify({ name: 'treeseed-cli-smoke', private: true, type: 'module' }, null, 2)}\n`, 'utf8');
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', '--help'], installRoot);
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', 'agents', '--help'], installRoot);
