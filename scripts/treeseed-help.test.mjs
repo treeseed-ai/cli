@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
 import { findCommandSpec, listCommandNames, runTreeseedCli } from '../dist/cli/main.js';
 import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
@@ -162,6 +164,56 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.equal(explicitResult.exitCode, 0);
 	assert.deepEqual(JSON.parse(defaultResult.stdout).scopes, ['local', 'staging', 'prod']);
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
+});
+
+function installCoreDevFixture(root, { workspace = false } = {}) {
+	if (workspace) {
+		const coreRoot = resolve(root, 'packages', 'core');
+		mkdirSync(resolve(coreRoot, 'scripts'), { recursive: true });
+		writeFileSync(resolve(coreRoot, 'package.json'), JSON.stringify({
+			name: '@treeseed/core',
+			version: '0.0.0',
+			exports: {
+				'./scripts/dev-platform': './dist/scripts/dev-platform.js',
+			},
+		}, null, 2));
+		writeFileSync(resolve(coreRoot, 'scripts', 'run-ts.mjs'), 'export {};\n');
+		writeFileSync(resolve(coreRoot, 'scripts', 'dev-platform.ts'), 'export {};\n');
+		return;
+	}
+
+	const coreRoot = resolve(root, 'node_modules', '@treeseed', 'core');
+	mkdirSync(resolve(coreRoot, 'dist', 'scripts'), { recursive: true });
+	writeFileSync(resolve(coreRoot, 'package.json'), JSON.stringify({
+		name: '@treeseed/core',
+		version: '0.0.0',
+		exports: {
+			'./scripts/dev-platform': './dist/scripts/dev-platform.js',
+		},
+	}, null, 2));
+	writeFileSync(resolve(coreRoot, 'dist', 'scripts', 'dev-platform.js'), 'export {};\n');
+}
+
+test('treeseed dev delegates to the core dev-platform entrypoint in workspace mode', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-workspace');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+
+	const result = await runCli(['dev'], { cwd: workspaceRoot });
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 1);
+	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/run-ts\.mjs/);
+	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
+});
+
+test('treeseed dev:watch delegates to the installed core entrypoint with --watch', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-installed');
+	installCoreDevFixture(workspaceRoot);
+
+	const result = await runCli(['dev:watch'], { cwd: workspaceRoot });
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 1);
+	assert.match(result.spawns[0].args.join(' '), /node_modules\/@treeseed\/core\/dist\/scripts\/dev-platform\.js/);
+	assert.ok(result.spawns[0].args.includes('--watch'));
 });
 
 test('command metadata stays aligned with help coverage', () => {

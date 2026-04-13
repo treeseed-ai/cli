@@ -2,7 +2,7 @@
 
 Operator-facing Treeseed CLI package.
 
-This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable workflow and runtime capabilities; `@treeseed/cli` owns argv parsing, command help, terminal formatting, command handlers, and the installable executable surface.
+This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable workflow and runtime capabilities, `@treeseed/core` owns integrated local platform orchestration, and `@treeseed/cli` owns argv parsing, command help, terminal formatting, command handlers, and the installable executable surface.
 
 ## Requirements
 
@@ -14,10 +14,10 @@ This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable 
 Install the CLI with its runtime dependencies:
 
 ```bash
-npm install @treeseed/cli @treeseed/sdk @treeseed/agent
+npm install @treeseed/cli @treeseed/core @treeseed/sdk @treeseed/agent
 ```
 
-`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the `@treeseed/agent` command namespace. In normal consumer installs, npm resolves the runtime dependencies automatically.
+`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the `@treeseed/agent` command namespace. `treeseed dev` resolves and delegates to the tenant-installed `@treeseed/core` runtime. In normal consumer installs, npm resolves the runtime dependencies automatically.
 
 After installation, the published binary is available as:
 
