@@ -87,7 +87,21 @@ function runtimeDependencyNames() {
 	return new Set(Object.keys(packageJson.dependencies ?? {}));
 }
 
-function mirrorDependencies(tempRoot: string) {
+function resolveWorkspaceRuntimePackageRoots() {
+	const runtimeDependencies = runtimeDependencyNames();
+	const roots = new Map<string, string>();
+	for (const packageName of runtimeDependencies) {
+		if (!packageName.startsWith('@treeseed/')) continue;
+		const folderName = packageName.slice('@treeseed/'.length);
+		const candidateRoot = resolve(packageRoot, '..', folderName);
+		if (existsSync(resolve(candidateRoot, 'package.json'))) {
+			roots.set(packageName, candidateRoot);
+		}
+	}
+	return roots;
+}
+
+function mirrorDependencies(tempRoot: string, excludedPackages = new Set<string>()) {
 	const sharedNodeModules = resolveNodeModulesRoot();
 	const runtimeDependencies = runtimeDependencyNames();
 	for (const entry of readdirSync(sharedNodeModules, { withFileTypes: true })) {
@@ -100,7 +114,12 @@ function mirrorDependencies(tempRoot: string) {
 			const targetScopeRoot = resolve(tempRoot, 'node_modules', entry.name);
 			mkdirSync(targetScopeRoot, { recursive: true });
 			for (const scopedEntry of readdirSync(sourceScopeRoot, { withFileTypes: true })) {
-				if (scopedEntry.name === 'cli' || !runtimeDependencies.has(`@treeseed/${scopedEntry.name}`)) {
+				const packageName = `@treeseed/${scopedEntry.name}`;
+				if (
+					scopedEntry.name === 'cli'
+					|| !runtimeDependencies.has(packageName)
+					|| excludedPackages.has(packageName)
+				) {
 					continue;
 				}
 
@@ -182,12 +201,20 @@ run('npm', ['test']);
 const stageRoot = mkdtempSync(join(tmpdir(), 'treeseed-cli-release-'));
 const extractRoot = resolve(stageRoot, 'extract');
 const installRoot = resolve(stageRoot, 'install');
+const workspaceRuntimePackageRoots = resolveWorkspaceRuntimePackageRoots();
 
 try {
 	mkdirSync(extractRoot, { recursive: true });
 	const cliTarball = pack(packageRoot, 'treeseed-cli.tgz');
+	const stagedTarballs: string[] = [cliTarball];
 
-	mirrorDependencies(installRoot);
+	mirrorDependencies(installRoot, new Set(workspaceRuntimePackageRoots.keys()));
+	for (const [packageName, dependencyRoot] of workspaceRuntimePackageRoots.entries()) {
+		const folderName = packageName.slice('@treeseed/'.length);
+		const tarballPath = pack(dependencyRoot, `treeseed-${folderName}.tgz`);
+		stagedTarballs.push(tarballPath);
+		installPackagedPackage(extractRoot, installRoot, tarballPath, folderName);
+	}
 	installPackagedPackage(extractRoot, installRoot, cliTarball, 'cli');
 	if (existsSync(resolve(installRoot, 'node_modules', '@treeseed', 'core'))) {
 		throw new Error('Packed install unexpectedly includes @treeseed/core.');
@@ -196,7 +223,9 @@ try {
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', '--help'], installRoot);
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', 'agents', '--help'], installRoot);
 	console.log('CLI packed-install bin smoke passed.');
-	rmSync(cliTarball, { force: true });
+	for (const tarballPath of stagedTarballs) {
+		rmSync(tarballPath, { force: true });
+	}
 } finally {
 	rmSync(stageRoot, { recursive: true, force: true });
 }
