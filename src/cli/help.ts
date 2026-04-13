@@ -129,7 +129,7 @@ export function renderTreeseedHelp(commandName?: string | null) {
 			'  treeseed agents --help',
 			'',
 			'Notes',
-			'  - Delegates to the `@treeseed/agent` CLI contract.',
+			'  - Delegates to the integrated `@treeseed/core` agent runtime.',
 			'  - Use `treeseed agents --help` to list supported agent subcommands.',
 		].join('\n');
 	}

@@ -1,4 +1,8 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { findNearestTreeseedRoot, findNearestTreeseedWorkspaceRoot } from '@treeseed/sdk/workflow-support';
 import { TreeseedOperationsSdk as SdkOperationsRuntime } from '@treeseed/sdk/operations';
 import type {
@@ -15,6 +19,8 @@ import { renderTreeseedHelp, renderUsage, suggestTreeseedCommands } from './oper
 import { parseTreeseedInvocation, validateTreeseedInvocation } from './operations-parser.ts';
 import { findTreeseedOperation, TRESEED_OPERATION_SPECS } from './operations-registry.ts';
 
+const require = createRequire(import.meta.url);
+
 function isHelpFlag(value: string | undefined) {
 	return value === '--help' || value === '-h';
 }
@@ -26,6 +32,44 @@ function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 
 function defaultSpawn(command: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; stdio?: 'inherit' }) {
 	return spawnSync(command, args, options);
+}
+
+function resolveCoreAgentCliEntrypoint(cwd: string) {
+	const workspaceRoot = findNearestTreeseedWorkspaceRoot(cwd) ?? cwd;
+	const workspacePackageJsonPath = resolve(workspaceRoot, 'packages', 'core', 'package.json');
+	const siblingPackageJsonPath = resolve(cwd, '..', 'core', 'package.json');
+	const installedPackageJsonPath = resolve(cwd, 'node_modules', '@treeseed', 'core', 'package.json');
+	let packageJsonPath = workspacePackageJsonPath;
+	if (!existsSync(packageJsonPath)) {
+		packageJsonPath = existsSync(siblingPackageJsonPath) ? siblingPackageJsonPath : installedPackageJsonPath;
+	}
+	if (!existsSync(packageJsonPath)) {
+		const resolvedPath = require.resolve('@treeseed/core', { paths: [cwd, process.cwd()] });
+		let currentDir = dirname(resolvedPath);
+		while (!existsSync(resolve(currentDir, 'package.json'))) {
+			const parentDir = dirname(currentDir);
+			if (parentDir === currentDir) {
+				throw new Error('Unable to resolve the installed @treeseed/core package root.');
+			}
+			currentDir = parentDir;
+		}
+		packageJsonPath = resolve(currentDir, 'package.json');
+	}
+
+	const packageRoot = dirname(packageJsonPath);
+	const sourceEntrypoint = resolve(packageRoot, 'src', 'agents', 'cli.ts');
+	if (existsSync(sourceEntrypoint)) {
+		return pathToFileURL(sourceEntrypoint).href;
+	}
+
+	const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
+		exports?: Record<string, string | { default?: string }>;
+	};
+	const exportedEntrypoint = packageJson.exports?.['./agent/cli'];
+	const distRelativePath = typeof exportedEntrypoint === 'string'
+		? exportedEntrypoint
+		: exportedEntrypoint?.default ?? './dist/agents/cli.js';
+	return pathToFileURL(resolve(packageRoot, distRelativePath)).href;
 }
 
 const sdkOperationsRuntime = new SdkOperationsRuntime();
@@ -179,7 +223,7 @@ export class TreeseedOperationsSdk {
 
 	private async executeAgents(argv: string[], context: TreeseedCommandContext) {
 		try {
-			const { runTreeseedAgentCli } = await import('@treeseed/agent/cli');
+			const { runTreeseedAgentCli } = await import(resolveCoreAgentCliEntrypoint(context.cwd));
 			return await runTreeseedAgentCli(argv, {
 				cwd: context.cwd,
 				env: context.env,

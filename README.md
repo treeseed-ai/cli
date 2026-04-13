@@ -14,10 +14,10 @@ This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable 
 Install the CLI with its runtime dependencies:
 
 ```bash
-npm install @treeseed/cli @treeseed/core @treeseed/sdk @treeseed/agent
+npm install @treeseed/cli @treeseed/core @treeseed/sdk
 ```
 
-`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the `@treeseed/agent` command namespace. `treeseed dev` resolves and delegates to the tenant-installed `@treeseed/core` runtime. In normal consumer installs, npm resolves the runtime dependencies automatically.
+`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the `@treeseed/core` runtime namespaces. `treeseed dev` and `treeseed agents ...` resolve and delegate to the tenant-installed or sibling-workspace `@treeseed/core` runtime. In normal consumer installs, npm resolves the runtime dependencies automatically.
 
 After installation, the published binary is available as:
 
