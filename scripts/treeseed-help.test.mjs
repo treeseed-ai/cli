@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
 import { findCommandSpec, listCommandNames, runTreeseedCli } from '../dist/cli/main.js';
@@ -14,6 +15,20 @@ import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..', '..', '..');
+const require = createRequire(import.meta.url);
+
+function resolveSdkConfigRuntimePath() {
+	const workspaceCandidate = resolve(repoRoot, 'packages', 'sdk', 'src', 'operations', 'services', 'config-runtime.ts');
+	if (existsSync(workspaceCandidate)) {
+		return workspaceCandidate;
+	}
+	const sdkOperationsEntry = require.resolve('@treeseed/sdk/operations');
+	const sdkDistRoot = resolve(dirname(sdkOperationsEntry), 'operations', 'services', 'config-runtime.js');
+	if (existsSync(sdkDistRoot)) {
+		return sdkDistRoot;
+	}
+	throw new Error('Unable to resolve SDK config runtime source or dist file for the CLI regression test.');
+}
 
 async function runCli(args, options = {}) {
 	const writes = [];
@@ -383,7 +398,7 @@ test('terminal mouse parser recognizes sgr mouse release events', () => {
 });
 
 test('sdk config runtime no longer embeds ink hook usage', () => {
-	const runtimeSource = readFileSync(resolve(repoRoot, 'packages', 'sdk', 'src', 'operations', 'services', 'config-runtime.ts'), 'utf8');
+	const runtimeSource = readFileSync(resolveSdkConfigRuntimePath(), 'utf8');
 	assert.doesNotMatch(runtimeSource, /useStdoutDimensions/);
 	assert.doesNotMatch(runtimeSource, /runTreeseedConfigWizard/);
 });
