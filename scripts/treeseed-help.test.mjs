@@ -232,6 +232,26 @@ test('shared ui framework routes clicks and wheel scrolling to the matching regi
 test('interactive ink help is gated to human tty mode', () => {
 	assert.equal(shouldUseInkHelp({ outputFormat: 'json' }), false);
 	assert.equal(typeof shouldUseInkHelp({ outputFormat: 'human' }), 'boolean');
+	const previousCi = process.env.CI;
+	const previousGitHubActions = process.env.GITHUB_ACTIONS;
+	const previousAct = process.env.ACT;
+	const previousVerifyDriver = process.env.TREESEED_VERIFY_DRIVER;
+	try {
+		process.env.CI = 'true';
+		process.env.GITHUB_ACTIONS = 'true';
+		process.env.ACT = 'true';
+		process.env.TREESEED_VERIFY_DRIVER = 'act';
+		assert.equal(shouldUseInkHelp({ outputFormat: 'human', interactiveUi: true }), false);
+	} finally {
+		if (previousCi === undefined) delete process.env.CI;
+		else process.env.CI = previousCi;
+		if (previousGitHubActions === undefined) delete process.env.GITHUB_ACTIONS;
+		else process.env.GITHUB_ACTIONS = previousGitHubActions;
+		if (previousAct === undefined) delete process.env.ACT;
+		else process.env.ACT = previousAct;
+		if (previousVerifyDriver === undefined) delete process.env.TREESEED_VERIFY_DRIVER;
+		else process.env.TREESEED_VERIFY_DRIVER = previousVerifyDriver;
+	}
 });
 
 test('agent execution reports a clear error when the core runtime is unavailable', async () => {
