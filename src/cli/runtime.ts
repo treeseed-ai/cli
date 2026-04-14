@@ -16,6 +16,7 @@ import type {
 } from './operations-types.ts';
 import { COMMAND_HANDLERS } from './registry.js';
 import { renderTreeseedHelp, renderUsage, suggestTreeseedCommands } from './operations-help.ts';
+import { renderTreeseedHelpInk, shouldUseInkHelp } from './help-ui.js';
 import { parseTreeseedInvocation, validateTreeseedInvocation } from './operations-parser.ts';
 import { findTreeseedOperation, TRESEED_OPERATION_SPECS } from './operations-registry.ts';
 
@@ -96,6 +97,7 @@ export function createTreeseedCommandContext(overrides: Partial<TreeseedCommandC
 		write: overrides.write ?? (defaultWrite as TreeseedWriter),
 		spawn: overrides.spawn ?? (defaultSpawn as TreeseedSpawner),
 		outputFormat: overrides.outputFormat ?? 'human',
+		interactiveUi: overrides.interactiveUi ?? (overrides.write == null),
 		prompt: overrides.prompt,
 		confirm: overrides.confirm,
 	};
@@ -255,16 +257,14 @@ export class TreeseedOperationsSdk {
 		const argv = request.argv ?? [];
 		const commandName = request.commandName;
 
-		if (commandName === 'agents') {
-			if (argv.some(isHelpFlag)) {
-				context.write(renderTreeseedHelp('agents'), 'stdout');
-				return 0;
-			}
-			return this.executeAgents(argv, context);
-		}
-
 		const spec = findTreeseedOperation(commandName);
 		if (!spec) {
+			if (shouldUseInkHelp(context)) {
+				const helpExitCode = await renderTreeseedHelpInk(commandName, context);
+				if (typeof helpExitCode === 'number') {
+					return helpExitCode;
+				}
+			}
 			const suggestions = suggestTreeseedCommands(commandName);
 			const lines = [`Unknown treeseed command: ${commandName}`];
 			if (suggestions.length > 0) {
@@ -275,13 +275,21 @@ export class TreeseedOperationsSdk {
 		}
 
 		if (argv.some(isHelpFlag)) {
+			if (shouldUseInkHelp(context)) {
+				const helpExitCode = await renderTreeseedHelpInk(spec.name, context);
+				if (typeof helpExitCode === 'number') {
+					return helpExitCode;
+				}
+			}
 			context.write(renderTreeseedHelp(spec.name), 'stdout');
 			return 0;
 		}
 
 		return spec.executionMode === 'adapter'
 			? this.executeAdapter(spec, argv, context)
-			: this.executeHandler(spec, argv, context);
+			: spec.executionMode === 'delegate'
+				? this.executeAgents(argv, context)
+				: this.executeHandler(spec, argv, context);
 	}
 
 	async run(argv: string[], overrides: Partial<TreeseedCommandContext> = {}) {
@@ -290,6 +298,12 @@ export class TreeseedOperationsSdk {
 
 		if (!firstArg || isHelpFlag(firstArg) || firstArg === 'help') {
 			const commandName = firstArg === 'help' ? (restArgs[0] ?? null) : null;
+			if (shouldUseInkHelp(context)) {
+				const helpExitCode = await renderTreeseedHelpInk(commandName, context);
+				if (typeof helpExitCode === 'number') {
+					return helpExitCode;
+				}
+			}
 			const helpText = renderTreeseedHelp(commandName);
 			context.write(helpText, 'stdout');
 			return commandName && helpText.startsWith('Unknown treeseed command:') ? 1 : 0;
@@ -309,7 +323,7 @@ function formatProjectError(spec: TreeseedOperationSpec) {
 }
 
 function commandNeedsProjectRoot(spec: TreeseedOperationSpec) {
-	return spec.name !== 'init';
+	return spec.name !== 'init' && spec.name !== 'export';
 }
 
 export function resolveTreeseedCommandCwd(spec: TreeseedOperationSpec, cwd: string) {

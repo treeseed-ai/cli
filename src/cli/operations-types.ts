@@ -8,7 +8,8 @@ import type {
 
 export type TreeseedCommandGroup = TreeseedOperationGroup;
 
-export type TreeseedExecutionMode = 'handler' | 'adapter';
+export type TreeseedExecutionDelegate = 'agents';
+export type TreeseedExecutionMode = 'handler' | 'adapter' | 'delegate';
 export type TreeseedArgumentKind = 'positional' | 'message_tail';
 export type TreeseedOptionKind = 'boolean' | 'string' | 'enum';
 
@@ -28,7 +29,40 @@ export type TreeseedCommandOptionSpec = {
 	values?: string[];
 };
 
-export type TreeseedCommandExample = string;
+export type TreeseedStructuredCommandExample = {
+	command: string;
+	title: string;
+	description: string;
+	result?: string;
+	why?: string;
+};
+
+export type TreeseedCommandExample = string | TreeseedStructuredCommandExample;
+
+export type TreeseedCommandHelpDetail = {
+	name: string;
+	detail: string;
+};
+
+export type TreeseedCommandRelatedDetail = {
+	name: string;
+	why: string;
+};
+
+export type TreeseedCommandHelpSpec = {
+	workflowPosition?: string;
+	longSummary?: string[];
+	whenToUse?: string[];
+	beforeYouRun?: string[];
+	outcomes?: string[];
+	examples?: TreeseedStructuredCommandExample[];
+	optionDetails?: TreeseedCommandHelpDetail[];
+	argumentDetails?: TreeseedCommandHelpDetail[];
+	automationNotes?: string[];
+	warnings?: string[];
+	relatedDetails?: TreeseedCommandRelatedDetail[];
+	seeAlso?: string[];
+};
 
 export type TreeseedParsedInvocation = {
 	commandName: string;
@@ -55,6 +89,7 @@ export type TreeseedCommandContext = {
 	write: TreeseedWriter;
 	spawn: TreeseedSpawner;
 	outputFormat?: 'human' | 'json';
+	interactiveUi?: boolean;
 	prompt?: TreeseedPromptHandler;
 	confirm?: TreeseedConfirmHandler;
 };
@@ -74,9 +109,13 @@ export type TreeseedOperationSpec = TreeseedOperationMetadata & {
 	arguments?: TreeseedCommandArgumentSpec[];
 	options?: TreeseedCommandOptionSpec[];
 	examples?: TreeseedCommandExample[];
+	help?: TreeseedCommandHelpSpec;
 	notes?: string[];
+	helpVisible?: boolean;
+	helpFeatured?: boolean;
 	executionMode: TreeseedExecutionMode;
 	handlerName?: string;
+	delegateTo?: TreeseedExecutionDelegate;
 	buildAdapterInput?: TreeseedAdapterInputBuilder;
 };
 

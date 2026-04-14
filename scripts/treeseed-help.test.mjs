@@ -1,10 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
 import { findCommandSpec, listCommandNames, runTreeseedCli } from '../dist/cli/main.js';
+import { buildTreeseedHelpView } from '../dist/cli/help.js';
+import { shouldUseInkHelp } from '../dist/cli/help-ui.js';
+import { buildCliConfigPages, computeConfigViewportLayout } from '../dist/cli/handlers/config-ui.js';
+import { findClickableRegion, routeWheelDeltaToScrollRegion } from '../dist/cli/ui/framework.js';
+import { parseTerminalMouseInput } from '../dist/cli/ui/mouse.js';
 import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, '..', '..', '..');
 
 async function runCli(args, options = {}) {
 	const writes = [];
@@ -43,9 +52,11 @@ test('treeseed with no args prints top-level help and exits successfully', async
 	const result = await runCli([]);
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /Treeseed CLI/);
-	assert.match(result.output, /Primary Workflow/);
+	assert.match(result.output, /Featured Commands/);
+	assert.match(result.output, /Utilities/);
 	assert.match(result.output, /switch/);
 	assert.match(result.output, /stage/);
+	assert.match(result.output, /agents/);
 	assert.doesNotMatch(result.output, /treeseed ship/);
 });
 
@@ -75,9 +86,24 @@ test('major workflow commands have usage, options, and examples in help', async 
 	for (const command of ['init', 'status', 'config', 'tasks', 'switch', 'save', 'close', 'stage', 'release', 'destroy', 'rollback', 'doctor']) {
 		const result = await runCli(['help', command]);
 		assert.equal(result.exitCode, 0, `help for ${command} should exit successfully`);
+		assert.match(result.output, /Overview/);
+		assert.match(result.output, /When To Use/);
 		assert.match(result.output, /Usage/);
 		assert.match(result.output, /Examples/);
+		assert.match(result.output, /Automation/);
 	}
+});
+
+test('config help includes the advanced full-editor flag', async () => {
+	const result = await runCli(['help', 'config']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /--full/);
+});
+
+test('export help includes the directory argument', async () => {
+	const result = await runCli(['help', 'export']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /treeseed export \[directory\] \[--json\]/);
 });
 
 test('unknown command suggests nearest valid commands', async () => {
@@ -107,10 +133,90 @@ test('published adapter commands still execute in isolated package installs', as
 test('agents help is rendered locally without requiring the core runtime', async () => {
 	const result = await runCli(['agents', '--help']);
 	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /agents  Run the Treeseed agent runtime namespace\./);
 	assert.match(result.output, /treeseed agents <command>/);
 	assert.match(result.output, /Delegates to the integrated `@treeseed\/core` agent runtime\./);
 	assert.doesNotMatch(result.output, /run-agent <slug>/);
 	assert.doesNotMatch(result.output, /release-leases/);
+});
+
+test('command help includes aliases from the shared registry metadata', async () => {
+	const result = await runCli(['help', 'release:verify']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /test:release:full  Run the full release verification path\./);
+	assert.match(result.output, /Aliases/);
+	assert.match(result.output, /release:verify/);
+});
+
+test('help view model is derived from the command registry', () => {
+	const topLevel = buildTreeseedHelpView();
+	const commandHelp = buildTreeseedHelpView('config');
+	assert.equal(topLevel.kind, 'top');
+	assert.ok(topLevel.sections.some((section) => section.title === 'Workflow'));
+	assert.ok(topLevel.sections.some((section) => (section.entries ?? []).some((entry) => entry.label === 'config' && entry.targetCommand === 'config')));
+	assert.equal(commandHelp.kind, 'command');
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Overview'));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'When To Use'));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Before You Run'));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Command'));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Behavior'));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Options'));
+	assert.ok(commandHelp.sections.some((section) => (section.entries ?? []).some((entry) => entry.label.includes('--full'))));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Related' && (section.entries ?? []).some((entry) => entry.targetCommand === 'status')));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Automation'));
+	assert.ok(commandHelp.sections.some((section) => section.title === 'Warnings'));
+	assert.match(commandHelp.statusPrimary, /goes back/);
+});
+
+test('every visible command exposes rich help metadata through the registry', () => {
+	for (const commandName of listCommandNames()) {
+		const spec = findCommandSpec(commandName);
+		assert.ok(spec, `missing spec for ${commandName}`);
+		assert.ok(spec.help, `missing rich help for ${commandName}`);
+		assert.ok((spec.help.longSummary ?? []).length > 0, `missing longSummary for ${commandName}`);
+		assert.ok((spec.help.whenToUse ?? []).length > 0, `missing whenToUse for ${commandName}`);
+		assert.ok((spec.help.beforeYouRun ?? []).length > 0, `missing beforeYouRun for ${commandName}`);
+		assert.ok((spec.help.automationNotes ?? []).length > 0, `missing automationNotes for ${commandName}`);
+	}
+});
+
+test('primary workflow commands expose multiple structured examples', () => {
+	for (const commandName of ['status', 'tasks', 'switch', 'save', 'close', 'stage', 'rollback', 'doctor', 'init', 'config', 'export', 'release', 'destroy']) {
+		const spec = findCommandSpec(commandName);
+		assert.ok(spec?.help, `missing help for ${commandName}`);
+		assert.ok((spec.help.examples ?? []).length >= 3, `expected multiple structured examples for ${commandName}`);
+		for (const example of spec.help.examples ?? []) {
+			assert.equal(typeof example.command, 'string');
+			assert.equal(typeof example.title, 'string');
+			assert.equal(typeof example.description, 'string');
+		}
+	}
+});
+
+test('shared ui framework routes clicks and wheel scrolling to the matching region', () => {
+	let clicked = false;
+	let nextOffset = -1;
+	const clickRegion = findClickableRegion([
+		{ id: 'a', rect: { x: 1, y: 1, width: 5, height: 1 }, onClick: () => { clicked = true; } },
+	], 2, 1);
+	clickRegion?.onClick();
+	assert.equal(clicked, true);
+
+	const didScroll = routeWheelDeltaToScrollRegion([
+		{
+			id: 'scroll',
+			rect: { x: 1, y: 1, width: 10, height: 3 },
+			state: { offset: 0, viewportSize: 2, totalSize: 5 },
+			onScroll: (offset) => { nextOffset = offset; },
+		},
+	], 2, 2, 1);
+	assert.equal(didScroll, true);
+	assert.equal(nextOffset, 1);
+});
+
+test('interactive ink help is gated to human tty mode', () => {
+	assert.equal(shouldUseInkHelp({ outputFormat: 'json' }), false);
+	assert.equal(typeof shouldUseInkHelp({ outputFormat: 'human' }), 'boolean');
 });
 
 test('agent execution reports a clear error when the core runtime is unavailable', async () => {
@@ -173,6 +279,115 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
 });
 
+test('export defaults to the current shell directory and writes a markdown snapshot', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/export-test');
+	const nestedDir = resolve(workspaceRoot, 'src', 'nested');
+	mkdirSync(nestedDir, { recursive: true });
+	writeFileSync(resolve(nestedDir, 'index.ts'), 'export const nested = true;\n');
+
+	const result = await runCli(['export', '--json'], { cwd: nestedDir });
+	assert.equal(result.exitCode, 0);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.command, 'export');
+	assert.equal(payload.ok, true);
+	assert.equal(payload.directory, nestedDir);
+	assert.match(payload.outputPath, /\.treeseed\/exports\/feature-export-test-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.md$/);
+	assert.equal(readFileSync(payload.outputPath, 'utf8').includes('File: index.ts'), true);
+});
+
+test('export accepts an explicit directory positional', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/export-positional');
+	const nestedDir = resolve(workspaceRoot, 'src', 'feature');
+	mkdirSync(nestedDir, { recursive: true });
+	writeFileSync(resolve(nestedDir, 'entry.ts'), 'export const value = 1;\n');
+
+	const result = await runCli(['export', 'src/feature', '--json'], { cwd: workspaceRoot });
+	assert.equal(result.exitCode, 0);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.directory, nestedDir);
+	assert.equal(readFileSync(payload.outputPath, 'utf8').includes('File: entry.ts'), true);
+});
+
+test('config ui startup page model includes only required unresolved entries and de-duplicates shared entries', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		authStatusByScope: {
+			local: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+			staging: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+			prod: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_WEB_SERVICE_ID', label: 'Web service ID', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: 'web', effectiveValue: 'web' },
+				{ id: 'TREESEED_API_WEB_SERVICE_ID', label: 'API trusted web service ID', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: 'web', effectiveValue: 'web' },
+				{ id: 'TREESEED_API_BASE_URL', label: 'API URL', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config', 'deploy'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: 'http://127.0.0.1:3000', suggestedValue: '', effectiveValue: 'http://127.0.0.1:3000' },
+				{ id: 'OPTIONAL_DEFAULTED', label: 'Optional defaulted', group: 'smtp', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: false, currentValue: '', suggestedValue: 'mailpit', effectiveValue: 'mailpit' },
+				{ id: 'OPTIONAL_MISSING', label: 'Optional missing', group: 'smtp', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: false, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			staging: [
+				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_API_BASE_URL', label: 'API URL', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config', 'deploy'], storage: 'scoped', scope: 'staging', sharedScopes: ['staging'], required: true, currentValue: 'https://staging-api.example.com', suggestedValue: '', effectiveValue: 'https://staging-api.example.com' },
+			],
+			prod: [
+				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'all', {}, 'startup');
+	assert.equal(pages.filter((page) => page.entry.id === 'SHARED_TOKEN').length, 1);
+	assert.equal(pages.some((page) => page.entry.id === 'TREESEED_WEB_SERVICE_ID'), false);
+	assert.equal(pages.some((page) => page.entry.id === 'TREESEED_API_WEB_SERVICE_ID'), false);
+	assert.equal(pages.filter((page) => page.entry.id === 'TREESEED_API_BASE_URL').length, 0);
+	assert.equal(pages.some((page) => page.entry.id === 'OPTIONAL_DEFAULTED'), false);
+	assert.equal(pages.some((page) => page.entry.id === 'OPTIONAL_MISSING'), false);
+});
+
+test('config ui full page model includes optional resolved entries', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		authStatusByScope: {
+			local: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+			staging: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+			prod: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'OPTIONAL_DEFAULTED', label: 'Optional defaulted', group: 'smtp', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: false, currentValue: '', suggestedValue: 'mailpit', effectiveValue: 'mailpit' },
+			],
+			staging: [],
+			prod: [],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'all', {}, 'full');
+	assert.equal(pages.some((page) => page.entry.id === 'OPTIONAL_DEFAULTED'), true);
+});
+
+test('config ui viewport layout stays within the terminal height budget', () => {
+	const layout = computeConfigViewportLayout(12, 80);
+	assert.ok(layout.totalHeight <= 12);
+	assert.ok(layout.bodyHeight > 0);
+	assert.ok(layout.detailViewportHeight > 0);
+	assert.ok(layout.inputHeight > 0);
+});
+
+test('terminal mouse parser recognizes sgr mouse release events', () => {
+	const events = parseTerminalMouseInput('\u001b[<0;12;5m');
+	assert.equal(events.length, 1);
+	assert.equal(events[0].x, 11);
+	assert.equal(events[0].y, 4);
+	assert.equal(events[0].button, 'left');
+	assert.equal(events[0].action, 'release');
+});
+
+test('sdk config runtime no longer embeds ink hook usage', () => {
+	const runtimeSource = readFileSync(resolve(repoRoot, 'packages', 'sdk', 'src', 'operations', 'services', 'config-runtime.ts'), 'utf8');
+	assert.doesNotMatch(runtimeSource, /useStdoutDimensions/);
+	assert.doesNotMatch(runtimeSource, /runTreeseedConfigWizard/);
+});
+
 function installCoreDevFixture(root, { workspace = false } = {}) {
 	if (workspace) {
 		const coreRoot = resolve(root, 'packages', 'core');
@@ -233,5 +448,10 @@ test('command metadata stays aligned with help coverage', () => {
 });
 
 test('cli command names are sourced from the sdk operation registry', () => {
-	assert.deepEqual(listCommandNames().sort(), listTreeseedOperationNames().sort());
+	const cliCommandNames = listCommandNames().sort();
+	const sdkCommandNames = listTreeseedOperationNames().sort();
+	assert.ok(cliCommandNames.includes('agents'));
+	for (const name of sdkCommandNames) {
+		assert.ok(cliCommandNames.includes(name), `${name} should be exposed by the CLI registry`);
+	}
 });

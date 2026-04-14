@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as cliExports from '../dist/cli/main.js';
+
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 test('cli package exposes its own runtime entrypoints', () => {
 	assert.equal(typeof cliExports.runTreeseedCli, 'function');
@@ -12,7 +15,7 @@ test('cli package exposes its own runtime entrypoints', () => {
 });
 
 test('published dist contains the cli runtime surface', () => {
-	const distRoot = resolve(process.cwd(), 'dist');
+	const distRoot = resolve(packageRoot, 'dist');
 	const actualFiles = [];
 	const walk = (root) => {
 		for (const entry of readdirSync(root, { withFileTypes: true })) {
@@ -32,6 +35,7 @@ test('published dist contains the cli runtime surface', () => {
 		'cli/main.js',
 		'cli/runtime.js',
 		'cli/help.js',
+		'cli/help-ui.js',
 		'cli/parser.js',
 		'cli/registry.js',
 		'cli/handlers/status.js',
@@ -39,4 +43,12 @@ test('published dist contains the cli runtime surface', () => {
 	]) {
 		assert.ok(actualFiles.includes(requiredFile), `${requiredFile} should be published`);
 	}
+});
+
+test('package bin exports both treeseed and trsd', () => {
+	const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
+	assert.deepEqual(packageJson.bin, {
+		treeseed: './dist/cli/main.js',
+		trsd: './dist/cli/main.js',
+	});
 });

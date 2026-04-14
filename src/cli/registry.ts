@@ -22,6 +22,7 @@ import { handleAuthWhoAmI } from './handlers/auth-whoami.js';
 import { handleTasks } from './handlers/tasks.js';
 import { handleSwitch } from './handlers/switch.js';
 import { handleStage } from './handlers/stage.js';
+import { handleExport } from './handlers/export.js';
 
 export const COMMAND_HANDLERS = {
 	init: handleInit,
@@ -40,6 +41,7 @@ export const COMMAND_HANDLERS = {
 	tasks: handleTasks,
 	switch: handleSwitch,
 	stage: handleStage,
+	export: handleExport,
 	'auth:login': handleAuthLogin,
 	'auth:logout': handleAuthLogout,
 	'auth:whoami': handleAuthWhoAmI,
