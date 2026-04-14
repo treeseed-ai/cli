@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -43,7 +43,7 @@
     "release:publish": "node ./scripts/run-ts.mjs ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "^0.4.6"
+    "@treeseed/sdk": "^0.4.7"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

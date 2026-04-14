@@ -19,6 +19,14 @@ npm install @treeseed/cli @treeseed/core @treeseed/sdk
 
 `@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the `@treeseed/core` runtime namespaces. `treeseed dev` and `treeseed agents ...` resolve and delegate to the tenant-installed or sibling-workspace `@treeseed/core` runtime. In normal consumer installs, npm resolves the runtime dependencies automatically.
 
+Workflow guarantees:
+
+- `treeseed init`, `treeseed config`, and `treeseed release` resolve the project from nested directories and do not rely on the currently checked-out task branch.
+- `treeseed switch` requires a clean worktree before leaving the current branch and creates new task branches from the latest `staging`.
+- `treeseed save` is the canonical checkpoint command: it syncs the current branch with origin, succeeds even when no new changes exist, and can create or refresh preview deployments with `--preview`.
+- `treeseed stage` and `treeseed close` auto-save meaningful uncommitted task-branch changes before merge or cleanup, then leave the repository on `staging`.
+- `treeseed release` completes on `staging` after promoting `staging` into `main` and pushing the release tag.
+
 After installation, the published binary is available as:
 
 ```bash
@@ -34,7 +42,7 @@ The main workflow commands exposed by the current CLI are:
 - `treeseed tasks [--json]`
 - `treeseed switch <branch-name> [--preview]`
 - `treeseed dev`
-- `treeseed save "<commit message>"`
+- `treeseed save [--preview] "<commit message>"`
 - `treeseed stage "<resolution message>"`
 - `treeseed close "<close reason>"`
 - `treeseed release --major|--minor|--patch`
@@ -51,7 +59,7 @@ treeseed status
 treeseed config
 treeseed switch feature/search-improvements --preview
 treeseed dev
-treeseed save "feat: add search filters"
+treeseed save --preview "feat: add search filters"
 treeseed stage "feat: add search filters"
 treeseed release --patch
 treeseed status --json

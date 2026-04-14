@@ -10,16 +10,20 @@ export const handleClose: TreeseedCommandHandler = async (invocation, context) =
 		const payload = result.payload as {
 			branchName: string;
 			message: string;
+			autoSaved: boolean;
 			deprecatedTag: { tagName: string };
 			previewCleanup: { performed: boolean };
+			finalBranch: string;
 		};
 		return guidedResult({
 			command: invocation.commandName || 'close',
 			summary: 'Treeseed close completed successfully.',
 			facts: [
 				{ label: 'Closed branch', value: payload.branchName },
+				{ label: 'Auto-saved', value: payload.autoSaved ? 'yes' : 'no' },
 				{ label: 'Deprecated tag', value: payload.deprecatedTag.tagName },
 				{ label: 'Preview cleanup', value: payload.previewCleanup.performed ? 'performed' : 'not needed' },
+				{ label: 'Final branch', value: payload.finalBranch },
 			],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: payload,

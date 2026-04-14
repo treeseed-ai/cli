@@ -10,9 +10,11 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			level: string;
 			rootVersion: string;
 			releaseTag: string;
+			releasedCommit: string;
 			stagingBranch: string;
 			productionBranch: string;
 			touchedPackages: string[];
+			finalBranch: string;
 		};
 		return guidedResult({
 			command: invocation.commandName || 'release',
@@ -23,7 +25,9 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Release level', value: payload.level },
 				{ label: 'Root version', value: payload.rootVersion },
 				{ label: 'Release tag', value: payload.releaseTag },
+				{ label: 'Released commit', value: payload.releasedCommit.slice(0, 12) },
 				{ label: 'Updated packages', value: payload.touchedPackages.length },
+				{ label: 'Final branch', value: payload.finalBranch },
 			],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: payload,

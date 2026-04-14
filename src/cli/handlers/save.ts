@@ -7,6 +7,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 		const result = await createWorkflowSdk(context).save({
 			message: invocation.positionals.join(' ').trim(),
 			hotfix: invocation.args.hotfix === true,
+			preview: invocation.args.preview === true,
 		});
 		const payload = result.payload as {
 			branch: string;
@@ -14,17 +15,20 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			hotfix: boolean;
 			message: string;
 			commitSha: string;
-			previewRefresh: Record<string, unknown> | null;
+			commitCreated: boolean;
+			noChanges: boolean;
+			previewAction: { status: string };
 		};
 		return guidedResult({
 			command: invocation.commandName || 'save',
-			summary: 'Treeseed save completed successfully.',
+			summary: payload.noChanges ? 'Treeseed save found no new changes and confirmed branch sync.' : 'Treeseed save completed successfully.',
 			facts: [
 				{ label: 'Branch', value: payload.branch },
 				{ label: 'Environment scope', value: payload.scope },
 				{ label: 'Hotfix', value: payload.hotfix ? 'yes' : 'no' },
 				{ label: 'Commit', value: payload.commitSha.slice(0, 12) },
-				{ label: 'Preview refreshed', value: payload.previewRefresh ? 'yes' : 'no' },
+				{ label: 'Commit created', value: payload.commitCreated ? 'yes' : 'no' },
+				{ label: 'Preview action', value: payload.previewAction?.status ?? 'skipped' },
 			],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: payload,
