@@ -42,6 +42,7 @@ function formatPrintEnvReports(payload: Record<string, any>) {
 function renderConfigResult(commandName: string, result: any) {
 	const payload = result.payload as Record<string, any>;
 	const toolHealth = payload.toolHealth as Record<string, any> | undefined;
+	const readinessByScope = payload.result?.readinessByScope ?? {};
 	const summary = payload.mode === 'print-env-only'
 		? 'Treeseed config environment report completed.'
 		: payload.mode === 'rotate-machine-key'
@@ -57,6 +58,9 @@ function renderConfigResult(commandName: string, result: any) {
 			{ label: 'Safe repairs', value: Array.isArray(payload.repairs) ? payload.repairs.length : 0 },
 			{ label: 'Machine config', value: payload.configPath },
 			{ label: 'Machine key', value: payload.keyPath },
+			{ label: 'Local readiness', value: readinessByScope.local?.deployable ? 'deployable' : readinessByScope.local?.configured ? 'configured' : 'pending' },
+			{ label: 'Staging readiness', value: readinessByScope.staging?.deployable ? 'deployable' : readinessByScope.staging?.provisioned ? 'provisioned' : readinessByScope.staging?.configured ? 'configured' : 'pending' },
+			{ label: 'Prod readiness', value: readinessByScope.prod?.deployable ? 'deployable' : readinessByScope.prod?.provisioned ? 'provisioned' : readinessByScope.prod?.configured ? 'configured' : 'pending' },
 			{ label: 'GitHub CLI', value: toolHealth?.githubCli?.available ? 'ready' : 'missing' },
 			{ label: 'gh act', value: toolHealth?.ghActExtension?.available ? 'ready' : 'missing' },
 			{ label: 'Docker', value: toolHealth?.dockerDaemon?.available ? 'ready' : 'missing' },
