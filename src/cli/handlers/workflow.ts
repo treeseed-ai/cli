@@ -13,15 +13,33 @@ export function createWorkflowSdk(context: TreeseedCommandContext, overrides: Pa
 
 export function workflowErrorResult(error: unknown): TreeseedCommandResult {
 	if (error instanceof TreeseedWorkflowError) {
+		const recovery = (error.details?.recovery ?? null) as Record<string, unknown> | null;
 		return {
 			exitCode: error.exitCode ?? (error.code === 'merge_conflict' ? 12 : 1),
 			stderr: [error.message],
 			report: {
+				schemaVersion: 1,
+				kind: 'treeseed.workflow.result',
+				command: error.operation,
+				executionMode: 'execute',
+				runId: typeof recovery?.runId === 'string' ? recovery.runId : null,
 				ok: false,
+				operation: error.operation,
+				summary: error.message,
+				facts: [],
 				error: error.message,
 				code: error.code,
-				operation: error.operation,
-				details: error.details ?? null,
+				payload: null,
+				result: null,
+				nextSteps: [],
+				recovery,
+				errors: [
+					{
+						code: error.code,
+						message: error.message,
+						details: error.details ?? null,
+					},
+				],
 			},
 		};
 	}
@@ -30,8 +48,26 @@ export function workflowErrorResult(error: unknown): TreeseedCommandResult {
 		exitCode: 1,
 		stderr: [message],
 		report: {
+			schemaVersion: 1,
+			kind: 'treeseed.workflow.result',
+			command: 'status',
+			executionMode: 'execute',
+			runId: null,
 			ok: false,
+			operation: 'status',
+			summary: message,
+			facts: [],
 			error: message,
+			payload: null,
+			result: null,
+			nextSteps: [],
+			recovery: null,
+			errors: [
+				{
+					code: 'unsupported_state',
+					message,
+				},
+			],
 		},
 	};
 }
@@ -49,6 +85,10 @@ export function renderWorkflowNextStep(step: TreeseedWorkflowNextStep) {
 			return `treeseed stage "${String(input.message ?? 'describe the resolution')}"`;
 		case 'release':
 			return `treeseed release --${String(input.bump ?? 'patch')}`;
+		case 'resume':
+			return `treeseed resume ${String(input.runId ?? '<run-id>')}`;
+		case 'recover':
+			return 'treeseed recover';
 		case 'config': {
 			const environments = Array.isArray(input.environment) ? input.environment : Array.isArray(input.target) ? input.target : null;
 			return environments?.length ? `treeseed config --environment ${environments[0]}` : 'treeseed config';

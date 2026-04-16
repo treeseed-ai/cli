@@ -245,9 +245,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'branch-name', description: 'Task branch to create or resume.', required: true }],
 		options: [
 			{ name: 'preview', flags: '--preview', description: 'Provision or refresh a branch-scoped Cloudflare preview environment.', kind: 'boolean' },
+			{ name: 'plan', flags: '--plan', description: 'Compute the recursive branch switch plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed switch feature/search-improvements', 'treeseed switch feature/search-improvements --preview'],
+		examples: ['treeseed switch feature/search-improvements', 'treeseed switch feature/search-improvements --preview', 'treeseed switch feature/search-improvements --plan'],
 		help: {
 			workflowPosition: 'start work',
 			longSummary: [
@@ -295,9 +297,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		options: [
 			{ name: 'hotfix', flags: '--hotfix', description: 'Allow save on main for an explicit hotfix.', kind: 'boolean' },
 			{ name: 'preview', flags: '--preview', description: 'Create or refresh the branch preview during save.', kind: 'boolean' },
+			{ name: 'plan', flags: '--plan', description: 'Compute the recursive save plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed save "feat: add search filters"', 'treeseed save --preview "feat: add search filters"', 'treeseed save --hotfix "fix: unblock production form submit"'],
+		examples: ['treeseed save "feat: add search filters"', 'treeseed save --preview "feat: add search filters"', 'treeseed save --plan "feat: add search filters"', 'treeseed save --hotfix "fix: unblock production form submit"'],
 		help: {
 			workflowPosition: 'checkpoint work',
 			longSummary: [
@@ -337,8 +341,12 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	})],
 	['close', command({
 		arguments: [{ name: 'message', description: 'Reason for closing the task without staging it.', required: true, kind: 'message_tail' }],
-		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
-		examples: ['treeseed close "superseded by feature/search-v2"'],
+		options: [
+			{ name: 'plan', flags: '--plan', description: 'Compute the recursive close plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed close "superseded by feature/search-v2"', 'treeseed close --plan "superseded by feature/search-v2"'],
 		notes: ['Auto-saves meaningful uncommitted task-branch changes before cleanup unless disabled in the workflow API.'],
 		help: {
 			workflowPosition: 'abandon task',
@@ -371,8 +379,12 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	})],
 	['stage', command({
 		arguments: [{ name: 'message', description: 'Resolution message for the staged task.', required: true, kind: 'message_tail' }],
-		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
-		examples: ['treeseed stage "feat: add search filters"'],
+		options: [
+			{ name: 'plan', flags: '--plan', description: 'Compute the recursive staging plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed stage "feat: add search filters"', 'treeseed stage --plan "feat: add search filters"'],
 		notes: ['Auto-saves meaningful uncommitted task-branch changes before merging into staging.'],
 		help: {
 			workflowPosition: 'merge to staging',
@@ -400,6 +412,56 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		},
 		executionMode: 'handler',
 		handlerName: 'stage',
+	})],
+	['resume', command({
+		arguments: [{ name: 'run-id', description: 'Interrupted workflow run id to resume.', required: true }],
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed resume save-abcd12', 'treeseed resume stage-ef3456 --json'],
+		help: {
+			workflowPosition: 'recover',
+			longSummary: [
+				'Resume continues a previously interrupted journaled workflow run from its next incomplete step.',
+			],
+			whenToUse: [
+				'Use this after `treeseed recover` or a workflow failure tells you a run is resumable.',
+			],
+			beforeYouRun: [
+				'Confirm the run id from `treeseed recover` and repair any missing remotes, credentials, or package drift that caused the interruption.',
+			],
+			outcomes: [
+				'Re-enters the original workflow command using its recorded input and journal.',
+			],
+			automationNotes: [
+				'`resume --json` preserves the versioned workflow result envelope so agents can continue from a known run id without reparsing a different shape.',
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'resume',
+	})],
+	['recover', command({
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed recover', 'treeseed recover --json'],
+		help: {
+			workflowPosition: 'recover',
+			longSummary: [
+				'Recover lists the active workflow lock plus resumable interrupted runs so humans and agents can decide whether to resume, wait, or repair manually.',
+			],
+			whenToUse: [
+				'Use this before starting a new mutating workflow when you suspect another run may already hold the workspace lock.',
+				'Use this after any interrupted recursive save, stage, close, release, or destroy command.',
+			],
+			beforeYouRun: [
+				'Run it from the market workspace root or anywhere inside the tenant so the CLI can inspect the correct `.treeseed/workflow` journal directory.',
+			],
+			outcomes: [
+				'Reports the active workflow lock, interrupted runs, and the exact `treeseed resume <run-id>` command for resumable runs.',
+			],
+			automationNotes: [
+				'`recover --json` is the supported discovery entrypoint for agents that need to inspect lock state and resumable run ids safely before mutating the workspace.',
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'recover',
 	})],
 	['rollback', command({
 		arguments: [{ name: 'environment', description: 'The persistent environment to roll back.', required: true }],
@@ -711,9 +773,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'major', flags: '--major', description: 'Bump to the next major version.', kind: 'boolean' },
 			{ name: 'minor', flags: '--minor', description: 'Bump to the next minor version.', kind: 'boolean' },
 			{ name: 'patch', flags: '--patch', description: 'Bump to the next patch version.', kind: 'boolean' },
+			{ name: 'plan', flags: '--plan', description: 'Compute the recursive release plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed release --patch', 'treeseed release --minor'],
+		examples: ['treeseed release --patch', 'treeseed release --minor', 'treeseed release --patch --plan'],
 		notes: ['Requires exactly one bump flag.'],
 		help: {
 			workflowPosition: 'promote to production',
@@ -750,17 +814,18 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'release',
 	})],
 	['destroy', command({
-		usage: 'treeseed destroy --environment <local|staging|prod> [--dry-run] [--force] [--skip-confirmation] [--confirm <slug>] [--remove-build-artifacts]',
+		usage: 'treeseed destroy --environment <local|staging|prod> [--plan|--dry-run] [--force] [--skip-confirmation] [--confirm <slug>] [--remove-build-artifacts]',
 		options: [
 			{ name: 'environment', flags: '--environment <scope>', description: 'Select the persistent environment to destroy.', kind: 'enum', values: ['local', 'staging', 'prod'] },
-			{ name: 'dryRun', flags: '--dry-run', description: 'Preview the destroy operation.', kind: 'boolean' },
+			{ name: 'plan', flags: '--plan', description: 'Compute the destroy plan without mutating the environment.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'force', flags: '--force', description: 'Force worker deletion when supported.', kind: 'boolean' },
 			{ name: 'skipConfirmation', flags: '--skip-confirmation', description: 'Skip the interactive confirmation prompt.', kind: 'boolean' },
 			{ name: 'confirm', flags: '--confirm <slug>', description: 'Provide the expected slug confirmation non-interactively.', kind: 'string' },
 			{ name: 'removeBuildArtifacts', flags: '--remove-build-artifacts', description: 'Also remove local build artifacts after destroy.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed destroy --environment staging --dry-run', 'treeseed destroy --environment prod --confirm example --skip-confirmation'],
+		examples: ['treeseed destroy --environment staging --plan', 'treeseed destroy --environment prod --confirm example --skip-confirmation'],
 		notes: ['Only for persistent environments. Task cleanup belongs to treeseed close.', 'This command is destructive and requires explicit confirmation.'],
 		help: {
 			workflowPosition: 'tear down environment',
@@ -769,7 +834,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			whenToUse: [
 				'Use this when a persistent environment should be intentionally removed rather than rolled back or updated.',
-				'Use `--dry-run` first when you want to inspect the destroy plan without committing to it.',
+				'Use `--plan` first when you want to inspect the destroy plan without committing to it.',
 			],
 			beforeYouRun: [
 				'Confirm the environment scope exactly. This command does not target task-branch cleanup; it targets persistent environments only.',
@@ -780,7 +845,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Optionally removes local build artifacts if requested.',
 			],
 			examples: [
-				example('treeseed destroy --environment staging --dry-run', 'Preview the destroy plan', 'Inspect what would be removed from staging without actually performing the destroy.'),
+				example('treeseed destroy --environment staging --plan', 'Preview the destroy plan', 'Inspect what would be removed from staging without actually performing the destroy.'),
 				example('treeseed destroy --environment prod --confirm example --skip-confirmation', 'Run a deliberate non-interactive destroy', 'Provide the expected slug explicitly when operating in a scripted or no-prompt environment.'),
 				example('treeseed destroy --environment local --remove-build-artifacts', 'Remove a local environment and its artifacts', 'Destroy the local environment and also delete local build outputs.'),
 			],

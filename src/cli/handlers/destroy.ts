@@ -27,6 +27,7 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 			},
 		}).destroy({
 			environment: String(invocation.args.environment) as 'local' | 'staging' | 'prod',
+			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 			force: invocation.args.force === true,
 			removeBuildArtifacts: invocation.args.removeBuildArtifacts === true,
@@ -38,14 +39,16 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 		};
 		return guidedResult({
 			command: invocation.commandName || 'destroy',
-			summary: payload.dryRun ? 'Treeseed destroy dry run completed.' : 'Treeseed destroy completed successfully.',
+			summary: result.executionMode === 'plan'
+				? 'Treeseed destroy plan ready.'
+				: 'Treeseed destroy completed successfully.',
 			facts: [
 				{ label: 'Environment', value: payload.scope },
 				{ label: 'Dry run', value: payload.dryRun ? 'yes' : 'no' },
 				{ label: 'Removed build artifacts', value: payload.removeBuildArtifacts ? 'yes' : 'no' },
 			],
 			nextSteps: renderWorkflowNextSteps(result),
-			report: payload,
+			report: result,
 		});
 	} catch (error) {
 		return workflowErrorResult(error);

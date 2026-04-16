@@ -21,6 +21,7 @@ export const handleTasks: TreeseedCommandHandler = async (_invocation, context) 
 			})),
 			nextSteps: renderWorkflowNextSteps(result),
 			report: {
+				...result,
 				tasks,
 			},
 		});

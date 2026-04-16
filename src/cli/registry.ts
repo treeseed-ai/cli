@@ -23,6 +23,8 @@ import { handleTasks } from './handlers/tasks.js';
 import { handleSwitch } from './handlers/switch.js';
 import { handleStage } from './handlers/stage.js';
 import { handleExport } from './handlers/export.js';
+import { handleResume } from './handlers/resume.js';
+import { handleRecover } from './handlers/recover.js';
 
 export const COMMAND_HANDLERS = {
 	init: handleInit,
@@ -41,6 +43,8 @@ export const COMMAND_HANDLERS = {
 	tasks: handleTasks,
 	switch: handleSwitch,
 	stage: handleStage,
+	resume: handleResume,
+	recover: handleRecover,
 	export: handleExport,
 	'auth:login': handleAuthLogin,
 	'auth:logout': handleAuthLogout,

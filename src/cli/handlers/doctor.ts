@@ -1,14 +1,18 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { TreeseedCommandHandler } from '../types.js';
 import { collectCliPreflight } from '@treeseed/sdk/workflow-support';
 import { guidedResult } from './utils.js';
-import { resolveTreeseedWorkflowState } from '../workflow-state.js';
 import { applyTreeseedSafeRepairs } from '../repair.js';
+import { createWorkflowSdk, workflowErrorResult } from './workflow.js';
 
-export const handleDoctor: TreeseedCommandHandler = (invocation, context) => {
-	const performedFixes = invocation.args.fix === true && resolveTreeseedWorkflowState(context.cwd).deployConfigPresent
-		? applyTreeseedSafeRepairs(context.cwd)
+export const handleDoctor: TreeseedCommandHandler = async (invocation, context) => {
+	try {
+	const status = await createWorkflowSdk(context).status();
+	const state = status.payload;
+	const performedFixes = invocation.args.fix === true && state.deployConfigPresent
+		? applyTreeseedSafeRepairs(state.cwd)
 		: [];
-	const state = resolveTreeseedWorkflowState(context.cwd);
 	const preflight = collectCliPreflight({ cwd: context.cwd, requireAuth: false });
 	const railwayManagedServicesEnabled = Object.values(state.managedServices).some((service) => service.enabled);
 	const mustFixNow: string[] = [];
@@ -20,6 +24,27 @@ export const handleDoctor: TreeseedCommandHandler = (invocation, context) => {
 	if (preflight.missingCommands.includes('git')) mustFixNow.push('Install Git.');
 	if (preflight.missingCommands.includes('npm')) mustFixNow.push('Install npm 10 or newer.');
 	if (!state.files.machineConfig) mustFixNow.push('Run `treeseed config --environment local` to create the local machine config.');
+	if (state.packageSync.blockers.length > 0) mustFixNow.push(...state.packageSync.blockers);
+	if (state.workflowControl.lock.active && state.workflowControl.lock.runId) {
+		mustFixNow.push(`Active workflow lock detected for run ${state.workflowControl.lock.runId}. Use \`treeseed recover\` before starting another mutating command.`);
+	}
+	if (state.workflowControl.interruptedRuns.length > 0) {
+		mustFixNow.push(`Interrupted workflow runs detected. Resume the latest run with \`treeseed resume ${state.workflowControl.interruptedRuns[0].runId}\` or inspect \`treeseed recover\`.`);
+	}
+	if (state.packageSync.completeCheckout) {
+		for (const repo of state.packageSync.repos) {
+			const publishWorkflowPath = resolve(state.cwd, repo.path, '.github', 'workflows', 'publish.yml');
+			if (!existsSync(publishWorkflowPath)) {
+				mustFixNow.push(`${repo.name} is missing .github/workflows/publish.yml required for recursive release.`);
+			}
+		}
+	}
+	for (const workflowName of ['verify.yml', 'deploy.yml']) {
+		const workflowPath = resolve(state.cwd, '.github', 'workflows', workflowName);
+		if (!existsSync(workflowPath)) {
+			mustFixNow.push(`Missing root workflow contract .github/workflows/${workflowName}.`);
+		}
+	}
 
 	if (!state.files.envLocal) optional.push('Create `.env.local` or run `treeseed config --environment local` to generate it.');
 	if (!state.files.devVars) optional.push('Generate `.dev.vars` by running `treeseed config --environment local`.');
@@ -48,6 +73,7 @@ export const handleDoctor: TreeseedCommandHandler = (invocation, context) => {
 			...(mustFixNow.length === 0 ? optional : optional.map((item) => `Optional: ${item}`)),
 		],
 		report: {
+			...status,
 			state,
 			preflight,
 			performedFixes,
@@ -56,4 +82,7 @@ export const handleDoctor: TreeseedCommandHandler = (invocation, context) => {
 		},
 		exitCode: mustFixNow.length === 0 ? 0 : 1,
 	});
+	} catch (error) {
+		return workflowErrorResult(error);
+	}
 };

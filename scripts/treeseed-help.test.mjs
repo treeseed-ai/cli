@@ -91,7 +91,7 @@ test('treeseed command help renders without executing the command', async () => 
 	const helpViaFlag = await runCli(['stage', '--help']);
 	assert.equal(helpViaCommand.exitCode, 0);
 	assert.equal(helpViaFlag.exitCode, 0);
-	assert.match(helpViaCommand.output, /stage  Merge the current task/);
+	assert.match(helpViaCommand.output, /stage  Squash a task branch into staging across market and packages\./);
 	assert.match(helpViaCommand.output, /<message>/);
 	assert.equal(helpViaCommand.output, helpViaFlag.output);
 	assert.equal(helpViaFlag.spawns.length, 0);

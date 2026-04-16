@@ -16,6 +16,11 @@ export const handleStatus: TreeseedCommandHandler = async (_invocation, context)
 				{ label: 'Branch role', value: state.branchRole },
 				{ label: 'Mapped environment', value: state.environment },
 				{ label: 'Dirty worktree', value: state.dirtyWorktree ? 'yes' : 'no' },
+				{ label: 'Package mode', value: state.packageSync.mode },
+				{ label: 'Full package checkout', value: state.packageSync.completeCheckout ? 'yes' : 'no' },
+				{ label: 'Package branch aligned', value: state.packageSync.aligned ? 'yes' : 'no' },
+				{ label: 'Dirty package repos', value: state.packageSync.dirty ? 'yes' : 'no' },
+				{ label: 'Package blockers', value: state.packageSync.blockers.length > 0 ? state.packageSync.blockers.join(' | ') : '(none)' },
 				{ label: 'Local initialized', value: state.persistentEnvironments.local.initialized ? 'yes' : 'no' },
 				{ label: 'Staging initialized', value: state.persistentEnvironments.staging.initialized ? 'yes' : 'no' },
 				{ label: 'Prod initialized', value: state.persistentEnvironments.prod.initialized ? 'yes' : 'no' },
@@ -30,6 +35,7 @@ export const handleStatus: TreeseedCommandHandler = async (_invocation, context)
 			],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: {
+				...result,
 				state,
 			},
 		});

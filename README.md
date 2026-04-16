@@ -21,11 +21,14 @@ npm install @treeseed/cli @treeseed/core @treeseed/sdk
 
 Workflow guarantees:
 
-- `treeseed init`, `treeseed config`, and `treeseed release` resolve the project from nested directories and do not rely on the currently checked-out task branch.
-- `treeseed switch` requires a clean worktree before leaving the current branch and creates new task branches from the latest `staging`.
-- `treeseed save` is the canonical checkpoint command: it syncs the current branch with origin, succeeds even when no new changes exist, and can create or refresh preview deployments with `--preview`.
-- `treeseed stage` and `treeseed close` auto-save meaningful uncommitted task-branch changes before merge or cleanup, then leave the repository on `staging`.
-- `treeseed release` completes on `staging` after promoting `staging` into `main` and pushing the release tag.
+- `treeseed` is the only supported project-management surface for market and any checked-out `packages/sdk`, `packages/core`, and `packages/cli` repos.
+- `treeseed switch` requires clean worktrees, mirrors the task branch into checked-out package repos, and only pushes the market branch on branch creation.
+- `treeseed save` is the canonical recursive checkpoint command: it verifies, commits, and pushes dirty package repos in dependency order before saving the market repo.
+- `treeseed stage` squash-merges task branches into `staging` across package repos first, refreshes market submodule pointers to package `staging` heads, then stages the market repo.
+- `treeseed close` recursively archives and deletes matching task branches across market and checked-out package repos.
+- `treeseed release` only bumps, tags, and publishes changed packages plus internal dependents, then syncs market production to package `main` heads.
+- Every mutating workflow command supports `--plan`; `--dry-run` is only an alias where it still exists for compatibility.
+- Interrupted workflow runs are journaled under `.treeseed/workflow`; use `treeseed recover` to inspect them and `treeseed resume <run-id>` to continue a resumable run.
 
 After installation, the published binary is available as:
 
@@ -42,11 +45,13 @@ The main workflow commands exposed by the current CLI are:
 - `treeseed tasks [--json]`
 - `treeseed switch <branch-name> [--preview]`
 - `treeseed dev`
-- `treeseed save [--preview] "<commit message>"`
+- `treeseed save [--preview] [--plan] "<commit message>"`
 - `treeseed stage "<resolution message>"`
 - `treeseed close "<close reason>"`
-- `treeseed release --major|--minor|--patch`
-- `treeseed destroy --environment <local|staging|prod>`
+- `treeseed release --major|--minor|--patch [--plan]`
+- `treeseed resume <run-id>`
+- `treeseed recover`
+- `treeseed destroy --environment <local|staging|prod> [--plan]`
 
 Support utilities such as `treeseed rollback`, `treeseed doctor`, `treeseed auth:*`, `treeseed template`, `treeseed sync`, `treeseed lint`, `treeseed test`, `treeseed build`, service helpers, and `treeseed agents ...` remain available.
 
@@ -57,13 +62,35 @@ Use `treeseed help` for the full command list and `treeseed help <command>` for 
 ```bash
 treeseed status
 treeseed config
+treeseed switch feature/search-improvements --plan
 treeseed switch feature/search-improvements --preview
 treeseed dev
 treeseed save --preview "feat: add search filters"
 treeseed stage "feat: add search filters"
 treeseed release --patch
+treeseed recover
 treeseed status --json
 ```
+
+## Agent-Safe Workflow
+
+Use planning mode before any destructive or multi-repo mutation:
+
+```bash
+treeseed switch feature/search-improvements --plan --json
+treeseed save --plan "feat: add search filters" --json
+treeseed stage --plan "feat: add search filters" --json
+treeseed release --patch --plan --json
+```
+
+If a workflow stops partway through, inspect the journaled state and resume from the recorded run:
+
+```bash
+treeseed recover
+treeseed resume <run-id>
+```
+
+In a full checked-out workspace, `treeseed tasks`, `treeseed status`, and `treeseed doctor` also report package-branch drift, dirty embedded repos, active workflow locks, and interrupted runs.
 
 ## Maintainer Workflow
 

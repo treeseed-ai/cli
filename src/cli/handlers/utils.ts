@@ -33,18 +33,27 @@ export function guidedResult(options: GuidedResultOptions): TreeseedCommandResul
 			lines.push(`- ${step}`);
 		}
 	}
-	return {
-		exitCode: options.exitCode ?? 0,
-		stdout: lines,
-		stderr: options.stderr,
-		report: {
+	const report = options.report && typeof options.report === 'object'
+		? {
+			...(options.report as Record<string, unknown>),
 			command: options.command,
 			ok: (options.exitCode ?? 0) === 0,
 			summary: options.summary,
 			facts: facts.map((fact) => ({ label: fact.label, value: fact.value })),
 			nextSteps: options.nextSteps ?? [],
-			...(options.report ?? {}),
-		},
+		}
+		: {
+			command: options.command,
+			ok: (options.exitCode ?? 0) === 0,
+			summary: options.summary,
+			facts: facts.map((fact) => ({ label: fact.label, value: fact.value })),
+			nextSteps: options.nextSteps ?? [],
+		};
+	return {
+		exitCode: options.exitCode ?? 0,
+		stdout: lines,
+		stderr: options.stderr,
+		report,
 	};
 }
 
