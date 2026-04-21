@@ -5,19 +5,24 @@ import { dirname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
-import { findCommandSpec, listCommandNames, runTreeseedCli } from '../dist/cli/main.js';
-import { buildTreeseedHelpView } from '../dist/cli/help.js';
-import { shouldUseInkHelp } from '../dist/cli/help-ui.js';
-import {
+import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+
+for (const key of ['CI', 'ACT', 'GITHUB_ACTIONS', 'TREESEED_VERIFY_DRIVER']) {
+	delete process.env[key];
+}
+
+const { findCommandSpec, listCommandNames, runTreeseedCli } = await import('../dist/cli/main.js');
+const { buildTreeseedHelpView } = await import('../dist/cli/help.js');
+const { shouldUseInkHelp } = await import('../dist/cli/help-ui.js');
+const {
 	applyConfigInputInsertion,
 	buildCliConfigPages,
 	computeConfigViewportLayout,
 	filterCliConfigPages,
 	normalizeConfigInputChunk,
-} from '../dist/cli/handlers/config-ui.js';
-import { findClickableRegion, routeWheelDeltaToScrollRegion } from '../dist/cli/ui/framework.js';
-import { parseTerminalMouseInput } from '../dist/cli/ui/mouse.js';
-import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+} = await import('../dist/cli/handlers/config-ui.js');
+const { findClickableRegion, routeWheelDeltaToScrollRegion } = await import('../dist/cli/ui/framework.js');
+const { parseTerminalMouseInput } = await import('../dist/cli/ui/mouse.js');
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..', '..', '..');
@@ -36,11 +41,23 @@ function resolveSdkConfigRuntimePath() {
 	throw new Error('Unable to resolve SDK config runtime source or dist file for the CLI regression test.');
 }
 
+function assertSuccessWithDiagnostics(result, label) {
+	if (result.exitCode !== 0) {
+		console.error(`[${label}] stdout:\n${result.stdout}`);
+		console.error(`[${label}] stderr:\n${result.stderr}`);
+	}
+	assert.equal(result.exitCode, 0);
+}
+
 async function runCli(args, options = {}) {
 	const writes = [];
 	const spawns = [];
 	const envOverrides = {
 		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
+		CI: undefined,
+		ACT: undefined,
+		GITHUB_ACTIONS: undefined,
+		TREESEED_VERIFY_DRIVER: undefined,
 		...(options.env ?? {}),
 	};
 	const previousEnv = new Map();
@@ -323,7 +340,7 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(result.exitCode, 0);
+	assertSuccessWithDiagnostics(result, 'config-json-local');
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.command, 'config');
 	assert.equal(payload.ok, true);
@@ -340,8 +357,8 @@ test('config defaults to all environments and supports explicit all', async () =
 	};
 	const defaultResult = await runCli(['config', '--print-env-only', '--json'], { cwd: workspaceRoot, env });
 	const explicitResult = await runCli(['config', '--environment', 'all', '--print-env-only', '--json'], { cwd: workspaceRoot, env });
-	assert.equal(defaultResult.exitCode, 0);
-	assert.equal(explicitResult.exitCode, 0);
+	assertSuccessWithDiagnostics(defaultResult, 'config-print-env-default');
+	assertSuccessWithDiagnostics(explicitResult, 'config-print-env-explicit-all');
 	assert.deepEqual(JSON.parse(defaultResult.stdout).scopes, ['local', 'staging', 'prod']);
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
 });
@@ -388,7 +405,7 @@ test('config supports explicit non-interactive application without json output',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(result.exitCode, 0);
+	assertSuccessWithDiagnostics(result, 'config-non-interactive');
 	assert.match(result.stdout, /Treeseed config completed successfully/);
 });
 
