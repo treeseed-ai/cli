@@ -1,4 +1,5 @@
-import { Box, render, Text, useApp, useInput, useWindowSize } from 'ink';
+import { spawnSync } from 'node:child_process';
+import { Box, render, Text, useApp, useInput, usePaste, useWindowSize } from 'ink';
 import React from 'react';
 import {
 	AppFrame,
@@ -10,7 +11,6 @@ import {
 	PrimaryButton,
 	SidebarList,
 	type UiClickRegion,
-	type UiRect,
 	type UiScrollRegion,
 	type UiViewportLayout,
 	routeWheelDeltaToScrollRegion,
@@ -18,26 +18,33 @@ import {
 	SecondaryButton,
 	StatusBar,
 	TextInputField,
-	TopTabs,
+	formatSecretMaskedValue,
 	truncateLine,
 	wrapText,
 } from '../ui/framework.js';
 import { useTerminalMouse } from '../ui/mouse.js';
 
-type ConfigScope = 'all' | 'local' | 'staging' | 'prod';
+type ConfigScope = 'local' | 'staging' | 'prod';
 export type ConfigViewMode = 'startup' | 'full';
-type ConfigFocusArea = 'environment' | 'mode' | 'sidebar' | 'content' | 'actions';
+type ConfigFocusArea = 'environment' | 'filter' | 'sidebar' | 'content' | 'actions';
+type ConfigValidation =
+	| { kind: 'string' | 'nonempty' | 'boolean' | 'number' | 'url' | 'email' }
+	| { kind: 'enum'; values: string[] };
 
 type ConfigEntry = {
 	id: string;
 	label: string;
 	group: string;
+	cluster: string;
+	startupProfile: 'core' | 'optional' | 'advanced';
+	requirement: 'required' | 'conditional' | 'optional';
 	description: string;
 	howToGet: string;
 	sensitivity: 'secret' | 'plain' | 'derived';
 	targets: string[];
 	purposes: string[];
 	storage: 'shared' | 'scoped';
+	validation?: ConfigValidation;
 	scope: Exclude<ConfigScope, 'all'>;
 	sharedScopes: Array<Exclude<ConfigScope, 'all'>>;
 	required: boolean;
@@ -53,14 +60,21 @@ type ConfigContextSnapshot = {
 	};
 	scopes: Array<Exclude<ConfigScope, 'all'>>;
 	entriesByScope: Record<Exclude<ConfigScope, 'all'>, ConfigEntry[]>;
-	authStatusByScope: Record<Exclude<ConfigScope, 'all'>, { gh: { authenticated: boolean }; wrangler: { authenticated: boolean }; railway: { authenticated: boolean } }>;
+	configReadinessByScope: Record<Exclude<ConfigScope, 'all'>, {
+		github: { configured: boolean };
+		cloudflare: { configured: boolean };
+		railway: { configured: boolean };
+		localDevelopment: { configured: boolean };
+	}>;
 };
 
 export type ConfigPage = {
+	kind: 'entry';
 	key: string;
 	entry: ConfigEntry;
-	scope: Exclude<ConfigScope, 'all'>;
-	scopes: Array<Exclude<ConfigScope, 'all'>>;
+	scope: ConfigScope;
+	scopes: ConfigScope[];
+	requiredScopes: ConfigScope[];
 	required: boolean;
 	currentValue: string;
 	suggestedValue: string;
@@ -78,6 +92,17 @@ export type ConfigEditorResult = {
 	viewMode: ConfigViewMode;
 };
 
+type ConfigCommitUpdate = {
+	scope: Exclude<ConfigScope, 'all'>;
+	entryId: string;
+	value: string;
+};
+
+export type ConfigInputState = {
+	value: string;
+	cursor: number;
+};
+
 export type ConfigViewportLayout = UiViewportLayout & {
 	sidebarWidth: number;
 	contentWidth: number;
@@ -87,28 +112,77 @@ export type ConfigViewportLayout = UiViewportLayout & {
 	actionRowHeight: number;
 };
 
-const CONFIG_FILTERS: ConfigScope[] = ['all', 'local', 'staging', 'prod'];
-const CONFIG_VIEW_MODES: ConfigViewMode[] = ['startup', 'full'];
+const FULL_CONFIG_FILTERS: ConfigScope[] = ['local', 'staging', 'prod'];
 
 function maskValue(value: string) {
 	if (!value) {
 		return '(unset)';
 	}
-	if (value.length <= 8) {
-		return '********';
-	}
-	return `${value.slice(0, 3)}...${value.slice(-3)}`;
+	return formatSecretMaskedValue(value);
 }
 
-function scopeOrder(scope: Exclude<ConfigScope, 'all'>) {
+function scopeOrder(scope: ConfigScope) {
 	return ['local', 'staging', 'prod'].indexOf(scope);
 }
 
+function providerWorkflowKey(entry: ConfigEntry) {
+	const id = entry.id.toUpperCase();
+	if (id.startsWith('GH_') || id.includes('GITHUB')) {
+		return 'github';
+	}
+	if (id.startsWith('CLOUDFLARE_') || id.includes('TURNSTILE') || entry.group === 'cloudflare') {
+		return 'cloudflare';
+	}
+	if (id.startsWith('RAILWAY_') || entry.group === 'railway') {
+		return 'railway';
+	}
+	if (entry.group === 'local-development') {
+		return 'local-development';
+	}
+	if (entry.group === 'forms') {
+		return 'forms';
+	}
+	if (entry.group === 'smtp') {
+		return 'smtp';
+	}
+	if (entry.group === 'auth') {
+		return 'auth-core';
+	}
+	return entry.group;
+}
+
+function providerWorkflowRank(entry: ConfigEntry) {
+	const order = ['auth-core', 'github', 'cloudflare', 'railway', 'local-development', 'forms', 'smtp'];
+	const index = order.indexOf(providerWorkflowKey(entry));
+	return index === -1 ? order.length : index;
+}
+
+function normalizedClusterKey(entry: ConfigEntry) {
+	const provider = providerWorkflowKey(entry);
+	const cluster = entry.cluster.trim().toLowerCase();
+	if (provider === 'cloudflare') {
+		if (entry.id.includes('API_TOKEN') || entry.id.includes('ACCOUNT_ID')) {
+			return 'cloudflare-account';
+		}
+		if (entry.id.includes('TURNSTILE') || cluster.includes('turnstile')) {
+			return 'cloudflare-turnstile';
+		}
+		return `cloudflare-${cluster}`;
+	}
+	if (provider === 'railway') {
+		if (entry.id.includes('API_TOKEN') || entry.id === 'RAILWAY_TOKEN') {
+			return 'railway-access';
+		}
+		return `railway-${cluster}`;
+	}
+	return `${provider}-${cluster}`;
+}
+
 function resolveFirstNonEmptyValue(
-	scopes: Array<Exclude<ConfigScope, 'all'>>,
+	scopes: ConfigScope[],
 	entriesByScope: ConfigContextSnapshot['entriesByScope'],
 	entryId: string,
-	field: 'currentValue' | 'suggestedValue',
+	field: 'currentValue' | 'suggestedValue' | 'effectiveValue',
 ) {
 	for (const scope of scopes) {
 		const entry = entriesByScope[scope].find((candidate) => candidate.id === entryId);
@@ -120,16 +194,98 @@ function resolveFirstNonEmptyValue(
 	return '';
 }
 
+function resolveSharedEntryValue(
+	relevantScopes: ConfigScope[],
+	requiredScopes: ConfigScope[],
+	entriesByScope: ConfigContextSnapshot['entriesByScope'],
+	entryId: string,
+	field: 'currentValue' | 'suggestedValue' | 'effectiveValue',
+	options: { fallbackToRelevant?: boolean } = {},
+) {
+	const preferredScopes = requiredScopes.length > 0 ? requiredScopes : relevantScopes;
+	const preferredValue = resolveFirstNonEmptyValue(preferredScopes, entriesByScope, entryId, field);
+	if (preferredValue.length > 0) {
+		return preferredValue;
+	}
+	if (options.fallbackToRelevant === false) {
+		return '';
+	}
+	return resolveFirstNonEmptyValue(relevantScopes, entriesByScope, entryId, field);
+}
+
+function resolveCurrentConfigValue(
+	context: ConfigContextSnapshot,
+	overrides: Record<string, string>,
+	entryId: string,
+	scope: ConfigScope = 'local',
+) {
+	const sharedOverrideKey = `shared:${entryId}`;
+	if (sharedOverrideKey in overrides) {
+		return overrides[sharedOverrideKey] ?? '';
+	}
+	const scopedOverrideKey = `${scope}:${entryId}`;
+	if (scopedOverrideKey in overrides) {
+		return overrides[scopedOverrideKey] ?? '';
+	}
+	for (const candidateScope of [scope, ...context.scopes.filter((candidate) => candidate !== scope)]) {
+		const entry = context.entriesByScope[candidateScope].find((candidate) => candidate.id === entryId);
+		if (entry?.storage === 'shared') {
+			const overrideKey = `shared:${entryId}`;
+			if (overrideKey in overrides) {
+				return overrides[overrideKey] ?? '';
+			}
+		}
+		if (typeof entry?.currentValue === 'string' && entry.currentValue.length > 0) {
+			return entry.currentValue;
+		}
+	}
+	return '';
+}
+
 function hasUsableValue(value: string) {
 	return typeof value === 'string' && value.trim().length > 0;
 }
 
-function isWizardRequiredMissing(page: Omit<ConfigPage, 'wizardRequiredMissing'>) {
-	if (!page.required) {
+function isConfigValueValid(entry: ConfigEntry, value: string) {
+	if (!hasUsableValue(value)) {
 		return false;
 	}
-	const resolvedValue = page.currentValue || page.suggestedValue || page.finalValue || page.entry.effectiveValue || '';
-	return !hasUsableValue(resolvedValue);
+	if (!entry.validation) {
+		return true;
+	}
+	switch (entry.validation.kind) {
+		case 'string':
+		case 'nonempty':
+			return value.trim().length > 0
+				&& (
+					typeof entry.validation.minLength !== 'number'
+					|| value.trim().length >= entry.validation.minLength
+				);
+		case 'boolean':
+			return /^(true|false|1|0)$/i.test(value);
+		case 'number':
+			return Number.isFinite(Number(value));
+		case 'url':
+			try {
+				new URL(value);
+				return true;
+			} catch {
+				return false;
+			}
+		case 'email':
+			return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+		case 'enum':
+			return entry.validation.values.includes(value);
+		default:
+			return true;
+	}
+}
+
+function isWizardRequiredMissing(page: Omit<ConfigPage, 'wizardRequiredMissing'>) {
+	if (page.requiredScopes.length === 0) {
+		return false;
+	}
+	return !isConfigValueValid(page.entry, page.finalValue);
 }
 
 function startupPriority(page: ConfigPage) {
@@ -147,6 +303,22 @@ function formatDisplayValue(page: ConfigPage, value: string, emptyLabel: string)
 		return emptyLabel;
 	}
 	return page.entry.sensitivity === 'secret' ? maskValue(value) : value;
+}
+
+export function filterCliConfigPages(pages: ConfigPage[], query: string) {
+	const normalizedQuery = query.trim().toLowerCase();
+	if (!normalizedQuery) {
+		return pages;
+	}
+	return pages.filter((page) =>
+		[
+			page.entry.id,
+			page.entry.label,
+			page.entry.group,
+			page.entry.cluster,
+			page.scope,
+		].some((field) => field.toLowerCase().includes(normalizedQuery)),
+	);
 }
 
 function tabRects(prefix: string, items: string[], selectedIndex: number, y: number, startX: number) {
@@ -174,7 +346,7 @@ function buttonRects(labels: string[], y: number, startX: number) {
 }
 
 export function computeConfigViewportLayout(rows: number, columns: number): ConfigViewportLayout {
-	const layout = computeViewportLayout(rows, columns, { topBarHeight: 2, footerHeight: 2 });
+	const layout = computeViewportLayout(rows, columns, { topBarHeight: 3, footerHeight: 2 });
 	const sidebarWidth = Math.max(22, Math.min(34, Math.floor(layout.columns * 0.28)));
 	const contentWidth = Math.max(34, layout.columns - sidebarWidth - 1);
 	const actionRowHeight = 1;
@@ -197,7 +369,9 @@ export function buildCliConfigPages(
 	overrides: Record<string, string> = {},
 	viewMode: ConfigViewMode = 'startup',
 ) {
-	const selectedScopes = selectedFilter === 'all' ? context.scopes : context.scopes.filter((scope) => scope === selectedFilter);
+	const selectedScopes = viewMode === 'startup'
+		? context.scopes
+		: context.scopes.filter((scope) => scope === selectedFilter);
 	const sharedEntries = new Set<string>();
 	const pages: ConfigPage[] = [];
 
@@ -210,17 +384,30 @@ export function buildCliConfigPages(
 				const relevantScopes = selectedScopes.filter((candidateScope) => context.entriesByScope[candidateScope].some((candidate) => candidate.id === entry.id));
 				const key = `shared:${entry.id}`;
 				sharedEntries.add(entry.id);
-				const currentValue = resolveFirstNonEmptyValue(relevantScopes, context.entriesByScope, entry.id, 'currentValue');
-				const suggestedValue = resolveFirstNonEmptyValue(relevantScopes, context.entriesByScope, entry.id, 'suggestedValue');
+				const requiredScopes = relevantScopes.filter((candidateScope) => context.entriesByScope[candidateScope].some((candidate) => candidate.id === entry.id && candidate.required));
+				const currentValue = resolveSharedEntryValue(relevantScopes, requiredScopes, context.entriesByScope, entry.id, 'currentValue');
+				const suggestedValue = resolveSharedEntryValue(relevantScopes, requiredScopes, context.entriesByScope, entry.id, 'suggestedValue', {
+					fallbackToRelevant: requiredScopes.length === 0,
+				});
+				const effectiveValue = resolveSharedEntryValue(relevantScopes, requiredScopes, context.entriesByScope, entry.id, 'effectiveValue', {
+					fallbackToRelevant: requiredScopes.length === 0,
+				});
 				const candidatePage = {
+					kind: 'entry' as const,
 					key,
 					entry,
 					scope,
 					scopes: relevantScopes,
-					required: relevantScopes.some((candidateScope) => context.entriesByScope[candidateScope].some((candidate) => candidate.id === entry.id && candidate.required)),
+					requiredScopes,
+					required: requiredScopes.length > 0,
 					currentValue,
 					suggestedValue,
-					finalValue: key in overrides ? overrides[key] : (currentValue || suggestedValue || entry.effectiveValue || ''),
+					finalValue: resolveEntryPageFinalValue(key, {
+						...entry,
+						currentValue,
+						suggestedValue,
+						effectiveValue,
+					}, overrides),
 				};
 				pages.push({
 					...candidatePage,
@@ -231,14 +418,16 @@ export function buildCliConfigPages(
 
 			const key = `${scope}:${entry.id}`;
 			const candidatePage = {
+				kind: 'entry' as const,
 				key,
 				entry,
 				scope,
 				scopes: [scope],
+				requiredScopes: entry.required ? [scope] : [],
 				required: entry.required,
 				currentValue: entry.currentValue,
 				suggestedValue: entry.suggestedValue,
-				finalValue: key in overrides ? overrides[key] : (entry.currentValue || entry.suggestedValue || entry.effectiveValue || ''),
+				finalValue: resolveEntryPageFinalValue(key, entry, overrides),
 			};
 			pages.push({
 				...candidatePage,
@@ -251,22 +440,31 @@ export function buildCliConfigPages(
 		if (startupPriority(left) !== startupPriority(right)) {
 			return startupPriority(left) - startupPriority(right);
 		}
+		if (left.entry.startupProfile !== right.entry.startupProfile) {
+			const order = { core: 0, optional: 1, advanced: 2 };
+			return order[left.entry.startupProfile] - order[right.entry.startupProfile];
+		}
+		if (providerWorkflowRank(left.entry) !== providerWorkflowRank(right.entry)) {
+			return providerWorkflowRank(left.entry) - providerWorkflowRank(right.entry);
+		}
+		if (normalizedClusterKey(left.entry) !== normalizedClusterKey(right.entry)) {
+			return normalizedClusterKey(left.entry).localeCompare(normalizedClusterKey(right.entry));
+		}
 		if (left.entry.storage !== right.entry.storage) {
 			return left.entry.storage === 'shared' ? -1 : 1;
-		}
-		if (left.entry.purposes.length !== right.entry.purposes.length) {
-			return right.entry.purposes.length - left.entry.purposes.length;
-		}
-		if (left.entry.group !== right.entry.group) {
-			return left.entry.group.localeCompare(right.entry.group);
 		}
 		if (left.scope !== right.scope) {
 			return scopeOrder(left.scope) - scopeOrder(right.scope);
 		}
+		if (left.entry.purposes.length !== right.entry.purposes.length) {
+			return right.entry.purposes.length - left.entry.purposes.length;
+		}
 		return left.entry.label.localeCompare(right.entry.label);
 	});
 
-	return viewMode === 'startup' ? orderedPages.filter((page) => page.wizardRequiredMissing) : orderedPages;
+	return viewMode === 'startup'
+		? orderedPages.filter((page) => page.wizardRequiredMissing)
+		: orderedPages;
 }
 
 function buildStartupDetailLines(step: ConfigWizardStep | null, draftValue: string) {
@@ -274,17 +472,17 @@ function buildStartupDetailLines(step: ConfigWizardStep | null, draftValue: stri
 		return ['No startup configuration is required for the selected environment set.'];
 	}
 	return [
-		`Step ${step.index + 1} of ${step.total}`,
-		step.entry.label,
-		step.entry.id,
-		`${step.required ? 'Required' : 'Optional'} ${step.entry.storage === 'shared' ? 'shared' : 'environment-specific'} value for ${step.scopes.join(', ')}`,
+		`${step.entry.label} (${step.entry.id})`,
+		`Applies to: ${step.scopes.join(', ')}`,
+		`Required in: ${step.requiredScopes.join(', ')}`,
+		`Storage: ${step.entry.storage}`,
 		'',
-		step.entry.description || 'Treeseed needs this value to complete setup.',
-		'',
-		`How to get it: ${step.entry.howToGet || 'Use the suggested/default value if it matches your setup.'}`,
 		`Current value: ${formatDisplayValue(step, step.currentValue, '(unset)')}`,
 		`Suggested value: ${formatDisplayValue(step, step.suggestedValue, '(none)')}`,
 		`Pending value: ${formatDisplayValue(step, draftValue, '(unset)')}`,
+		'',
+		step.entry.description || 'Treeseed needs this value to complete setup.',
+		`How to get it: ${step.entry.howToGet || 'Use the suggested/default value if it matches your setup.'}`,
 	];
 }
 
@@ -293,23 +491,17 @@ function buildFullDetailLines(page: ConfigPage | null, draftValue: string) {
 		return ['No configuration entries match the selected environment filter.'];
 	}
 	return [
-		page.entry.label,
-		page.entry.id,
+		`${page.entry.label} (${page.entry.id})`,
 		`Scope: ${page.scopes.join(', ')}`,
 		`Storage: ${page.entry.storage} | ${page.required ? 'required' : 'optional'}`,
 		`Group: ${page.entry.group}`,
-		`Used for: ${page.entry.purposes.join(', ') || '(none)'}`,
-		`Targets: ${page.entry.targets.join(', ') || '(none)'}`,
-		'',
-		'About',
-		page.entry.description || '(no description)',
-		'',
-		'How to get it',
-		page.entry.howToGet || '(no extra setup guidance)',
 		'',
 		`Current: ${formatDisplayValue(page, page.currentValue, '(unset)')}`,
 		`Suggested: ${formatDisplayValue(page, page.suggestedValue, '(none)')}`,
 		`Pending: ${formatDisplayValue(page, draftValue, '(unset)')}`,
+		'',
+		page.entry.description || '(no description)',
+		`Get it: ${page.entry.howToGet || '(no extra setup guidance)'}`,
 	];
 }
 
@@ -330,6 +522,13 @@ function nextDraftValue(page: ConfigPage | null, drafts: Record<string, string>)
 		return '';
 	}
 	return page.key in drafts ? drafts[page.key] : page.finalValue;
+}
+
+function resolveEntryPageFinalValue(pageKey: string, entry: ConfigEntry, overrides: Record<string, string>) {
+	if (pageKey in overrides) {
+		return overrides[pageKey]!;
+	}
+	return entry.effectiveValue || entry.suggestedValue || entry.currentValue || '';
 }
 
 function insertAt(value: string, insert: string, cursor: number) {
@@ -358,15 +557,83 @@ function deleteForward(value: string, cursor: number) {
 
 function cycleFocus(current: ConfigFocusArea, viewMode: ConfigViewMode) {
 	const areas: ConfigFocusArea[] = viewMode === 'startup'
-		? ['environment', 'mode', 'content', 'actions']
-		: ['environment', 'mode', 'sidebar', 'content', 'actions'];
+		? ['content', 'actions']
+		: ['environment', 'filter', 'sidebar', 'content', 'actions'];
 	const index = areas.indexOf(current);
 	return areas[(index + 1) % areas.length] ?? 'content';
 }
 
+export function normalizeConfigInputChunk(input: string) {
+	if (!input) {
+		return '';
+	}
+	return input
+		.replace(/\u001b\[200~/gu, '')
+		.replace(/\u001b\[201~/gu, '')
+		.replace(/\r\n/gu, '\n')
+		.replace(/\r/gu, '\n')
+		.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, '')
+		.replace(/\n+$/gu, '');
+}
+
+export function applyConfigInputInsertion(state: ConfigInputState, input: string): ConfigInputState {
+	const normalized = normalizeConfigInputChunk(input);
+	if (!normalized) {
+		return state;
+	}
+	return {
+		value: insertAt(state.value, normalized, state.cursor),
+		cursor: state.cursor + normalized.length,
+	};
+}
+
+function runClipboardCommand(command: string, args: string[]) {
+	const result = spawnSync(command, args, {
+		stdio: 'pipe',
+		encoding: 'utf8',
+		timeout: 1500,
+	});
+	if (result.status !== 0) {
+		return null;
+	}
+	const text = String(result.stdout ?? '').replace(/\r\n/gu, '\n');
+	return text.length > 0 ? text : null;
+}
+
+export function readLinuxClipboardText() {
+	if (process.platform !== 'linux') {
+		return null;
+	}
+	return runClipboardCommand('wl-paste', ['--no-newline'])
+		?? runClipboardCommand('xclip', ['-selection', 'clipboard', '-o'])
+		?? runClipboardCommand('xsel', ['--clipboard', '--output']);
+}
+
+function isCtrlVPaste(input: string, key: { ctrl?: boolean }) {
+	return (key.ctrl && input === 'v') || input === '\u0016';
+}
+
 export async function runCliConfigEditor(
 	context: ConfigContextSnapshot,
-	options: { initialViewMode?: ConfigViewMode } = {},
+	options: {
+		initialViewMode?: ConfigViewMode;
+		mouseEnabled?: boolean;
+		initialStatusMessage?: string;
+		toolAvailability?: {
+			githubCli?: { available: boolean };
+			wranglerCli?: { available: boolean };
+			railwayCli?: { available: boolean };
+			ghActExtension?: { available: boolean };
+			dockerDaemon?: { available: boolean };
+		};
+		secretSession?: {
+			status?: { unlocked?: boolean };
+			createdWrappedKey?: boolean;
+			migratedWrappedKey?: boolean;
+			unlockSource?: string;
+		};
+		onCommit?: (update: ConfigCommitUpdate) => Promise<ConfigContextSnapshot> | ConfigContextSnapshot;
+	} = {},
 ) {
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
 		return null;
@@ -386,6 +653,8 @@ export async function runCliConfigEditor(
 		};
 
 		function App() {
+			const sidebarFilterHeight = 4;
+			const [currentContext, setCurrentContext] = React.useState(context);
 			const [filterIndex, setFilterIndex] = React.useState(0);
 			const [viewMode, setViewMode] = React.useState<ConfigViewMode>(options.initialViewMode ?? 'startup');
 			const [pageIndex, setPageIndex] = React.useState(0);
@@ -394,36 +663,68 @@ export async function runCliConfigEditor(
 			const [drafts, setDrafts] = React.useState<Record<string, string>>({});
 			const [cursorPositions, setCursorPositions] = React.useState<Record<string, number>>({});
 			const [overrides, setOverrides] = React.useState<Record<string, string>>({});
-			const [focusArea, setFocusArea] = React.useState<ConfigFocusArea>(options.initialViewMode === 'full' ? 'sidebar' : 'content');
+			const [filterQuery, setFilterQuery] = React.useState('');
+			const [filterCursor, setFilterCursor] = React.useState(0);
+			const [focusArea, setFocusArea] = React.useState<ConfigFocusArea>(options.initialViewMode === 'full' ? 'filter' : 'content');
 			const [actionIndex, setActionIndex] = React.useState(0);
-			const [statusMessage, setStatusMessage] = React.useState('Startup wizard ready. Click or Tab through controls, then update values one step at a time.');
+			const [saving, setSaving] = React.useState(false);
+			const [statusMessage, setStatusMessage] = React.useState(
+				options.initialStatusMessage
+					?? (options.initialViewMode === 'full'
+					? 'Full editor ready. Filter the variable list or edit the selected value.'
+					: 'Startup wizard ready. Update each required value in order.'),
+			);
 			const { exit } = useApp();
 			const windowSize = useWindowSize();
 			const layout = computeConfigViewportLayout(windowSize?.rows ?? 24, windowSize?.columns ?? 100);
-			const selectedFilter = CONFIG_FILTERS[filterIndex] ?? 'all';
-			const pages = buildCliConfigPages(context, selectedFilter, overrides, viewMode);
+			const selectedFilter = FULL_CONFIG_FILTERS[filterIndex] ?? 'local';
+			const allPages = buildCliConfigPages(currentContext, selectedFilter, overrides, viewMode);
+			const pages = viewMode === 'full' ? filterCliConfigPages(allPages, filterQuery) : allPages;
 			const safePageIndex = pages.length === 0 ? 0 : Math.min(pageIndex, pages.length - 1);
 			const selectedPage = pages[safePageIndex] ?? null;
 			const draftValue = nextDraftValue(selectedPage, drafts);
 			const cursorPosition = selectedPage ? Math.max(0, Math.min(cursorPositions[selectedPage.key] ?? draftValue.length, draftValue.length)) : 0;
+			const focusAreaRef = React.useRef<ConfigFocusArea>(focusArea);
+			const viewModeRef = React.useRef<ConfigViewMode>(viewMode);
+			const selectedPageRef = React.useRef<ConfigPage | null>(selectedPage);
+			const draftValueRef = React.useRef(draftValue);
+			const cursorPositionRef = React.useRef(cursorPosition);
+			const filterQueryRef = React.useRef(filterQuery);
+			const filterCursorRef = React.useRef(filterCursor);
+			focusAreaRef.current = focusArea;
+			viewModeRef.current = viewMode;
+			selectedPageRef.current = selectedPage;
+			draftValueRef.current = draftValue;
+			cursorPositionRef.current = cursorPosition;
+			filterQueryRef.current = filterQuery;
+			filterCursorRef.current = filterCursor;
 			const startupStep = selectedPage ? { ...selectedPage, index: safePageIndex, total: pages.length } : null;
 			const detailSourceLines = viewMode === 'startup'
 				? buildStartupDetailLines(startupStep, draftValue)
 				: buildFullDetailLines(selectedPage, draftValue);
-			const detailPanel = detailViewportLines(detailSourceLines, layout.contentWidth, layout.detailHeight, detailOffset);
-			const authStatus = context.authStatusByScope.local ?? context.authStatusByScope[context.scopes[0]];
-			const sidebarViewportSize = Math.max(1, layout.bodyHeight - 4);
+			const detailWidth = viewMode === 'full' ? layout.contentWidth : layout.columns;
+			const detailPanel = detailViewportLines(detailSourceLines, detailWidth, layout.detailHeight, detailOffset);
+			const configReadiness = {
+				github: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'GH_TOKEN', 'local')) },
+				cloudflare: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'CLOUDFLARE_API_TOKEN', 'local')) },
+				railway: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'RAILWAY_API_TOKEN', 'local')) },
+				localDevelopment: currentContext.configReadinessByScope.local?.localDevelopment ?? { configured: true },
+			};
+			const sidebarHeight = Math.max(4, layout.bodyHeight - sidebarFilterHeight);
+			const sidebarViewportSize = Math.max(1, sidebarHeight - 4);
 			const safeSidebarOffset = clampOffset(ensureVisible(safePageIndex, sidebarOffset, sidebarViewportSize), pages.length, sidebarViewportSize);
 			const visibleSidebar = pages.slice(safeSidebarOffset, safeSidebarOffset + sidebarViewportSize);
 			const startupActions = selectedPage
-				? ['Back', ...(hasUsableValue(selectedPage?.suggestedValue ?? '') ? ['Use Suggested + Next'] : []), 'Update + Next', 'Full Editor']
-				: ['Open Full Editor', 'Save and Continue'];
-			const fullActions = ['Update + Next', 'Clear', 'Startup Wizard', 'Finish'];
+				? ['Back', ...(hasUsableValue(selectedPage?.suggestedValue ?? '') ? ['Use Suggested + Next'] : []), 'Update + Next']
+				: [];
+			const fullActions = ['Save Value', 'Clear', 'Finish'];
 			const actions = viewMode === 'startup' ? startupActions : fullActions;
-			const envRects = tabRects('Env ', CONFIG_FILTERS, filterIndex, 2, 1);
-			const modeRects = tabRects('View ', CONFIG_VIEW_MODES, CONFIG_VIEW_MODES.indexOf(viewMode), 2, Math.floor(layout.columns / 2));
+			const envRects = viewMode === 'full'
+				? tabRects('Env ', FULL_CONFIG_FILTERS, filterIndex, 2, 1)
+				: [];
 			const clickRegions: UiClickRegion[] = [];
 			const sidebarRect = { x: 0, y: layout.topBarHeight, width: layout.sidebarWidth, height: layout.bodyHeight };
+			const filterRect = { x: 0, y: layout.topBarHeight, width: layout.sidebarWidth, height: sidebarFilterHeight };
 			const detailRect = {
 				x: viewMode === 'full' ? layout.sidebarWidth + 1 : 0,
 				y: layout.topBarHeight,
@@ -451,11 +752,22 @@ export async function runCliConfigEditor(
 
 			React.useEffect(() => {
 				setActionIndex(0);
-			}, [viewMode]);
+			}, [viewMode, selectedPage?.key]);
 
 			React.useEffect(() => {
 				setDetailOffset(0);
 			}, [selectedPage?.key]);
+
+			React.useEffect(() => {
+				if (viewMode === 'startup' && selectedPage) {
+					setFocusArea('content');
+				}
+			}, [selectedPage?.key, viewMode, selectedPage]);
+
+			React.useEffect(() => {
+				setPageIndex(0);
+				setSidebarOffset(0);
+			}, [filterQuery, selectedFilter]);
 
 			React.useEffect(() => {
 				if (selectedPage && !(selectedPage.key in cursorPositions)) {
@@ -464,24 +776,110 @@ export async function runCliConfigEditor(
 			}, [cursorPositions, draftValue.length, selectedPage]);
 
 			React.useEffect(() => {
-				setFocusArea(viewMode === 'full' ? 'sidebar' : 'content');
+				setFocusArea(viewMode === 'full' ? 'filter' : 'content');
 			}, [viewMode]);
 
-			const saveCurrentDraft = React.useCallback((advance: boolean) => {
-				if (!selectedPage) {
+			React.useEffect(() => {
+				if (viewMode === 'startup' && pages.length === 0) {
+					setViewMode('full');
+					setFocusArea('filter');
+					setPageIndex(0);
+					setFilterIndex(0);
+					setFilterQuery('');
+					setFilterCursor(0);
+					setStatusMessage('Startup configuration is complete. Switched to the full editor.');
+				}
+			}, [pages.length, viewMode]);
+
+			const finishWithOverrides = React.useCallback((nextOverrides: Record<string, string>) => {
+				finish({
+					overrides: nextOverrides,
+					viewMode,
+				});
+			}, [viewMode]);
+
+			const advanceStartupFlow = React.useCallback((
+				nextOverrides: Record<string, string>,
+				currentPageKey: string,
+			) => {
+				const nextPages = buildCliConfigPages(currentContext, selectedFilter, nextOverrides, 'startup');
+				const currentIndex = nextPages.findIndex((page) => page.key === currentPageKey);
+				const nextIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
+				if (nextIndex >= nextPages.length) {
+					setOverrides(nextOverrides);
+					setViewMode('full');
+					setFocusArea('filter');
+					setPageIndex(0);
+					setFilterIndex(0);
+					setFilterQuery('');
+					setFilterCursor(0);
+					setDetailOffset(0);
+					setStatusMessage('Startup configuration is complete. Switched to the full editor.');
+					return;
+				}
+				setFocusArea('content');
+				setPageIndex(nextIndex);
+				setDetailOffset(0);
+			}, [currentContext, selectedFilter]);
+
+			const commitCurrentDraft = React.useCallback(async (value: string) => {
+				if (!selectedPage || !options.onCommit) {
+					return true;
+				}
+				setSaving(true);
+				setStatusMessage(`Saving ${selectedPage.entry.id}...`);
+				try {
+					const refreshedContext = await options.onCommit({
+						scope: selectedPage.scope,
+						entryId: selectedPage.entry.id,
+						value,
+					});
+					setCurrentContext(refreshedContext);
+					setDrafts((current) => ({ ...current, [selectedPage.key]: value }));
+					setCursorPositions((current) => ({ ...current, [selectedPage.key]: value.length }));
+					setOverrides((current) => {
+						const next = { ...current };
+						delete next[selectedPage.key];
+						return next;
+					});
+					return true;
+				} catch (error) {
+					setStatusMessage(error instanceof Error ? error.message : `Unable to save ${selectedPage.entry.id}.`);
+					return false;
+				} finally {
+					setSaving(false);
+				}
+			}, [options, selectedPage]);
+
+			const saveCurrentDraft = React.useCallback(async (advance: boolean) => {
+				if (!selectedPage || saving) {
 					return;
 				}
 				const value = nextDraftValue(selectedPage, drafts);
-				setOverrides((current) => ({ ...current, [selectedPage.key]: value }));
+				const committed = await commitCurrentDraft(value);
+				if (!committed) {
+					return;
+				}
+				const nextOverrides = { ...overrides, [selectedPage.key]: value };
+				setOverrides(nextOverrides);
+				setFocusArea('content');
 				setStatusMessage(`Updated ${selectedPage.entry.id}.`);
 				if (advance) {
+					if (viewMode === 'startup') {
+						advanceStartupFlow(nextOverrides, selectedPage.key);
+						return;
+					}
 					setPageIndex((current) => Math.min(Math.max(0, pages.length - 1), current + 1));
 					setDetailOffset(0);
 				}
-			}, [drafts, pages.length, selectedPage]);
+			}, [advanceStartupFlow, commitCurrentDraft, drafts, overrides, pages.length, saving, selectedPage, viewMode]);
 
-			const activateAction = React.useCallback((label: string) => {
+			const activateAction = React.useCallback(async (label: string) => {
+				if (saving) {
+					return;
+				}
 				if (label === 'Back') {
+					setFocusArea('content');
 					setPageIndex((current) => Math.max(0, current - 1));
 					setDetailOffset(0);
 					return;
@@ -490,14 +888,28 @@ export async function runCliConfigEditor(
 					const suggested = selectedPage.suggestedValue || selectedPage.finalValue;
 					setDrafts((current) => ({ ...current, [selectedPage.key]: suggested }));
 					setCursorPositions((current) => ({ ...current, [selectedPage.key]: suggested.length }));
-					setOverrides((current) => ({ ...current, [selectedPage.key]: suggested }));
-					setPageIndex((current) => Math.min(Math.max(0, pages.length - 1), current + 1));
+					const committed = await commitCurrentDraft(suggested);
+					if (!committed) {
+						return;
+					}
+					const nextOverrides = { ...overrides, [selectedPage.key]: suggested };
+					setOverrides(nextOverrides);
+					setFocusArea('content');
 					setStatusMessage(`Accepted suggested value for ${selectedPage.entry.id}.`);
+					if (viewMode === 'startup') {
+						advanceStartupFlow(nextOverrides, selectedPage.key);
+						return;
+					}
+					setPageIndex((current) => Math.min(Math.max(0, pages.length - 1), current + 1));
 					setDetailOffset(0);
 					return;
 				}
 				if (label === 'Update + Next') {
-					saveCurrentDraft(true);
+					void saveCurrentDraft(true);
+					return;
+				}
+				if (label === 'Save Value') {
+					void saveCurrentDraft(false);
 					return;
 				}
 				if (label === 'Clear' && selectedPage) {
@@ -507,37 +919,21 @@ export async function runCliConfigEditor(
 					setStatusMessage(`Cleared ${selectedPage.entry.id}.`);
 					return;
 				}
-				if (label === 'Full Editor') {
-					setViewMode('full');
-					setFocusArea('sidebar');
-					setStatusMessage('Switched to the advanced editor.');
-					return;
+				if (label === 'Finish') {
+					finishWithOverrides(overrides);
 				}
-				if (label === 'Startup Wizard') {
-					setViewMode('startup');
-					setFocusArea('content');
-					setStatusMessage('Switched back to the startup wizard.');
-					return;
-				}
-				if (label === 'Open Full Editor') {
-					setViewMode('full');
-					setFocusArea('sidebar');
-					setStatusMessage('Opened the advanced editor.');
-					return;
-				}
-				if (label === 'Save and Continue' || label === 'Finish') {
-					finish({
-						overrides,
-						viewMode,
-					});
-				}
-			}, [overrides, pages.length, saveCurrentDraft, selectedPage, viewMode]);
+			}, [advanceStartupFlow, commitCurrentDraft, finishWithOverrides, overrides, saveCurrentDraft, saving, selectedPage, viewMode]);
 
 			const scrollRegions: UiScrollRegion[] = [
 				...(viewMode === 'full'
 					? [{
 						id: 'config-sidebar',
-						rect: sidebarRect,
+						rect: {
+							x: sidebarRect.x,
+							y: sidebarRect.y + sidebarFilterHeight,
+							width: sidebarRect.width,
+							height: sidebarHeight,
+						},
 						state: {
 							offset: safeSidebarOffset,
 							viewportSize: sidebarViewportSize,
@@ -573,7 +969,7 @@ export async function runCliConfigEditor(
 					return;
 				}
 				findClickableRegion(clickRegions, event.x, event.y)?.onClick();
-			});
+			}, { enabled: options.mouseEnabled === true });
 
 			useInput((input, key) => {
 				if (key.ctrl && input === 'c') {
@@ -587,39 +983,76 @@ export async function runCliConfigEditor(
 					return;
 				}
 
-				if (input === 't') {
-					setViewMode((current) => current === 'startup' ? 'full' : 'startup');
-					return;
-				}
-
-				if (input === 's') {
+				if (input === 's' && focusArea !== 'content' && focusArea !== 'filter') {
 					if (viewMode === 'startup' && selectedPage) {
 						setStatusMessage('Complete each required startup step before saving. Use Update + Next to continue.');
 						return;
 					}
-					finish({
-						overrides,
-						viewMode,
-					});
+					finishWithOverrides(overrides);
 					return;
 				}
 
 				if (focusArea === 'environment') {
+					if (viewMode === 'startup') {
+						return;
+					}
 					if (key.leftArrow) {
 						setFilterIndex((current) => Math.max(0, current - 1));
 						setPageIndex(0);
 						return;
 					}
 					if (key.rightArrow) {
-						setFilterIndex((current) => Math.min(CONFIG_FILTERS.length - 1, current + 1));
+						setFilterIndex((current) => Math.min(FULL_CONFIG_FILTERS.length - 1, current + 1));
 						setPageIndex(0);
 						return;
 					}
 				}
 
-				if (focusArea === 'mode') {
-					if (key.leftArrow || key.rightArrow || key.return) {
-						setViewMode((current) => current === 'startup' ? 'full' : 'startup');
+				if (focusArea === 'filter' && viewMode === 'full') {
+					if (isCtrlVPaste(input, key)) {
+						const clipboardText = readLinuxClipboardText();
+						if (!clipboardText) {
+							setStatusMessage('Ctrl+V clipboard paste is unavailable. Use right-click/menu paste or install wl-paste, xclip, or xsel.');
+							return;
+						}
+						const next = applyConfigInputInsertion({ value: filterQuery, cursor: filterCursor }, clipboardText);
+						setFilterQuery(next.value);
+						setFilterCursor(next.cursor);
+						setStatusMessage('Filtered the variable list from the clipboard.');
+						return;
+					}
+					if (key.home) {
+						setFilterCursor(0);
+						return;
+					}
+					if (key.end) {
+						setFilterCursor(filterQuery.length);
+						return;
+					}
+					if (key.leftArrow) {
+						setFilterCursor((current) => Math.max(0, current - 1));
+						return;
+					}
+					if (key.rightArrow) {
+						setFilterCursor((current) => Math.min(filterQuery.length, current + 1));
+						return;
+					}
+					if (key.backspace) {
+						const next = deleteBackward(filterQuery, filterCursor);
+						setFilterQuery(next.value);
+						setFilterCursor(next.cursor);
+						return;
+					}
+					if (key.delete) {
+						const next = deleteForward(filterQuery, filterCursor);
+						setFilterQuery(next.value);
+						setFilterCursor(next.cursor);
+						return;
+					}
+					if (!key.ctrl && !key.meta && input && !key.return && !key.upArrow && !key.downArrow && !key.pageDown && !key.pageUp) {
+						const next = applyConfigInputInsertion({ value: filterQuery, cursor: filterCursor }, input);
+						setFilterQuery(next.value);
+						setFilterCursor(next.cursor);
 						return;
 					}
 				}
@@ -644,6 +1077,26 @@ export async function runCliConfigEditor(
 				}
 
 				if (focusArea === 'content') {
+					if (selectedPage && isCtrlVPaste(input, key)) {
+						const clipboardText = readLinuxClipboardText();
+						if (!clipboardText) {
+							setStatusMessage('Ctrl+V clipboard paste is unavailable. Use right-click/menu paste or install wl-paste, xclip, or xsel.');
+							return;
+						}
+						const next = applyConfigInputInsertion({ value: draftValue, cursor: cursorPosition }, clipboardText);
+						setDrafts((current) => ({ ...current, [selectedPage.key]: next.value }));
+						setCursorPositions((current) => ({ ...current, [selectedPage.key]: next.cursor }));
+						setStatusMessage(`Pasted text into ${selectedPage.entry.id}.`);
+						return;
+					}
+					if (selectedPage && key.home) {
+						setCursorPositions((current) => ({ ...current, [selectedPage.key]: 0 }));
+						return;
+					}
+					if (selectedPage && key.end) {
+						setCursorPositions((current) => ({ ...current, [selectedPage.key]: draftValue.length }));
+						return;
+					}
 					if (selectedPage && key.leftArrow) {
 						setCursorPositions((current) => ({ ...current, [selectedPage.key]: Math.max(0, cursorPosition - 1) }));
 						return;
@@ -681,13 +1134,13 @@ export async function runCliConfigEditor(
 						return;
 					}
 					if (selectedPage && key.return && viewMode === 'startup') {
-						saveCurrentDraft(true);
+						void saveCurrentDraft(true);
 						return;
 					}
 					if (!key.ctrl && !key.meta && input && selectedPage && !key.upArrow && !key.downArrow && !key.pageDown && !key.pageUp) {
-						const nextValue = insertAt(draftValue, input, cursorPosition);
-						setDrafts((current) => ({ ...current, [selectedPage.key]: nextValue }));
-						setCursorPositions((current) => ({ ...current, [selectedPage.key]: cursorPosition + input.length }));
+						const next = applyConfigInputInsertion({ value: draftValue, cursor: cursorPosition }, input);
+						setDrafts((current) => ({ ...current, [selectedPage.key]: next.value }));
+						setCursorPositions((current) => ({ ...current, [selectedPage.key]: next.cursor }));
 						return;
 					}
 				}
@@ -702,32 +1155,41 @@ export async function runCliConfigEditor(
 						return;
 					}
 					if (key.return) {
-						activateAction(actions[actionIndex] ?? actions[0] ?? 'Save and Continue');
+						void activateAction(actions[actionIndex] ?? actions[0] ?? 'Finish');
 					}
 				}
 			});
 
-			for (const [index, item] of envRects.entries()) {
-				clickRegions.push({
-					id: `env-${item.item}`,
-					rect: item.rect,
-					onClick: () => {
-						setFilterIndex(index);
-						setPageIndex(0);
-						setFocusArea('environment');
-					},
-				});
-			}
+			usePaste((text) => {
+				if (focusAreaRef.current === 'filter' && viewModeRef.current === 'full') {
+					const next = applyConfigInputInsertion({ value: filterQueryRef.current, cursor: filterCursorRef.current }, text);
+					setFilterQuery(next.value);
+					setFilterCursor(next.cursor);
+					setStatusMessage('Filtered the variable list.');
+					return;
+				}
+				const currentPage = selectedPageRef.current;
+				if (focusAreaRef.current !== 'content' || !currentPage) {
+					return;
+				}
+				const next = applyConfigInputInsertion({ value: draftValueRef.current, cursor: cursorPositionRef.current }, text);
+				setDrafts((current) => ({ ...current, [currentPage.key]: next.value }));
+				setCursorPositions((current) => ({ ...current, [currentPage.key]: next.cursor }));
+				setStatusMessage(`Pasted text into ${currentPage.entry.id}.`);
+			}, { isActive: true });
 
-			for (const [index, item] of modeRects.entries()) {
-				clickRegions.push({
-					id: `mode-${item.item}`,
-					rect: item.rect,
-					onClick: () => {
-						setViewMode(CONFIG_VIEW_MODES[index] ?? 'startup');
-						setFocusArea('mode');
-					},
-				});
+			if (viewMode === 'full') {
+				for (const [index, item] of envRects.entries()) {
+					clickRegions.push({
+						id: `env-${item.item}`,
+						rect: item.rect,
+						onClick: () => {
+							setFilterIndex(index);
+							setPageIndex(0);
+							setFocusArea('environment');
+						},
+					});
+				}
 			}
 
 			clickRegions.push({
@@ -739,6 +1201,13 @@ export async function runCliConfigEditor(
 			});
 
 			if (viewMode === 'full') {
+				clickRegions.push({
+					id: 'filter-focus',
+					rect: filterRect,
+					onClick: () => {
+						setFocusArea('filter');
+					},
+				});
 				for (let index = 0; index < visibleSidebar.length; index += 1) {
 					const page = visibleSidebar[index];
 					if (!page) {
@@ -746,7 +1215,7 @@ export async function runCliConfigEditor(
 					}
 					clickRegions.push({
 						id: `sidebar-${page.key}`,
-						rect: { x: 1, y: layout.topBarHeight + 2 + index, width: layout.sidebarWidth - 2, height: 1 },
+						rect: { x: 1, y: layout.topBarHeight + sidebarFilterHeight + 2 + index, width: layout.sidebarWidth - 2, height: 1 },
 						onClick: () => {
 							setPageIndex(safeSidebarOffset + index);
 							setFocusArea('sidebar');
@@ -763,41 +1232,38 @@ export async function runCliConfigEditor(
 					onClick: () => {
 						setFocusArea('actions');
 						setActionIndex(index);
-						activateAction(item.label);
+						void activateAction(item.label);
 					},
 				});
 			}
 
+			const titleLine = truncateLine(
+				`Treeseed Config  ${currentContext.project.name} (${currentContext.project.slug})  GH cfg:${configReadiness.github.configured ? 'ok' : 'miss'}  CF cfg:${configReadiness.cloudflare.configured ? 'ok' : 'miss'}  RW cfg:${configReadiness.railway.configured ? 'ok' : 'miss'}`,
+				layout.columns,
+			);
+			const statusTail = viewMode === 'full'
+				? `Env ${selectedFilter}`
+				: '';
+			const toolsLine = truncateLine(
+				`gh:${options.toolAvailability?.githubCli?.available ? 'ok' : 'miss'}  wr:${options.toolAvailability?.wranglerCli?.available ? 'ok' : 'miss'}  rw:${options.toolAvailability?.railwayCli?.available ? 'ok' : 'miss'}  act:${options.toolAvailability?.ghActExtension?.available ? 'ok' : 'miss'}  dk:${options.toolAvailability?.dockerDaemon?.available ? 'ok' : 'miss'}  sec:${options.secretSession?.status?.unlocked ? 'on' : 'off'}${statusTail ? `  ${statusTail}` : ''}`,
+				layout.columns,
+			);
 			const topBar = React.createElement(
 				React.Fragment,
 				null,
-				React.createElement(Text, { color: 'cyan', bold: true }, truncateLine(`Treeseed Config  ${context.project.name} (${context.project.slug})  GH:${authStatus?.gh?.authenticated ? 'ok' : 'missing'}  CF:${authStatus?.wrangler?.authenticated ? 'ok' : 'missing'}  RW:${authStatus?.railway?.authenticated ? 'ok' : 'missing'}`, layout.columns)),
-				React.createElement(
-					Box,
-					{ width: layout.columns },
-					React.createElement(TopTabs, {
-						width: Math.floor(layout.columns / 2) - 1,
-						title: 'Env',
-						items: CONFIG_FILTERS.map((filter) => ({ id: filter, label: filter })),
-						activeId: selectedFilter,
-						focused: focusArea === 'environment',
-					}),
-					React.createElement(TopTabs, {
-						width: Math.ceil(layout.columns / 2),
-						title: 'View',
-						items: CONFIG_VIEW_MODES.map((mode) => ({ id: mode, label: mode === 'startup' ? 'wizard' : 'full' })),
-						activeId: viewMode,
-						focused: focusArea === 'mode',
-					}),
-				),
+				React.createElement(Text, { color: 'cyan', bold: true }, titleLine),
+				React.createElement(Text, { color: 'gray' }, toolsLine),
+				viewMode === 'full'
+					? React.createElement(Text, { color: focusArea === 'environment' ? 'cyan' : 'gray' }, truncateLine(`Env ${FULL_CONFIG_FILTERS.map((filter) => filter === selectedFilter ? `[${filter}]` : filter).join(' ')}`, layout.columns))
+					: React.createElement(Text, { color: 'gray' }, truncateLine(`Wizard mode across ${currentContext.scopes.join(', ')}.`, layout.columns)),
 			);
 
 			const footer = React.createElement(StatusBar, {
 				width: layout.columns,
 				accent: focusArea === 'content',
 				primary: viewMode === 'full'
-					? 'Tab cycles controls. Type in the input when focused. Sidebar arrows or wheel change variables. Detail PgUp/PgDn or wheel scroll help text.'
-					: 'Wizard input is live when focused. Type to edit, Left/Right move the cursor, Enter updates and advances, PgUp/PgDn or wheel scroll help text.',
+					? `Tab cycles env, filter, list, editor, and actions. Type in Filter to narrow variables. Sidebar arrows${options.mouseEnabled === true ? ' or wheel' : ''} change selection.`
+					: `Type or paste to edit. Left/Right move the cursor, Home/End jump, Enter updates and advances.`,
 				secondary: statusMessage,
 			});
 
@@ -809,7 +1275,7 @@ export async function runCliConfigEditor(
 						React.createElement(ScrollPanel, {
 							width: layout.columns,
 							height: layout.detailHeight,
-							title: startupStep ? `Startup Wizard  ${startupStep.index + 1}/${startupStep.total}` : 'Startup Wizard',
+							title: startupStep ? `Required Setup  ${Math.max(0, startupStep.total - startupStep.index - 1)} left` : 'Required Setup',
 							lines: detailPanel.lines,
 							focused: focusArea === 'content',
 							tone: 'accent',
@@ -822,12 +1288,13 @@ export async function runCliConfigEditor(
 						React.createElement(TextInputField, {
 							width: layout.columns,
 							height: layout.inputHeight,
-							label: selectedPage.entry.sensitivity === 'secret' ? 'New value' : 'New value',
+							label: 'Value',
 							focused: focusArea === 'content',
 							value: draftValue,
 							cursorPosition,
 							secret: selectedPage.entry.sensitivity === 'secret',
-							placeholder: selectedPage.suggestedValue || '(empty)',
+							placeholder: '',
+							helperText: '',
 						}),
 						React.createElement(
 							Box,
@@ -848,8 +1315,8 @@ export async function runCliConfigEditor(
 					: React.createElement(EmptyState, {
 						width: layout.columns,
 						height: layout.bodyHeight,
-						title: 'Startup Complete',
-						message: 'No startup configuration items remain for the selected environment. You can finish now or switch to the full editor for advanced settings.',
+						title: 'Required Setup Complete',
+						message: 'The required setup flow is complete.',
 					});
 
 				return React.createElement(AppFrame, { layout, topBar, body, footer });
@@ -858,23 +1325,37 @@ export async function runCliConfigEditor(
 			const body = React.createElement(
 				Box,
 				{ width: layout.columns, height: layout.bodyHeight, overflow: 'hidden' },
-				React.createElement(SidebarList, {
-					width: layout.sidebarWidth,
-					height: layout.bodyHeight,
-					title: 'Variables',
-					focused: focusArea === 'sidebar',
-					scrollState: {
-						offset: safeSidebarOffset,
-						viewportSize: sidebarViewportSize,
-						totalSize: pages.length,
-					},
-					items: visibleSidebar.map((page, index) => ({
-						id: page.key,
-						label: page.entry.id,
-						active: safeSidebarOffset + index === safePageIndex,
-						tone: page.required ? 'required' : 'normal',
-					})),
-				}),
+				React.createElement(
+					Box,
+					{ flexDirection: 'column', width: layout.sidebarWidth, height: layout.bodyHeight, overflow: 'hidden' },
+					React.createElement(TextInputField, {
+						width: layout.sidebarWidth,
+						height: sidebarFilterHeight,
+						label: 'Filter',
+						focused: focusArea === 'filter',
+						value: filterQuery,
+						cursorPosition: filterCursor,
+						placeholder: 'id, label, group, cluster',
+						helperText: 'Type to narrow by id, label, group, or cluster.',
+					}),
+					React.createElement(SidebarList, {
+						width: layout.sidebarWidth,
+						height: sidebarHeight,
+						title: filterQuery ? `Variables (${pages.length})` : 'Variables',
+						focused: focusArea === 'sidebar',
+						scrollState: {
+							offset: safeSidebarOffset,
+							viewportSize: sidebarViewportSize,
+							totalSize: pages.length,
+						},
+						items: visibleSidebar.map((page, index) => ({
+							id: page.key,
+							label: page.entry.id,
+							active: safeSidebarOffset + index === safePageIndex,
+							tone: page.required ? 'required' : 'normal',
+						})),
+					}),
+				),
 				React.createElement(Text, null, ' '),
 				React.createElement(
 					Box,
@@ -899,12 +1380,13 @@ export async function runCliConfigEditor(
 							React.createElement(TextInputField, {
 								width: layout.contentWidth,
 								height: layout.inputHeight,
-								label: 'New value',
+								label: 'Value',
 								focused: focusArea === 'content',
 								value: draftValue,
 								cursorPosition,
 								secret: selectedPage.entry.sensitivity === 'secret',
-								placeholder: selectedPage.suggestedValue || '(empty)',
+								placeholder: '',
+								helperText: '',
 							}),
 							React.createElement(
 								Box,

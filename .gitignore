@@ -4,5 +4,6 @@ dist/
 coverage/
 *.log
 *.tgz
+.treeseed/
 scripts/.ts-run-*.mjs
 npm-debug.log*

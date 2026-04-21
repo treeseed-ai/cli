@@ -24,6 +24,8 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 	if (preflight.missingCommands.includes('git')) mustFixNow.push('Install Git.');
 	if (preflight.missingCommands.includes('npm')) mustFixNow.push('Install npm 10 or newer.');
 	if (!state.files.machineConfig) mustFixNow.push('Run `treeseed config --environment local` to create the local machine config.');
+	if (!state.secrets.wrappedKeyPresent) mustFixNow.push('Run `treeseed secrets:unlock` to create the wrapped machine key used for local secret storage.');
+	if (state.secrets.migrationRequired) mustFixNow.push('Run `treeseed secrets:migrate-key` to replace the legacy plaintext machine key with the wrapped format.');
 	if (state.packageSync.blockers.length > 0) mustFixNow.push(...state.packageSync.blockers);
 	if (state.workflowControl.lock.active && state.workflowControl.lock.runId) {
 		mustFixNow.push(`Active workflow lock detected for run ${state.workflowControl.lock.runId}. Use \`treeseed recover\` before starting another mutating command.`);
@@ -46,15 +48,19 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 		}
 	}
 
-	if (!state.files.envLocal) optional.push('Create `.env.local` or run `treeseed config --environment local` to generate it.');
-	if (!state.files.devVars) optional.push('Generate `.dev.vars` by running `treeseed config --environment local`.');
-	if (!state.auth.gh) optional.push('Configure `GH_TOKEN` for GitHub CLI automation and Copilot-backed workflows.');
-	if (!state.auth.wrangler) optional.push('Configure `CLOUDFLARE_API_TOKEN` before staging, preview, or production deployment work.');
+	if (!state.auth.gh) optional.push('Configure GitHub token/config (`GH_TOKEN`) for GitHub CLI automation and Copilot-backed workflows.');
+	if (!state.auth.wrangler) optional.push('Configure Cloudflare token/config (`CLOUDFLARE_API_TOKEN`) before staging, preview, or production deployment work.');
 	if (!state.auth.railway && railwayManagedServicesEnabled) {
-		optional.push('Configure `RAILWAY_API_TOKEN` before deploying the managed Railway services.');
+		optional.push('Configure Railway token/config (`RAILWAY_API_TOKEN`) before deploying the managed Railway services.');
 	}
 	if (!state.auth.remoteApi && state.managedServices.api.enabled) {
 		optional.push('Run `treeseed auth:login` so the CLI can use the configured remote API.');
+	}
+	if (state.secrets.wrappedKeyPresent && !state.secrets.keyAgentUnlocked) {
+		optional.push('Run `treeseed secrets:unlock` before starting secret-backed dev, deploy, or runner commands.');
+	}
+	if (!state.secrets.keyAgentRunning) {
+		optional.push('The Treeseed key-agent is not running yet. It will start automatically when you unlock the secret session.');
 	}
 	if (!state.auth.copilot) optional.push('Configure `GH_TOKEN` if you rely on local Copilot-assisted workflows.');
 

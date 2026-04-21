@@ -8,7 +8,13 @@ import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
 import { findCommandSpec, listCommandNames, runTreeseedCli } from '../dist/cli/main.js';
 import { buildTreeseedHelpView } from '../dist/cli/help.js';
 import { shouldUseInkHelp } from '../dist/cli/help-ui.js';
-import { buildCliConfigPages, computeConfigViewportLayout } from '../dist/cli/handlers/config-ui.js';
+import {
+	applyConfigInputInsertion,
+	buildCliConfigPages,
+	computeConfigViewportLayout,
+	filterCliConfigPages,
+	normalizeConfigInputChunk,
+} from '../dist/cli/handlers/config-ui.js';
 import { findClickableRegion, routeWheelDeltaToScrollRegion } from '../dist/cli/ui/framework.js';
 import { parseTerminalMouseInput } from '../dist/cli/ui/mouse.js';
 import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
@@ -33,13 +39,22 @@ function resolveSdkConfigRuntimePath() {
 async function runCli(args, options = {}) {
 	const writes = [];
 	const spawns = [];
-	const originalHome = process.env.HOME;
-	if (typeof options.env?.HOME === 'string') process.env.HOME = options.env.HOME;
+	const envOverrides = {
+		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
+		...(options.env ?? {}),
+	};
+	const previousEnv = new Map();
+	for (const [key, value] of Object.entries(envOverrides)) {
+		previousEnv.set(key, Object.prototype.hasOwnProperty.call(process.env, key) ? process.env[key] : undefined);
+		if (value === undefined) delete process.env[key];
+		else process.env[key] = value;
+	}
 	let exitCode;
 	try {
 		exitCode = await runTreeseedCli(args, {
 			cwd: options.cwd ?? process.cwd(),
-			env: { ...process.env, ...(options.env ?? {}) },
+			env: { ...process.env, ...envOverrides },
+			interactiveUi: options.interactiveUi,
 			write(output, stream) {
 				writes.push({ output, stream });
 			},
@@ -49,8 +64,10 @@ async function runCli(args, options = {}) {
 			},
 		});
 	} finally {
-		if (originalHome === undefined) delete process.env.HOME;
-		else process.env.HOME = originalHome;
+		for (const [key, value] of previousEnv.entries()) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
 	}
 
 	return {
@@ -113,6 +130,9 @@ test('config help includes the advanced full-editor flag', async () => {
 	const result = await runCli(['help', 'config']);
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /--full/);
+	assert.match(result.output, /--mouse/);
+	assert.match(result.output, /--non-interactive/);
+	assert.match(result.output, /--install-missing-tooling/);
 });
 
 test('export help includes the directory argument', async () => {
@@ -242,6 +262,11 @@ test('interactive ink help is gated to human tty mode', () => {
 		process.env.ACT = 'true';
 		process.env.TREESEED_VERIFY_DRIVER = 'act';
 		assert.equal(shouldUseInkHelp({ outputFormat: 'human', interactiveUi: true }), false);
+		process.env.CI = 'false';
+		process.env.GITHUB_ACTIONS = 'false';
+		process.env.ACT = 'false';
+		process.env.TREESEED_VERIFY_DRIVER = 'direct';
+		assert.equal(shouldUseInkHelp({ outputFormat: 'human', interactiveUi: true }), false);
 	} finally {
 		if (previousCi === undefined) delete process.env.CI;
 		else process.env.CI = previousCi;
@@ -292,8 +317,10 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
-			GH_TOKEN: 'gh_test',
-			CLOUDFLARE_API_TOKEN: 'cf_test',
+			GH_TOKEN: 'gh_test_token',
+			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
 	assert.equal(result.exitCode, 0);
@@ -302,16 +329,67 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	assert.equal(payload.ok, true);
 	assert.ok(Array.isArray(payload.scopes));
 	assert.ok(payload.scopes.includes('local'));
+	assert.equal(payload.toolHealth.ghActExtension.attemptedInstall, false);
 });
 
 test('config defaults to all environments and supports explicit all', async () => {
 	const workspaceRoot = makeTenantWorkspace('staging');
-	const defaultResult = await runCli(['config', '--print-env-only', '--json'], { cwd: workspaceRoot, env: { HOME: workspaceRoot } });
-	const explicitResult = await runCli(['config', '--environment', 'all', '--print-env-only', '--json'], { cwd: workspaceRoot, env: { HOME: workspaceRoot } });
+	const env = {
+		HOME: workspaceRoot,
+		TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+	};
+	const defaultResult = await runCli(['config', '--print-env-only', '--json'], { cwd: workspaceRoot, env });
+	const explicitResult = await runCli(['config', '--environment', 'all', '--print-env-only', '--json'], { cwd: workspaceRoot, env });
 	assert.equal(defaultResult.exitCode, 0);
 	assert.equal(explicitResult.exitCode, 0);
 	assert.deepEqual(JSON.parse(defaultResult.stdout).scopes, ['local', 'staging', 'prod']);
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
+});
+
+test('config rejects non-tty execution without explicit automation mode', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['config', '--environment', 'local', '--sync', 'none'], {
+		cwd: workspaceRoot,
+		env: { HOME: workspaceRoot },
+	});
+	assert.equal(result.exitCode, 1);
+	assert.match(result.stderr, /requires a TTY/i);
+});
+
+test('config does not open the interactive editor when interactive ui is disabled in tests', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const originalStdinIsTTY = process.stdin.isTTY;
+	const originalStdoutIsTTY = process.stdout.isTTY;
+	Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: true });
+	Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: true });
+	try {
+		const result = await runCli(['config', '--environment', 'local', '--sync', 'none'], {
+			cwd: workspaceRoot,
+			env: { HOME: workspaceRoot },
+			interactiveUi: false,
+		});
+		assert.equal(result.exitCode, 1);
+		assert.match(result.stderr, /requires a TTY/i);
+	} finally {
+		Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: originalStdinIsTTY });
+		Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: originalStdoutIsTTY });
+	}
+});
+
+test('config supports explicit non-interactive application without json output', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['config', '--environment', 'local', '--sync', 'none', '--non-interactive'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			GH_TOKEN: 'gh_test_token',
+			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(result.exitCode, 0);
+	assert.match(result.stdout, /Treeseed config completed successfully/);
 });
 
 test('export defaults to the current shell directory and writes a markdown snapshot', async () => {
@@ -347,57 +425,359 @@ test('config ui startup page model includes only required unresolved entries and
 	const context = {
 		project: { name: 'Test', slug: 'test' },
 		scopes: ['local', 'staging', 'prod'],
-		authStatusByScope: {
-			local: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
-			staging: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
-			prod: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+		onboardingFeatures: [],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
 		},
 		entriesByScope: {
 			local: [
-				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'TREESEED_WEB_SERVICE_ID', label: 'Web service ID', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: 'web', effectiveValue: 'web' },
-				{ id: 'TREESEED_API_WEB_SERVICE_ID', label: 'API trusted web service ID', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: 'web', effectiveValue: 'web' },
-				{ id: 'TREESEED_API_BASE_URL', label: 'API URL', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config', 'deploy'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: 'http://127.0.0.1:3000', suggestedValue: '', effectiveValue: 'http://127.0.0.1:3000' },
-				{ id: 'OPTIONAL_DEFAULTED', label: 'Optional defaulted', group: 'smtp', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: false, currentValue: '', suggestedValue: 'mailpit', effectiveValue: 'mailpit' },
-				{ id: 'OPTIONAL_MISSING', label: 'Optional missing', group: 'smtp', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: false, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', cluster: 'auth:shared', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_WEB_SERVICE_ID', label: 'Web service ID', group: 'auth', cluster: 'auth:web', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: 'web', effectiveValue: 'web' },
+				{ id: 'TREESEED_API_WEB_SERVICE_ID', label: 'API trusted web service ID', group: 'auth', cluster: 'auth:web', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: 'web', effectiveValue: 'web' },
+				{ id: 'TREESEED_API_BASE_URL', label: 'API URL', group: 'auth', cluster: 'auth:api', onboardingFeature: null, startupProfile: 'advanced', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config', 'deploy'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: 'http://127.0.0.1:3000', suggestedValue: '', effectiveValue: 'http://127.0.0.1:3000' },
+				{ id: 'OPTIONAL_DEFAULTED', label: 'Optional defaulted', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: 'mailpit', effectiveValue: 'mailpit' },
+				{ id: 'OPTIONAL_MISSING', label: 'Optional missing', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 			staging: [
-				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'TREESEED_API_BASE_URL', label: 'API URL', group: 'auth', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config', 'deploy'], storage: 'scoped', scope: 'staging', sharedScopes: ['staging'], required: true, currentValue: 'https://staging-api.example.com', suggestedValue: '', effectiveValue: 'https://staging-api.example.com' },
+				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', cluster: 'auth:shared', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_API_BASE_URL', label: 'API URL', group: 'auth', cluster: 'auth:api', onboardingFeature: null, startupProfile: 'advanced', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config', 'deploy'], storage: 'scoped', scope: 'staging', sharedScopes: ['staging'], required: true, currentValue: 'https://staging-api.example.com', suggestedValue: '', effectiveValue: 'https://staging-api.example.com' },
 			],
 			prod: [
-				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'SHARED_TOKEN', label: 'Shared token', group: 'auth', cluster: 'auth:shared', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 		},
 	};
-	const pages = buildCliConfigPages(context, 'all', {}, 'startup');
-	assert.equal(pages.filter((page) => page.entry.id === 'SHARED_TOKEN').length, 1);
-	assert.equal(pages.some((page) => page.entry.id === 'TREESEED_WEB_SERVICE_ID'), false);
-	assert.equal(pages.some((page) => page.entry.id === 'TREESEED_API_WEB_SERVICE_ID'), false);
-	assert.equal(pages.filter((page) => page.entry.id === 'TREESEED_API_BASE_URL').length, 0);
-	assert.equal(pages.some((page) => page.entry.id === 'OPTIONAL_DEFAULTED'), false);
-	assert.equal(pages.some((page) => page.entry.id === 'OPTIONAL_MISSING'), false);
+	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
+	const entryPages = pages.filter((page) => page.kind === 'entry');
+	assert.equal(entryPages.filter((page) => page.entry.id === 'SHARED_TOKEN').length, 1);
+	assert.equal(entryPages.some((page) => page.entry.id === 'TREESEED_WEB_SERVICE_ID'), false);
+	assert.equal(entryPages.some((page) => page.entry.id === 'TREESEED_API_WEB_SERVICE_ID'), false);
+	assert.equal(entryPages.filter((page) => page.entry.id === 'TREESEED_API_BASE_URL').length, 0);
+	assert.equal(entryPages.some((page) => page.entry.id === 'OPTIONAL_DEFAULTED'), false);
+	assert.equal(entryPages.some((page) => page.entry.id === 'OPTIONAL_MISSING'), true);
+});
+
+test('config ui startup includes missing required scoped entries across staging and prod', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		onboardingFeatures: [],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			staging: [
+				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			prod: [
+				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
+	const smtpScopes = pages
+		.filter((page) => page.entry.id === 'TREESEED_SMTP_HOST')
+		.map((page) => page.scope);
+	assert.deepEqual(smtpScopes, ['local']);
+});
+
+test('config ui startup includes required advanced hosted entries that still need attention', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: false, currentValue: '', suggestedValue: '127.0.0.1', effectiveValue: '127.0.0.1' },
+			],
+			staging: [
+				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			prod: [
+				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'forms', cluster: 'turnstile', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
+	assert.deepEqual(
+		pages.map((page) => `${page.entry.id}:${page.scope}`),
+		['TREESEED_TURNSTILE_SECRET_KEY:prod', 'TREESEED_SMTP_HOST:local'],
+	);
+});
+
+test('config ui startup keeps invalid required values in the wizard until they are corrected', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [],
+			staging: [
+				{ id: 'TREESEED_SMTP_PORT', label: 'SMTP port', group: 'smtp', cluster: 'smtp', startupProfile: 'optional', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', validation: { kind: 'number' }, scope: 'staging', sharedScopes: ['staging'], required: true, currentValue: 'mailpit', suggestedValue: '', effectiveValue: 'mailpit' },
+			],
+			prod: [],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
+	assert.deepEqual(pages.map((page) => page.entry.id), ['TREESEED_SMTP_PORT']);
 });
 
 test('config ui full page model includes optional resolved entries', () => {
 	const context = {
 		project: { name: 'Test', slug: 'test' },
 		scopes: ['local', 'staging', 'prod'],
-		authStatusByScope: {
-			local: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
-			staging: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
-			prod: { gh: { authenticated: false }, wrangler: { authenticated: false }, railway: { authenticated: false } },
+		onboardingFeatures: [],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
 		},
 		entriesByScope: {
 			local: [
-				{ id: 'OPTIONAL_DEFAULTED', label: 'Optional defaulted', group: 'smtp', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: false, currentValue: '', suggestedValue: 'mailpit', effectiveValue: 'mailpit' },
+				{ id: 'OPTIONAL_DEFAULTED', label: 'Optional defaulted', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: 'mailpit', effectiveValue: 'mailpit' },
 			],
 			staging: [],
 			prod: [],
 		},
 	};
-	const pages = buildCliConfigPages(context, 'all', {}, 'full');
-	assert.equal(pages.some((page) => page.entry.id === 'OPTIONAL_DEFAULTED'), true);
+	const pages = buildCliConfigPages(context, 'local', {}, 'full');
+	assert.equal(pages.some((page) => page.kind === 'entry' && page.entry.id === 'OPTIONAL_DEFAULTED'), true);
+});
+
+test('config ui full page model filters to the selected scope only', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		onboardingFeatures: [],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'LOCAL_ONLY', label: 'Local only', group: 'auth', cluster: 'auth:local', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			staging: [
+				{ id: 'STAGING_ONLY', label: 'Staging only', group: 'auth', cluster: 'auth:staging', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'scoped', scope: 'staging', sharedScopes: ['staging'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			prod: [],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'full');
+	assert.equal(pages.some((page) => page.entry.id === 'LOCAL_ONLY'), true);
+	assert.equal(pages.some((page) => page.entry.id === 'STAGING_ONLY'), false);
+});
+
+test('config ui full page filter matches id, label, group, and cluster', () => {
+	const pages = [
+		{
+			kind: 'entry',
+			key: 'local:TREESEED_SMTP_HOST',
+			entry: {
+				id: 'TREESEED_SMTP_HOST',
+				label: 'SMTP host',
+				group: 'smtp',
+				cluster: 'smtp',
+				startupProfile: 'optional',
+				requirement: 'conditional',
+				description: '',
+				howToGet: '',
+				sensitivity: 'plain',
+				targets: [],
+				purposes: ['config'],
+				storage: 'scoped',
+				scope: 'local',
+				sharedScopes: ['local'],
+				required: false,
+				currentValue: '',
+				suggestedValue: '127.0.0.1',
+				effectiveValue: '127.0.0.1',
+			},
+			scope: 'local',
+			scopes: ['local'],
+			requiredScopes: [],
+			required: false,
+			currentValue: '',
+			suggestedValue: '127.0.0.1',
+			finalValue: '127.0.0.1',
+			wizardRequiredMissing: false,
+		},
+		{
+			kind: 'entry',
+			key: 'local:TREESEED_FORM_TOKEN_SECRET',
+			entry: {
+				id: 'TREESEED_FORM_TOKEN_SECRET',
+				label: 'Forms token secret',
+				group: 'forms',
+				cluster: 'forms-core',
+				startupProfile: 'core',
+				requirement: 'required',
+				description: '',
+				howToGet: '',
+				sensitivity: 'secret',
+				targets: [],
+				purposes: ['config'],
+				storage: 'shared',
+				scope: 'local',
+				sharedScopes: ['local', 'staging', 'prod'],
+				required: true,
+				currentValue: '',
+				suggestedValue: '',
+				effectiveValue: '',
+			},
+			scope: 'local',
+			scopes: ['local'],
+			requiredScopes: ['local'],
+			required: true,
+			currentValue: '',
+			suggestedValue: '',
+			finalValue: '',
+			wizardRequiredMissing: true,
+		},
+	];
+	assert.deepEqual(filterCliConfigPages(pages, 'smtp').map((page) => page.entry.id), ['TREESEED_SMTP_HOST']);
+	assert.deepEqual(filterCliConfigPages(pages, 'Forms token').map((page) => page.entry.id), ['TREESEED_FORM_TOKEN_SECRET']);
+	assert.deepEqual(filterCliConfigPages(pages, 'forms-core').map((page) => page.entry.id), ['TREESEED_FORM_TOKEN_SECRET']);
+});
+
+test('config ui startup keeps clustered variables adjacent across scopes and preserves shared-before-scoped ordering', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		onboardingFeatures: [],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'TREESEED_PUBLIC_TURNSTILE_SITE_KEY', label: 'Turnstile site key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			staging: [
+				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			prod: [],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
+	const entryIds = pages
+		.filter((page) => page.kind === 'entry')
+		.map((page) => `${page.entry.id}:${page.scope}`);
+	assert.deepEqual(entryIds, [
+		'TREESEED_TURNSTILE_SECRET_KEY:local',
+		'TREESEED_PUBLIC_TURNSTILE_SITE_KEY:local',
+	]);
+});
+
+test('config ui orders provider workflow groups before cluster names', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'TREESEED_FORM_TOKEN_SECRET', label: 'Forms token', group: 'forms', cluster: 'z-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'CLOUDFLARE_API_TOKEN', label: 'Cloudflare token', group: 'cloudflare', cluster: 'a-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'RAILWAY_API_TOKEN', label: 'Railway token', group: 'railway', cluster: 'm-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			staging: [],
+			prod: [],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'full');
+	assert.deepEqual(
+		pages.map((page) => page.entry.id),
+		['CLOUDFLARE_API_TOKEN', 'RAILWAY_API_TOKEN', 'TREESEED_FORM_TOKEN_SECRET'],
+	);
+});
+
+test('config ui keeps mixed-group Cloudflare account settings adjacent', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local', 'staging', 'prod'],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [
+				{ id: 'CLOUDFLARE_API_TOKEN', label: 'Cloudflare token', group: 'auth', cluster: 'auth:a', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'CLOUDFLARE_ACCOUNT_ID', label: 'Cloudflare account ID', group: 'cloudflare', cluster: 'cloudflare:z', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'RAILWAY_API_TOKEN', label: 'Railway token', group: 'railway', cluster: 'railway:a', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+			],
+			staging: [],
+			prod: [],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'full');
+	const orderedIds = pages.map((page) => page.entry.id);
+	const tokenIndex = orderedIds.indexOf('CLOUDFLARE_API_TOKEN');
+	const accountIndex = orderedIds.indexOf('CLOUDFLARE_ACCOUNT_ID');
+	assert.equal(Math.abs(tokenIndex - accountIndex), 1);
+	assert.equal(orderedIds.at(-1), 'RAILWAY_API_TOKEN');
+});
+
+test('config ui keeps short required secret values in the startup wizard', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['local'],
+		configReadinessByScope: {
+			local: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			local: [
+				{
+					id: 'RAILWAY_API_TOKEN',
+					label: 'Railway token',
+					group: 'auth',
+					cluster: 'auth:railway',
+					onboardingFeature: null,
+					startupProfile: 'core',
+					requirement: 'required',
+					description: '',
+					howToGet: '',
+					sensitivity: 'secret',
+					targets: [],
+					purposes: ['config'],
+					storage: 'shared',
+					scope: 'local',
+					sharedScopes: ['local', 'staging', 'prod'],
+					required: true,
+					validation: { kind: 'nonempty', minLength: 8 },
+					currentValue: '0',
+					suggestedValue: '',
+					effectiveValue: '0',
+				},
+			],
+		},
+	};
+	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
+	assert.equal(pages.length, 1);
+	assert.equal(pages[0].entry.id, 'RAILWAY_API_TOKEN');
+	assert.equal(pages[0].wizardRequiredMissing, true);
 });
 
 test('config ui viewport layout stays within the terminal height budget', () => {
@@ -406,6 +786,25 @@ test('config ui viewport layout stays within the terminal height budget', () => 
 	assert.ok(layout.bodyHeight > 0);
 	assert.ok(layout.detailViewportHeight > 0);
 	assert.ok(layout.inputHeight > 0);
+});
+
+test('config ui normalizes bracketed paste chunks', () => {
+	assert.equal(normalizeConfigInputChunk('\u001b[200~multi\nline\u001b[201~'), 'multi\nline');
+});
+
+test('config ui strips trailing newlines from pasted config values', () => {
+	assert.equal(normalizeConfigInputChunk('secret-value\n'), 'secret-value');
+	assert.equal(normalizeConfigInputChunk('\u001b[200~secret-value\r\n\u001b[201~'), 'secret-value');
+});
+
+test('config ui applies pasted text at the cursor position', () => {
+	const inserted = applyConfigInputInsertion({ value: 'abcdef', cursor: 3 }, 'XYZ');
+	assert.deepEqual(inserted, { value: 'abcXYZdef', cursor: 6 });
+});
+
+test('config ui preserves multiline bracketed paste content', () => {
+	const inserted = applyConfigInputInsertion({ value: '', cursor: 0 }, '\u001b[200~alpha\nbeta\u001b[201~');
+	assert.deepEqual(inserted, { value: 'alpha\nbeta', cursor: 'alpha\nbeta'.length });
 });
 
 test('terminal mouse parser recognizes sgr mouse release events', () => {
@@ -421,6 +820,23 @@ test('sdk config runtime no longer embeds ink hook usage', () => {
 	const runtimeSource = readFileSync(resolveSdkConfigRuntimePath(), 'utf8');
 	assert.doesNotMatch(runtimeSource, /useStdoutDimensions/);
 	assert.doesNotMatch(runtimeSource, /runTreeseedConfigWizard/);
+});
+
+test('config ui no longer renders an in-app wizard or view switcher', () => {
+	const configUiSource = readFileSync(resolve(repoRoot, 'packages', 'cli', 'src', 'cli', 'handlers', 'config-ui.ts'), 'utf8');
+	assert.doesNotMatch(configUiSource, /title:\s*'View'/);
+	assert.doesNotMatch(configUiSource, /Startup Wizard/);
+	assert.doesNotMatch(configUiSource, /Full Editor/);
+	assert.doesNotMatch(configUiSource, /Step \$\{step\.index \+ 1\} of \$\{step\.total\}/);
+	assert.match(configUiSource, /Wizard mode across/);
+	assert.doesNotMatch(configUiSource, /\(empty\)/);
+});
+
+test('text input helper copy no longer uses parenthesized empty placeholders', () => {
+	const frameworkSource = readFileSync(resolve(repoRoot, 'packages', 'cli', 'src', 'cli', 'ui', 'framework.ts'), 'utf8');
+	assert.doesNotMatch(frameworkSource, /\(empty\)/);
+	assert.doesNotMatch(frameworkSource, /Value is unset\. Type or paste a value\./);
+	assert.match(frameworkSource, /props\.secret && props\.value\.length > 0 \? formatSecretMaskedValue\(props\.value\) : props\.value/);
 });
 
 function installCoreDevFixture(root, { workspace = false } = {}) {
@@ -455,7 +871,13 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	const workspaceRoot = makeTenantWorkspace('feature/dev-workspace');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const result = await runCli(['dev'], { cwd: workspaceRoot });
+	const result = await runCli(['dev'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
 	assert.equal(result.exitCode, 0);
 	assert.equal(result.spawns.length, 1);
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/run-ts\.mjs/);
@@ -466,7 +888,13 @@ test('treeseed dev:watch delegates to the installed core entrypoint with --watch
 	const workspaceRoot = makeTenantWorkspace('feature/dev-installed');
 	installCoreDevFixture(workspaceRoot);
 
-	const result = await runCli(['dev:watch'], { cwd: workspaceRoot });
+	const result = await runCli(['dev:watch'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
 	assert.equal(result.exitCode, 0);
 	assert.equal(result.spawns.length, 1);
 	assert.match(result.spawns[0].args.join(' '), /node_modules\/@treeseed\/core\/dist\/scripts\/dev-platform\.js/);

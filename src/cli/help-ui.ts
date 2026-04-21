@@ -555,5 +555,5 @@ function isNonHumanInteractiveEnvironment() {
 	return process.env.CI === 'true'
 		|| process.env.GITHUB_ACTIONS === 'true'
 		|| process.env.ACT === 'true'
-		|| process.env.TREESEED_VERIFY_DRIVER === 'act';
+		|| typeof process.env.TREESEED_VERIFY_DRIVER === 'string';
 }

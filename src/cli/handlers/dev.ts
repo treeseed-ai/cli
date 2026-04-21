@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { resolveTreeseedLaunchEnvironment } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
 
@@ -56,7 +57,11 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		const args = watch ? [...resolved.args, '--watch'] : resolved.args;
 		const result = context.spawn(resolved.command, args, {
 			cwd: context.cwd,
-			env: context.env,
+			env: resolveTreeseedLaunchEnvironment({
+				tenantRoot: context.cwd,
+				scope: 'local',
+				baseEnv: { ...process.env, ...(context.env ?? {}) },
+			}),
 			stdio: 'inherit',
 		});
 		return {

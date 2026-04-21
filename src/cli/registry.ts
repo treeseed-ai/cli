@@ -19,6 +19,14 @@ import { handleSync } from './handlers/sync.js';
 import { handleAuthLogin } from './handlers/auth-login.js';
 import { handleAuthLogout } from './handlers/auth-logout.js';
 import { handleAuthWhoAmI } from './handlers/auth-whoami.js';
+import {
+	handleSecretsLock,
+	handleSecretsMigrateKey,
+	handleSecretsRotateMachineKey,
+	handleSecretsRotatePassphrase,
+	handleSecretsStatus,
+	handleSecretsUnlock,
+} from './handlers/secrets.js';
 import { handleTasks } from './handlers/tasks.js';
 import { handleSwitch } from './handlers/switch.js';
 import { handleStage } from './handlers/stage.js';
@@ -49,6 +57,12 @@ export const COMMAND_HANDLERS = {
 	'auth:login': handleAuthLogin,
 	'auth:logout': handleAuthLogout,
 	'auth:whoami': handleAuthWhoAmI,
+	'secrets:status': handleSecretsStatus,
+	'secrets:unlock': handleSecretsUnlock,
+	'secrets:lock': handleSecretsLock,
+	'secrets:migrate-key': handleSecretsMigrateKey,
+	'secrets:rotate-passphrase': handleSecretsRotatePassphrase,
+	'secrets:rotate-machine-key': handleSecretsRotateMachineKey,
 } as const;
 
 export const TRESEED_COMMAND_SPECS: TreeseedCommandSpec[] = TRESEED_OPERATION_SPECS;

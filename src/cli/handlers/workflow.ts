@@ -1,4 +1,5 @@
 import { TreeseedWorkflowError, TreeseedWorkflowSdk, type TreeseedWorkflowContext, type TreeseedWorkflowNextStep, type TreeseedWorkflowResult } from '@treeseed/sdk/workflow';
+import { TreeseedKeyAgentError } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandContext, TreeseedCommandResult } from '../types.js';
 
 export function createWorkflowSdk(context: TreeseedCommandContext, overrides: Partial<TreeseedWorkflowContext> = {}) {
@@ -33,6 +34,36 @@ export function workflowErrorResult(error: unknown): TreeseedCommandResult {
 				result: null,
 				nextSteps: [],
 				recovery,
+				errors: [
+					{
+						code: error.code,
+						message: error.message,
+						details: error.details ?? null,
+					},
+				],
+			},
+		};
+	}
+	if (error instanceof TreeseedKeyAgentError) {
+		return {
+			exitCode: 1,
+			stderr: [error.message],
+			report: {
+				schemaVersion: 1,
+				kind: 'treeseed.workflow.result',
+				command: 'status',
+				executionMode: 'execute',
+				runId: null,
+				ok: false,
+				operation: 'status',
+				summary: error.message,
+				facts: [],
+				error: error.message,
+				code: error.code,
+				payload: null,
+				result: null,
+				nextSteps: [],
+				recovery: null,
 				errors: [
 					{
 						code: error.code,

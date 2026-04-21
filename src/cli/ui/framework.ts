@@ -109,6 +109,34 @@ export function truncateLine(value: string, width: number) {
 	return `${value.slice(0, Math.max(0, width - 1))}…`;
 }
 
+export function formatSecretMaskedValue(value: string) {
+	if (!value) {
+		return '(unset)';
+	}
+
+	const normalized = value
+		.replace(/\r\n/g, '\n')
+		.replace(/\r/g, '\n')
+		.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+		.replace(/\n+/g, ' ')
+		.trim();
+	if (!normalized) {
+		return '(unset)';
+	}
+
+	if (normalized.length === 1) {
+		return `${normalized} [1]`;
+	}
+
+	const maxRevealedTotal = Math.max(2, Math.floor(normalized.length * 0.25));
+	const revealPerSide = Math.min(3, Math.max(1, Math.floor(maxRevealedTotal / 2)));
+	const leading = normalized.slice(0, revealPerSide);
+	const trailing = normalized.slice(Math.max(revealPerSide, normalized.length - revealPerSide));
+	const maskedCount = Math.max(0, normalized.length - leading.length - trailing.length);
+	const maskedMiddle = '*'.repeat(maskedCount);
+	return `${leading}${maskedMiddle}${trailing} [${normalized.length}]`;
+}
+
 export function wrapText(value: string, width: number) {
 	if (width <= 0) {
 		return [''];
@@ -323,31 +351,48 @@ type TextInputFieldProps = {
 	secret?: boolean;
 	placeholder?: string;
 	cursorPosition?: number;
+	helperText?: string;
 };
+
+function renderTextInputContent(props: TextInputFieldProps) {
+	const safeCursor = Math.max(0, Math.min(props.cursorPosition ?? props.value.length, props.value.length));
+	const placeholder = props.placeholder ?? '';
+	const contentWidth = Math.max(1, props.width - 2);
+	if (!props.focused && !props.value) {
+		return React.createElement(Text, { color: 'gray' }, truncateLine(placeholder || ' '.repeat(contentWidth), contentWidth));
+	}
+
+	const visibleValue = props.secret && props.value.length > 0 ? formatSecretMaskedValue(props.value) : props.value;
+	if (!props.focused) {
+		return React.createElement(Text, null, truncateLine(visibleValue || placeholder, contentWidth));
+	}
+
+	const preservedPrefix = visibleValue.slice(0, safeCursor);
+	const visiblePrefix = preservedPrefix.slice(Math.max(0, preservedPrefix.length - Math.max(0, contentWidth - 1)));
+	const cursorCell = visibleValue[safeCursor] ?? ' ';
+	const padding = ' '.repeat(Math.max(0, contentWidth - visiblePrefix.length - 1));
+	return React.createElement(
+		Text,
+		null,
+		visiblePrefix,
+		React.createElement(Text, { color: 'black', backgroundColor: 'cyan' }, cursorCell),
+		padding,
+	);
+}
 
 export function TextInputField(props: TextInputFieldProps) {
 	const height = props.height ?? 4;
-	const safeCursor = Math.max(0, Math.min(props.cursorPosition ?? props.value.length, props.value.length));
-	const visibleValue = props.secret && props.value ? '•'.repeat(props.value.length) : props.value;
-	const placeholder = props.placeholder ?? '(empty)';
-	let inputLine = visibleValue;
-	if (props.focused) {
-		const beforeCursor = visibleValue.slice(0, safeCursor);
-		const afterCursor = visibleValue.slice(safeCursor);
-		inputLine = `${beforeCursor}\u2588${afterCursor}`;
-	} else if (!inputLine) {
-		inputLine = placeholder;
-	}
-	return React.createElement(FieldCard, {
-		width: props.width,
-		height,
-		title: props.label,
-		focused: props.focused,
-		lines: [
-			inputLine || '\u2588',
-			props.value.length > 0 ? 'Type a replacement value or leave this as-is.' : placeholder,
-		],
-	});
+	const placeholder = props.placeholder ?? '';
+	const helperText = props.helperText ?? (props.value.length > 0
+		? (props.secret ? 'Secret value captured. Paste or type a replacement, or leave this as-is.' : 'Type a replacement value or leave this as-is.')
+		: placeholder);
+	return React.createElement(
+		Box,
+		{ flexDirection: 'column', width: props.width, height, borderStyle: 'round', borderColor: props.focused ? 'cyan' : 'blue', overflow: 'hidden' },
+		React.createElement(Text, { color: 'blue', bold: true }, truncateLine(props.label, props.width - 2)),
+		renderTextInputContent(props),
+		React.createElement(Text, { color: 'gray' }, truncateLine(helperText || ' ', props.width - 2)),
+	);
 }
 
 type TextAreaFieldProps = {
@@ -364,7 +409,7 @@ export function TextAreaField(props: TextAreaFieldProps) {
 		height: props.height,
 		title: props.label,
 		focused: props.focused,
-		lines: wrapText(props.value || '(empty)', Math.max(1, props.width - 2)),
+		lines: wrapText(props.value || 'Value is unset.', Math.max(1, props.width - 2)),
 	});
 }
 

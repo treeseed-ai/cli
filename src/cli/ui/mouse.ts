@@ -55,7 +55,7 @@ export function parseTerminalMouseInput(input: string): TerminalMouseEvent[] {
 	return events;
 }
 
-export function useTerminalMouse(onEvent: (event: TerminalMouseEvent) => void) {
+export function useTerminalMouse(onEvent: (event: TerminalMouseEvent) => void, options: { enabled?: boolean } = {}) {
 	const { stdin } = useStdin();
 	const { stdout } = useStdout();
 	const handlerRef = React.useRef(onEvent);
@@ -65,7 +65,7 @@ export function useTerminalMouse(onEvent: (event: TerminalMouseEvent) => void) {
 	}, [onEvent]);
 
 	React.useEffect(() => {
-		if (!stdin || !stdout || !process.stdin.isTTY || !process.stdout.isTTY) {
+		if (options.enabled === false || !stdin || !stdout || !process.stdin.isTTY || !process.stdout.isTTY) {
 			return;
 		}
 
@@ -84,5 +84,5 @@ export function useTerminalMouse(onEvent: (event: TerminalMouseEvent) => void) {
 			stdin.off('data', handleData);
 			stdout.write('\u001B[?1000l\u001B[?1006l');
 		};
-	}, [stdin, stdout]);
+	}, [options.enabled, stdin, stdout]);
 }

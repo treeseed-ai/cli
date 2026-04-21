@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
 	createDefaultTreeseedMachineConfig,
@@ -8,7 +8,7 @@ import {
 	loadDeployState,
 	loadTreeseedMachineConfig,
 	resolveTreeseedMachineEnvironmentValues,
-	writeTreeseedLocalEnvironmentFiles,
+	warnDeprecatedTreeseedLocalEnvFiles,
 	writeTreeseedMachineConfig,
 	createPersistentDeployTarget,
 	ensureGeneratedWranglerConfig,
@@ -23,12 +23,9 @@ export function applyTreeseedSafeRepairs(tenantRoot: string): TreeseedRepairActi
 	const actions: TreeseedRepairAction[] = [];
 	ensureTreeseedGitignoreEntries(tenantRoot);
 	actions.push({ id: 'gitignore', detail: 'Ensured Treeseed gitignore entries are present.' });
-
-	const envLocalPath = resolve(tenantRoot, '.env.local');
-	const envLocalExamplePath = resolve(tenantRoot, '.env.local.example');
-	if (!existsSync(envLocalPath) && existsSync(envLocalExamplePath)) {
-		copyFileSync(envLocalExamplePath, envLocalPath);
-		actions.push({ id: 'env-local', detail: 'Created .env.local from .env.local.example.' });
+	const deprecatedFiles = warnDeprecatedTreeseedLocalEnvFiles(tenantRoot);
+	if (deprecatedFiles.length > 0) {
+		actions.push({ id: 'deprecated-local-env', detail: 'Detected deprecated .env.local/.dev.vars files that Treeseed now ignores.' });
 	}
 
 	const deployConfig = loadCliDeployConfig(tenantRoot);
@@ -48,8 +45,6 @@ export function applyTreeseedSafeRepairs(tenantRoot: string): TreeseedRepairActi
 
 	const machineConfig = loadTreeseedMachineConfig(tenantRoot);
 	writeTreeseedMachineConfig(tenantRoot, machineConfig);
-	writeTreeseedLocalEnvironmentFiles(tenantRoot);
-	actions.push({ id: 'local-env', detail: 'Regenerated .env.local and .dev.vars from the current machine config.' });
 
 	const stateRoot = resolve(tenantRoot, '.treeseed', 'state', 'environments');
 	if (existsSync(stateRoot)) {
