@@ -25,6 +25,7 @@ const { findClickableRegion, routeWheelDeltaToScrollRegion } = await import('../
 const { parseTerminalMouseInput } = await import('../dist/cli/ui/mouse.js');
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
+const cliPackageRoot = resolve(scriptDir, '..');
 const repoRoot = resolve(scriptDir, '..', '..', '..');
 const require = createRequire(import.meta.url);
 
@@ -840,7 +841,7 @@ test('sdk config runtime no longer embeds ink hook usage', () => {
 });
 
 test('config ui no longer renders an in-app wizard or view switcher', () => {
-	const configUiSource = readFileSync(resolve(repoRoot, 'packages', 'cli', 'src', 'cli', 'handlers', 'config-ui.ts'), 'utf8');
+	const configUiSource = readFileSync(resolve(cliPackageRoot, 'src', 'cli', 'handlers', 'config-ui.ts'), 'utf8');
 	assert.doesNotMatch(configUiSource, /title:\s*'View'/);
 	assert.doesNotMatch(configUiSource, /Startup Wizard/);
 	assert.doesNotMatch(configUiSource, /Full Editor/);
@@ -850,7 +851,7 @@ test('config ui no longer renders an in-app wizard or view switcher', () => {
 });
 
 test('text input helper copy no longer uses parenthesized empty placeholders', () => {
-	const frameworkSource = readFileSync(resolve(repoRoot, 'packages', 'cli', 'src', 'cli', 'ui', 'framework.ts'), 'utf8');
+	const frameworkSource = readFileSync(resolve(cliPackageRoot, 'src', 'cli', 'ui', 'framework.ts'), 'utf8');
 	assert.doesNotMatch(frameworkSource, /\(empty\)/);
 	assert.doesNotMatch(frameworkSource, /Value is unset\. Type or paste a value\./);
 	assert.match(frameworkSource, /props\.secret && props\.value\.length > 0 \? formatSecretMaskedValue\(props\.value\) : props\.value/);
