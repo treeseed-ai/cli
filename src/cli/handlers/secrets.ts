@@ -1,6 +1,8 @@
 import type { TreeseedCommandHandler } from '../types.js';
 import {
 	inspectTreeseedKeyAgentStatus,
+	inspectTreeseedKeyAgentTransportDiagnostic,
+	inspectTreeseedPassphraseEnvDiagnostic,
 	lockTreeseedSecretSession,
 	migrateTreeseedMachineKeyToWrapped,
 	rotateTreeseedMachineKey,
@@ -13,8 +15,10 @@ import {
 import { fail, guidedResult } from './utils.js';
 import { promptForNewPassphrase } from './secret-prompts.js';
 
-function renderStatus(command: string, tenantRoot: string) {
+async function renderStatus(command: string, tenantRoot: string) {
 	const status = inspectTreeseedKeyAgentStatus(tenantRoot);
+	const passphraseEnv = inspectTreeseedPassphraseEnvDiagnostic();
+	const transport = await inspectTreeseedKeyAgentTransportDiagnostic();
 	return guidedResult({
 		command,
 		summary: status.unlocked ? 'Treeseed secrets are unlocked.' : 'Treeseed secrets are locked.',
@@ -22,14 +26,24 @@ function renderStatus(command: string, tenantRoot: string) {
 			{ label: 'Key agent', value: status.running ? 'running' : 'stopped' },
 			{ label: 'Wrapped key', value: status.wrappedKeyPresent ? 'present' : 'missing' },
 			{ label: 'Migration required', value: status.migrationRequired ? 'yes' : 'no' },
+			{ label: 'Socket', value: transport.socketPresent ? 'present' : 'missing' },
+			{ label: 'Socket connect', value: transport.socketConnectable ? 'yes' : 'no' },
+			{ label: 'Socket health', value: transport.healthOk ? 'ok' : 'failed' },
 			{ label: 'Idle timeout', value: `${Math.round(status.idleTimeoutMs / 1000)}s` },
 			{ label: 'Idle remaining', value: `${Math.round(status.idleRemainingMs / 1000)}s` },
-			{ label: 'Passphrase env', value: process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV]?.trim() ? 'configured' : 'unset' },
+			{ label: 'Passphrase env', value: passphraseEnv.configured ? 'configured' : 'unset' },
 			{ label: 'Key path', value: status.keyPath },
+			{ label: 'Socket path', value: transport.socketPath },
 		],
 		report: {
 			status,
+			passphraseEnv,
+			transport,
 		},
+		nextSteps: [
+			...(passphraseEnv.configured ? [] : [passphraseEnv.recommendedLaunch]),
+			...(transport.lastError ? [`Key-agent transport error: ${transport.lastError}`] : []),
+		],
 	});
 }
 

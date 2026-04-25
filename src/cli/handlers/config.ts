@@ -129,6 +129,7 @@ function renderConfigResult(commandName: string, result: any) {
 	const configContext = payload.context as Record<string, any> | undefined;
 	const configReadiness = configContext?.configReadinessByScope?.local ?? {};
 	const readinessByScope = payload.result?.readinessByScope ?? {};
+	const resourceInventoryByScope = payload.result?.resourceInventoryByScope ?? payload.resourceInventoryByScope ?? {};
 	const secretSession = payload.secretSession as Record<string, any> | undefined;
 	const sharedStorageMigrations = payload.result?.sharedStorageMigrations as Array<Record<string, any>> | undefined;
 	const summary = payload.mode === 'print-env-only'
@@ -137,7 +138,11 @@ function renderConfigResult(commandName: string, result: any) {
 			? 'Treeseed machine key rotated successfully.'
 			: payload.mode === 'connect-market'
 				? 'Knowledge Coop pairing completed successfully.'
-			: 'Treeseed config completed successfully.';
+				: payload.mode === 'bootstrap-preflight'
+					? 'Treeseed bootstrap verification preflight completed.'
+				: payload.mode === 'bootstrap'
+					? 'Treeseed platform bootstrap completed successfully.'
+				: 'Treeseed config completed successfully.';
 	const market = payload.market as Record<string, any> | undefined;
 	return guidedResult({
 		command: commandName,
@@ -149,11 +154,17 @@ function renderConfigResult(commandName: string, result: any) {
 			{ label: 'Safe repairs', value: Array.isArray(payload.repairs) ? payload.repairs.length : 0 },
 			{ label: 'Machine config', value: payload.configPath },
 			{ label: 'Machine key', value: payload.keyPath },
+			{ label: 'Passphrase env', value: payload.passphraseEnv?.configured ? 'configured' : 'unset' },
 			{ label: 'Secrets session', value: describeSecretBootstrap(secretSession) },
 			{ label: 'Shared consolidations', value: describeSharedStorageMigrations(sharedStorageMigrations) },
+			{ label: 'Deployment key', value: resourceInventoryByScope.staging?.identity?.deploymentKey ?? resourceInventoryByScope.prod?.identity?.deploymentKey ?? '(unset)' },
+			{ label: 'Team', value: resourceInventoryByScope.staging?.identity?.teamId ?? resourceInventoryByScope.prod?.identity?.teamId ?? '(unset)' },
+			{ label: 'Project', value: resourceInventoryByScope.staging?.identity?.projectId ?? resourceInventoryByScope.prod?.identity?.projectId ?? '(unset)' },
 			{ label: 'Local readiness', value: configReadinessLabel(readinessByScope.local) },
 			{ label: 'Staging readiness', value: configReadinessLabel(readinessByScope.staging) },
 			{ label: 'Prod readiness', value: configReadinessLabel(readinessByScope.prod) },
+			{ label: 'Pages project', value: resourceInventoryByScope.staging?.resources?.pagesProject ?? resourceInventoryByScope.prod?.resources?.pagesProject ?? '(unset)' },
+			{ label: 'R2 bucket', value: resourceInventoryByScope.staging?.resources?.contentBucket ?? resourceInventoryByScope.prod?.resources?.contentBucket ?? '(unset)' },
 			{ label: 'GitHub token/config', value: configReadiness.github?.configured ? 'configured' : 'missing' },
 			{ label: 'Cloudflare token/config', value: configReadiness.cloudflare?.configured ? 'configured' : 'missing' },
 			{ label: 'Railway token/config', value: configReadiness.railway?.configured ? 'configured' : 'missing' },
@@ -172,7 +183,10 @@ function renderConfigResult(commandName: string, result: any) {
 				{ label: 'Runtime ready', value: market.runtimeReady ? 'yes' : 'no' },
 			] : []),
 		],
-		nextSteps: renderWorkflowNextSteps(result),
+		nextSteps: [
+			...(payload.passphraseEnv?.configured ? [] : [payload.passphraseEnv?.recommendedLaunch].filter(Boolean)),
+			...renderWorkflowNextSteps(result),
+		],
 		report: payload,
 	});
 }
@@ -189,9 +203,9 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 			&& process.stdin.isTTY
 			&& process.stdout.isTTY;
 		const nonInteractive = invocation.args.nonInteractive === true || context.outputFormat === 'json';
-		const operationalMode = invocation.args.printEnvOnly === true || invocation.args.rotateMachineKey === true || invocation.args.connectMarket === true;
+		const operationalMode = invocation.args.printEnvOnly === true || invocation.args.rotateMachineKey === true || invocation.args.connectMarket === true || invocation.args.bootstrap === true;
 		if (!interactive && !nonInteractive && !operationalMode) {
-			return fail('Treeseed config requires a TTY for the interactive editor. Re-run in a terminal, or use --non-interactive, --json, --print-env-only, --rotate-machine-key, or --connect-market.');
+			return fail('Treeseed config requires a TTY for the interactive editor. Re-run in a terminal, or use --non-interactive, --json, --bootstrap, --print-env-only, --rotate-machine-key, or --connect-market.');
 		}
 		if (interactive && !nonInteractive && !operationalMode) {
 			const tenantRoot = findNearestTreeseedRoot(context.cwd) ?? context.cwd;
@@ -281,6 +295,8 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 		const result = await workflow.config({
 			environment: invocation.args.environment as never,
 			sync,
+			bootstrap: invocation.args.bootstrap === true,
+			preflight: invocation.args.preflight === true,
 			printEnv: invocation.args.printEnv === true,
 			printEnvOnly: invocation.args.printEnvOnly === true,
 			showSecrets: invocation.args.showSecrets === true,

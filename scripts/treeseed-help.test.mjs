@@ -148,6 +148,7 @@ test('config help includes the advanced full-editor flag', async () => {
 	const result = await runCli(['help', 'config']);
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /--full/);
+	assert.match(result.output, /--bootstrap/);
 	assert.match(result.output, /--mouse/);
 	assert.match(result.output, /--non-interactive/);
 	assert.match(result.output, /--install-missing-tooling/);
@@ -337,6 +338,7 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
@@ -402,6 +404,7 @@ test('config supports explicit non-interactive application without json output',
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},

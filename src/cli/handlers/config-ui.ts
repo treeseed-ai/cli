@@ -170,7 +170,7 @@ function normalizedClusterKey(entry: ConfigEntry) {
 		return `cloudflare-${cluster}`;
 	}
 	if (provider === 'railway') {
-		if (entry.id.includes('API_TOKEN') || entry.id === 'RAILWAY_TOKEN') {
+		if (entry.id.includes('API_TOKEN')) {
 			return 'railway-access';
 		}
 		return `railway-${cluster}`;

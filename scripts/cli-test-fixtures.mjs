@@ -14,6 +14,10 @@ export function makeWorkspaceRoot() {
 slug: help-test
 siteUrl: https://example.com
 contactEmail: hello@example.com
+hosting:
+  kind: hosted_project
+  teamId: help-team
+  projectId: help-test
 cloudflare:
   accountId: account-123
 `, 'utf8');
