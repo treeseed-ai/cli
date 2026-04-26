@@ -26,6 +26,59 @@ function isHelpFlag(value: string | undefined) {
 	return value === '--help' || value === '-h';
 }
 
+function isNoColorFlag(value: string | undefined) {
+	return value === '--no-color';
+}
+
+function stripGlobalFlags(argv: string[]) {
+	return argv.filter((value) => !isNoColorFlag(value));
+}
+
+function resolveColorEnabled(argv: string[], env: NodeJS.ProcessEnv, override?: boolean) {
+	if (typeof override === 'boolean') {
+		return override;
+	}
+	if (argv.some(isNoColorFlag)) {
+		return false;
+	}
+	if (env.NO_COLOR !== undefined || env.TREESEED_NO_COLOR === '1' || env.TREESEED_NO_COLOR === 'true') {
+		return false;
+	}
+	return true;
+}
+
+function colorCodeForBootstrapSystem(system: string) {
+	switch (system) {
+		case 'github':
+			return '35;1';
+		case 'data':
+			return '34;1';
+		case 'web':
+			return '36;1';
+		case 'api':
+			return '32;1';
+		case 'agents':
+			return '33;1';
+		case 'skip':
+			return '90;1';
+		default:
+			return '37;1';
+	}
+}
+
+export function colorizeTreeseedCliOutput(output: string, colorEnabled = true) {
+	if (!colorEnabled) {
+		return output;
+	}
+	return output.replace(/^((?:\[[^\]]+\]){3,4})(\s|$)/u, (match, prefix: string, suffix: string) => {
+		const segments = [...prefix.matchAll(/\[([^\]]+)\]/gu)].map((entry) => entry[1]);
+		const system = segments[1] ?? '';
+		const stage = segments[segments.length - 1] ?? '';
+		const code = /fail|error/iu.test(stage) ? '31;1' : /skip/iu.test(stage) ? '90;1' : colorCodeForBootstrapSystem(system);
+		return `\u001b[${code}m${prefix}\u001b[0m${suffix}`;
+	});
+}
+
 function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 	if (!output) return;
 	(stream === 'stderr' ? process.stderr : process.stdout).write(`${output}\n`);
@@ -91,13 +144,18 @@ function formatValidationError(spec: TreeseedOperationSpec, errors: string[]) {
 }
 
 export function createTreeseedCommandContext(overrides: Partial<TreeseedCommandContext> = {}): TreeseedCommandContext {
+	const colorEnabled = resolveColorEnabled([], overrides.env ?? process.env, overrides.colorEnabled);
+	const rawWrite = overrides.write ?? (defaultWrite as TreeseedWriter);
 	return {
 		cwd: overrides.cwd ?? process.cwd(),
 		env: overrides.env ?? process.env,
-		write: overrides.write ?? (defaultWrite as TreeseedWriter),
+		write: overrides.write
+			? rawWrite
+			: ((output, stream) => rawWrite(colorizeTreeseedCliOutput(output, colorEnabled), stream)) as TreeseedWriter,
 		spawn: overrides.spawn ?? (defaultSpawn as TreeseedSpawner),
 		outputFormat: overrides.outputFormat ?? 'human',
 		interactiveUi: overrides.interactiveUi ?? (overrides.write == null),
+		colorEnabled,
 		prompt: overrides.prompt,
 		confirm: overrides.confirm,
 	};
@@ -350,15 +408,20 @@ const cliOperationsSdk = new TreeseedOperationsSdk({
 });
 
 export async function executeTreeseedCommand(commandName: string, argv: string[], context: TreeseedCommandContext) {
+	const cleanArgv = stripGlobalFlags(argv);
+	const commandContext = {
+		...context,
+		colorEnabled: resolveColorEnabled(argv, context.env ?? process.env, context.colorEnabled),
+	};
 	const spec = cliOperationsSdk.findOperation(commandName);
 	if (!spec) {
-		return cliOperationsSdk.executeOperation({ commandName, argv }, context);
+		return cliOperationsSdk.executeOperation({ commandName, argv: cleanArgv }, commandContext);
 	}
-	if (argv.some(isHelpFlag)) {
-		return cliOperationsSdk.executeOperation({ commandName, argv }, context);
+	if (cleanArgv.some(isHelpFlag)) {
+		return cliOperationsSdk.executeOperation({ commandName, argv: cleanArgv }, commandContext);
 	}
 
-	const resolved = resolveTreeseedCommandCwd(spec, context.cwd);
+	const resolved = resolveTreeseedCommandCwd(spec, commandContext.cwd);
 	if (commandNeedsProjectRoot(spec) && !resolved.resolvedProjectRoot) {
 		return writeTreeseedResult({
 			exitCode: 1,
@@ -366,23 +429,25 @@ export async function executeTreeseedCommand(commandName: string, argv: string[]
 			report: {
 				command: spec.name,
 				ok: false,
-				error: `No ancestor containing treeseed.site.yaml was found from ${context.cwd}.`,
+				error: `No ancestor containing treeseed.site.yaml was found from ${commandContext.cwd}.`,
 				hint: `treeseed help ${spec.name}`,
 			},
-		}, { ...context, outputFormat: argv.includes('--json') ? 'json' : (context.outputFormat ?? 'human') });
+		}, { ...commandContext, outputFormat: cleanArgv.includes('--json') ? 'json' : (commandContext.outputFormat ?? 'human') });
 	}
 
-	return cliOperationsSdk.executeOperation({ commandName, argv }, { ...context, cwd: resolved.cwd });
+	return cliOperationsSdk.executeOperation({ commandName, argv: cleanArgv }, { ...commandContext, cwd: resolved.cwd });
 }
 
 export async function runTreeseedCli(argv: string[], overrides: Partial<TreeseedCommandContext> = {}) {
-	const [firstArg] = argv;
+	const cleanArgv = stripGlobalFlags(argv);
+	const colorEnabled = resolveColorEnabled(argv, overrides.env ?? process.env, overrides.colorEnabled);
+	const [firstArg] = cleanArgv;
 	const spec = firstArg ? cliOperationsSdk.findOperation(firstArg) : null;
 	if (!spec) {
-		return cliOperationsSdk.run(argv, overrides);
+		return cliOperationsSdk.run(cleanArgv, { ...overrides, colorEnabled });
 	}
-	if (argv.slice(1).some(isHelpFlag)) {
-		return cliOperationsSdk.run(argv, overrides);
+	if (cleanArgv.slice(1).some(isHelpFlag)) {
+		return cliOperationsSdk.run(cleanArgv, { ...overrides, colorEnabled });
 	}
 
 	const baseCwd = overrides.cwd ?? process.cwd();
@@ -399,12 +464,13 @@ export async function runTreeseedCli(argv: string[], overrides: Partial<Treeseed
 			},
 		}, createTreeseedCommandContext({
 			...overrides,
-			outputFormat: argv.includes('--json') ? 'json' : (overrides.outputFormat ?? 'human'),
+			colorEnabled,
+			outputFormat: cleanArgv.includes('--json') ? 'json' : (overrides.outputFormat ?? 'human'),
 		}));
 	}
 	const contextOverrides = commandNeedsProjectRoot(spec) && resolved.resolvedProjectRoot
-		? { ...overrides, cwd: resolved.cwd }
-		: overrides;
+		? { ...overrides, cwd: resolved.cwd, colorEnabled }
+		: { ...overrides, colorEnabled };
 
-	return cliOperationsSdk.run(argv, contextOverrides);
+	return cliOperationsSdk.run(cleanArgv, contextOverrides);
 }

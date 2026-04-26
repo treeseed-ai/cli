@@ -11,7 +11,7 @@ for (const key of ['CI', 'ACT', 'GITHUB_ACTIONS', 'TREESEED_VERIFY_DRIVER']) {
 	delete process.env[key];
 }
 
-const { findCommandSpec, listCommandNames, runTreeseedCli } = await import('../dist/cli/main.js');
+const { colorizeTreeseedCliOutput, findCommandSpec, listCommandNames, runTreeseedCli } = await import('../dist/cli/main.js');
 const { buildTreeseedHelpView } = await import('../dist/cli/help.js');
 const { shouldUseInkHelp } = await import('../dist/cli/help-ui.js');
 const {
@@ -149,9 +149,28 @@ test('config help includes the advanced full-editor flag', async () => {
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /--full/);
 	assert.match(result.output, /--bootstrap/);
+	assert.match(result.output, /--system/);
+	assert.match(result.output, /--systems/);
+	assert.match(result.output, /--skip-unavailable/);
+	assert.match(result.output, /--bootstrap-sequential/);
 	assert.match(result.output, /--mouse/);
 	assert.match(result.output, /--non-interactive/);
 	assert.match(result.output, /--install-missing-tooling/);
+});
+
+test('global color controls are accepted and documented', async () => {
+	const topLevel = await runCli(['--no-color', 'help']);
+	const commandHelp = await runCli(['help', 'config', '--no-color']);
+	assert.equal(topLevel.exitCode, 0);
+	assert.equal(commandHelp.exitCode, 0);
+	assert.match(topLevel.output, /--no-color/);
+	assert.match(topLevel.output, /NO_COLOR/);
+});
+
+test('bootstrap prefix colorization can be disabled', () => {
+	const line = '[staging][web][publish][deploy] Uploaded assets.';
+	assert.match(colorizeTreeseedCliOutput(line, true), /\u001b\[/);
+	assert.equal(colorizeTreeseedCliOutput(line, false), line);
 });
 
 test('export help includes the directory argument', async () => {
@@ -337,6 +356,8 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 		env: {
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
+			TREESEED_GITHUB_OWNER: 'knowledge-coop',
+			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
 			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
@@ -349,6 +370,15 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	assert.equal(payload.ok, true);
 	assert.ok(Array.isArray(payload.scopes));
 	assert.ok(payload.scopes.includes('local'));
+	const localEntryIds = new Set(payload.context.entriesByScope.local.map((entry) => entry.id));
+	assert.equal(localEntryIds.has('GH_TOKEN'), true);
+	assert.equal(localEntryIds.has('TREESEED_GITHUB_OWNER'), true);
+	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_NAME'), true);
+	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_VISIBILITY'), true);
+	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), false);
+	assert.equal(localEntryIds.has('TREESEED_RAILWAY_WORKSPACE'), false);
 	assert.equal(payload.toolHealth.ghActExtension.attemptedInstall, false);
 });
 
@@ -362,8 +392,17 @@ test('config defaults to all environments and supports explicit all', async () =
 	const explicitResult = await runCli(['config', '--environment', 'all', '--print-env-only', '--json'], { cwd: workspaceRoot, env });
 	assertSuccessWithDiagnostics(defaultResult, 'config-print-env-default');
 	assertSuccessWithDiagnostics(explicitResult, 'config-print-env-explicit-all');
-	assert.deepEqual(JSON.parse(defaultResult.stdout).scopes, ['local', 'staging', 'prod']);
+	const defaultPayload = JSON.parse(defaultResult.stdout);
+	assert.deepEqual(defaultPayload.scopes, ['local', 'staging', 'prod']);
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
+	const localEntryIds = new Set(defaultPayload.context.entriesByScope.local.map((entry) => entry.id));
+	const stagingEntryIds = new Set(defaultPayload.context.entriesByScope.staging.map((entry) => entry.id));
+	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), false);
+	assert.equal(stagingEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
+	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), true);
+	assert.equal(stagingEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 });
 
 test('config rejects non-tty execution without explicit automation mode', async () => {
@@ -403,6 +442,8 @@ test('config supports explicit non-interactive application without json output',
 		env: {
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
+			TREESEED_GITHUB_OWNER: 'knowledge-coop',
+			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
 			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
@@ -526,7 +567,7 @@ test('config ui startup includes required advanced hosted entries that still nee
 				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 			prod: [
-				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'forms', cluster: 'turnstile', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'forms', cluster: 'turnstile', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 		},
 	};
@@ -688,12 +729,10 @@ test('config ui startup keeps clustered variables adjacent across scopes and pre
 			prod: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
 		},
 		entriesByScope: {
-			local: [
-				{ id: 'TREESEED_PUBLIC_TURNSTILE_SITE_KEY', label: 'Turnstile site key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-			],
+			local: [],
 			staging: [
-				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_PUBLIC_TURNSTILE_SITE_KEY', label: 'Turnstile site key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 			prod: [],
 		},
@@ -703,8 +742,8 @@ test('config ui startup keeps clustered variables adjacent across scopes and pre
 		.filter((page) => page.kind === 'entry')
 		.map((page) => `${page.entry.id}:${page.scope}`);
 	assert.deepEqual(entryIds, [
-		'TREESEED_TURNSTILE_SECRET_KEY:local',
-		'TREESEED_PUBLIC_TURNSTILE_SITE_KEY:local',
+		'TREESEED_TURNSTILE_SECRET_KEY:staging',
+		'TREESEED_PUBLIC_TURNSTILE_SITE_KEY:staging',
 	]);
 });
 

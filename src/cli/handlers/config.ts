@@ -24,6 +24,16 @@ function normalizeConfigScopes(value: unknown) {
 	return ['local', 'staging', 'prod'].filter((scope) => requested.includes(scope)) as Array<'local' | 'staging' | 'prod'>;
 }
 
+function normalizeBootstrapSystems(system: unknown, systems: unknown) {
+	const values = [
+		...(Array.isArray(system) ? system.map(String) : typeof system === 'string' ? [system] : []),
+		...(typeof systems === 'string' ? systems.split(',') : Array.isArray(systems) ? systems.flatMap((value) => String(value).split(',')) : []),
+	]
+		.map((value) => value.trim())
+		.filter(Boolean);
+	return values.length > 0 ? values : undefined;
+}
+
 function formatPrintEnvReports(payload: Record<string, any>) {
 	const lines: string[] = [];
 	for (const report of payload.reports ?? []) {
@@ -129,6 +139,9 @@ function renderConfigResult(commandName: string, result: any) {
 	const configContext = payload.context as Record<string, any> | undefined;
 	const configReadiness = configContext?.configReadinessByScope?.local ?? {};
 	const readinessByScope = payload.result?.readinessByScope ?? {};
+	const bootstrapSystemsByScope = payload.result?.bootstrapSystemsByScope ?? payload.bootstrapSystemsByScope ?? {};
+	const skippedSystems = Object.values(bootstrapSystemsByScope as Record<string, any>)
+		.flatMap((entry: any) => Array.isArray(entry?.skipped) ? entry.skipped : []);
 	const resourceInventoryByScope = payload.result?.resourceInventoryByScope ?? payload.resourceInventoryByScope ?? {};
 	const secretSession = payload.secretSession as Record<string, any> | undefined;
 	const sharedStorageMigrations = payload.result?.sharedStorageMigrations as Array<Record<string, any>> | undefined;
@@ -151,6 +164,8 @@ function renderConfigResult(commandName: string, result: any) {
 			{ label: 'Mode', value: payload.mode },
 			{ label: 'Scopes', value: Array.isArray(payload.scopes) ? payload.scopes.join(', ') : '(none)' },
 			{ label: 'Sync', value: payload.sync ?? 'all' },
+			{ label: 'Bootstrap systems', value: Object.values(bootstrapSystemsByScope as Record<string, any>).flatMap((entry: any) => entry?.runnable ?? []).filter((value, index, all) => all.indexOf(value) === index).join(', ') || '(none)' },
+			{ label: 'Skipped systems', value: skippedSystems.map((entry: any) => entry.system).filter((value, index, all) => all.indexOf(value) === index).join(', ') || '(none)' },
 			{ label: 'Safe repairs', value: Array.isArray(payload.repairs) ? payload.repairs.length : 0 },
 			{ label: 'Machine config', value: payload.configPath },
 			{ label: 'Machine key', value: payload.keyPath },
@@ -198,6 +213,7 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 		});
 		const scopes = normalizeConfigScopes(invocation.args.environment);
 		const sync = invocation.args.sync as never;
+		const systems = normalizeBootstrapSystems(invocation.args.system, invocation.args.systems);
 		const interactive = context.outputFormat !== 'json'
 			&& context.interactiveUi !== false
 			&& process.stdin.isTTY
@@ -282,6 +298,9 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 			context.write('Applying config updates, validating environments, and syncing managed providers...', 'stdout');
 			const result = await workflow.config({
 				environment: scopes as never,
+				systems: systems as never,
+				skipUnavailable: invocation.args.skipUnavailable === true ? true : undefined,
+				bootstrapExecution: invocation.args.bootstrapSequential === true ? 'sequential' : 'parallel',
 				sync,
 				printEnv: invocation.args.printEnv === true,
 				showSecrets: invocation.args.showSecrets === true,
@@ -294,6 +313,9 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 
 		const result = await workflow.config({
 			environment: invocation.args.environment as never,
+			systems: systems as never,
+			skipUnavailable: invocation.args.skipUnavailable === true ? true : undefined,
+			bootstrapExecution: invocation.args.bootstrapSequential === true ? 'sequential' : 'parallel',
 			sync,
 			bootstrap: invocation.args.bootstrap === true,
 			preflight: invocation.args.preflight === true,

@@ -259,6 +259,7 @@ export function buildTreeseedHelpView(commandName?: string | null): TreeseedHelp
 				'Workspace-only commands must be run inside a Treeseed workspace; the CLI resolves the project root from ancestor directories when possible.',
 				'Help text is generated from the CLI command registry.',
 				'Use --json on supported workflow and utility commands when an AI agent or script needs machine-readable output.',
+				'Use --no-color, NO_COLOR, or TREESEED_NO_COLOR=1 to disable CLI color output globally.',
 			],
 		});
 		return {

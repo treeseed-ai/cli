@@ -90,6 +90,7 @@ export type TreeseedCommandContext = {
 	spawn: TreeseedSpawner;
 	outputFormat?: 'human' | 'json';
 	interactiveUi?: boolean;
+	colorEnabled?: boolean;
 	prompt?: TreeseedPromptHandler;
 	confirm?: TreeseedConfirmHandler;
 };
