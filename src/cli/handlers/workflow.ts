@@ -108,8 +108,10 @@ export function renderWorkflowNextStep(step: TreeseedWorkflowNextStep) {
 	switch (step.operation) {
 		case 'switch':
 			return `treeseed switch ${String(input.branch ?? 'feature/my-change')}${input.preview ? ' --preview' : ''}`;
-		case 'save':
-			return `treeseed save "${String(input.message ?? 'describe your change')}"${input.hotfix ? ' --hotfix' : ''}`;
+		case 'save': {
+			const message = String(input.message ?? '').trim();
+			return `treeseed save${message ? ` "${message}"` : ''}${input.hotfix ? ' --hotfix' : ''}`;
+		}
 		case 'close':
 			return `treeseed close "${String(input.message ?? 'reason')}"`;
 		case 'stage':

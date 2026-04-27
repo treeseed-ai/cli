@@ -293,7 +293,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'switch',
 	})],
 	['save', command({
-		arguments: [{ name: 'message', description: 'Git commit message for the save operation.', required: true, kind: 'message_tail' }],
+		arguments: [{ name: 'message', description: 'Optional hint for generated save commit messages.', required: false, kind: 'message_tail' }],
 		options: [
 			{ name: 'hotfix', flags: '--hotfix', description: 'Allow save on main for an explicit hotfix.', kind: 'boolean' },
 			{ name: 'preview', flags: '--preview', description: 'Create or refresh the branch preview during save.', kind: 'boolean' },
@@ -301,7 +301,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed save "feat: add search filters"', 'treeseed save --preview "feat: add search filters"', 'treeseed save --plan "feat: add search filters"', 'treeseed save --hotfix "fix: unblock production form submit"'],
+		examples: ['treeseed save', 'treeseed save "add search filters"', 'treeseed save --preview', 'treeseed save --plan', 'treeseed save --hotfix "fix production form submit"'],
 		help: {
 			workflowPosition: 'checkpoint work',
 			longSummary: [
@@ -315,17 +315,18 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			beforeYouRun: [
 				'Run from a task branch unless you intentionally mean to use the hotfix path.',
-				'Provide a commit message that captures the checkpoint clearly because Treeseed will use it for the save commit.',
+				'Optionally provide a short hint; Treeseed generates the final commit message from the diff and hint.',
 			],
 			outcomes: [
-				'Verifies and commits current work using the provided message.',
+				'Verifies and commits current work using a generated commit message.',
 				'Syncs and pushes branch state.',
 				'Optionally refreshes preview infrastructure if requested.',
 			],
 			examples: [
-				example('treeseed save "feat: add search filters"', 'Standard task checkpoint', 'Verify, commit, and push the current task branch with a descriptive message.'),
-				example('treeseed save --preview "feat: add search filters"', 'Checkpoint plus preview refresh', 'Include preview refresh when the save should update the branch environment.'),
-				example('treeseed save --hotfix "fix: unblock production form submit"', 'Explicit hotfix save', 'Allow a save from main when the work is a deliberate hotfix path.', { why: 'Use sparingly and only when the workflow intentionally bypasses the usual task-branch rule.' }),
+				example('treeseed save', 'Generated checkpoint', 'Verify, commit, and push the current task branch with a generated message.'),
+				example('treeseed save "add search filters"', 'Checkpoint with a hint', 'Feed a short hint into commit-message generation without replacing the generated message.'),
+				example('treeseed save --preview', 'Checkpoint plus preview refresh', 'Include preview refresh when the save should update the branch environment.'),
+				example('treeseed save --hotfix "fix production form submit"', 'Explicit hotfix save', 'Allow a save from main when the work is a deliberate hotfix path.', { why: 'Use sparingly and only when the workflow intentionally bypasses the usual task-branch rule.' }),
 			],
 			warnings: [
 				'`--hotfix` deliberately loosens the normal task-branch safety model. Keep it exceptional.',

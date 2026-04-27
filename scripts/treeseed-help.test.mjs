@@ -132,6 +132,16 @@ test('treeseed command help renders without executing the command', async () => 
 	assert.equal(helpViaFlag.spawns.length, 0);
 });
 
+test('save help documents optional generated commit message hints', async () => {
+	const result = await runCli(['help', 'save']);
+	const saveSpec = findCommandSpec('save');
+	assert.equal(result.exitCode, 0);
+	assert.equal(saveSpec.arguments[0].required, false);
+	assert.match(result.output, /treeseed save/);
+	assert.match(result.output, /generated message/);
+	assert.doesNotMatch(result.output, /<message>/);
+});
+
 test('major workflow commands have usage, options, and examples in help', async () => {
 	for (const command of ['init', 'status', 'config', 'tasks', 'switch', 'save', 'close', 'stage', 'release', 'destroy', 'rollback', 'doctor']) {
 		const result = await runCli(['help', command]);
@@ -359,6 +369,7 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
 			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
 			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
@@ -375,9 +386,9 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_OWNER'), true);
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_NAME'), true);
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_VISIBILITY'), true);
-	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
 	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
-	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(localEntryIds.has('TREESEED_RAILWAY_WORKSPACE'), false);
 	assert.equal(payload.toolHealth.ghActExtension.attemptedInstall, false);
 });
@@ -397,9 +408,9 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
 	const localEntryIds = new Set(defaultPayload.context.entriesByScope.local.map((entry) => entry.id));
 	const stagingEntryIds = new Set(defaultPayload.context.entriesByScope.staging.map((entry) => entry.id));
-	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
 	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
-	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
 	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), true);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
