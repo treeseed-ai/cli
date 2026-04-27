@@ -70,8 +70,13 @@ export function colorizeTreeseedCliOutput(output: string, colorEnabled = true) {
 	if (!colorEnabled) {
 		return output;
 	}
-	return output.replace(/^((?:\[[^\]]+\]){3,4})(\s|$)/u, (match, prefix: string, suffix: string) => {
+	return output.replace(/^((?:\[[^\]]+\]){2,4})(\s|$)/u, (match, prefix: string, suffix: string) => {
 		const segments = [...prefix.matchAll(/\[([^\]]+)\]/gu)].map((entry) => entry[1]);
+		if (segments.length === 2) {
+			const stage = segments[1] ?? '';
+			const code = /fail|error/iu.test(stage) ? '31;1' : /skip/iu.test(stage) ? '90;1' : '32;1';
+			return `\u001b[${code}m${prefix}\u001b[0m${suffix}`;
+		}
 		const system = segments[1] ?? '';
 		const stage = segments[segments.length - 1] ?? '';
 		const code = /fail|error/iu.test(stage) ? '31;1' : /skip/iu.test(stage) ? '90;1' : colorCodeForBootstrapSystem(system);

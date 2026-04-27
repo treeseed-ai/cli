@@ -183,6 +183,13 @@ test('bootstrap prefix colorization can be disabled', () => {
 	assert.equal(colorizeTreeseedCliOutput(line, false), line);
 });
 
+test('save progress prefixes are colorized without command prefix', () => {
+	const line = '[@treeseed/market][push] $ git push origin staging';
+	const colored = colorizeTreeseedCliOutput(line, true);
+	assert.match(colored, /^\u001b\[32;1m\[@treeseed\/market\]\[push\]\u001b\[0m /);
+	assert.equal(colorizeTreeseedCliOutput(line, false), line);
+});
+
 test('export help includes the directory argument', async () => {
 	const result = await runCli(['help', 'export']);
 	assert.equal(result.exitCode, 0);
