@@ -17,6 +17,7 @@ export const handleStatus: TreeseedCommandHandler = async (_invocation, context)
 				{ label: 'Mapped environment', value: state.environment },
 				{ label: 'Dirty worktree', value: state.dirtyWorktree ? 'yes' : 'no' },
 				{ label: 'Package mode', value: state.packageSync.mode },
+				{ label: 'Dependency mode', value: state.packageSync.dependencyMode ?? '(unknown)' },
 				{ label: 'Full package checkout', value: state.packageSync.completeCheckout ? 'yes' : 'no' },
 				{ label: 'Package branch aligned', value: state.packageSync.aligned ? 'yes' : 'no' },
 				{ label: 'Dirty package repos', value: state.packageSync.dirty ? 'yes' : 'no' },

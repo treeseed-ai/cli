@@ -33,6 +33,9 @@ import { handleStage } from './handlers/stage.js';
 import { handleExport } from './handlers/export.js';
 import { handleResume } from './handlers/resume.js';
 import { handleRecover } from './handlers/recover.js';
+import { handleWorkspace } from './handlers/workspace.js';
+
+const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
 
 export const COMMAND_HANDLERS = {
 	init: handleInit,
@@ -53,6 +56,9 @@ export const COMMAND_HANDLERS = {
 	stage: handleStage,
 	resume: handleResume,
 	recover: handleRecover,
+	[workspaceCommand('status')]: handleWorkspace,
+	[workspaceCommand('link')]: handleWorkspace,
+	[workspaceCommand('unlink')]: handleWorkspace,
 	export: handleExport,
 	'auth:login': handleAuthLogin,
 	'auth:logout': handleAuthLogout,

@@ -90,6 +90,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			message: invocation.positionals.join(' ').trim(),
 			hotfix: invocation.args.hotfix === true,
 			preview: invocation.args.preview === true,
+			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 		});
@@ -122,6 +123,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				waves?: SavePlanWave[];
 				plannedVersions?: Record<string, string>;
 			};
+			plannedSteps?: Array<{ id?: string; description?: string }>;
 			previewAction?: { status: string };
 		};
 		const commitSha = typeof payload.commitSha === 'string' && payload.commitSha.length > 0
@@ -161,7 +163,14 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				{ label: 'Market pushed', value: payload.rootRepo?.pushed ? 'yes' : 'no' },
 				{ label: 'Preview action', value: payload.previewAction?.status ?? 'skipped' },
 			],
-			sections: result.executionMode === 'plan' ? formatSavePlanSections(payload.repositoryPlan) : [],
+			sections: result.executionMode === 'plan' ? [
+				...(payload.plannedSteps?.length
+					? [{ title: 'Dependency mode transitions', lines: payload.plannedSteps
+						.filter((step) => /workspace-(?:link|unlink)/u.test(String(step.id ?? '')))
+						.map((step) => `- ${step.description ?? step.id}`) }]
+					: []),
+				...formatSavePlanSections(payload.repositoryPlan),
+			] : [],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: result,
 		});

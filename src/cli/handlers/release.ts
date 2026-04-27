@@ -7,6 +7,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const bump = (['major', 'minor', 'patch'] as const).find((candidate) => invocation.args[candidate] === true) ?? 'patch';
 		const result = await createWorkflowSdk(context).release({
 			bump,
+			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 		});

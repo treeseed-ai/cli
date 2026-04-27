@@ -31,6 +31,8 @@ function command(overlay: CommandOverlay): CommandOverlay {
 	return overlay;
 }
 
+const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
+
 function example(commandLine: string, title: string, description: string, extras: Pick<TreeseedStructuredCommandExample, 'result' | 'why'> = {}): TreeseedStructuredCommandExample {
 	return {
 		command: commandLine,
@@ -245,6 +247,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'branch-name', description: 'Task branch to create or resume.', required: true }],
 		options: [
 			{ name: 'preview', flags: '--preview', description: 'Provision or refresh a branch-scoped Cloudflare preview environment.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive branch switch plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -297,6 +300,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		options: [
 			{ name: 'hotfix', flags: '--hotfix', description: 'Allow save on main for an explicit hotfix.', kind: 'boolean' },
 			{ name: 'preview', flags: '--preview', description: 'Create or refresh the branch preview during save.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive save plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -344,6 +348,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'message', description: 'Reason for closing the task without staging it.', required: true, kind: 'message_tail' }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive close plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
@@ -382,6 +387,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'message', description: 'Resolution message for the staged task.', required: true, kind: 'message_tail' }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive staging plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
@@ -463,6 +469,24 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		},
 		executionMode: 'handler',
 		handlerName: 'recover',
+	})],
+	[workspaceCommand('status'), command({
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed workspace:status'],
+		executionMode: 'handler',
+		handlerName: workspaceCommand('status'),
+	})],
+	[workspaceCommand('link'), command({
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed workspace:link'],
+		executionMode: 'handler',
+		handlerName: workspaceCommand('link'),
+	})],
+	[workspaceCommand('unlink'), command({
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed workspace:unlink'],
+		executionMode: 'handler',
+		handlerName: workspaceCommand('unlink'),
 	})],
 	['rollback', command({
 		arguments: [{ name: 'environment', description: 'The persistent environment to roll back.', required: true }],
@@ -886,6 +910,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'major', flags: '--major', description: 'Bump to the next major version.', kind: 'boolean' },
 			{ name: 'minor', flags: '--minor', description: 'Bump to the next minor version.', kind: 'boolean' },
 			{ name: 'patch', flags: '--patch', description: 'Bump to the next patch version.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive release plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -975,6 +1000,9 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'destroy',
 	})],
 	['dev', command({
+		options: [
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+		],
 		examples: ['treeseed dev'],
 		help: {
 			longSummary: ['Dev starts the unified local Treeseed runtime so you can work against the integrated web, API, and supporting local surfaces.'],
@@ -988,6 +1016,9 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'dev',
 	})],
 	['dev:watch', command({
+		options: [
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+		],
 		examples: ['treeseed dev:watch'],
 		help: {
 			longSummary: ['Dev:watch starts local development with rebuild and watch semantics so code changes are reflected continuously during active development.'],
