@@ -355,6 +355,23 @@ test('status and tasks support machine-readable json', async () => {
 	assert.ok(Array.isArray(tasksJson.tasks));
 });
 
+test('release plan supports machine-readable json without execute-only fields', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['release', '--patch', '--plan', '--json'], { cwd: workspaceRoot });
+	assertSuccessWithDiagnostics(result, 'release-plan-json');
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.command, 'release');
+	assert.equal(payload.executionMode, 'plan');
+	assert.equal(payload.ok, true);
+	assert.equal(payload.payload.mode, 'root-only');
+	assert.equal(payload.payload.rootVersion, '0.0.1');
+	assert.equal(payload.payload.releaseTag, '0.0.1');
+	assert.equal(payload.payload.plannedVersions['@treeseed/market'], '0.0.1');
+	assert.ok(Array.isArray(payload.payload.plannedSteps));
+	assert.ok(payload.payload.plannedSteps.some((step) => step.id === 'release-plan'));
+	assert.ok(Array.isArray(payload.payload.plannedPublishWaits));
+});
+
 test('doctor reports blocking issues with structured json', async () => {
 	const workspaceRoot = makeTenantWorkspace('staging');
 	const result = await runCli(['doctor', '--json'], { cwd: workspaceRoot });
