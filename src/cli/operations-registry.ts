@@ -178,8 +178,11 @@ const PASS_THROUGH_ARGS = (invocation: TreeseedParsedInvocation) => ({ args: inv
 
 const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['status', command({
-		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
-		examples: ['treeseed status', 'treeseed status --json'],
+		options: [
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+			{ name: 'live', flags: '--live', description: 'Run read-only provider connectivity checks and include the results in status.', kind: 'boolean' },
+		],
+		examples: ['treeseed status', 'treeseed status --json', 'treeseed status --live'],
 		help: {
 			workflowPosition: 'inspect',
 			longSummary: [
@@ -192,6 +195,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			beforeYouRun: [
 				'Run from the workspace you want to inspect.',
+				'Use `--live` only when you want read-only provider connectivity checks in addition to saved state.',
 				'Choose `--json` when another tool or agent needs to read the status programmatically.',
 			],
 			outcomes: [
@@ -201,6 +205,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			examples: [
 				example('treeseed status', 'Check the current task state', 'Show the current branch role and project health in human-readable form.'),
 				example('treeseed status --json', 'Feed an agent or script', 'Emit structured status data for automation and external tooling.'),
+				example('treeseed status --live', 'Check provider connectivity', 'Include read-only GitHub, Cloudflare, and Railway identity checks in the status report.'),
 				example('trsd status', 'Use the short alias', 'Run the same status inspection path through the shorter CLI entrypoint.'),
 			],
 			automationNotes: [

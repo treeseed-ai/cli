@@ -351,8 +351,49 @@ test('status and tasks support machine-readable json', async () => {
 	assert.equal(statusJson.command, 'status');
 	assert.equal(statusJson.ok, true);
 	assert.equal(statusJson.state.branchRole, 'feature');
+	assert.ok(statusJson.state.environmentStatus.local);
+	assert.ok(statusJson.state.environmentStatus.staging);
+	assert.ok(statusJson.state.environmentStatus.prod);
+	assert.ok(statusJson.state.providerStatus.local.github);
+	assert.ok(statusJson.state.providerStatus.staging.railway);
+	assert.equal(statusJson.state.providerStatus.local.railway.applicable, false);
 	assert.equal(tasksJson.command, 'tasks');
 	assert.ok(Array.isArray(tasksJson.tasks));
+});
+
+test('status human fallback groups all environments', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['status'], { cwd: workspaceRoot, interactiveUi: false });
+	assert.equal(result.exitCode, 0);
+	assert.match(result.stdout, /Local:/);
+	assert.match(result.stdout, /Staging:/);
+	assert.match(result.stdout, /Production:/);
+	assert.match(result.stdout, /Cloudflare: .*local/);
+	assert.match(result.stdout, /BLOCKER:|Blockers: none/);
+	const stagingSection = result.stdout.slice(result.stdout.indexOf('Staging:'), result.stdout.indexOf('Production:'));
+	const productionSection = result.stdout.slice(result.stdout.indexOf('Production:'), result.stdout.indexOf('Managed services:'));
+	assert.doesNotMatch(stagingSection, /Local development:/);
+	assert.doesNotMatch(productionSection, /Local development:/);
+});
+
+test('status live json includes provider live details', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['status', '--live', '--json'], { cwd: workspaceRoot });
+	assert.equal(result.exitCode, 0);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.live, true);
+	assert.equal(payload.state.providerStatus.local.github.live.checked, true);
+	assert.equal(payload.state.providerStatus.local.railway.applicable, false);
+	assert.equal(payload.state.providerStatus.local.railway.live.skipped, true);
+	assert.equal(payload.state.providerStatus.local.cloudflare.applicable, false);
+	assert.equal(payload.state.providerStatus.local.cloudflare.live.skipped, true);
+	assert.equal(payload.state.providerStatus.staging.railway.live.checked, true);
+	const localSection = payload.sections.find((section) => section.title === 'Local');
+	assert.ok(!localSection.lines.includes('URL: https://example.com'));
+	const stagingSection = payload.sections.find((section) => section.title === 'Staging');
+	const productionSection = payload.sections.find((section) => section.title === 'Production');
+	assert.ok(!stagingSection.lines.some((line) => line.startsWith('Local development:')));
+	assert.ok(!productionSection.lines.some((line) => line.startsWith('Local development:')));
 });
 
 test('release plan supports machine-readable json without execute-only fields', async () => {
