@@ -50,9 +50,27 @@ function assertSuccessWithDiagnostics(result, label) {
 	assert.equal(result.exitCode, 0);
 }
 
+function ensureTestManagedGh(env) {
+	const toolsHome = env?.TREESEED_TOOLS_HOME
+		?? (env?.XDG_CACHE_HOME ? resolve(env.XDG_CACHE_HOME, 'treeseed', 'tools') : null)
+		?? (env?.HOME ? resolve(env.HOME, '.cache', 'treeseed', 'tools') : null);
+	if (!toolsHome) return;
+	const ghPath = resolve(toolsHome, 'gh', '2.90.0', `${process.platform}-${process.arch}`, 'bin', 'gh');
+	mkdirSync(dirname(ghPath), { recursive: true });
+	writeFileSync(ghPath, '#!/bin/sh\necho gh version 2.90.0\n', { mode: 0o755 });
+}
+
+function npmInstallTestEnv() {
+	return {
+		NODE_ENV: 'test',
+		TREESEED_TEST_NPM_INSTALL_STATUS: 'installed',
+	};
+}
+
 async function runCli(args, options = {}) {
 	const writes = [];
 	const spawns = [];
+	ensureTestManagedGh(options.env);
 	const envOverrides = {
 		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
 		CI: undefined,
@@ -218,6 +236,48 @@ test('published adapter commands still execute in isolated package installs', as
 	assert.equal(typeof result.exitCode, 'number');
 	assert.match(result.output, /Treeseed preflight summary/);
 	assert.doesNotMatch(result.stderr, /Unknown treeseed command/);
+});
+
+test('install command emits a managed dependency report as json', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	const home = resolve(workspaceRoot, '.home');
+	const result = await runCli(['install', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			...npmInstallTestEnv(),
+			HOME: home,
+			PATH: process.env.PATH,
+			TREESEED_TOOLS_HOME: resolve(workspaceRoot, '.tools'),
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'install-json');
+	const report = JSON.parse(result.stdout);
+	assert.equal(report.ok, true);
+	assert.ok(Array.isArray(report.npmInstalls));
+	assert.equal(report.npmInstalls[0].root, workspaceRoot);
+	assert.equal(report.npmInstalls[0].status, 'installed');
+	assert.ok(Array.isArray(report.tools));
+	assert.ok(report.tools.some((tool) => tool.name === 'gh' && tool.status === 'already-present'));
+	assert.ok(report.tools.some((tool) => tool.name === 'wrangler' && tool.kind === 'npm'));
+});
+
+test('install --force repairs npm dependencies even when node_modules exists', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	mkdirSync(resolve(workspaceRoot, 'node_modules'), { recursive: true });
+	const result = await runCli(['install', '--force', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			...npmInstallTestEnv(),
+			HOME: resolve(workspaceRoot, '.home'),
+			PATH: process.env.PATH,
+			TREESEED_TOOLS_HOME: resolve(workspaceRoot, '.tools'),
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'install-force-json');
+	const report = JSON.parse(result.stdout);
+	assert.equal(report.ok, true);
+	assert.equal(report.npmInstalls[0].status, 'installed');
+	assert.match(report.npmInstalls[0].command.join(' '), /install --no-audit --no-fund/);
 });
 
 test('agents help is rendered locally without requiring the core runtime', async () => {
@@ -429,6 +489,7 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	const result = await runCli(['config', '--environment', 'local', '--sync', 'none', '--json'], {
 		cwd: workspaceRoot,
 		env: {
+			...npmInstallTestEnv(),
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
@@ -461,6 +522,7 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 test('config defaults to all environments and supports explicit all', async () => {
 	const workspaceRoot = makeTenantWorkspace('staging');
 	const env = {
+		...npmInstallTestEnv(),
 		HOME: workspaceRoot,
 		TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 	};
@@ -516,6 +578,7 @@ test('config supports explicit non-interactive application without json output',
 	const result = await runCli(['config', '--environment', 'local', '--sync', 'none', '--non-interactive'], {
 		cwd: workspaceRoot,
 		env: {
+			...npmInstallTestEnv(),
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
@@ -527,6 +590,7 @@ test('config supports explicit non-interactive application without json output',
 		},
 	});
 	assertSuccessWithDiagnostics(result, 'config-non-interactive');
+	assert.match(result.stdout, /Installing npm dependencies/);
 	assert.match(result.stdout, /Treeseed config completed successfully/);
 });
 

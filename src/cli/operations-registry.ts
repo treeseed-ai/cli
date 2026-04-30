@@ -565,6 +565,40 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		executionMode: 'handler',
 		handlerName: 'doctor',
 	})],
+	['install', command({
+		options: [
+			{ name: 'force', flags: '--force', description: 'Repair or reinstall managed tools even when they are already present.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed install', 'trsd install --json', 'treeseed install --force'],
+		help: {
+			workflowPosition: 'setup',
+			longSummary: [
+				'Install prepares the local Treeseed toolchain by installing or verifying Treeseed-managed dependencies. It is safe to rerun and uses the same dependency initializer that config runs during bootstrap.',
+			],
+			whenToUse: [
+				'Use this on a new machine before running config, dev, or deployment workflows.',
+				'Use `--force` when a managed tool cache looks stale or corrupted.',
+			],
+			outcomes: [
+				'Installs the managed GitHub CLI, verifies npm-backed Treeseed tool dependencies, and installs gh-act when Docker is available.',
+				'Reports any missing host prerequisites such as Git without modifying the operating system.',
+			],
+			examples: [
+				example('treeseed install', 'Install managed dependencies', 'Prepare the local Treeseed dependency toolchain.'),
+				example('trsd install --json', 'Inspect setup from automation', 'Emit a structured dependency report for scripts or agents.'),
+				example('treeseed install --force', 'Repair the managed cache', 'Reinstall managed downloaded tools and extensions.'),
+			],
+			relatedDetails: [
+				related('config', 'Use `config` after install to configure project and provider values.'),
+				related('doctor', 'Use `doctor` when install succeeds but workflow readiness still looks wrong.'),
+			],
+		},
+		executionMode: 'adapter',
+		buildAdapterInput: (invocation) => ({
+			force: invocation.args.force === true,
+		}),
+	})],
 	['auth:login', command({
 		options: [
 			{ name: 'host', flags: '--host <id>', description: 'Override the configured remote host id for this login.', kind: 'string' },

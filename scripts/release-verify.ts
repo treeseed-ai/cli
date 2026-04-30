@@ -149,7 +149,23 @@ function collectRuntimeDependenciesForPackaging() {
 }
 
 function resolveInstalledPackageRoot(packageName: string, searchRoots: string[]) {
-	let resolvedEntry = require.resolve(packageName, { paths: searchRoots });
+	const packageParts = packageName.split('/');
+	for (const searchRoot of searchRoots) {
+		let current = searchRoot;
+		while (true) {
+			const candidate = resolve(current, 'node_modules', ...packageParts, 'package.json');
+			if (existsSync(candidate)) {
+				return dirname(candidate);
+			}
+			const parent = dirname(current);
+			if (parent === current) {
+				break;
+			}
+			current = parent;
+		}
+	}
+
+	const resolvedEntry = require.resolve(packageName, { paths: searchRoots });
 	let current = dirname(resolvedEntry);
 	while (true) {
 		const packageJsonPath = resolve(current, 'package.json');
