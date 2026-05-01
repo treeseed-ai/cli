@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
-import { resolveTreeseedLaunchEnvironment } from '@treeseed/sdk/workflow-support';
+import { ensureLocalWorkspaceLinks, findNearestTreeseedWorkspaceRoot, resolveTreeseedLaunchEnvironment } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
 
@@ -53,6 +53,14 @@ function resolveCoreDevEntrypoint(cwd: string) {
 export const handleDev: TreeseedCommandHandler = async (invocation, context) => {
 	try {
 		const watch = invocation.commandName === 'dev:watch' || invocation.args.watch === true;
+		const workspaceRoot = findNearestTreeseedWorkspaceRoot(context.cwd);
+		const workspaceLinksMode = typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined;
+		const workspaceLinks = workspaceRoot
+			? ensureLocalWorkspaceLinks(workspaceRoot, { env: context.env, mode: workspaceLinksMode })
+			: null;
+		if (workspaceLinks?.created.length) {
+			context.write(`[workspace][link] Linked ${workspaceLinks.created.length} local workspace package paths.`, 'stdout');
+		}
 		const resolved = resolveCoreDevEntrypoint(context.cwd);
 		const args = watch ? [...resolved.args, '--watch'] : resolved.args;
 		const result = context.spawn(resolved.command, args, {
@@ -72,6 +80,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 				watch,
 				executable: resolved.command,
 				args,
+				workspaceLinks,
 			},
 		};
 	} catch (error) {

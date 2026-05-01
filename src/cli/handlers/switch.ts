@@ -8,6 +8,7 @@ export const handleSwitch: TreeseedCommandHandler = async (invocation, context) 
 		const result = await createWorkflowSdk(context).switchTask({
 			branch,
 			preview: invocation.args.preview === true,
+			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 		});

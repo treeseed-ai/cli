@@ -12,6 +12,7 @@ type GuidedResultOptions = {
 	command: string;
 	summary: string;
 	facts?: Array<{ label: string; value: string | number | boolean | null | undefined }>;
+	sections?: Array<{ title: string; lines: string[] }>;
 	nextSteps?: string[];
 	report?: Record<string, unknown> | null;
 	exitCode?: number;
@@ -27,6 +28,11 @@ export function guidedResult(options: GuidedResultOptions): TreeseedCommandResul
 			lines.push(`${fact.label}: ${fact.value}`);
 		}
 	}
+	for (const section of options.sections ?? []) {
+		const sectionLines = section.lines.filter((line) => line.length > 0);
+		if (sectionLines.length === 0) continue;
+		lines.push('', `${section.title}:`, ...sectionLines);
+	}
 	if ((options.nextSteps ?? []).length > 0) {
 		lines.push('', 'Next steps:');
 		for (const step of options.nextSteps ?? []) {
@@ -40,6 +46,7 @@ export function guidedResult(options: GuidedResultOptions): TreeseedCommandResul
 			ok: (options.exitCode ?? 0) === 0,
 			summary: options.summary,
 			facts: facts.map((fact) => ({ label: fact.label, value: fact.value })),
+			sections: options.sections ?? [],
 			nextSteps: options.nextSteps ?? [],
 		}
 		: {
@@ -47,6 +54,7 @@ export function guidedResult(options: GuidedResultOptions): TreeseedCommandResul
 			ok: (options.exitCode ?? 0) === 0,
 			summary: options.summary,
 			facts: facts.map((fact) => ({ label: fact.label, value: fact.value })),
+			sections: options.sections ?? [],
 			nextSteps: options.nextSteps ?? [],
 		};
 	return {

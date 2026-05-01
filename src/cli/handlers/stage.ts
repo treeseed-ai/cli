@@ -6,6 +6,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 	try {
 		const result = await createWorkflowSdk(context).stage({
 			message: invocation.positionals.join(' ').trim(),
+			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 		});

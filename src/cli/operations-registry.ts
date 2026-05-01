@@ -31,6 +31,8 @@ function command(overlay: CommandOverlay): CommandOverlay {
 	return overlay;
 }
 
+const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
+
 function example(commandLine: string, title: string, description: string, extras: Pick<TreeseedStructuredCommandExample, 'result' | 'why'> = {}): TreeseedStructuredCommandExample {
 	return {
 		command: commandLine,
@@ -176,8 +178,11 @@ const PASS_THROUGH_ARGS = (invocation: TreeseedParsedInvocation) => ({ args: inv
 
 const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['status', command({
-		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
-		examples: ['treeseed status', 'treeseed status --json'],
+		options: [
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+			{ name: 'live', flags: '--live', description: 'Run read-only provider connectivity checks and include the results in status.', kind: 'boolean' },
+		],
+		examples: ['treeseed status', 'treeseed status --json', 'treeseed status --live'],
 		help: {
 			workflowPosition: 'inspect',
 			longSummary: [
@@ -190,6 +195,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			beforeYouRun: [
 				'Run from the workspace you want to inspect.',
+				'Use `--live` only when you want read-only provider connectivity checks in addition to saved state.',
 				'Choose `--json` when another tool or agent needs to read the status programmatically.',
 			],
 			outcomes: [
@@ -199,6 +205,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			examples: [
 				example('treeseed status', 'Check the current task state', 'Show the current branch role and project health in human-readable form.'),
 				example('treeseed status --json', 'Feed an agent or script', 'Emit structured status data for automation and external tooling.'),
+				example('treeseed status --live', 'Check provider connectivity', 'Include read-only GitHub, Cloudflare, and Railway identity checks in the status report.'),
 				example('trsd status', 'Use the short alias', 'Run the same status inspection path through the shorter CLI entrypoint.'),
 			],
 			automationNotes: [
@@ -245,6 +252,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'branch-name', description: 'Task branch to create or resume.', required: true }],
 		options: [
 			{ name: 'preview', flags: '--preview', description: 'Provision or refresh a branch-scoped Cloudflare preview environment.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive branch switch plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -293,15 +301,16 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'switch',
 	})],
 	['save', command({
-		arguments: [{ name: 'message', description: 'Git commit message for the save operation.', required: true, kind: 'message_tail' }],
+		arguments: [{ name: 'message', description: 'Optional hint for generated save commit messages.', required: false, kind: 'message_tail' }],
 		options: [
 			{ name: 'hotfix', flags: '--hotfix', description: 'Allow save on main for an explicit hotfix.', kind: 'boolean' },
 			{ name: 'preview', flags: '--preview', description: 'Create or refresh the branch preview during save.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive save plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed save "feat: add search filters"', 'treeseed save --preview "feat: add search filters"', 'treeseed save --plan "feat: add search filters"', 'treeseed save --hotfix "fix: unblock production form submit"'],
+		examples: ['treeseed save', 'treeseed save "add search filters"', 'treeseed save --preview', 'treeseed save --plan', 'treeseed save --hotfix "fix production form submit"'],
 		help: {
 			workflowPosition: 'checkpoint work',
 			longSummary: [
@@ -315,17 +324,18 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			beforeYouRun: [
 				'Run from a task branch unless you intentionally mean to use the hotfix path.',
-				'Provide a commit message that captures the checkpoint clearly because Treeseed will use it for the save commit.',
+				'Optionally provide a short hint; Treeseed generates the final commit message from the diff and hint.',
 			],
 			outcomes: [
-				'Verifies and commits current work using the provided message.',
+				'Verifies and commits current work using a generated commit message.',
 				'Syncs and pushes branch state.',
 				'Optionally refreshes preview infrastructure if requested.',
 			],
 			examples: [
-				example('treeseed save "feat: add search filters"', 'Standard task checkpoint', 'Verify, commit, and push the current task branch with a descriptive message.'),
-				example('treeseed save --preview "feat: add search filters"', 'Checkpoint plus preview refresh', 'Include preview refresh when the save should update the branch environment.'),
-				example('treeseed save --hotfix "fix: unblock production form submit"', 'Explicit hotfix save', 'Allow a save from main when the work is a deliberate hotfix path.', { why: 'Use sparingly and only when the workflow intentionally bypasses the usual task-branch rule.' }),
+				example('treeseed save', 'Generated checkpoint', 'Verify, commit, and push the current task branch with a generated message.'),
+				example('treeseed save "add search filters"', 'Checkpoint with a hint', 'Feed a short hint into commit-message generation without replacing the generated message.'),
+				example('treeseed save --preview', 'Checkpoint plus preview refresh', 'Include preview refresh when the save should update the branch environment.'),
+				example('treeseed save --hotfix "fix production form submit"', 'Explicit hotfix save', 'Allow a save from main when the work is a deliberate hotfix path.', { why: 'Use sparingly and only when the workflow intentionally bypasses the usual task-branch rule.' }),
 			],
 			warnings: [
 				'`--hotfix` deliberately loosens the normal task-branch safety model. Keep it exceptional.',
@@ -343,6 +353,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'message', description: 'Reason for closing the task without staging it.', required: true, kind: 'message_tail' }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive close plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
@@ -381,6 +392,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'message', description: 'Resolution message for the staged task.', required: true, kind: 'message_tail' }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive staging plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
@@ -463,6 +475,24 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		executionMode: 'handler',
 		handlerName: 'recover',
 	})],
+	[workspaceCommand('status'), command({
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed workspace:status'],
+		executionMode: 'handler',
+		handlerName: workspaceCommand('status'),
+	})],
+	[workspaceCommand('link'), command({
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed workspace:link'],
+		executionMode: 'handler',
+		handlerName: workspaceCommand('link'),
+	})],
+	[workspaceCommand('unlink'), command({
+		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
+		examples: ['treeseed workspace:unlink'],
+		executionMode: 'handler',
+		handlerName: workspaceCommand('unlink'),
+	})],
 	['rollback', command({
 		arguments: [{ name: 'environment', description: 'The persistent environment to roll back.', required: true }],
 		options: [
@@ -534,6 +564,40 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		},
 		executionMode: 'handler',
 		handlerName: 'doctor',
+	})],
+	['install', command({
+		options: [
+			{ name: 'force', flags: '--force', description: 'Repair or reinstall managed tools even when they are already present.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed install', 'trsd install --json', 'treeseed install --force'],
+		help: {
+			workflowPosition: 'setup',
+			longSummary: [
+				'Install prepares the local Treeseed toolchain by installing or verifying Treeseed-managed dependencies. It is safe to rerun and uses the same dependency initializer that config runs during bootstrap.',
+			],
+			whenToUse: [
+				'Use this on a new machine before running config, dev, or deployment workflows.',
+				'Use `--force` when a managed tool cache looks stale or corrupted.',
+			],
+			outcomes: [
+				'Installs the managed GitHub CLI, verifies npm-backed Treeseed tool dependencies, and installs gh-act when Docker is available.',
+				'Reports any missing host prerequisites such as Git without modifying the operating system.',
+			],
+			examples: [
+				example('treeseed install', 'Install managed dependencies', 'Prepare the local Treeseed dependency toolchain.'),
+				example('trsd install --json', 'Inspect setup from automation', 'Emit a structured dependency report for scripts or agents.'),
+				example('treeseed install --force', 'Repair the managed cache', 'Reinstall managed downloaded tools and extensions.'),
+			],
+			relatedDetails: [
+				related('config', 'Use `config` after install to configure project and provider values.'),
+				related('doctor', 'Use `doctor` when install succeeds but workflow readiness still looks wrong.'),
+			],
+		},
+		executionMode: 'adapter',
+		buildAdapterInput: (invocation) => ({
+			force: invocation.args.force === true,
+		}),
 	})],
 	['auth:login', command({
 		options: [
@@ -885,6 +949,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'major', flags: '--major', description: 'Bump to the next major version.', kind: 'boolean' },
 			{ name: 'minor', flags: '--minor', description: 'Bump to the next minor version.', kind: 'boolean' },
 			{ name: 'patch', flags: '--patch', description: 'Bump to the next patch version.', kind: 'boolean' },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive release plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -974,6 +1039,9 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'destroy',
 	})],
 	['dev', command({
+		options: [
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+		],
 		examples: ['treeseed dev'],
 		help: {
 			longSummary: ['Dev starts the unified local Treeseed runtime so you can work against the integrated web, API, and supporting local surfaces.'],
@@ -987,6 +1055,9 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'dev',
 	})],
 	['dev:watch', command({
+		options: [
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+		],
 		examples: ['treeseed dev:watch'],
 		help: {
 			longSummary: ['Dev:watch starts local development with rebuild and watch semantics so code changes are reflected continuously during active development.'],

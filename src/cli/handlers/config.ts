@@ -5,6 +5,8 @@ import {
 	ensureTreeseedActVerificationTooling,
 	ensureTreeseedSecretSessionForConfig,
 	findNearestTreeseedRoot,
+	formatTreeseedDependencyFailureDetails,
+	installTreeseedDependencies,
 } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { fail, guidedResult } from './utils.js';
@@ -227,6 +229,15 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 			const tenantRoot = findNearestTreeseedRoot(context.cwd) ?? context.cwd;
 			if (!tenantRoot) {
 				return fail('Treeseed config requires a Treeseed project. Run the command from inside a tenant or initialize one first.');
+			}
+			const dependencyInstall = await installTreeseedDependencies({
+				tenantRoot,
+				force: invocation.args.installMissingTooling === true,
+				env: context.env,
+				write: context.write,
+			});
+			if (!dependencyInstall.ok) {
+				return fail(`Treeseed dependency initialization failed:\n- ${formatTreeseedDependencyFailureDetails(dependencyInstall)}`);
 			}
 			applyTreeseedSafeRepairs(tenantRoot);
 			const toolAvailability = ensureTreeseedActVerificationTooling({

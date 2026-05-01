@@ -70,8 +70,13 @@ export function colorizeTreeseedCliOutput(output: string, colorEnabled = true) {
 	if (!colorEnabled) {
 		return output;
 	}
-	return output.replace(/^((?:\[[^\]]+\]){3,4})(\s|$)/u, (match, prefix: string, suffix: string) => {
+	return output.replace(/^((?:\[[^\]]+\]){2,4})(\s|$)/u, (match, prefix: string, suffix: string) => {
 		const segments = [...prefix.matchAll(/\[([^\]]+)\]/gu)].map((entry) => entry[1]);
+		if (segments.length === 2) {
+			const stage = segments[1] ?? '';
+			const code = /fail|error/iu.test(stage) ? '31;1' : /skip/iu.test(stage) ? '90;1' : '32;1';
+			return `\u001b[${code}m${prefix}\u001b[0m${suffix}`;
+		}
 		const system = segments[1] ?? '';
 		const stage = segments[segments.length - 1] ?? '';
 		const code = /fail|error/iu.test(stage) ? '31;1' : /skip/iu.test(stage) ? '90;1' : colorCodeForBootstrapSystem(system);
@@ -270,22 +275,26 @@ export class TreeseedOperationsSdk {
 				rawArgs: argv,
 			};
 		const input = spec.buildAdapterInput?.(invocation, context) ?? {};
+		const adapterContext = {
+			...context,
+			outputFormat: invocation.args.json === true ? 'json' : (context.outputFormat ?? 'human'),
+		};
 
 		return sdkOperationsRuntime.execute(
 			{ operationName: spec.name, input },
 			{
-				cwd: context.cwd,
-				env: context.env,
-				write: context.write,
-				spawn: context.spawn,
-				outputFormat: context.outputFormat,
+				cwd: adapterContext.cwd,
+				env: adapterContext.env,
+				write: adapterContext.write,
+				spawn: adapterContext.spawn,
+				outputFormat: adapterContext.outputFormat,
 				transport: 'cli',
 			},
-		).then((result) => writeTreeseedResult(result, context))
+		).then((result) => writeTreeseedResult(result, adapterContext))
 			.catch((error) => writeTreeseedResult({
 				exitCode: 1,
 				stderr: [error instanceof Error ? error.message : String(error)],
-			}, context));
+			}, adapterContext));
 	}
 
 	private async executeAgents(argv: string[], context: TreeseedCommandContext) {
@@ -381,7 +390,7 @@ function formatProjectError(spec: TreeseedOperationSpec) {
 }
 
 function commandNeedsProjectRoot(spec: TreeseedOperationSpec) {
-	return spec.name !== 'init' && spec.name !== 'export';
+	return spec.name !== 'init' && spec.name !== 'export' && spec.name !== 'install';
 }
 
 export function resolveTreeseedCommandCwd(spec: TreeseedOperationSpec, cwd: string) {

@@ -50,9 +50,27 @@ function assertSuccessWithDiagnostics(result, label) {
 	assert.equal(result.exitCode, 0);
 }
 
+function ensureTestManagedGh(env) {
+	const toolsHome = env?.TREESEED_TOOLS_HOME
+		?? (env?.XDG_CACHE_HOME ? resolve(env.XDG_CACHE_HOME, 'treeseed', 'tools') : null)
+		?? (env?.HOME ? resolve(env.HOME, '.cache', 'treeseed', 'tools') : null);
+	if (!toolsHome) return;
+	const ghPath = resolve(toolsHome, 'gh', '2.90.0', `${process.platform}-${process.arch}`, 'bin', 'gh');
+	mkdirSync(dirname(ghPath), { recursive: true });
+	writeFileSync(ghPath, '#!/bin/sh\necho gh version 2.90.0\n', { mode: 0o755 });
+}
+
+function npmInstallTestEnv() {
+	return {
+		NODE_ENV: 'test',
+		TREESEED_TEST_NPM_INSTALL_STATUS: 'installed',
+	};
+}
+
 async function runCli(args, options = {}) {
 	const writes = [];
 	const spawns = [];
+	ensureTestManagedGh(options.env);
 	const envOverrides = {
 		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
 		CI: undefined,
@@ -132,6 +150,16 @@ test('treeseed command help renders without executing the command', async () => 
 	assert.equal(helpViaFlag.spawns.length, 0);
 });
 
+test('save help documents optional generated commit message hints', async () => {
+	const result = await runCli(['help', 'save']);
+	const saveSpec = findCommandSpec('save');
+	assert.equal(result.exitCode, 0);
+	assert.equal(saveSpec.arguments[0].required, false);
+	assert.match(result.output, /treeseed save/);
+	assert.match(result.output, /generated message/);
+	assert.doesNotMatch(result.output, /<message>/);
+});
+
 test('major workflow commands have usage, options, and examples in help', async () => {
 	for (const command of ['init', 'status', 'config', 'tasks', 'switch', 'save', 'close', 'stage', 'release', 'destroy', 'rollback', 'doctor']) {
 		const result = await runCli(['help', command]);
@@ -173,6 +201,13 @@ test('bootstrap prefix colorization can be disabled', () => {
 	assert.equal(colorizeTreeseedCliOutput(line, false), line);
 });
 
+test('save progress prefixes are colorized without command prefix', () => {
+	const line = '[@treeseed/market][push] $ git push origin staging';
+	const colored = colorizeTreeseedCliOutput(line, true);
+	assert.match(colored, /^\u001b\[32;1m\[@treeseed\/market\]\[push\]\u001b\[0m /);
+	assert.equal(colorizeTreeseedCliOutput(line, false), line);
+});
+
 test('export help includes the directory argument', async () => {
 	const result = await runCli(['help', 'export']);
 	assert.equal(result.exitCode, 0);
@@ -201,6 +236,48 @@ test('published adapter commands still execute in isolated package installs', as
 	assert.equal(typeof result.exitCode, 'number');
 	assert.match(result.output, /Treeseed preflight summary/);
 	assert.doesNotMatch(result.stderr, /Unknown treeseed command/);
+});
+
+test('install command emits a managed dependency report as json', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	const home = resolve(workspaceRoot, '.home');
+	const result = await runCli(['install', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			...npmInstallTestEnv(),
+			HOME: home,
+			PATH: process.env.PATH,
+			TREESEED_TOOLS_HOME: resolve(workspaceRoot, '.tools'),
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'install-json');
+	const report = JSON.parse(result.stdout);
+	assert.equal(report.ok, true);
+	assert.ok(Array.isArray(report.npmInstalls));
+	assert.equal(report.npmInstalls[0].root, workspaceRoot);
+	assert.equal(report.npmInstalls[0].status, 'installed');
+	assert.ok(Array.isArray(report.tools));
+	assert.ok(report.tools.some((tool) => tool.name === 'gh' && tool.status === 'already-present'));
+	assert.ok(report.tools.some((tool) => tool.name === 'wrangler' && tool.kind === 'npm'));
+});
+
+test('install --force repairs npm dependencies even when node_modules exists', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	mkdirSync(resolve(workspaceRoot, 'node_modules'), { recursive: true });
+	const result = await runCli(['install', '--force', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			...npmInstallTestEnv(),
+			HOME: resolve(workspaceRoot, '.home'),
+			PATH: process.env.PATH,
+			TREESEED_TOOLS_HOME: resolve(workspaceRoot, '.tools'),
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'install-force-json');
+	const report = JSON.parse(result.stdout);
+	assert.equal(report.ok, true);
+	assert.equal(report.npmInstalls[0].status, 'installed');
+	assert.match(report.npmInstalls[0].command.join(' '), /install --no-audit --no-fund/);
 });
 
 test('agents help is rendered locally without requiring the core runtime', async () => {
@@ -334,8 +411,66 @@ test('status and tasks support machine-readable json', async () => {
 	assert.equal(statusJson.command, 'status');
 	assert.equal(statusJson.ok, true);
 	assert.equal(statusJson.state.branchRole, 'feature');
+	assert.ok(statusJson.state.environmentStatus.local);
+	assert.ok(statusJson.state.environmentStatus.staging);
+	assert.ok(statusJson.state.environmentStatus.prod);
+	assert.ok(statusJson.state.providerStatus.local.github);
+	assert.ok(statusJson.state.providerStatus.staging.railway);
+	assert.equal(statusJson.state.providerStatus.local.railway.applicable, false);
 	assert.equal(tasksJson.command, 'tasks');
 	assert.ok(Array.isArray(tasksJson.tasks));
+});
+
+test('status human fallback groups all environments', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['status'], { cwd: workspaceRoot, interactiveUi: false });
+	assert.equal(result.exitCode, 0);
+	assert.match(result.stdout, /Local:/);
+	assert.match(result.stdout, /Staging:/);
+	assert.match(result.stdout, /Production:/);
+	assert.match(result.stdout, /Cloudflare: .*local/);
+	assert.match(result.stdout, /BLOCKER:|Blockers: none/);
+	const stagingSection = result.stdout.slice(result.stdout.indexOf('Staging:'), result.stdout.indexOf('Production:'));
+	const productionSection = result.stdout.slice(result.stdout.indexOf('Production:'), result.stdout.indexOf('Managed services:'));
+	assert.doesNotMatch(stagingSection, /Local development:/);
+	assert.doesNotMatch(productionSection, /Local development:/);
+});
+
+test('status live json includes provider live details', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['status', '--live', '--json'], { cwd: workspaceRoot });
+	assert.equal(result.exitCode, 0);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.live, true);
+	assert.equal(payload.state.providerStatus.local.github.live.checked, true);
+	assert.equal(payload.state.providerStatus.local.railway.applicable, false);
+	assert.equal(payload.state.providerStatus.local.railway.live.skipped, true);
+	assert.equal(payload.state.providerStatus.local.cloudflare.applicable, false);
+	assert.equal(payload.state.providerStatus.local.cloudflare.live.skipped, true);
+	assert.equal(payload.state.providerStatus.staging.railway.live.checked, true);
+	const localSection = payload.sections.find((section) => section.title === 'Local');
+	assert.ok(!localSection.lines.includes('URL: https://example.com'));
+	const stagingSection = payload.sections.find((section) => section.title === 'Staging');
+	const productionSection = payload.sections.find((section) => section.title === 'Production');
+	assert.ok(!stagingSection.lines.some((line) => line.startsWith('Local development:')));
+	assert.ok(!productionSection.lines.some((line) => line.startsWith('Local development:')));
+});
+
+test('release plan supports machine-readable json without execute-only fields', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['release', '--patch', '--plan', '--json'], { cwd: workspaceRoot });
+	assertSuccessWithDiagnostics(result, 'release-plan-json');
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.command, 'release');
+	assert.equal(payload.executionMode, 'plan');
+	assert.equal(payload.ok, true);
+	assert.equal(payload.payload.mode, 'root-only');
+	assert.equal(payload.payload.rootVersion, '0.0.1');
+	assert.equal(payload.payload.releaseTag, '0.0.1');
+	assert.equal(payload.payload.plannedVersions['@treeseed/market'], '0.0.1');
+	assert.ok(Array.isArray(payload.payload.plannedSteps));
+	assert.ok(payload.payload.plannedSteps.some((step) => step.id === 'release-plan'));
+	assert.ok(Array.isArray(payload.payload.plannedPublishWaits));
 });
 
 test('doctor reports blocking issues with structured json', async () => {
@@ -354,11 +489,13 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	const result = await runCli(['config', '--environment', 'local', '--sync', 'none', '--json'], {
 		cwd: workspaceRoot,
 		env: {
+			...npmInstallTestEnv(),
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
 			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
 			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
@@ -375,9 +512,9 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_OWNER'), true);
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_NAME'), true);
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_VISIBILITY'), true);
-	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
 	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
-	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(localEntryIds.has('TREESEED_RAILWAY_WORKSPACE'), false);
 	assert.equal(payload.toolHealth.ghActExtension.attemptedInstall, false);
 });
@@ -385,6 +522,7 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 test('config defaults to all environments and supports explicit all', async () => {
 	const workspaceRoot = makeTenantWorkspace('staging');
 	const env = {
+		...npmInstallTestEnv(),
 		HOME: workspaceRoot,
 		TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 	};
@@ -397,9 +535,9 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
 	const localEntryIds = new Set(defaultPayload.context.entriesByScope.local.map((entry) => entry.id));
 	const stagingEntryIds = new Set(defaultPayload.context.entriesByScope.staging.map((entry) => entry.id));
-	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
 	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
-	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), false);
+	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
 	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), true);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
@@ -440,6 +578,7 @@ test('config supports explicit non-interactive application without json output',
 	const result = await runCli(['config', '--environment', 'local', '--sync', 'none', '--non-interactive'], {
 		cwd: workspaceRoot,
 		env: {
+			...npmInstallTestEnv(),
 			HOME: workspaceRoot,
 			GH_TOKEN: 'gh_test_token',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
@@ -451,6 +590,7 @@ test('config supports explicit non-interactive application without json output',
 		},
 	});
 	assertSuccessWithDiagnostics(result, 'config-non-interactive');
+	assert.match(result.stdout, /Installing npm dependencies/);
 	assert.match(result.stdout, /Treeseed config completed successfully/);
 });
 
