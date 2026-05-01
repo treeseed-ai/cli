@@ -2,7 +2,7 @@
 
 import { spawnSync } from 'node:child_process';
 
-if (process.env.CI === 'true' && process.env.TREESEED_RUN_PREPARE_IN_CI !== '1') {
+if (process.env.TREESEED_SKIP_PACKAGE_PREPARE === '1') {
 	process.exit(0);
 }
 
