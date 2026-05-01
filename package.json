@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.6.8",
+  "version": "0.6.9-dev.staging.20260501T060508Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -33,7 +33,7 @@
     "lint": "npm run build:dist",
     "test": "npm run build:dist && node --test --test-concurrency=1 ./scripts/treeseed-help.test.mjs ./scripts/wrapper-package.test.mjs",
     "build:dist": "node ./scripts/run-ts.mjs ./scripts/build-dist.ts",
-    "prepare": "npm run build:dist",
+    "prepare": "node ./scripts/prepare.mjs",
     "prepack": "npm run build:dist",
     "verify:direct": "npm run release:verify",
     "verify:local": "node --input-type=module -e \"process.env.TREESEED_VERIFY_DRIVER='direct'; await import('./scripts/verify-driver.mjs')\"",
@@ -45,7 +45,7 @@
     "release:publish": "node ./scripts/run-ts.mjs ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.6.8",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#0.6.9-dev.staging.20260501T060052Z",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
