@@ -34,11 +34,5 @@ jobs:
           fi
           git checkout -- package.json
 
-      - name: Prepare SDK dependency
-        run: |
-          if test -f ./node_modules/@treeseed/sdk/package.json; then
-            npm run build:dist --prefix ./node_modules/@treeseed/sdk
-          fi
-
       - name: Verify package
         run: npm run verify:direct
