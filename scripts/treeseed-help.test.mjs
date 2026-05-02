@@ -211,7 +211,7 @@ test('save progress prefixes are colorized without command prefix', () => {
 test('export help includes the directory argument', async () => {
 	const result = await runCli(['help', 'export']);
 	assert.equal(result.exitCode, 0);
-	assert.match(result.output, /treeseed export \[directory\] \[--json\]/);
+	assert.match(result.output, /treeseed export \[directory\] \[--worktree <mode>\] \[--json\]/);
 });
 
 test('unknown command suggests nearest valid commands', async () => {

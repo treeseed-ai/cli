@@ -68,6 +68,8 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const bump = (['major', 'minor', 'patch'] as const).find((candidate) => invocation.args[candidate] === true) ?? 'patch';
 		const result = await createWorkflowSdk(context).release({
 			bump,
+			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
+			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
@@ -90,6 +92,9 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			plannedSteps?: Array<{ id?: string; description?: string }>;
 			blockers?: string[];
 			finalBranch?: string;
+			ciMode?: string;
+			workflowGates?: Array<Record<string, unknown>>;
+			worktreePath?: string | null;
 		};
 		const publishWait = payload.publishWait ?? [];
 		const completedPublishes = publishWait.filter((entry) => entry.status === 'completed').length;
@@ -113,6 +118,9 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Dependent packages', value: String(payload.packageSelection.dependents.length) },
 				{ label: result.executionMode === 'plan' ? 'Packages planned' : 'Released packages', value: String((payload.touchedPackages ?? payload.packageSelection.selected).length) },
 				{ label: 'Publish waits', value: result.executionMode === 'plan' ? String(plannedPublishes) : String(completedPublishes) },
+				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },
+				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
+				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? (result.executionMode === 'plan' ? payload.stagingBranch : '(unknown)') },
 			],
 			sections: result.executionMode === 'plan' ? formatReleasePlanSections(payload) : [],

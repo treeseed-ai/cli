@@ -8,6 +8,7 @@ export const handleSwitch: TreeseedCommandHandler = async (invocation, context) 
 		const result = await createWorkflowSdk(context).switchTask({
 			branch,
 			preview: invocation.args.preview === true,
+			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
@@ -19,7 +20,10 @@ export const handleSwitch: TreeseedCommandHandler = async (invocation, context) 
 			resumed: boolean;
 			repos: Array<{ created: boolean; resumed: boolean }>;
 			rootRepo: { created: boolean; resumed: boolean };
-			preview: { enabled: boolean; url: string | null };
+			preview?: { enabled: boolean; url: string | null };
+			previewRequested?: boolean;
+			worktreeMode?: string;
+			worktreePath?: string | null;
 		};
 		const packageCreated = payload.repos.filter((repo) => repo.created).length;
 		const packageResumed = payload.repos.filter((repo) => repo.resumed).length;
@@ -38,8 +42,10 @@ export const handleSwitch: TreeseedCommandHandler = async (invocation, context) 
 				{ label: 'Market created', value: payload.rootRepo.created ? 'yes' : 'no' },
 				{ label: 'Package branches created', value: String(packageCreated) },
 				{ label: 'Package branches resumed', value: String(packageResumed) },
-				{ label: 'Preview', value: payload.preview.enabled ? 'enabled' : 'disabled' },
-				{ label: 'Preview URL', value: payload.preview.url ?? '(none)' },
+				{ label: 'Preview', value: payload.preview?.enabled ? 'enabled' : payload.previewRequested ? 'planned' : 'disabled' },
+				{ label: 'Preview URL', value: payload.preview?.url ?? '(none)' },
+				{ label: 'Worktree mode', value: payload.worktreeMode ?? 'auto' },
+				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 			],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: result,
