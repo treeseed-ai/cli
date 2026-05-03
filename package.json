@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.6.14",
+  "version": "0.6.15-dev.feature-dev-supervisor-watch-stability.20260503T082853Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
