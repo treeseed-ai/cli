@@ -166,8 +166,11 @@ export function createTreeseedCommandContext(overrides: Partial<TreeseedCommandC
 	};
 }
 
-export function writeTreeseedResult(result: TreeseedOperationResult | { exitCode?: number; stdout?: string[]; stderr?: string[]; report?: Record<string, unknown> | null }, context: TreeseedCommandContext) {
+export function writeTreeseedResult(result: TreeseedOperationResult | { exitCode?: number; stdout?: string[]; stderr?: string[]; report?: Record<string, unknown> | null; suppressJsonResult?: boolean }, context: TreeseedCommandContext) {
 	if (context.outputFormat === 'json') {
+		if (result.suppressJsonResult === true) {
+			return result.exitCode ?? 0;
+		}
 		const payload = result.report ?? {
 			ok: (result.exitCode ?? 0) === 0,
 			stdout: result.stdout ?? [],

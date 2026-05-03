@@ -53,16 +53,40 @@ function resolveCoreDevEntrypoint(cwd: string) {
 export const handleDev: TreeseedCommandHandler = async (invocation, context) => {
 	try {
 		const watch = invocation.commandName === 'dev:watch' || invocation.args.watch === true;
+		const passthroughArgs: string[] = [];
+		const forwardStringOption = (name: string, flag: string) => {
+			const value = invocation.args[name];
+			if (typeof value === 'string' && value.trim().length > 0) {
+				passthroughArgs.push(flag, value);
+			}
+		};
+		const forwardBooleanOption = (name: string, flag: string) => {
+			if (invocation.args[name] === true) {
+				passthroughArgs.push(flag);
+			}
+		};
+
+		forwardStringOption('surface', '--surface');
+		forwardStringOption('host', '--host');
+		forwardStringOption('port', '--port');
+		forwardStringOption('apiHost', '--api-host');
+		forwardStringOption('apiPort', '--api-port');
+		forwardStringOption('managerPort', '--manager-port');
+		forwardStringOption('setup', '--setup');
+		forwardStringOption('feedback', '--feedback');
+		forwardStringOption('open', '--open');
+		forwardBooleanOption('plan', '--plan');
+		forwardBooleanOption('json', '--json');
 		const workspaceRoot = findNearestTreeseedWorkspaceRoot(context.cwd);
 		const workspaceLinksMode = typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined;
 		const workspaceLinks = workspaceRoot
 			? ensureLocalWorkspaceLinks(workspaceRoot, { env: context.env, mode: workspaceLinksMode })
 			: null;
-		if (workspaceLinks?.created.length) {
+		if (workspaceLinks?.created.length && invocation.args.json !== true) {
 			context.write(`[workspace][link] Linked ${workspaceLinks.created.length} local workspace package paths.`, 'stdout');
 		}
 		const resolved = resolveCoreDevEntrypoint(context.cwd);
-		const args = watch ? [...resolved.args, '--watch'] : resolved.args;
+		const args = watch ? [...resolved.args, ...passthroughArgs, '--watch'] : [...resolved.args, ...passthroughArgs];
 		const result = context.spawn(resolved.command, args, {
 			cwd: context.cwd,
 			env: resolveTreeseedLaunchEnvironment({
@@ -74,6 +98,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		});
 		return {
 			exitCode: result.status ?? 1,
+			suppressJsonResult: invocation.args.json === true,
 			report: {
 				command: 'dev',
 				ok: (result.status ?? 1) === 0,

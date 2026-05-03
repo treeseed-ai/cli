@@ -50,6 +50,22 @@ function related(name: string, why: string) {
 	return { name, why };
 }
 
+const DEV_RUNTIME_OPTIONS: TreeseedCommandOptionSpec[] = [
+	{ name: 'surface', flags: '--surface <surface>', description: 'Select the local dev surface to run.', kind: 'enum', values: ['integrated', 'web', 'api', 'manager', 'worker', 'services'] },
+	{ name: 'host', flags: '--host <host>', description: 'Host for the web dev server.', kind: 'string' },
+	{ name: 'port', flags: '--port <port>', description: 'Port for the web dev server.', kind: 'string' },
+	{ name: 'apiHost', flags: '--api-host <host>', description: 'Host used to construct the local API URL.', kind: 'string' },
+	{ name: 'apiPort', flags: '--api-port <port>', description: 'Port for the local API server.', kind: 'string' },
+	{ name: 'managerPort', flags: '--manager-port <port>', description: 'Port used for the local manager service URL.', kind: 'string' },
+	{ name: 'setup', flags: '--setup <mode>', description: 'Control automatic local runtime setup.', kind: 'enum', values: ['auto', 'check', 'off'] },
+	{ name: 'feedback', flags: '--feedback <mode>', description: 'Control live feedback, service restarts, and browser reload stamps.', kind: 'enum', values: ['live', 'restart', 'off'] },
+	{ name: 'open', flags: '--open <mode>', description: 'Control whether dev opens the browser after readiness.', kind: 'enum', values: ['auto', 'on', 'off'] },
+	{ name: 'plan', flags: '--plan', description: 'Print the dev runtime plan and exit without starting services.', kind: 'boolean' },
+	{ name: 'json', flags: '--json', description: 'Emit structured JSON or newline-delimited dev events.', kind: 'boolean' },
+	{ name: 'watch', flags: '--watch', description: 'Enable live watch behavior. `dev` defaults to live feedback; this remains for compatibility.', kind: 'boolean' },
+	{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+];
+
 function genericWorkflowPosition(spec: Pick<TreeseedOperationMetadata, 'group' | 'name'>): string {
 	if (spec.group === 'Workflow') {
 		if (spec.name === 'switch') return 'start work';
@@ -1080,31 +1096,30 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'destroy',
 	})],
 	['dev', command({
-		options: [
-			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
-		],
-		examples: ['treeseed dev'],
+		options: DEV_RUNTIME_OPTIONS,
+		examples: ['treeseed dev', 'treeseed dev --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
 		help: {
 			longSummary: ['Dev starts the unified local Treeseed runtime so you can work against the integrated web, API, and supporting local surfaces.'],
 			examples: [
 				example('treeseed dev', 'Start integrated local development', 'Run the default integrated local runtime.'),
+				example('treeseed dev --plan --json', 'Inspect the runtime plan', 'Emit a structured plan with setup steps, commands, ports, URLs, readiness checks, and watch entries.'),
+				example('treeseed dev --surface web --port 4322 --open off', 'Run only the web surface', 'Start the Astro UI on a specific port without opening a browser.'),
 				example('trsd dev', 'Use the short alias', 'Start the same local runtime through the shorter entrypoint.'),
-				example('treeseed dev && treeseed status', 'Pair runtime start with orientation', 'Start the local runtime and then inspect workflow state in another shell.'),
+				example('treeseed dev --json', 'Stream dev events', 'Emit newline-delimited events while the long-running dev process supervises local services.'),
 			],
 		},
 		executionMode: 'handler',
 		handlerName: 'dev',
 	})],
 	['dev:watch', command({
-		options: [
-			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
-		],
-		examples: ['treeseed dev:watch'],
+		options: DEV_RUNTIME_OPTIONS,
+		examples: ['treeseed dev:watch', 'treeseed dev:watch --json'],
 		help: {
 			longSummary: ['Dev:watch starts local development with rebuild and watch semantics so code changes are reflected continuously during active development.'],
 			examples: [
 				example('treeseed dev:watch', 'Start watch mode', 'Run the local runtime with watch and rebuild behavior enabled.'),
 				example('trsd dev:watch', 'Use the short alias', 'Start the same watch-mode runtime through the shorter entrypoint.'),
+				example('treeseed dev:watch --feedback restart', 'Restart services without browser reload', 'Use watcher-driven service restarts while leaving browser refresh to your own tooling.'),
 				example('treeseed dev:watch --help', 'Inspect watch help', 'Read the help surface before starting a longer watch session.'),
 			],
 		},
