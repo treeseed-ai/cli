@@ -67,6 +67,9 @@ export function guidedResult(options: GuidedResultOptions): TreeseedCommandResul
 
 export function writeResult(result: TreeseedCommandResult, context: TreeseedCommandContext) {
 	if (context.outputFormat === 'json') {
+		if (result.suppressJsonResult === true) {
+			return result.exitCode ?? 0;
+		}
 		const payload = result.report ?? {
 			ok: (result.exitCode ?? 0) === 0,
 			stdout: result.stdout ?? [],

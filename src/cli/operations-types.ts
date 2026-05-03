@@ -76,6 +76,7 @@ export type TreeseedCommandResult = {
 	stdout?: string[];
 	stderr?: string[];
 	report?: Record<string, unknown> | null;
+	suppressJsonResult?: boolean;
 };
 
 export type TreeseedWriter = NonNullable<SdkOperationContext['write']>;

@@ -1102,7 +1102,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	const workspaceRoot = makeTenantWorkspace('feature/dev-workspace');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const result = await runCli(['dev'], {
+	const result = await runCli(['dev', '--surface', 'web', '--port', '4499', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
@@ -1113,6 +1113,10 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	assert.equal(result.spawns.length, 1);
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/run-ts\.mjs/);
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
+	assert.deepEqual(
+		result.spawns[0].args.slice(-12),
+		['--surface', 'web', '--port', '4499', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--json'],
+	);
 });
 
 test('treeseed dev:watch delegates to the installed core entrypoint with --watch', async () => {
