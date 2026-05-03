@@ -7,7 +7,10 @@ export const handleExport: TreeseedCommandHandler = async (invocation, context) 
 		const directory = typeof invocation.positionals[0] === 'string' && invocation.positionals[0].trim().length > 0
 			? invocation.positionals[0]
 			: undefined;
-		const result = await createWorkflowSdk(context).export({ directory });
+		const result = await createWorkflowSdk(context).export({
+			directory,
+			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
+		});
 		const exported = result.payload as Record<string, any>;
 		return guidedResult({
 			command: 'export',
@@ -20,6 +23,7 @@ export const handleExport: TreeseedCommandHandler = async (invocation, context) 
 				{ label: 'Files', value: exported.summary?.totalFiles },
 				{ label: 'Tokens', value: exported.summary?.totalTokens },
 				{ label: 'Bundled paths', value: Array.isArray(exported.includedBundlePaths) ? exported.includedBundlePaths.length : 0 },
+				{ label: 'Worktree path', value: exported.worktreePath ?? '(in-place)' },
 			],
 			report: exported,
 		});

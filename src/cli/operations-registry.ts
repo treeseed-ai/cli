@@ -252,6 +252,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'branch-name', description: 'Task branch to create or resume.', required: true }],
 		options: [
 			{ name: 'preview', flags: '--preview', description: 'Provision or refresh a branch-scoped Cloudflare preview environment.', kind: 'boolean' },
+			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive branch switch plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
@@ -305,6 +306,9 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		options: [
 			{ name: 'hotfix', flags: '--hotfix', description: 'Allow save on main for an explicit hotfix.', kind: 'boolean' },
 			{ name: 'preview', flags: '--preview', description: 'Create or refresh the branch preview during save.', kind: 'boolean' },
+			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
+			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
+			{ name: 'verifyMode', flags: '--verify <mode>', description: 'Control save verification depth.', kind: 'enum', values: ['fast', 'local', 'hosted', 'both', 'skip'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive save plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
@@ -353,6 +357,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'message', description: 'Reason for closing the task without staging it.', required: true, kind: 'message_tail' }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive close plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -392,6 +397,8 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		arguments: [{ name: 'message', description: 'Resolution message for the staged task.', required: true, kind: 'message_tail' }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive staging plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
+			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -451,8 +458,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'resume',
 	})],
 	['recover', command({
-		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
-		examples: ['treeseed recover', 'treeseed recover --json'],
+		options: [
+			{ name: 'pruneStale', flags: '--prune-stale', description: 'Archive stale interrupted runs that are no longer safe to resume.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed recover', 'treeseed recover --json', 'treeseed recover --prune-stale --json'],
 		help: {
 			workflowPosition: 'recover',
 			longSummary: [
@@ -466,10 +476,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Run it from the market workspace root or anywhere inside the tenant so the CLI can inspect the correct `.treeseed/workflow` journal directory.',
 			],
 			outcomes: [
-				'Reports the active workflow lock, interrupted runs, and the exact `treeseed resume <run-id>` command for resumable runs.',
+				'Reports the active workflow lock, resumable interrupted runs, stale runs, obsolete runs, and the exact `treeseed resume <run-id>` command for resumable runs.',
 			],
 			automationNotes: [
 				'`recover --json` is the supported discovery entrypoint for agents that need to inspect lock state and resumable run ids safely before mutating the workspace.',
+				'Use `recover --prune-stale --json` to archive stale journals after the recorded branch or release heads no longer match current state.',
 			],
 		},
 		executionMode: 'handler',
@@ -598,6 +609,33 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		buildAdapterInput: (invocation) => ({
 			force: invocation.args.force === true,
 		}),
+	})],
+	['tools', command({
+		options: [
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed tools', 'trsd tools --json'],
+		help: {
+			workflowPosition: 'setup',
+			longSummary: [
+				'Tools reports the Treeseed-managed executable cache, exact binary paths, invocation mode, and GitHub CLI authentication state without installing or mutating tools.',
+			],
+			whenToUse: [
+				'Use this before shelling out to `gh`, Wrangler, Railway, or Copilot from an agent or script.',
+				'Use this when a command claims an executable is missing but `treeseed install` has already prepared the managed tool cache.',
+			],
+			outcomes: [
+				'Reports toolsHome, ghConfigDir, per-tool binaryPath, invocation command, and GitHub auth remediation.',
+			],
+			examples: [
+				example('trsd tools --json', 'Resolve managed paths for automation', 'Emit stable executable paths and auth status for scripts or agents.'),
+			],
+			relatedDetails: [
+				related('install', 'Use `install` when tools are missing or the managed cache needs repair.'),
+				related('doctor', 'Use `doctor` when tools exist but workflow readiness is still blocked.'),
+			],
+		},
+		executionMode: 'adapter',
 	})],
 	['auth:login', command({
 		options: [
@@ -907,6 +945,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['export', command({
 		arguments: [{ name: 'directory', description: 'Directory subtree to export. Defaults to the current shell directory.', required: false }],
 		options: [
+			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Include managed workflow worktree mode metadata.', kind: 'enum', values: ['auto', 'on', 'off'] },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
 		examples: ['treeseed export', 'treeseed export src', 'treeseed export packages/sdk --json'],
@@ -949,6 +988,8 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'major', flags: '--major', description: 'Bump to the next major version.', kind: 'boolean' },
 			{ name: 'minor', flags: '--minor', description: 'Bump to the next minor version.', kind: 'boolean' },
 			{ name: 'patch', flags: '--patch', description: 'Bump to the next patch version.', kind: 'boolean' },
+			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
+			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive release plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },

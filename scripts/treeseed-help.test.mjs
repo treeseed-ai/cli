@@ -211,7 +211,14 @@ test('save progress prefixes are colorized without command prefix', () => {
 test('export help includes the directory argument', async () => {
 	const result = await runCli(['help', 'export']);
 	assert.equal(result.exitCode, 0);
-	assert.match(result.output, /treeseed export \[directory\] \[--json\]/);
+	assert.match(result.output, /treeseed export \[directory\] \[--worktree <mode>\] \[--json\]/);
+});
+
+test('recover help documents stale run pruning', async () => {
+	const result = await runCli(['help', 'recover']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /--prune-stale/);
+	assert.match(result.output, /stale/i);
 });
 
 test('unknown command suggests nearest valid commands', async () => {
@@ -259,6 +266,30 @@ test('install command emits a managed dependency report as json', async () => {
 	assert.ok(Array.isArray(report.tools));
 	assert.ok(report.tools.some((tool) => tool.name === 'gh' && tool.status === 'already-present'));
 	assert.ok(report.tools.some((tool) => tool.name === 'wrangler' && tool.kind === 'npm'));
+});
+
+test('tools command emits managed executable paths and auth status as json', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	const result = await runCli(['tools', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			...npmInstallTestEnv(),
+			HOME: resolve(workspaceRoot, '.home'),
+			PATH: process.env.PATH,
+			TREESEED_TOOLS_HOME: resolve(workspaceRoot, '.tools'),
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'tools-json');
+	const report = JSON.parse(result.stdout);
+	assert.equal(report.ok, true);
+	assert.match(report.toolsHome, /\.tools$/);
+	assert.ok(Array.isArray(report.tools));
+	const gh = report.tools.find((tool) => tool.name === 'gh');
+	assert.equal(gh.status, 'already-present');
+	assert.equal(gh.invocation.mode, 'direct');
+	assert.match(gh.invocation.binaryPath, /\/gh$/);
+	assert.equal(report.auth.github.checked, true);
+	assert.ok(Array.isArray(report.auth.github.remediation));
 });
 
 test('install --force repairs npm dependencies even when node_modules exists', async () => {

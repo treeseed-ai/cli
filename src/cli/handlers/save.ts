@@ -90,6 +90,9 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			message: invocation.positionals.join(' ').trim(),
 			hotfix: invocation.args.hotfix === true,
 			preview: invocation.args.preview === true,
+			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
+			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
+			verifyMode: typeof invocation.args.verifyMode === 'string' ? invocation.args.verifyMode as 'fast' | 'local' | 'hosted' | 'both' | 'skip' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
@@ -125,6 +128,11 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			};
 			plannedSteps?: Array<{ id?: string; description?: string }>;
 			previewAction?: { status: string };
+			ciMode?: string;
+			verifyMode?: string;
+			workflowGates?: Array<{ status?: string; conclusion?: string | null }>;
+			worktreeMode?: string;
+			worktreePath?: string | null;
 		};
 		const commitSha = typeof payload.commitSha === 'string' && payload.commitSha.length > 0
 			? payload.commitSha.slice(0, 12)
@@ -162,6 +170,9 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				},
 				{ label: 'Market pushed', value: payload.rootRepo?.pushed ? 'yes' : 'no' },
 				{ label: 'Preview action', value: payload.previewAction?.status ?? 'skipped' },
+				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },
+				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
+				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 			],
 			sections: result.executionMode === 'plan' ? [
 				...(payload.plannedSteps?.length
