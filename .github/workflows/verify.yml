@@ -27,10 +27,20 @@ jobs:
       - name: Install dependencies
         run: |
           node -e "const fs = require('fs'); const p = JSON.parse(fs.readFileSync('package.json', 'utf8')); if (p.scripts) delete p.scripts.prepare; fs.writeFileSync('package.json', JSON.stringify(p, null, '\t') + '\n');"
+          install_with_retry() {
+            for attempt in 1 2 3; do
+              if "$@"; then
+                return 0
+              fi
+              echo "dependency install failed; retrying (${attempt}/3)."
+              sleep $((attempt * 5))
+            done
+            "$@"
+          }
           if test -f package-lock.json; then
-            npm ci
+            install_with_retry npm ci
           else
-            npm install --no-audit --no-fund
+            install_with_retry npm install --no-audit --no-fund
           fi
           git checkout -- package.json
 

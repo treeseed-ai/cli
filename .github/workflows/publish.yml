@@ -32,6 +32,14 @@ jobs:
       - name: Install dependencies
         run: |
           node -e "const fs = require('fs'); const p = JSON.parse(fs.readFileSync('package.json', 'utf8')); if (p.scripts) delete p.scripts.prepare; fs.writeFileSync('package.json', JSON.stringify(p, null, '\t') + '\n');"
+          for attempt in 1 2 3; do
+            if npm ci; then
+              git checkout -- package.json
+              exit 0
+            fi
+            echo "npm ci failed; retrying (${attempt}/3)."
+            sleep $((attempt * 5))
+          done
           npm ci
           git checkout -- package.json
 
