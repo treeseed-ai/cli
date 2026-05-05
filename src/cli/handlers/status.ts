@@ -67,6 +67,7 @@ function statusFacts(state: Record<string, any>, live: boolean) {
 		{ label: 'Package branch aligned', value: state.packageSync.aligned ? 'yes' : 'no' },
 		{ label: 'Dirty package repos', value: state.packageSync.dirty ? 'yes' : 'no' },
 		{ label: 'Package blockers', value: state.packageSync.blockers.length > 0 ? state.packageSync.blockers.join(' | ') : '(none)' },
+		{ label: 'Package repairs', value: Array.isArray(state.packageSync.warnings) && state.packageSync.warnings.length > 0 ? state.packageSync.warnings.join(' | ') : '(none)' },
 		{ label: 'Preview enabled', value: state.preview.enabled ? 'yes' : 'no' },
 		{ label: 'Preview URL', value: state.preview.url ?? '(none)' },
 		{ label: 'Remote API auth', value: state.auth.remoteApi ? 'ready' : 'not ready' },
