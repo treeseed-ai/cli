@@ -61,6 +61,7 @@ const DEV_RUNTIME_OPTIONS: TreeseedCommandOptionSpec[] = [
 	{ name: 'feedback', flags: '--feedback <mode>', description: 'Control live feedback, service restarts, and browser reload stamps.', kind: 'enum', values: ['live', 'restart', 'off'] },
 	{ name: 'open', flags: '--open <mode>', description: 'Control whether dev opens the browser after readiness.', kind: 'enum', values: ['auto', 'on', 'off'] },
 	{ name: 'plan', flags: '--plan', description: 'Print the dev runtime plan and exit without starting services.', kind: 'boolean' },
+	{ name: 'reset', flags: '--reset', description: 'Clear local dev runtime state before setup, migrations, and service startup.', kind: 'boolean' },
 	{ name: 'json', flags: '--json', description: 'Emit structured JSON or newline-delimited dev events.', kind: 'boolean' },
 	{ name: 'watch', flags: '--watch', description: 'Enable live watch behavior. `dev` defaults to live feedback; this remains for compatibility.', kind: 'boolean' },
 	{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
@@ -1097,7 +1098,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	})],
 	['dev', command({
 		options: DEV_RUNTIME_OPTIONS,
-		examples: ['treeseed dev', 'treeseed dev --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
+		examples: ['treeseed dev', 'treeseed dev --reset', 'treeseed dev --reset --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
 		help: {
 			longSummary: [
 				'Dev starts the unified local Treeseed runtime as a foreground supervisor so you can work against the integrated web, API, and supporting local surfaces.',
@@ -1106,10 +1107,13 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			beforeYouRun: [
 				'Run from the tenant or workspace root you want to develop.',
 				'Use `--plan --json` when you want to inspect commands, setup steps, readiness checks, and watched paths without starting services.',
+				'Use `--reset` when you want a fresh local D1 database, Mailpit inbox, generated worker bundle, and Wrangler temp output without deleting configuration.',
 				'Keep the foreground process running while you test. Press Ctrl+C to stop the supervised stack and free the local ports.',
 			],
 			examples: [
 				example('treeseed dev', 'Start integrated local development', 'Run the default integrated local runtime and keep supervising it in the foreground.'),
+				example('treeseed dev --reset', 'Start from a fresh local runtime', 'Clear disposable local dev state, rerun setup and D1 migrations, then start the dev supervisor.'),
+				example('treeseed dev --reset --plan --json', 'Inspect reset actions', 'Emit the reset, setup, readiness, command, and watch plan without deleting local state or starting services.'),
 				example('treeseed dev --plan --json', 'Inspect the runtime plan', 'Emit a structured plan with setup steps, commands, ports, URLs, readiness checks, and watch entries.'),
 				example('treeseed dev --surface web --port 4322 --open off', 'Run only the web surface', 'Start the Astro UI on a specific port without opening a browser.'),
 				example('trsd dev', 'Use the short alias', 'Start the same local runtime through the shorter entrypoint.'),

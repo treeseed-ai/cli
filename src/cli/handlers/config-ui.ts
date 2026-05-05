@@ -482,7 +482,9 @@ function buildStartupDetailLines(step: ConfigWizardStep | null, draftValue: stri
 		`Pending value: ${formatDisplayValue(step, draftValue, '(unset)')}`,
 		'',
 		step.entry.description || 'Treeseed needs this value to complete setup.',
-		`How to get it: ${step.entry.howToGet || 'Use the suggested/default value if it matches your setup.'}`,
+		'',
+		'How to get it:',
+		...(step.entry.howToGet || 'Use the suggested/default value if it matches your setup.').split('\n'),
 	];
 }
 
@@ -501,7 +503,9 @@ function buildFullDetailLines(page: ConfigPage | null, draftValue: string) {
 		`Pending: ${formatDisplayValue(page, draftValue, '(unset)')}`,
 		'',
 		page.entry.description || '(no description)',
-		`Get it: ${page.entry.howToGet || '(no extra setup guidance)'}`,
+		'',
+		'How to get it:',
+		...(page.entry.howToGet || '(no extra setup guidance)').split('\n'),
 	];
 }
 

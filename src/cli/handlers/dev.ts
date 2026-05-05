@@ -76,6 +76,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardStringOption('feedback', '--feedback');
 		forwardStringOption('open', '--open');
 		forwardBooleanOption('plan', '--plan');
+		forwardBooleanOption('reset', '--reset');
 		forwardBooleanOption('json', '--json');
 		const workspaceRoot = findNearestTreeseedWorkspaceRoot(context.cwd);
 		const workspaceLinksMode = typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined;
