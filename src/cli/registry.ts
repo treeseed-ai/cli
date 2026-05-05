@@ -11,6 +11,7 @@ import { handleSave } from './handlers/save.js';
 import { handleRelease } from './handlers/release.js';
 import { handleDestroy } from './handlers/destroy.js';
 import { handleStatus } from './handlers/status.js';
+import { handleCi } from './handlers/ci.js';
 import { handleDev } from './handlers/dev.js';
 import { handleDoctor } from './handlers/doctor.js';
 import { handleRollback } from './handlers/rollback.js';
@@ -45,6 +46,7 @@ export const COMMAND_HANDLERS = {
 	release: handleRelease,
 	destroy: handleDestroy,
 	status: handleStatus,
+	ci: handleCi,
 	dev: handleDev,
 	'dev:watch': handleDev,
 	doctor: handleDoctor,

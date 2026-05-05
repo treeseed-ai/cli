@@ -61,6 +61,7 @@ const DEV_RUNTIME_OPTIONS: TreeseedCommandOptionSpec[] = [
 	{ name: 'feedback', flags: '--feedback <mode>', description: 'Control live feedback, service restarts, and browser reload stamps.', kind: 'enum', values: ['live', 'restart', 'off'] },
 	{ name: 'open', flags: '--open <mode>', description: 'Control whether dev opens the browser after readiness.', kind: 'enum', values: ['auto', 'on', 'off'] },
 	{ name: 'plan', flags: '--plan', description: 'Print the dev runtime plan and exit without starting services.', kind: 'boolean' },
+	{ name: 'reset', flags: '--reset', description: 'Clear local dev runtime state before setup, migrations, and service startup.', kind: 'boolean' },
 	{ name: 'json', flags: '--json', description: 'Emit structured JSON or newline-delimited dev events.', kind: 'boolean' },
 	{ name: 'watch', flags: '--watch', description: 'Enable live watch behavior. `dev` defaults to live feedback; this remains for compatibility.', kind: 'boolean' },
 	{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
@@ -235,6 +236,56 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		},
 		executionMode: 'handler',
 		handlerName: 'status',
+	})],
+	['ci', command({
+		options: [
+			{ name: 'failed', flags: '--failed', description: 'Focus human output on failures and attention-needed workflows.', kind: 'boolean' },
+			{ name: 'logs', flags: '--logs', description: 'Fetch capped log excerpts for failed jobs.', kind: 'boolean' },
+			{ name: 'logLines', flags: '--log-lines <n>', description: 'Maximum failed-job log lines to include with --logs.', kind: 'string' },
+			{ name: 'scope', flags: '--scope <scope>', description: 'Select workspace, root, or package repositories.', kind: 'enum', values: ['workspace', 'root', 'packages'] },
+			{ name: 'workflow', flags: '--workflow <file>', description: 'Inspect a specific workflow file. May be repeated.', kind: 'string', repeatable: true },
+			{ name: 'branch', flags: '--branch <name>', description: 'Inspect this branch name in all selected repositories.', kind: 'string' },
+			{ name: 'strict', flags: '--strict', description: 'Return nonzero for pending workflows as well as failures.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed ci', 'treeseed ci --failed', 'treeseed ci --logs --log-lines 50', 'treeseed ci --scope packages --workflow verify.yml --json'],
+		help: {
+			workflowPosition: 'inspect',
+			longSummary: [
+				'CI inspects the remote GitHub Actions runs for the current branch heads in market and checked-out package repositories.',
+				'It is read-only and is designed for quickly finding failed hosted verification without digging through GitHub UI pages.',
+			],
+			whenToUse: [
+				'Use this after `save`, `stage`, or a pushed package change when you need the latest remote verification state.',
+				'Use `--failed` when you only want attention items, or `--logs` when you want failed-job excerpts inline.',
+			],
+			beforeYouRun: [
+				'Run from the Treeseed workspace you want to inspect.',
+				'Make sure the branch heads you care about have been pushed; unpushed heads are reported as not pushed.',
+				'Use `--json` for agent or script consumption.',
+			],
+			outcomes: [
+				'Lists passing, pending, missing, not-pushed, and failing GitHub Actions workflows.',
+				'Shows failed jobs, failed steps when GitHub provides them, workflow URLs, and inspect commands.',
+			],
+			examples: [
+				example('treeseed ci', 'Inspect workspace CI', 'Check market and checked-out package workflows for the active branch heads.'),
+				example('treeseed ci --failed', 'Focus on failures', 'Show only failed and attention-needed workflows in human output.'),
+				example('treeseed ci --logs --log-lines 50', 'Include failed logs', 'Fetch compact failed-job log excerpts while keeping output bounded.'),
+				example('treeseed ci --scope packages --json', 'Automate package CI checks', 'Emit structured package workflow status for agents and scripts.'),
+			],
+			automationNotes: [
+				'`--json` includes the full repository list plus a flattened `failures` array.',
+				'The command is read-only; it does not wait, rerun, or mutate GitHub Actions runs.',
+			],
+			relatedDetails: [
+				related('status', 'Use `status` for local workspace health before inspecting hosted CI.'),
+				related('save', 'Use `save` before CI inspection when local changes need to be pushed.'),
+				related('stage', 'Use `stage` after hosted CI is healthy and the task is ready for staging.'),
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'ci',
 	})],
 	['tasks', command({
 		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
@@ -1097,7 +1148,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	})],
 	['dev', command({
 		options: DEV_RUNTIME_OPTIONS,
-		examples: ['treeseed dev', 'treeseed dev --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
+		examples: ['treeseed dev', 'treeseed dev --reset', 'treeseed dev --reset --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
 		help: {
 			longSummary: [
 				'Dev starts the unified local Treeseed runtime as a foreground supervisor so you can work against the integrated web, API, and supporting local surfaces.',
@@ -1106,10 +1157,13 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			beforeYouRun: [
 				'Run from the tenant or workspace root you want to develop.',
 				'Use `--plan --json` when you want to inspect commands, setup steps, readiness checks, and watched paths without starting services.',
+				'Use `--reset` when you want a fresh local D1 database, Mailpit inbox, generated worker bundle, and Wrangler temp output without deleting configuration.',
 				'Keep the foreground process running while you test. Press Ctrl+C to stop the supervised stack and free the local ports.',
 			],
 			examples: [
 				example('treeseed dev', 'Start integrated local development', 'Run the default integrated local runtime and keep supervising it in the foreground.'),
+				example('treeseed dev --reset', 'Start from a fresh local runtime', 'Clear disposable local dev state, rerun setup and D1 migrations, then start the dev supervisor.'),
+				example('treeseed dev --reset --plan --json', 'Inspect reset actions', 'Emit the reset, setup, readiness, command, and watch plan without deleting local state or starting services.'),
 				example('treeseed dev --plan --json', 'Inspect the runtime plan', 'Emit a structured plan with setup steps, commands, ports, URLs, readiness checks, and watch entries.'),
 				example('treeseed dev --surface web --port 4322 --open off', 'Run only the web surface', 'Start the Astro UI on a specific port without opening a browser.'),
 				example('trsd dev', 'Use the short alias', 'Start the same local runtime through the shorter entrypoint.'),

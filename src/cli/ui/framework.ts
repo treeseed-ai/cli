@@ -205,7 +205,7 @@ type AppFrameProps = {
 	footer: React.ReactNode;
 };
 
-export function AppFrame(props: AppFrameProps) {
+export function AppFrame(props: AppFrameProps): React.ReactElement {
 	return React.createElement(
 		Box,
 		{ flexDirection: 'column', width: props.layout.columns, height: props.layout.totalHeight, overflow: 'hidden' },
@@ -224,7 +224,7 @@ type TopTabsProps = {
 	prefix?: string;
 };
 
-export function TopTabs(props: TopTabsProps) {
+export function TopTabs(props: TopTabsProps): React.ReactElement {
 	const line = `${props.prefix ?? ''}${props.items.map((item) => item.id === props.activeId ? `[${item.label}]` : item.label).join(' ')}`;
 	return React.createElement(Text, {
 		color: props.focused ? 'black' : 'cyan',
@@ -241,7 +241,7 @@ type SidebarListProps = {
 	title?: string;
 };
 
-export function SidebarList(props: SidebarListProps) {
+export function SidebarList(props: SidebarListProps): React.ReactElement {
 	const topIndicator = props.scrollState && props.scrollState.offset > 0 ? '↑ more' : '';
 	const bottomIndicator = props.scrollState && props.scrollState.offset + props.scrollState.viewportSize < props.scrollState.totalSize
 		? '↓ more'
@@ -291,7 +291,7 @@ type ScrollPanelProps = {
 	scrollState?: ScrollRegionState;
 };
 
-export function ScrollPanel(props: ScrollPanelProps) {
+export function ScrollPanel(props: ScrollPanelProps): React.ReactElement {
 	const headerRows = props.title ? 1 : 0;
 	const footerRows = props.scrollState ? 1 : 0;
 	const contentRows = Math.max(1, props.height - 2 - headerRows - footerRows);
@@ -329,7 +329,7 @@ type FieldCardProps = {
 	focused?: boolean;
 };
 
-export function FieldCard(props: FieldCardProps) {
+export function FieldCard(props: FieldCardProps): React.ReactElement {
 	return React.createElement(
 		Box,
 		{ flexDirection: 'column', width: props.width, height: props.height, borderStyle: 'round', borderColor: props.focused ? 'cyan' : 'blue', overflow: 'hidden' },
@@ -354,7 +354,7 @@ type TextInputFieldProps = {
 	helperText?: string;
 };
 
-function renderTextInputContent(props: TextInputFieldProps) {
+function renderTextInputContent(props: TextInputFieldProps): React.ReactElement {
 	const safeCursor = Math.max(0, Math.min(props.cursorPosition ?? props.value.length, props.value.length));
 	const placeholder = props.placeholder ?? '';
 	const contentWidth = Math.max(1, props.width - 2);
@@ -380,7 +380,7 @@ function renderTextInputContent(props: TextInputFieldProps) {
 	);
 }
 
-export function TextInputField(props: TextInputFieldProps) {
+export function TextInputField(props: TextInputFieldProps): React.ReactElement {
 	const height = props.height ?? 4;
 	const placeholder = props.placeholder ?? '';
 	const helperText = props.helperText ?? (props.value.length > 0
@@ -403,7 +403,7 @@ type TextAreaFieldProps = {
 	focused?: boolean;
 };
 
-export function TextAreaField(props: TextAreaFieldProps) {
+export function TextAreaField(props: TextAreaFieldProps): React.ReactElement {
 	return React.createElement(FieldCard, {
 		width: props.width,
 		height: props.height,
@@ -420,7 +420,7 @@ type ButtonProps = {
 	width?: number;
 };
 
-function ActionButton(props: ButtonProps & { tone: 'primary' | 'secondary' }) {
+function ActionButton(props: ButtonProps & { tone: 'primary' | 'secondary' }): React.ReactElement {
 	const color = props.tone === 'primary' ? 'black' : 'white';
 	const backgroundColor = props.tone === 'primary' ? 'green' : 'gray';
 	return React.createElement(
@@ -433,11 +433,11 @@ function ActionButton(props: ButtonProps & { tone: 'primary' | 'secondary' }) {
 	);
 }
 
-export function PrimaryButton(props: ButtonProps) {
+export function PrimaryButton(props: ButtonProps): React.ReactElement {
 	return React.createElement(ActionButton, { ...props, tone: 'primary' });
 }
 
-export function SecondaryButton(props: ButtonProps) {
+export function SecondaryButton(props: ButtonProps): React.ReactElement {
 	return React.createElement(ActionButton, { ...props, tone: 'secondary' });
 }
 
@@ -448,7 +448,7 @@ type StatusBarProps = {
 	accent?: boolean;
 };
 
-export function StatusBar(props: StatusBarProps) {
+export function StatusBar(props: StatusBarProps): React.ReactElement {
 	return React.createElement(
 		Box,
 		{ flexDirection: 'column', width: props.width, overflow: 'hidden' },
@@ -457,7 +457,7 @@ export function StatusBar(props: StatusBarProps) {
 	);
 }
 
-export function EmptyState(props: { width: number; height: number; title: string; message: string }) {
+export function EmptyState(props: { width: number; height: number; title: string; message: string }): React.ReactElement {
 	return React.createElement(
 		FieldCard,
 		{
