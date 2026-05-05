@@ -221,6 +221,16 @@ test('recover help documents stale run pruning', async () => {
 	assert.match(result.output, /stale/i);
 });
 
+test('ci help documents hosted workflow inspection options', async () => {
+	const result = await runCli(['help', 'ci']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /treeseed ci/);
+	assert.match(result.output, /--failed/);
+	assert.match(result.output, /--logs/);
+	assert.match(result.output, /--log-lines/);
+	assert.match(result.output, /read-only/i);
+});
+
 test('unknown command suggests nearest valid commands', async () => {
 	const result = await runCli(['relase']);
 	assert.equal(result.exitCode, 1);

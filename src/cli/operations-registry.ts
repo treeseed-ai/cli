@@ -237,6 +237,56 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		executionMode: 'handler',
 		handlerName: 'status',
 	})],
+	['ci', command({
+		options: [
+			{ name: 'failed', flags: '--failed', description: 'Focus human output on failures and attention-needed workflows.', kind: 'boolean' },
+			{ name: 'logs', flags: '--logs', description: 'Fetch capped log excerpts for failed jobs.', kind: 'boolean' },
+			{ name: 'logLines', flags: '--log-lines <n>', description: 'Maximum failed-job log lines to include with --logs.', kind: 'string' },
+			{ name: 'scope', flags: '--scope <scope>', description: 'Select workspace, root, or package repositories.', kind: 'enum', values: ['workspace', 'root', 'packages'] },
+			{ name: 'workflow', flags: '--workflow <file>', description: 'Inspect a specific workflow file. May be repeated.', kind: 'string', repeatable: true },
+			{ name: 'branch', flags: '--branch <name>', description: 'Inspect this branch name in all selected repositories.', kind: 'string' },
+			{ name: 'strict', flags: '--strict', description: 'Return nonzero for pending workflows as well as failures.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed ci', 'treeseed ci --failed', 'treeseed ci --logs --log-lines 50', 'treeseed ci --scope packages --workflow verify.yml --json'],
+		help: {
+			workflowPosition: 'inspect',
+			longSummary: [
+				'CI inspects the remote GitHub Actions runs for the current branch heads in market and checked-out package repositories.',
+				'It is read-only and is designed for quickly finding failed hosted verification without digging through GitHub UI pages.',
+			],
+			whenToUse: [
+				'Use this after `save`, `stage`, or a pushed package change when you need the latest remote verification state.',
+				'Use `--failed` when you only want attention items, or `--logs` when you want failed-job excerpts inline.',
+			],
+			beforeYouRun: [
+				'Run from the Treeseed workspace you want to inspect.',
+				'Make sure the branch heads you care about have been pushed; unpushed heads are reported as not pushed.',
+				'Use `--json` for agent or script consumption.',
+			],
+			outcomes: [
+				'Lists passing, pending, missing, not-pushed, and failing GitHub Actions workflows.',
+				'Shows failed jobs, failed steps when GitHub provides them, workflow URLs, and inspect commands.',
+			],
+			examples: [
+				example('treeseed ci', 'Inspect workspace CI', 'Check market and checked-out package workflows for the active branch heads.'),
+				example('treeseed ci --failed', 'Focus on failures', 'Show only failed and attention-needed workflows in human output.'),
+				example('treeseed ci --logs --log-lines 50', 'Include failed logs', 'Fetch compact failed-job log excerpts while keeping output bounded.'),
+				example('treeseed ci --scope packages --json', 'Automate package CI checks', 'Emit structured package workflow status for agents and scripts.'),
+			],
+			automationNotes: [
+				'`--json` includes the full repository list plus a flattened `failures` array.',
+				'The command is read-only; it does not wait, rerun, or mutate GitHub Actions runs.',
+			],
+			relatedDetails: [
+				related('status', 'Use `status` for local workspace health before inspecting hosted CI.'),
+				related('save', 'Use `save` before CI inspection when local changes need to be pushed.'),
+				related('stage', 'Use `stage` after hosted CI is healthy and the task is ready for staging.'),
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'ci',
+	})],
 	['tasks', command({
 		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
 		examples: ['treeseed tasks', 'treeseed tasks --json'],
