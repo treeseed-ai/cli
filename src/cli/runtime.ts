@@ -393,7 +393,19 @@ function formatProjectError(spec: TreeseedOperationSpec) {
 }
 
 function commandNeedsProjectRoot(spec: TreeseedOperationSpec) {
-	return spec.name !== 'init' && spec.name !== 'export' && spec.name !== 'install';
+	return !new Set([
+		'init',
+		'export',
+		'install',
+		'auth:login',
+		'auth:logout',
+		'auth:whoami',
+		'market',
+		'teams',
+		'projects',
+		'packs',
+		'template',
+	]).has(spec.name);
 }
 
 export function resolveTreeseedCommandCwd(spec: TreeseedOperationSpec, cwd: string) {

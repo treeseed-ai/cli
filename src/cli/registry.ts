@@ -20,6 +20,10 @@ import { handleSync } from './handlers/sync.js';
 import { handleAuthLogin } from './handlers/auth-login.js';
 import { handleAuthLogout } from './handlers/auth-logout.js';
 import { handleAuthWhoAmI } from './handlers/auth-whoami.js';
+import { handleMarket } from './handlers/market.js';
+import { handleTeams } from './handlers/teams.js';
+import { handleProjects } from './handlers/projects.js';
+import { handlePacks } from './handlers/packs.js';
 import {
 	handleSecretsLock,
 	handleSecretsMigrateKey,
@@ -65,6 +69,10 @@ export const COMMAND_HANDLERS = {
 	'auth:login': handleAuthLogin,
 	'auth:logout': handleAuthLogout,
 	'auth:whoami': handleAuthWhoAmI,
+	market: handleMarket,
+	teams: handleTeams,
+	projects: handleProjects,
+	packs: handlePacks,
 	'secrets:status': handleSecretsStatus,
 	'secrets:unlock': handleSecretsUnlock,
 	'secrets:lock': handleSecretsLock,
