@@ -1,11 +1,10 @@
 import type { TreeseedCommandHandler } from '../types.js';
-import { RemoteTreeseedAuthClient, RemoteTreeseedClient } from '@treeseed/sdk/remote';
 import {
-	resolveTreeseedRemoteConfig,
-	setTreeseedRemoteSession,
-	TreeseedKeyAgentError,
-} from '@treeseed/sdk/workflow-support';
+	setMarketSession,
+} from '@treeseed/sdk/market-client';
+import { TreeseedKeyAgentError } from '@treeseed/sdk/workflow-support';
 import { guidedResult } from './utils.js';
+import { createMarketClientForInvocation, marketAuthRoot } from './market-utils.js';
 
 function sleep(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -13,16 +12,11 @@ function sleep(ms: number) {
 
 export const handleAuthLogin: TreeseedCommandHandler = async (invocation, context) => {
 	try {
-		const tenantRoot = context.cwd;
-		const remoteConfig = resolveTreeseedRemoteConfig(tenantRoot, context.env);
-		const hostId = typeof invocation.args.host === 'string' ? invocation.args.host : remoteConfig.activeHostId;
-		const client = new RemoteTreeseedAuthClient(new RemoteTreeseedClient({
-			...remoteConfig,
-			activeHostId: hostId,
-		}));
-		const started = await client.startDeviceFlow({
+		const tenantRoot = marketAuthRoot(context);
+		const { profile, client } = createMarketClientForInvocation(invocation, context);
+		const started = await client.startDeviceLogin({
 			clientName: 'treeseed-cli',
-			scopes: ['auth:me', 'sdk', 'operations'],
+			scopes: ['auth:me', 'market'],
 		});
 
 		if (context.outputFormat !== 'json') {
@@ -33,10 +27,10 @@ export const handleAuthLogin: TreeseedCommandHandler = async (invocation, contex
 
 		const deadline = Date.parse(started.expiresAt);
 		while (Date.now() < deadline) {
-			const response = await client.pollDeviceFlow({ deviceCode: started.deviceCode });
+			const response = await client.pollDeviceLogin({ deviceCode: started.deviceCode });
 			if (response.ok && response.status === 'approved') {
-				setTreeseedRemoteSession(tenantRoot, {
-					hostId,
+				setMarketSession(tenantRoot, {
+					marketId: profile.id,
 					accessToken: response.accessToken,
 					refreshToken: response.refreshToken,
 					expiresAt: response.expiresAt,
@@ -46,12 +40,14 @@ export const handleAuthLogin: TreeseedCommandHandler = async (invocation, contex
 					command: 'auth:login',
 					summary: 'Treeseed API login completed successfully.',
 					facts: [
-						{ label: 'Host', value: hostId },
+						{ label: 'Market', value: profile.id },
+						{ label: 'URL', value: profile.baseUrl },
 						{ label: 'Principal', value: response.principal.displayName ?? response.principal.id },
 						{ label: 'Scopes', value: response.principal.scopes.join(', ') },
 					],
 					report: {
-						hostId,
+						marketId: profile.id,
+						baseUrl: profile.baseUrl,
 						principal: response.principal,
 					},
 				});

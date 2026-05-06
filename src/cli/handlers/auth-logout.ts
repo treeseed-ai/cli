@@ -1,22 +1,27 @@
 import type { TreeseedCommandHandler } from '../types.js';
 import {
-	clearTreeseedRemoteSession,
-	resolveTreeseedRemoteConfig,
 	TreeseedKeyAgentError,
 } from '@treeseed/sdk/workflow-support';
+import { clearMarketSession } from '@treeseed/sdk/market-client';
 import { guidedResult } from './utils.js';
+import { createMarketClientForInvocation, marketAuthRoot } from './market-utils.js';
 
 export const handleAuthLogout: TreeseedCommandHandler = async (invocation, context) => {
 	try {
-		const tenantRoot = context.cwd;
-		const remoteConfig = resolveTreeseedRemoteConfig(tenantRoot, context.env);
-		const hostId = typeof invocation.args.host === 'string' ? invocation.args.host : remoteConfig.activeHostId;
-		clearTreeseedRemoteSession(tenantRoot, hostId);
+		const tenantRoot = marketAuthRoot(context);
+		const { profile, client, session } = createMarketClientForInvocation(invocation, context);
+		if (session?.accessToken) {
+			await client.logout().catch(() => null);
+		}
+		clearMarketSession(tenantRoot, profile.id);
 		return guidedResult({
 			command: 'auth:logout',
 			summary: 'Cleared the local Treeseed API session.',
-			facts: [{ label: 'Host', value: hostId }],
-			report: { hostId },
+			facts: [
+				{ label: 'Market', value: profile.id },
+				{ label: 'URL', value: profile.baseUrl },
+			],
+			report: { marketId: profile.id, baseUrl: profile.baseUrl },
 		});
 	} catch (error) {
 		if (error instanceof TreeseedKeyAgentError) {
