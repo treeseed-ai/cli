@@ -90,7 +90,8 @@ function statusFacts(state: Record<string, any>, live: boolean) {
 export const handleStatus: TreeseedCommandHandler = async (invocation, context) => {
 	try {
 		const live = invocation.args.live === true;
-		const result = await createWorkflowSdk(context).status({ live });
+		const history = invocation.args.history === 'all' ? 'all' : 'recent';
+		const result = await createWorkflowSdk(context).status({ live, history });
 		const state = result.payload as Record<string, any>;
 		const nextSteps = renderWorkflowNextSteps(result);
 		const report = {

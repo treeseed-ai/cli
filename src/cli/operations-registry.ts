@@ -198,8 +198,9 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		options: [
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 			{ name: 'live', flags: '--live', description: 'Run read-only provider connectivity checks and include the results in status.', kind: 'boolean' },
+			{ name: 'history', flags: '--history <mode>', description: 'Control obsolete workflow history detail in status output.', kind: 'enum', values: ['recent', 'all'] },
 		],
-		examples: ['treeseed status', 'treeseed status --json', 'treeseed status --live'],
+		examples: ['treeseed status', 'treeseed status --json', 'treeseed status --live', 'treeseed status --history all --json'],
 		help: {
 			workflowPosition: 'inspect',
 			longSummary: [
@@ -223,6 +224,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				example('treeseed status', 'Check the current task state', 'Show the current branch role and project health in human-readable form.'),
 				example('treeseed status --json', 'Feed an agent or script', 'Emit structured status data for automation and external tooling.'),
 				example('treeseed status --live', 'Check provider connectivity', 'Include read-only GitHub, Cloudflare, and Railway identity checks in the status report.'),
+				example('treeseed status --history all --json', 'Inspect full workflow history', 'Include every obsolete workflow run instead of the default recent cap.'),
 				example('trsd status', 'Use the short alias', 'Run the same status inspection path through the shorter CLI entrypoint.'),
 			],
 			automationNotes: [
