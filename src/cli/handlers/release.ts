@@ -71,6 +71,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
+			fresh: invocation.args.fresh === true,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 		});
@@ -93,6 +94,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			blockers?: string[];
 			finalBranch?: string;
 			ciMode?: string;
+			fresh?: boolean;
 			workflowGates?: Array<Record<string, unknown>>;
 			worktreePath?: string | null;
 		};
@@ -119,6 +121,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: result.executionMode === 'plan' ? 'Packages planned' : 'Released packages', value: String((payload.touchedPackages ?? payload.packageSelection.selected).length) },
 				{ label: 'Publish waits', value: result.executionMode === 'plan' ? String(plannedPublishes) : String(completedPublishes) },
 				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },
+				{ label: 'Fresh release', value: payload.fresh === true ? 'yes' : 'no' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? (result.executionMode === 'plan' ? payload.stagingBranch : '(unknown)') },

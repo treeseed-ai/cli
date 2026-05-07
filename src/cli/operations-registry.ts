@@ -527,9 +527,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['recover', command({
 		options: [
 			{ name: 'pruneStale', flags: '--prune-stale', description: 'Archive stale interrupted runs that are no longer safe to resume.', kind: 'boolean' },
+			{ name: 'obsolete', flags: '--obsolete <run-id>', description: 'Mark one failed workflow run obsolete so it will not be auto-resumed.', kind: 'string' },
+			{ name: 'reason', flags: '--reason <text>', description: 'Reason to store when marking a workflow run obsolete.', kind: 'string' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed recover', 'treeseed recover --json', 'treeseed recover --prune-stale --json'],
+		examples: ['treeseed recover', 'treeseed recover --json', 'treeseed recover --prune-stale --json', 'treeseed recover --obsolete release-abcd12 --reason "superseded by new staging save"'],
 		help: {
 			workflowPosition: 'recover',
 			longSummary: [
@@ -1069,11 +1071,12 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
 			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+			{ name: 'fresh', flags: '--fresh', description: 'Start a new release instead of auto-resuming stale failed release runs.', kind: 'boolean' },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive release plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed release --patch', 'treeseed release --minor', 'treeseed release --patch --plan'],
+		examples: ['treeseed release --patch', 'treeseed release --minor', 'treeseed release --patch --fresh', 'treeseed release --patch --plan'],
 		notes: ['Requires exactly one bump flag.'],
 		help: {
 			workflowPosition: 'promote to production',
