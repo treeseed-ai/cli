@@ -24,6 +24,7 @@ import { handleMarket } from './handlers/market.js';
 import { handleTeams } from './handlers/teams.js';
 import { handleProjects } from './handlers/projects.js';
 import { handlePacks } from './handlers/packs.js';
+import { handleToolWrapper } from './handlers/tool-wrapper.js';
 import {
 	handleSecretsLock,
 	handleSecretsMigrateKey,
@@ -35,6 +36,7 @@ import {
 import { handleTasks } from './handlers/tasks.js';
 import { handleSwitch } from './handlers/switch.js';
 import { handleStage } from './handlers/stage.js';
+import { handleTagsCleanup } from './handlers/tags-cleanup.js';
 import { handleExport } from './handlers/export.js';
 import { handleResume } from './handlers/resume.js';
 import { handleRecover } from './handlers/recover.js';
@@ -60,6 +62,7 @@ export const COMMAND_HANDLERS = {
 	tasks: handleTasks,
 	switch: handleSwitch,
 	stage: handleStage,
+	'tags:cleanup': handleTagsCleanup,
 	resume: handleResume,
 	recover: handleRecover,
 	[workspaceCommand('status')]: handleWorkspace,
@@ -73,6 +76,9 @@ export const COMMAND_HANDLERS = {
 	teams: handleTeams,
 	projects: handleProjects,
 	packs: handlePacks,
+	gh: handleToolWrapper,
+	railway: handleToolWrapper,
+	wrangler: handleToolWrapper,
 	'secrets:status': handleSecretsStatus,
 	'secrets:unlock': handleSecretsUnlock,
 	'secrets:lock': handleSecretsLock,

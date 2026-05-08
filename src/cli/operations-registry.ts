@@ -154,7 +154,7 @@ function genericWarnings(spec: TreeseedOperationSpec): string[] {
 	if (spec.name === 'release') {
 		warnings.push('Release operations assume staging is the source of truth for what should move to production. Treat version bumps and promotion as deliberate release events.');
 	}
-	if (spec.executionMode === 'passthrough') {
+	if (spec.group === 'Passthrough') {
 		warnings.push('This command forwards to another CLI surface. Flags after `--` or positional forwarding may follow the target tool semantics rather than Treeseed-specific semantics.');
 	}
 	return warnings;
@@ -192,6 +192,10 @@ function mergeHelpSpec(metadata: TreeseedOperationMetadata, overlay: CommandOver
 }
 
 const PASS_THROUGH_ARGS = (invocation: TreeseedParsedInvocation) => ({ args: invocation.rawArgs });
+
+const TOOL_WRAPPER_OPTIONS: TreeseedCommandOptionSpec[] = [
+	{ name: 'environment', flags: '--environment <scope>', description: 'Treeseed environment scope used to decrypt and inject provider credentials.', kind: 'enum', values: ['local', 'staging', 'prod'] },
+];
 
 const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['status', command({
@@ -500,6 +504,43 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		},
 		executionMode: 'handler',
 		handlerName: 'stage',
+	})],
+	['tags:cleanup', command({
+		usage: 'treeseed tags:cleanup [--plan|--dry-run] [--include-packages <names>] [--branch-scope <staging|preview|all>] [--json]',
+		options: [
+			{ name: 'plan', flags: '--plan', description: 'Compute stale dev tag cleanup without deleting tags.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'includePackages', flags: '--include-packages <names>', description: 'Comma-separated package names to inspect.', kind: 'string' },
+			{ name: 'branchScope', flags: '--branch-scope <scope>', description: 'Limit cleanup to staging tags, preview tags, or all dev branch tags.', kind: 'enum', values: ['staging', 'preview', 'all'] },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed tags:cleanup --plan', 'treeseed tags:cleanup --branch-scope staging', 'treeseed tags:cleanup --include-packages @treeseed/sdk,@treeseed/core --json'],
+		notes: ['Only deletes Treeseed-managed package dev tags older than each package current version line.'],
+		help: {
+			workflowPosition: 'maintain workspace',
+			longSummary: [
+				'Tags cleanup removes stale Treeseed-managed package dev tags from staging and preview branch saves.',
+			],
+			whenToUse: [
+				'Use this when old staging or preview package tags have accumulated after many saves and releases.',
+				'Use `--plan` first to inspect exactly which tags would be removed.',
+			],
+			outcomes: [
+				'Plans or deletes stale local and origin package dev tags.',
+				'Preserves current-version dev tags, active dependency references, stable release tags, and non-Treeseed tags.',
+			],
+			examples: [
+				example('treeseed tags:cleanup --plan', 'Inspect cleanup', 'Show stale tag candidates without deleting anything.'),
+				example('treeseed tags:cleanup --branch-scope preview', 'Clean preview tags', 'Delete stale non-staging branch dev tags while leaving staging dev tags alone.'),
+				example('treeseed tags:cleanup --json', 'Automate cleanup', 'Emit structured per-repository cleanup counts and skipped reasons.'),
+			],
+			relatedDetails: [
+				related('release', 'Release also runs safe dev tag cleanup after successful stable promotion.'),
+				related('status', 'Use `status` to inspect workspace alignment before maintenance.'),
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'tags:cleanup',
 	})],
 	['resume', command({
 		arguments: [{ name: 'run-id', description: 'Interrupted workflow run id to resume.', required: true }],
@@ -1263,6 +1304,78 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 ]);
 
 const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
+	{
+		id: 'tools.gh',
+		name: 'gh',
+		aliases: [],
+		group: 'Passthrough',
+		summary: 'Run the managed GitHub CLI with Treeseed environment credentials.',
+		description: 'Decrypt Treeseed machine configuration for the selected environment and pass it to the managed GitHub CLI.',
+		provider: 'default',
+		related: ['tools', 'install', 'config'],
+		usage: 'treeseed gh [--environment staging] -- <gh-args>',
+		arguments: [{ name: 'args', description: 'Arguments forwarded to GitHub CLI.', required: false }],
+		options: TOOL_WRAPPER_OPTIONS,
+		examples: ['treeseed gh --environment staging -- run list --limit 5', 'treeseed gh -- repo view'],
+		help: {
+			longSummary: ['The GitHub wrapper resolves the Treeseed-managed `gh` executable, decrypts scoped machine configuration, and passes the resulting GitHub token only to the child process environment.'],
+			whenToUse: ['Use this when provider auth lives in Treeseed machine config rather than your shell environment.'],
+			beforeYouRun: ['Run from a Treeseed project. Use `--environment staging` unless you intentionally need local or production credentials.'],
+			automationNotes: ['Use `--` before target CLI flags when a flag could be parsed by Treeseed itself. The wrapper does not print decrypted secrets.'],
+		},
+		helpVisible: true,
+		helpFeatured: false,
+		executionMode: 'handler',
+		handlerName: 'gh',
+	},
+	{
+		id: 'tools.railway',
+		name: 'railway',
+		aliases: [],
+		group: 'Passthrough',
+		summary: 'Run the managed Railway CLI with Treeseed environment credentials.',
+		description: 'Decrypt Treeseed machine configuration for the selected environment and pass it to the managed Railway CLI.',
+		provider: 'default',
+		related: ['tools', 'install', 'config'],
+		usage: 'treeseed railway [--environment staging] -- <railway-args>',
+		arguments: [{ name: 'args', description: 'Arguments forwarded to Railway CLI.', required: false }],
+		options: TOOL_WRAPPER_OPTIONS,
+		examples: ['treeseed railway --environment staging -- whoami', 'treeseed railway --environment staging -- status'],
+		help: {
+			longSummary: ['The Railway wrapper resolves the Treeseed-managed Railway executable, decrypts scoped machine configuration, and passes the resulting Railway token only to the child process environment.'],
+			whenToUse: ['Use this to debug Railway projects and service builds with the same decrypted `RAILWAY_API_TOKEN` Treeseed deploys use.'],
+			beforeYouRun: ['Run from a Treeseed project. Use `--environment staging` when inspecting staging deployments.'],
+			automationNotes: ['Use `--` before target CLI flags when a flag could be parsed by Treeseed itself. The wrapper does not print decrypted secrets.'],
+		},
+		helpVisible: true,
+		helpFeatured: false,
+		executionMode: 'handler',
+		handlerName: 'railway',
+	},
+	{
+		id: 'tools.wrangler',
+		name: 'wrangler',
+		aliases: [],
+		group: 'Passthrough',
+		summary: 'Run the managed Wrangler CLI with Treeseed environment credentials.',
+		description: 'Decrypt Treeseed machine configuration for the selected environment and pass it to the managed Wrangler CLI.',
+		provider: 'default',
+		related: ['tools', 'install', 'config'],
+		usage: 'treeseed wrangler [--environment staging] -- <wrangler-args>',
+		arguments: [{ name: 'args', description: 'Arguments forwarded to Wrangler CLI.', required: false }],
+		options: TOOL_WRAPPER_OPTIONS,
+		examples: ['treeseed wrangler --environment staging -- whoami', 'treeseed wrangler --environment staging -- d1 list'],
+		help: {
+			longSummary: ['The Wrangler wrapper resolves the Treeseed-managed Wrangler executable, decrypts scoped machine configuration, and passes the resulting Cloudflare token and account settings only to the child process environment.'],
+			whenToUse: ['Use this to debug Cloudflare resources with the same decrypted `CLOUDFLARE_API_TOKEN` and account settings Treeseed deploys use.'],
+			beforeYouRun: ['Run from a Treeseed project. Use `--environment staging` when inspecting staging resources.'],
+			automationNotes: ['Use `--` before target CLI flags when a flag could be parsed by Treeseed itself. The wrapper does not print decrypted secrets.'],
+		},
+		helpVisible: true,
+		helpFeatured: false,
+		executionMode: 'handler',
+		handlerName: 'wrangler',
+	},
 	{
 		id: 'market.registry',
 		name: 'market',

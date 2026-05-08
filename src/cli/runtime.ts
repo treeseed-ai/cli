@@ -26,6 +26,15 @@ function isHelpFlag(value: string | undefined) {
 	return value === '--help' || value === '-h';
 }
 
+function shouldRenderCommandHelp(spec: TreeseedOperationSpec, argv: string[]) {
+	if (spec.group !== 'Passthrough') {
+		return argv.some(isHelpFlag);
+	}
+	const separatorIndex = argv.indexOf('--');
+	const treeseedArgs = separatorIndex >= 0 ? argv.slice(0, separatorIndex) : argv;
+	return treeseedArgs.some(isHelpFlag);
+}
+
 function isNoColorFlag(value: string | undefined) {
 	return value === '--no-color';
 }
@@ -344,7 +353,7 @@ export class TreeseedOperationsSdk {
 			return writeTreeseedResult({ exitCode: 1, stderr: [lines.join('\n')] }, context);
 		}
 
-		if (argv.some(isHelpFlag)) {
+		if (shouldRenderCommandHelp(spec, argv)) {
 			if (shouldUseInkHelp(context)) {
 				const helpExitCode = await renderTreeseedHelpInk(spec.name, context);
 				if (typeof helpExitCode === 'number') {
@@ -441,7 +450,7 @@ export async function executeTreeseedCommand(commandName: string, argv: string[]
 	if (!spec) {
 		return cliOperationsSdk.executeOperation({ commandName, argv: cleanArgv }, commandContext);
 	}
-	if (cleanArgv.some(isHelpFlag)) {
+	if (shouldRenderCommandHelp(spec, cleanArgv)) {
 		return cliOperationsSdk.executeOperation({ commandName, argv: cleanArgv }, commandContext);
 	}
 
@@ -470,7 +479,7 @@ export async function runTreeseedCli(argv: string[], overrides: Partial<Treeseed
 	if (!spec) {
 		return cliOperationsSdk.run(cleanArgv, { ...overrides, colorEnabled });
 	}
-	if (cleanArgv.slice(1).some(isHelpFlag)) {
+	if (shouldRenderCommandHelp(spec, cleanArgv.slice(1))) {
 		return cliOperationsSdk.run(cleanArgv, { ...overrides, colorEnabled });
 	}
 
