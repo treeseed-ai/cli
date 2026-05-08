@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.36] - 2026-05-08
+
+### Added
+
+- feat(cli): add provider cli wrappers and refresh railway sdk lock (ea24f06dc0d1)
+- feat(cli): add tags:cleanup command (96e015f194c4)
+
+### Dependencies
+
+- build(build): sync package dependency references (21fdd5d1118a)
+- build(cli): bump version and update @treeseed/sdk (eb7870fb0edd)
+- chore(cli): bump version and update @treeseed/sdk (e80ab05f0782)
+- chore(cli): update version and @treeseed/sdk dependency (39a48402a7ab)
+- build(cli): bump version and @treeseed/sdk dependency (57edacfb8dc2)
+- build(cli): bump version and update @treeseed/sdk dependency (b29cd10e6017)
+- Release @treeseed/cli 0.6.36.
+
 ## [0.6.35] - 2026-05-07
 
 ### Dependencies
