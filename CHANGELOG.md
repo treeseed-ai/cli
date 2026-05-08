@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.43] - 2026-05-08
+
+### Dependencies
+
+- build(cli): bump version to 0.6.43-dev.staging.20260508T184742Z (56fc7061aefb)
+- Release @treeseed/cli 0.6.43.
+
 ## [0.6.42] - 2026-05-08
 
 ### Dependencies
