@@ -501,6 +501,43 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		executionMode: 'handler',
 		handlerName: 'stage',
 	})],
+	['tags:cleanup', command({
+		usage: 'treeseed tags:cleanup [--plan|--dry-run] [--include-packages <names>] [--branch-scope <staging|preview|all>] [--json]',
+		options: [
+			{ name: 'plan', flags: '--plan', description: 'Compute stale dev tag cleanup without deleting tags.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'includePackages', flags: '--include-packages <names>', description: 'Comma-separated package names to inspect.', kind: 'string' },
+			{ name: 'branchScope', flags: '--branch-scope <scope>', description: 'Limit cleanup to staging tags, preview tags, or all dev branch tags.', kind: 'enum', values: ['staging', 'preview', 'all'] },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed tags:cleanup --plan', 'treeseed tags:cleanup --branch-scope staging', 'treeseed tags:cleanup --include-packages @treeseed/sdk,@treeseed/core --json'],
+		notes: ['Only deletes Treeseed-managed package dev tags older than each package current version line.'],
+		help: {
+			workflowPosition: 'maintain workspace',
+			longSummary: [
+				'Tags cleanup removes stale Treeseed-managed package dev tags from staging and preview branch saves.',
+			],
+			whenToUse: [
+				'Use this when old staging or preview package tags have accumulated after many saves and releases.',
+				'Use `--plan` first to inspect exactly which tags would be removed.',
+			],
+			outcomes: [
+				'Plans or deletes stale local and origin package dev tags.',
+				'Preserves current-version dev tags, active dependency references, stable release tags, and non-Treeseed tags.',
+			],
+			examples: [
+				example('treeseed tags:cleanup --plan', 'Inspect cleanup', 'Show stale tag candidates without deleting anything.'),
+				example('treeseed tags:cleanup --branch-scope preview', 'Clean preview tags', 'Delete stale non-staging branch dev tags while leaving staging dev tags alone.'),
+				example('treeseed tags:cleanup --json', 'Automate cleanup', 'Emit structured per-repository cleanup counts and skipped reasons.'),
+			],
+			relatedDetails: [
+				related('release', 'Release also runs safe dev tag cleanup after successful stable promotion.'),
+				related('status', 'Use `status` to inspect workspace alignment before maintenance.'),
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'tags:cleanup',
+	})],
 	['resume', command({
 		arguments: [{ name: 'run-id', description: 'Interrupted workflow run id to resume.', required: true }],
 		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
