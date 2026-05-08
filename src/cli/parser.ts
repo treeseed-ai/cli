@@ -26,6 +26,10 @@ export function parseTreeseedInvocation(command: TreeseedOperationSpec, argv: st
 			const [flag, inlineValue] = current.split('=', 2);
 			const spec = byFlag.get(flag);
 			if (!spec) {
+				if (command.group === 'Passthrough') {
+					positionals.push(current);
+					continue;
+				}
 				throw new Error(`Unknown option: ${flag}`);
 			}
 			if (spec.kind === 'boolean') {

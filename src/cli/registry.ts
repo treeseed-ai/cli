@@ -24,6 +24,7 @@ import { handleMarket } from './handlers/market.js';
 import { handleTeams } from './handlers/teams.js';
 import { handleProjects } from './handlers/projects.js';
 import { handlePacks } from './handlers/packs.js';
+import { handleToolWrapper } from './handlers/tool-wrapper.js';
 import {
 	handleSecretsLock,
 	handleSecretsMigrateKey,
@@ -75,6 +76,9 @@ export const COMMAND_HANDLERS = {
 	teams: handleTeams,
 	projects: handleProjects,
 	packs: handlePacks,
+	gh: handleToolWrapper,
+	railway: handleToolWrapper,
+	wrangler: handleToolWrapper,
 	'secrets:status': handleSecretsStatus,
 	'secrets:unlock': handleSecretsUnlock,
 	'secrets:lock': handleSecretsLock,
