@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.40] - 2026-05-08
+
+### Added
+
+- feat(cli): select Railway environment before forwarding args (163d5c8efe09)
+
+### Dependencies
+
+- Release @treeseed/cli 0.6.40.
+
 ## [0.6.39] - 2026-05-08
 
 ### Dependencies

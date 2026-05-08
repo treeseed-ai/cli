@@ -208,6 +208,22 @@ test('save progress prefixes are colorized without command prefix', () => {
 	assert.equal(colorizeTreeseedCliOutput(line, false), line);
 });
 
+test('railway wrapper selects the requested Railway environment before forwarding args', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['railway', '--environment', 'prod', '--', 'status', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			RAILWAY_API_TOKEN: 'railway-token',
+		},
+	});
+
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 2);
+	assert.deepEqual(result.spawns[0].args.slice(-3), ['environment', 'production', '--json']);
+	assert.deepEqual(result.spawns[1].args.slice(-2), ['status', '--json']);
+});
+
 test('export help includes the directory argument', async () => {
 	const result = await runCli(['help', 'export']);
 	assert.equal(result.exitCode, 0);

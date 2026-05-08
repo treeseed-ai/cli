@@ -26,6 +26,10 @@ function wrapperScope(value: unknown): TreeseedEnvironmentScope {
 	return 'staging';
 }
 
+function railwayEnvironmentName(scope: TreeseedEnvironmentScope) {
+	return scope === 'prod' ? 'production' : scope;
+}
+
 export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) => {
 	try {
 		const toolName = wrappedToolName(invocation.commandName);
@@ -59,6 +63,37 @@ export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) =
 		}
 
 		const targetArgs = invocation.positionals;
+		if (toolName === 'railway' && scope !== 'local') {
+			const environmentResult = context.spawn(resolved.command, [
+				...resolved.argsPrefix,
+				'environment',
+				railwayEnvironmentName(scope),
+				'--json',
+			], {
+				cwd: context.cwd,
+				env: managedEnv,
+				stdio: 'pipe',
+			});
+			if ((environmentResult.status ?? 1) !== 0) {
+				return {
+					exitCode: environmentResult.status ?? 1,
+					stderr: [`Failed to select Railway environment ${railwayEnvironmentName(scope)} before running ${targetArgs.join(' ') || 'railway'}.`],
+					report: {
+						command: toolName,
+						ok: false,
+						scope,
+						executable: resolved.command,
+						binaryPath: resolved.binaryPath,
+						argsPrefix: resolved.argsPrefix,
+						args: targetArgs,
+						environmentSelection: {
+							environment: railwayEnvironmentName(scope),
+							status: environmentResult.status ?? 1,
+						},
+					},
+				};
+			}
+		}
 		const result = context.spawn(resolved.command, [...resolved.argsPrefix, ...targetArgs], {
 			cwd: context.cwd,
 			env: managedEnv,
