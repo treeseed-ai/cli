@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.46] - 2026-05-08
+
+### Infrastructure
+
+- chore(cli): bump version to 0.6.46-dev.staging.20260508T202431Z (dd3f2072ba65)
+
+### Dependencies
+
+- Release @treeseed/cli 0.6.46.
+
 ## [0.6.45] - 2026-05-08
 
 ### Dependencies
