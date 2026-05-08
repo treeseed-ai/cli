@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.38] - 2026-05-08
+
+### Dependencies
+
+- build(cli): update version and @treeseed/sdk dependency (6324656d9821)
+- Release @treeseed/cli 0.6.38.
+
 ## [0.6.37] - 2026-05-08
 
 ### Dependencies
