@@ -12,6 +12,19 @@ function workflowLabel(repo: { name?: string; repository?: string | null }, work
 	return `- ${repo.name ?? repo.repository ?? 'repo'} ${workflow.workflow ?? 'workflow'}: ${status}${workflow.url ? ` (${workflow.url})` : ''}${workflow.inspectCommand ? `\n  Inspect: ${workflow.inspectCommand}` : ''}`;
 }
 
+function activeJobLines(workflow: { jobs?: Array<{ name?: string; status?: string | null; steps?: Array<{ name?: string; status?: string | null }> }> }) {
+	const jobs = Array.isArray(workflow.jobs) ? workflow.jobs : [];
+	return jobs
+		.filter((job) => job.status && job.status !== 'completed')
+		.slice(0, 3)
+		.map((job) => {
+			const step = Array.isArray(job.steps)
+				? job.steps.find((entry) => entry.status && entry.status !== 'completed')
+				: null;
+			return `  Active: ${job.name ?? 'job'}${step?.name ? ` > ${step.name}` : ''}`;
+		});
+}
+
 function failureLines(payload: TreeseedCiResult) {
 	return payload.failures.flatMap((failure) => {
 		const target = failure.jobName
@@ -37,7 +50,10 @@ function pendingLines(payload: TreeseedCiResult) {
 	return payload.repositories.flatMap((repo) =>
 		repo.workflows
 			.filter((workflow) => workflow.state === 'pending')
-			.map((workflow) => workflowLabel(repo, workflow)));
+			.flatMap((workflow) => [
+				workflowLabel(repo, workflow),
+				...activeJobLines(workflow),
+			]));
 }
 
 function missingOrNotPushedLines(payload: TreeseedCiResult) {

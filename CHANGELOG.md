@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.41] - 2026-05-08
+
+### Added
+
+- feat(ci): display active jobs and steps in pending workflows (554386ea9a2c)
+
+### Dependencies
+
+- Release @treeseed/cli 0.6.41.
+
 ## [0.6.40] - 2026-05-08
 
 ### Added
