@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.47] - 2026-05-09
+
+### Tests
+
+- build(build): sync package dependency references (275e085a959d)
+
+### Dependencies
+
+- Release @treeseed/cli 0.6.47.
+
 ## [0.6.46] - 2026-05-08
 
 ### Infrastructure

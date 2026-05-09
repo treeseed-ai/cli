@@ -3,7 +3,8 @@ import {
 	resolveTreeseedLaunchEnvironment,
 	resolveTreeseedToolCommand,
 } from '@treeseed/sdk/workflow-support';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
@@ -64,6 +65,35 @@ function findRailwayProjectId(value: unknown): string | null {
 	return null;
 }
 
+function findRailwayProjectIdFromCommand(value: unknown): string | null {
+	if (!value || typeof value !== 'object') {
+		return null;
+	}
+	if (Array.isArray(value)) {
+		for (const entry of value) {
+			const found = findRailwayProjectIdFromCommand(entry);
+			if (found) {
+				return found;
+			}
+		}
+		return null;
+	}
+	const record = value as Record<string, unknown>;
+	if (typeof record.lastDeploymentCommand === 'string') {
+		const match = record.lastDeploymentCommand.match(/--project\s+([0-9a-f]{8}-[0-9a-f-]{27,})/iu);
+		if (match?.[1]) {
+			return match[1];
+		}
+	}
+	for (const entry of Object.values(record)) {
+		const found = findRailwayProjectIdFromCommand(entry);
+		if (found) {
+			return found;
+		}
+	}
+	return null;
+}
+
 function railwayProjectIdFromDeployState(cwd: string, scope: TreeseedEnvironmentScope) {
 	const stateScope = scope === 'prod' ? 'prod' : scope;
 	const statePath = join(cwd, '.treeseed', 'state', 'environments', stateScope, 'deploy.json');
@@ -71,13 +101,20 @@ function railwayProjectIdFromDeployState(cwd: string, scope: TreeseedEnvironment
 		return null;
 	}
 	try {
-		return findRailwayProjectId(JSON.parse(readFileSync(statePath, 'utf8')));
+		const state = JSON.parse(readFileSync(statePath, 'utf8'));
+		return findRailwayProjectIdFromCommand(state) ?? findRailwayProjectId(state);
 	} catch {
 		return null;
 	}
 }
 
+function railwayCommandUsesProjectFiles(args: string[]) {
+	const command = args[0] ?? '';
+	return ['up', 'dev', 'develop', 'run', 'local', 'shell'].includes(command);
+}
+
 export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) => {
+	let isolatedRailwayCwd: string | null = null;
 	try {
 		const toolName = wrappedToolName(invocation.commandName);
 		const scope = wrapperScope(invocation.args.environment);
@@ -113,8 +150,18 @@ export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) =
 		if (toolName === 'railway' && scope !== 'local' && targetArgs[0] !== 'link') {
 			const environmentName = railwayEnvironmentName(scope);
 			const projectId = managedEnv.TREESEED_RAILWAY_PROJECT_ID || railwayProjectIdFromDeployState(context.cwd, scope);
+			const railwayCwd = railwayCommandUsesProjectFiles(targetArgs)
+				? context.cwd
+				: (isolatedRailwayCwd = mkdtempSync(join(tmpdir(), `treeseed-railway-${scope}-`)));
+			const railwayEnv = isolatedRailwayCwd
+				? {
+					...managedEnv,
+					HOME: isolatedRailwayCwd,
+					XDG_CONFIG_HOME: join(isolatedRailwayCwd, '.config'),
+				}
+				: managedEnv;
 			if (projectId) {
-				context.spawn(resolved.command, [
+				const linkResult = context.spawn(resolved.command, [
 					...resolved.argsPrefix,
 					'link',
 					'--project',
@@ -123,44 +170,74 @@ export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) =
 					environmentName,
 					'--json',
 				], {
-					cwd: context.cwd,
-					env: managedEnv,
+					cwd: railwayCwd,
+					env: railwayEnv,
 					stdio: 'pipe',
 				});
-			}
-			const environmentResult = context.spawn(resolved.command, [
-				...resolved.argsPrefix,
-				'environment',
-				environmentName,
-				'--json',
-			], {
-				cwd: context.cwd,
-				env: managedEnv,
-				stdio: 'pipe',
-			});
-			if ((environmentResult.status ?? 1) !== 0) {
-				return {
-					exitCode: environmentResult.status ?? 1,
-					stderr: [`Failed to select Railway environment ${railwayEnvironmentName(scope)} before running ${targetArgs.join(' ') || 'railway'}.`],
-					report: {
-						command: toolName,
-						ok: false,
-						scope,
-						executable: resolved.command,
-						binaryPath: resolved.binaryPath,
-						argsPrefix: resolved.argsPrefix,
-						args: targetArgs,
-						environmentSelection: {
-							environment: environmentName,
-							status: environmentResult.status ?? 1,
+				if ((linkResult.status ?? 1) !== 0) {
+					return {
+						exitCode: linkResult.status ?? 1,
+						stderr: [`Failed to link Railway project ${projectId} for ${environmentName} before running ${targetArgs.join(' ') || 'railway'}.`],
+						report: {
+							command: toolName,
+							ok: false,
+							scope,
+							executable: resolved.command,
+							binaryPath: resolved.binaryPath,
+							argsPrefix: resolved.argsPrefix,
+							args: targetArgs,
+							projectLink: {
+								projectId,
+								environment: environmentName,
+								status: linkResult.status ?? 1,
+							},
 						},
-					},
-				};
+					};
+				}
+			}
+			if (!(isolatedRailwayCwd && projectId)) {
+				const environmentResult = context.spawn(resolved.command, [
+					...resolved.argsPrefix,
+					'environment',
+					environmentName,
+					'--json',
+				], {
+					cwd: railwayCwd,
+					env: railwayEnv,
+					stdio: 'pipe',
+				});
+				if ((environmentResult.status ?? 1) !== 0) {
+					return {
+						exitCode: environmentResult.status ?? 1,
+						stderr: [`Failed to select Railway environment ${railwayEnvironmentName(scope)} before running ${targetArgs.join(' ') || 'railway'}.`],
+						report: {
+							command: toolName,
+							ok: false,
+							scope,
+							executable: resolved.command,
+							binaryPath: resolved.binaryPath,
+							argsPrefix: resolved.argsPrefix,
+							args: targetArgs,
+							environmentSelection: {
+								environment: environmentName,
+								status: environmentResult.status ?? 1,
+							},
+						},
+					};
+				}
 			}
 		}
+		const railwayTargetCwd = toolName === 'railway' && isolatedRailwayCwd ? isolatedRailwayCwd : context.cwd;
+		const targetEnv = toolName === 'railway' && isolatedRailwayCwd
+			? {
+				...managedEnv,
+				HOME: isolatedRailwayCwd,
+				XDG_CONFIG_HOME: join(isolatedRailwayCwd, '.config'),
+			}
+			: managedEnv;
 		const result = context.spawn(resolved.command, [...resolved.argsPrefix, ...targetArgs], {
-			cwd: context.cwd,
-			env: managedEnv,
+			cwd: railwayTargetCwd,
+			env: targetEnv,
 			stdio: 'inherit',
 		});
 		return {
@@ -178,5 +255,13 @@ export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) =
 		};
 	} catch (error) {
 		return workflowErrorResult(error);
+	} finally {
+		if (isolatedRailwayCwd) {
+			try {
+				rmSync(isolatedRailwayCwd, { recursive: true, force: true });
+			} catch {
+				// Best-effort cleanup for an operator convenience wrapper.
+			}
+		}
 	}
 };

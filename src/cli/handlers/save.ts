@@ -84,8 +84,11 @@ function formatSavePlanSections(repositoryPlan: {
 
 export const handleSave: TreeseedCommandHandler = async (invocation, context) => {
 	try {
+		const progressWrite = context.outputFormat === 'json'
+			? ((output: string) => context.write(output, 'stderr'))
+			: context.write;
 		const result = await createWorkflowSdk(context, {
-			write: context.outputFormat === 'json' ? (() => {}) : context.write,
+			write: progressWrite,
 		}).save({
 			message: invocation.positionals.join(' ').trim(),
 			hotfix: invocation.args.hotfix === true,
