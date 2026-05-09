@@ -94,8 +94,8 @@ async function runCli(args, options = {}) {
 			write(output, stream) {
 				writes.push({ output, stream });
 			},
-			spawn(command, spawnArgs) {
-				spawns.push({ command, args: spawnArgs });
+			spawn(command, spawnArgs, spawnOptions) {
+				spawns.push({ command, args: spawnArgs, options: spawnOptions });
 				return { status: options.spawnStatus ?? 0 };
 			},
 		});
@@ -215,13 +215,17 @@ test('railway wrapper selects the requested Railway environment before forwardin
 		env: {
 			HOME: workspaceRoot,
 			RAILWAY_API_TOKEN: 'railway-token',
+			TREESEED_RAILWAY_PROJECT_ID: 'f593a85c-38a2-4e76-a90b-2c20ecf81d6e',
 		},
 	});
 
 	assert.equal(result.exitCode, 0);
 	assert.equal(result.spawns.length, 2);
-	assert.deepEqual(result.spawns[0].args.slice(-3), ['environment', 'production', '--json']);
+	assert.deepEqual(result.spawns[0].args.slice(-6), ['link', '--project', 'f593a85c-38a2-4e76-a90b-2c20ecf81d6e', '--environment', 'production', '--json']);
 	assert.deepEqual(result.spawns[1].args.slice(-2), ['status', '--json']);
+	assert.notEqual(result.spawns[1].options.cwd, workspaceRoot);
+	assert.equal(result.spawns[1].options.env.HOME, result.spawns[1].options.cwd);
+	assert.match(result.spawns[1].options.env.XDG_CONFIG_HOME, /treeseed-railway-prod-/);
 });
 
 test('export help includes the directory argument', async () => {
