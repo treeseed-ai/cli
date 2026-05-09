@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1] - 2026-05-09
+
+### Dependencies
+
+- Release @treeseed/cli 0.8.1.
+
 ## [0.8.0] - 2026-05-09
 
 ### Dependencies
