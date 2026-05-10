@@ -600,7 +600,7 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
 	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
-	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), true);
+	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), false);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 });
 
