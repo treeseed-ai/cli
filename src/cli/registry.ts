@@ -41,6 +41,7 @@ import { handleExport } from './handlers/export.js';
 import { handleResume } from './handlers/resume.js';
 import { handleRecover } from './handlers/recover.js';
 import { handleWorkspace } from './handlers/workspace.js';
+import { handleAudit } from './handlers/audit.js';
 
 const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
 
@@ -85,6 +86,7 @@ export const COMMAND_HANDLERS = {
 	'secrets:migrate-key': handleSecretsMigrateKey,
 	'secrets:rotate-passphrase': handleSecretsRotatePassphrase,
 	'secrets:rotate-machine-key': handleSecretsRotateMachineKey,
+	audit: handleAudit,
 } as const;
 
 export const TRESEED_COMMAND_SPECS: TreeseedCommandSpec[] = TRESEED_OPERATION_SPECS;

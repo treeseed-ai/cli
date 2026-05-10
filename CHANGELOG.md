@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.2] - 2026-05-10
+
+### Added
+
+- feat(cli): add `audit hosting` command (b1c4d180bc9a)
+
+### Dependencies
+
+- Release @treeseed/cli 0.8.2.
+
 ## [0.8.1] - 2026-05-09
 
 ### Dependencies

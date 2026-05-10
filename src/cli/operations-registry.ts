@@ -1308,6 +1308,48 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 
 const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 	{
+		id: 'audit.hosting',
+		name: 'audit',
+		aliases: [],
+		group: 'Validation',
+		summary: 'Audit TreeSeed hosting readiness.',
+		description: 'Run a read-only or explicit repair audit for Repository, Web, Processing, and Email hosting setup.',
+		provider: 'default',
+		related: ['status', 'config', 'save', 'release'],
+		usage: 'treeseed audit hosting [--environment current|local|staging|prod] [--repair] [--json]',
+		arguments: [{ name: 'target', description: 'Audit target. Use hosting.', required: false }],
+		options: [
+			{ name: 'environment', flags: '--environment <environment>', description: 'Audit environment. Defaults to current branch mapping.', kind: 'enum', values: ['current', 'local', 'staging', 'prod'] },
+			{ name: 'repair', flags: '--repair', description: 'Explicitly reconcile missing platform/provider resources.', kind: 'boolean' },
+			{ name: 'hostKinds', flags: '--host-kinds <kinds>', description: 'Comma-separated host kinds to audit.', kind: 'string' },
+			{ name: 'json', flags: '--json', description: 'Emit the hosting audit report as JSON.', kind: 'boolean' },
+		],
+		examples: ['treeseed audit hosting', 'treeseed audit hosting --environment staging --json', 'treeseed audit hosting --repair --environment prod'],
+		help: {
+			workflowPosition: 'validate',
+			longSummary: [
+				'The hosting audit proves that TreeSeed can use its configured Repository, Web, Processing, and Email platforms before saving hosts or launching team projects.',
+				'It is read-only by default. Use `--repair` only when you explicitly want TreeSeed to reconcile provider resources.',
+			],
+			whenToUse: [
+				'Run this before saving managed hosts, launching a hub, or promoting a release that depends on hosted provider resources.',
+				'Use it after changing provider credentials or service topology to verify that the selected environment is complete.',
+			],
+			beforeYouRun: [
+				'Run from the TreeSeed workspace you want to audit.',
+				'Use `--json` for automation and `--repair` only for deliberate provider reconciliation.',
+			],
+			automationNotes: [
+				'The report lists missing key names and resource identifiers but never prints decrypted secret values.',
+				'Save, stage, and release resource verification can include the same read-only audit; repair remains explicit.',
+			],
+		},
+		helpVisible: true,
+		helpFeatured: true,
+		executionMode: 'handler',
+		handlerName: 'audit',
+	},
+	{
 		id: 'tools.gh',
 		name: 'gh',
 		aliases: [],
