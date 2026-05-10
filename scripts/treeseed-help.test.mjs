@@ -346,7 +346,7 @@ test('agents help is rendered locally without requiring the core runtime', async
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /agents  Run the Treeseed agent runtime namespace\./);
 	assert.match(result.output, /treeseed agents <command>/);
-	assert.match(result.output, /Delegates to the integrated `@treeseed\/core` agent runtime\./);
+	assert.match(result.output, /Delegates to the `@treeseed\/agent` runtime\./);
 	assert.doesNotMatch(result.output, /run-agent <slug>/);
 	assert.doesNotMatch(result.output, /release-leases/);
 });

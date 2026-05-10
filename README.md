@@ -17,7 +17,7 @@ Install the CLI with its runtime dependencies:
 npm install @treeseed/cli @treeseed/core @treeseed/sdk
 ```
 
-`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the `@treeseed/core` runtime namespaces. `treeseed dev` and `treeseed agents ...` resolve and delegate to the tenant-installed or sibling-workspace `@treeseed/core` runtime. In normal consumer installs, npm resolves the runtime dependencies automatically.
+`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the Treeseed runtime packages. `treeseed dev` resolves the tenant-installed or sibling-workspace `@treeseed/core` web runtime, while `treeseed agents ...` delegates to `@treeseed/agent`. In normal consumer installs, npm resolves the runtime dependencies automatically.
 
 Workflow guarantees:
 
