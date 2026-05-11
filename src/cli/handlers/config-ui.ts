@@ -114,6 +114,13 @@ export type ConfigViewportLayout = UiViewportLayout & {
 
 const FULL_CONFIG_FILTERS: ConfigScope[] = ['local', 'staging', 'prod'];
 
+function firstAvailableScope(context: ConfigContextSnapshot, preferred: ConfigScope = 'local') {
+	if (context.scopes.includes(preferred)) {
+		return preferred;
+	}
+	return context.scopes[0] ?? preferred;
+}
+
 function maskValue(value: string) {
 	if (!value) {
 		return '(unset)';
@@ -213,7 +220,7 @@ function resolveSharedEntryValue(
 	return resolveFirstNonEmptyValue(relevantScopes, entriesByScope, entryId, field);
 }
 
-function resolveCurrentConfigValue(
+export function resolveCurrentConfigValue(
 	context: ConfigContextSnapshot,
 	overrides: Record<string, string>,
 	entryId: string,
@@ -228,7 +235,7 @@ function resolveCurrentConfigValue(
 		return overrides[scopedOverrideKey] ?? '';
 	}
 	for (const candidateScope of [scope, ...context.scopes.filter((candidate) => candidate !== scope)]) {
-		const entry = context.entriesByScope[candidateScope].find((candidate) => candidate.id === entryId);
+		const entry = context.entriesByScope[candidateScope]?.find((candidate) => candidate.id === entryId);
 		if (entry?.storage === 'shared') {
 			const overrideKey = `shared:${entryId}`;
 			if (overrideKey in overrides) {
@@ -376,15 +383,15 @@ export function buildCliConfigPages(
 	const pages: ConfigPage[] = [];
 
 	for (const scope of selectedScopes) {
-		for (const entry of context.entriesByScope[scope]) {
+		for (const entry of context.entriesByScope[scope] ?? []) {
 			if (entry.storage === 'shared') {
 				if (sharedEntries.has(entry.id)) {
 					continue;
 				}
-				const relevantScopes = selectedScopes.filter((candidateScope) => context.entriesByScope[candidateScope].some((candidate) => candidate.id === entry.id));
+				const relevantScopes = selectedScopes.filter((candidateScope) => context.entriesByScope[candidateScope]?.some((candidate) => candidate.id === entry.id));
 				const key = `shared:${entry.id}`;
 				sharedEntries.add(entry.id);
-				const requiredScopes = relevantScopes.filter((candidateScope) => context.entriesByScope[candidateScope].some((candidate) => candidate.id === entry.id && candidate.required));
+				const requiredScopes = relevantScopes.filter((candidateScope) => context.entriesByScope[candidateScope]?.some((candidate) => candidate.id === entry.id && candidate.required));
 				const currentValue = resolveSharedEntryValue(relevantScopes, requiredScopes, context.entriesByScope, entry.id, 'currentValue');
 				const suggestedValue = resolveSharedEntryValue(relevantScopes, requiredScopes, context.entriesByScope, entry.id, 'suggestedValue', {
 					fallbackToRelevant: requiredScopes.length === 0,
@@ -659,7 +666,10 @@ export async function runCliConfigEditor(
 		function App() {
 			const sidebarFilterHeight = 4;
 			const [currentContext, setCurrentContext] = React.useState(context);
-			const [filterIndex, setFilterIndex] = React.useState(0);
+			const [filterIndex, setFilterIndex] = React.useState(() => {
+				const initialScope = firstAvailableScope(context);
+				return Math.max(0, FULL_CONFIG_FILTERS.indexOf(initialScope));
+			});
 			const [viewMode, setViewMode] = React.useState<ConfigViewMode>(options.initialViewMode ?? 'startup');
 			const [pageIndex, setPageIndex] = React.useState(0);
 			const [sidebarOffset, setSidebarOffset] = React.useState(0);
@@ -681,7 +691,8 @@ export async function runCliConfigEditor(
 			const { exit } = useApp();
 			const windowSize = useWindowSize();
 			const layout = computeConfigViewportLayout(windowSize?.rows ?? 24, windowSize?.columns ?? 100);
-			const selectedFilter = FULL_CONFIG_FILTERS[filterIndex] ?? 'local';
+			const selectedFilter = FULL_CONFIG_FILTERS[filterIndex] ?? firstAvailableScope(currentContext);
+			const readinessScope = firstAvailableScope(currentContext, selectedFilter);
 			const allPages = buildCliConfigPages(currentContext, selectedFilter, overrides, viewMode);
 			const pages = viewMode === 'full' ? filterCliConfigPages(allPages, filterQuery) : allPages;
 			const safePageIndex = pages.length === 0 ? 0 : Math.min(pageIndex, pages.length - 1);
@@ -709,10 +720,10 @@ export async function runCliConfigEditor(
 			const detailWidth = viewMode === 'full' ? layout.contentWidth : layout.columns;
 			const detailPanel = detailViewportLines(detailSourceLines, detailWidth, layout.detailHeight, detailOffset);
 			const configReadiness = {
-				github: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'GH_TOKEN', 'local')) },
-				cloudflare: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'CLOUDFLARE_API_TOKEN', 'local')) },
-				railway: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'RAILWAY_API_TOKEN', 'local')) },
-				localDevelopment: currentContext.configReadinessByScope.local?.localDevelopment ?? { configured: true },
+				github: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'GH_TOKEN', readinessScope)) },
+				cloudflare: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'CLOUDFLARE_API_TOKEN', readinessScope)) },
+				railway: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'RAILWAY_API_TOKEN', readinessScope)) },
+				localDevelopment: currentContext.configReadinessByScope[readinessScope]?.localDevelopment ?? { configured: true },
 			};
 			const sidebarHeight = Math.max(4, layout.bodyHeight - sidebarFilterHeight);
 			const sidebarViewportSize = Math.max(1, sidebarHeight - 4);

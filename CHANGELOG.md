@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.7] - 2026-05-11
+
+### Tests
+
+- build(build): sync package dependency references (0cb6e2465876)
+
+### Dependencies
+
+- build(build): sync package dependency references (c3953adae339)
+- build(cli): bump version and update @treeseed/sdk (e3ba68826453)
+- Release @treeseed/cli 0.8.7.
+
 ## [0.8.6] - 2026-05-11
 
 ### Dependencies
