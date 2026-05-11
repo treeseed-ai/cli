@@ -346,7 +346,7 @@ test('agents help is rendered locally without requiring the core runtime', async
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /agents  Run the Treeseed agent runtime namespace\./);
 	assert.match(result.output, /treeseed agents <command>/);
-	assert.match(result.output, /Delegates to the integrated `@treeseed\/core` agent runtime\./);
+	assert.match(result.output, /Delegates to the `@treeseed\/agent` runtime\./);
 	assert.doesNotMatch(result.output, /run-agent <slug>/);
 	assert.doesNotMatch(result.output, /release-leases/);
 });
@@ -600,7 +600,7 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
 	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
-	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), true);
+	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), false);
 	assert.equal(stagingEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
 });
 

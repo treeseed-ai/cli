@@ -1541,7 +1541,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		aliases: [],
 		group: 'Utilities',
 		summary: 'Run the Treeseed agent runtime namespace.',
-		description: 'Delegate to the integrated `@treeseed/core` agent runtime namespace and forward the remaining subcommand arguments.',
+		description: 'Delegate to the `@treeseed/agent` runtime namespace and forward the remaining subcommand arguments.',
 		provider: 'default',
 		related: ['status', 'config'],
 		usage: 'treeseed agents <command>',
@@ -1549,13 +1549,13 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		examples: ['treeseed agents --help'],
 		help: {
 			longSummary: [
-				'Agents is the CLI entrypoint into the integrated Treeseed agent runtime namespace. It forwards the remaining subcommand arguments to the runtime owned by `@treeseed/core`.',
+				'Agents is the CLI entrypoint into the Treeseed agent runtime namespace. It forwards the remaining subcommand arguments to the runtime owned by `@treeseed/agent`.',
 			],
 			whenToUse: [
 				'Use this when the thing you want is inside the agent runtime namespace rather than the main Treeseed command set.',
 			],
 			beforeYouRun: [
-				'Make sure the integrated `@treeseed/core` runtime is installed and available because this command delegates rather than handling the work locally.',
+				'Make sure the `@treeseed/agent` runtime is installed and available because this command delegates rather than handling the work locally.',
 			],
 			outcomes: [
 				'Passes control to the agent runtime and forwards the remaining arguments unchanged.',
@@ -1574,7 +1574,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 			],
 		},
 		notes: [
-			'Delegates to the integrated `@treeseed/core` agent runtime.',
+			'Delegates to the `@treeseed/agent` runtime.',
 			'Use `treeseed agents --help` to list supported agent subcommands.',
 		],
 		helpVisible: true,

@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.8.4] - 2026-05-11
+
+### Tests
+
+- build(cli): bump version and update @treeseed/sdk (d2685c61abf9)
+- build(build): sync package dependency references (7448f4507f69)
+
+### Dependencies
+
+- build(cli): bump version and @treeseed/sdk dependency (d669179f7f48)
+- build(cli): bump version and @treeseed/sdk dependency (8bbc52d41b4e)
+- build(cli): update version and @treeseed/sdk dependency (367e5672aefb)
+- build(build): sync package dependency references (4f41216ec9c3)
+- chore(cli): bump version and update @treeseed/sdk (6877749c3671)
+- build(build): sync package dependency references (2bf04e7f7098)
+- build(cli): update version and @treeseed/sdk dependency (fc15041930ce)
+- build(cli): bump version and update @treeseed/sdk dependency (91212342ec15)
+- build(cli): bump version and update @treeseed/sdk pointer (9ce75c86d1e0)
+- build(cli): bump version and update @treeseed/sdk (047e9a12f895)
+- build(cli): bump version and update @treeseed/sdk (41fcb4c20624)
+- build(build): sync package dependency references (918b811df10b)
+- build(build): sync package dependency references (cca20c8c872e)
+- build(cli): bump version and update @treeseed/sdk dependency (08931d10f242)
+- build(cli): update version and @treeseed/sdk dependency (8760189bf7cd)
+- build(cli): bump version and update @treeseed/sdk dependency (05326fbdc557)
+- chore(cli): bump version and update @treeseed/sdk (121dac2f91f8)
+- build(build): sync package dependency references (1e893d40674a)
+- chore(cli): bump version and update @treeseed/sdk (7587acbc5977)
+- build(cli): update version and @treeseed/sdk dependency (94eb48602a34)
+- 33 additional changes omitted from this summary.
+
 ## [0.8.3] - 2026-05-10
 
 ### Dependencies
