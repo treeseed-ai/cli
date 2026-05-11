@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.8] - 2026-05-11
+
+### Dependencies
+
+- build(build): sync package dependency references (a5be5c2352e9)
+- build(source): sync package dependency references (428188d97070)
+- Release @treeseed/cli 0.8.8.
+
 ## [0.8.7] - 2026-05-11
 
 ### Tests
