@@ -20,6 +20,7 @@ const {
 	computeConfigViewportLayout,
 	filterCliConfigPages,
 	normalizeConfigInputChunk,
+	resolveCurrentConfigValue,
 } = await import('../dist/cli/handlers/config-ui.js');
 const { findClickableRegion, routeWheelDeltaToScrollRegion } = await import('../dist/cli/ui/framework.js');
 const { parseTerminalMouseInput } = await import('../dist/cli/ui/mouse.js');
@@ -798,6 +799,30 @@ test('config ui startup keeps invalid required values in the wizard until they a
 	};
 	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
 	assert.deepEqual(pages.map((page) => page.entry.id), ['TREESEED_SMTP_PORT']);
+});
+
+test('config ui helpers tolerate environment-limited config contexts', () => {
+	const context = {
+		project: { name: 'Test', slug: 'test' },
+		scopes: ['staging'],
+		configReadinessByScope: {
+			staging: { github: { configured: false }, cloudflare: { configured: false }, railway: { configured: false }, localDevelopment: { configured: true } },
+		},
+		entriesByScope: {
+			staging: [
+				{ id: 'TREESEED_HOSTED_HUBS_GITHUB_OWNER', label: 'Hosted owner', group: 'github', cluster: 'github:hosted', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'GH_TOKEN', label: 'GitHub token', group: 'github', cluster: 'github:token', startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: 'gh-token', suggestedValue: '', effectiveValue: 'gh-token' },
+			],
+		},
+	};
+
+	assert.equal(resolveCurrentConfigValue(context, {}, 'GH_TOKEN', 'local'), 'gh-token');
+	assert.deepEqual(
+		buildCliConfigPages(context, 'local', {}, 'startup').map((page) => page.entry.id),
+		['TREESEED_HOSTED_HUBS_GITHUB_OWNER'],
+	);
+	assert.deepEqual(buildCliConfigPages(context, 'local', {}, 'full'), []);
+	assert.equal(buildCliConfigPages(context, 'staging', {}, 'full').length, 2);
 });
 
 test('config ui full page model includes optional resolved entries', () => {

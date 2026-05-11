@@ -139,8 +139,16 @@ function renderConfigResult(commandName: string, result: any) {
 	const payload = result.payload as Record<string, any>;
 	const toolHealth = payload.toolHealth as Record<string, any> | undefined;
 	const configContext = payload.context as Record<string, any> | undefined;
-	const configReadiness = configContext?.configReadinessByScope?.local ?? {};
 	const readinessByScope = payload.result?.readinessByScope ?? {};
+	const configReadinessByScope = configContext?.configReadinessByScope ?? {};
+	const providerConfigStatus = (provider: 'github' | 'cloudflare' | 'railway') => {
+		const selectedScopes = Array.isArray(payload.scopes) && payload.scopes.length > 0
+			? payload.scopes
+			: Object.keys(configReadinessByScope);
+		return selectedScopes.some((scope) => configReadinessByScope?.[scope]?.[provider]?.configured)
+			? 'configured'
+			: 'missing';
+	};
 	const bootstrapSystemsByScope = payload.result?.bootstrapSystemsByScope ?? payload.bootstrapSystemsByScope ?? {};
 	const skippedSystems = Object.values(bootstrapSystemsByScope as Record<string, any>)
 		.flatMap((entry: any) => Array.isArray(entry?.skipped) ? entry.skipped : []);
@@ -182,9 +190,9 @@ function renderConfigResult(commandName: string, result: any) {
 			{ label: 'Prod readiness', value: configReadinessLabel(readinessByScope.prod) },
 			{ label: 'Pages project', value: resourceInventoryByScope.staging?.resources?.pagesProject ?? resourceInventoryByScope.prod?.resources?.pagesProject ?? '(unset)' },
 			{ label: 'R2 bucket', value: resourceInventoryByScope.staging?.resources?.contentBucket ?? resourceInventoryByScope.prod?.resources?.contentBucket ?? '(unset)' },
-			{ label: 'GitHub token/config', value: configReadiness.github?.configured ? 'configured' : 'missing' },
-			{ label: 'Cloudflare token/config', value: configReadiness.cloudflare?.configured ? 'configured' : 'missing' },
-			{ label: 'Railway token/config', value: configReadiness.railway?.configured ? 'configured' : 'missing' },
+			{ label: 'GitHub token/config', value: providerConfigStatus('github') },
+			{ label: 'Cloudflare token/config', value: providerConfigStatus('cloudflare') },
+			{ label: 'Railway token/config', value: providerConfigStatus('railway') },
 			{ label: 'GitHub CLI', value: toolHealth?.githubCli?.available ? 'ready' : 'missing' },
 			{ label: 'Wrangler CLI', value: toolHealth?.wranglerCli?.available ? 'ready' : 'missing' },
 			{ label: 'Railway CLI', value: toolHealth?.railwayCli?.available ? 'ready' : 'missing' },
