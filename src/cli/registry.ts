@@ -23,6 +23,7 @@ import { handleAuthWhoAmI } from './handlers/auth-whoami.js';
 import { handleMarket } from './handlers/market.js';
 import { handleTeams } from './handlers/teams.js';
 import { handleProjects } from './handlers/projects.js';
+import { handleCapacity } from './handlers/capacity.js';
 import { handlePacks } from './handlers/packs.js';
 import { handleToolWrapper } from './handlers/tool-wrapper.js';
 import {
@@ -76,6 +77,7 @@ export const COMMAND_HANDLERS = {
 	market: handleMarket,
 	teams: handleTeams,
 	projects: handleProjects,
+	capacity: handleCapacity,
 	packs: handlePacks,
 	gh: handleToolWrapper,
 	railway: handleToolWrapper,
