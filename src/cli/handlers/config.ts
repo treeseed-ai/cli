@@ -160,7 +160,7 @@ function renderConfigResult(commandName: string, result: any) {
 		: payload.mode === 'rotate-machine-key'
 			? 'Treeseed machine key rotated successfully.'
 			: payload.mode === 'connect-market'
-				? 'Knowledge Coop pairing completed successfully.'
+				? 'TreeSeed pairing completed successfully.'
 				: payload.mode === 'bootstrap-preflight'
 					? 'Treeseed bootstrap verification preflight completed.'
 				: payload.mode === 'bootstrap'
