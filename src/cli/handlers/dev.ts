@@ -52,7 +52,8 @@ function resolveCoreDevEntrypoint(cwd: string) {
 
 export const handleDev: TreeseedCommandHandler = async (invocation, context) => {
 	try {
-		const watch = invocation.commandName === 'dev:watch' || invocation.args.watch === true;
+		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
+		const watch = feedback !== 'off';
 		const passthroughArgs: string[] = [];
 		const forwardStringOption = (name: string, flag: string) => {
 			const value = invocation.args[name];
