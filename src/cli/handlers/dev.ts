@@ -68,6 +68,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		};
 
 		forwardStringOption('surface', '--surface');
+		forwardStringOption('surfaces', '--surfaces');
 		forwardStringOption('host', '--host');
 		forwardStringOption('port', '--port');
 		forwardStringOption('apiHost', '--api-host');

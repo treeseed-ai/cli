@@ -51,7 +51,8 @@ function related(name: string, why: string) {
 }
 
 const DEV_RUNTIME_OPTIONS: TreeseedCommandOptionSpec[] = [
-	{ name: 'surface', flags: '--surface <surface>', description: 'Select the local dev surface to run.', kind: 'enum', values: ['integrated', 'web', 'api', 'manager', 'worker', 'agents', 'services'] },
+	{ name: 'surface', flags: '--surface <surface>', description: 'Select one local dev surface to run. Compatibility alias for --surfaces.', kind: 'enum', values: ['integrated', 'web', 'api', 'manager', 'worker', 'agents', 'services'] },
+	{ name: 'surfaces', flags: '--surfaces <surfaces>', description: 'Select comma-separated local dev surfaces to run.', kind: 'string' },
 	{ name: 'host', flags: '--host <host>', description: 'Host for the web dev server.', kind: 'string' },
 	{ name: 'port', flags: '--port <port>', description: 'Port for the web dev server.', kind: 'string' },
 	{ name: 'apiHost', flags: '--api-host <host>', description: 'Host used to construct the local API URL.', kind: 'string' },
@@ -1208,10 +1209,10 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	})],
 	['dev', command({
 		options: DEV_RUNTIME_OPTIONS,
-		examples: ['treeseed dev', 'treeseed dev --reset', 'treeseed dev --reset --plan --json', 'treeseed dev --surface api --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
+		examples: ['treeseed dev', 'treeseed dev --reset', 'treeseed dev --reset --plan --json', 'treeseed dev --surfaces web,api --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
 		help: {
 			longSummary: [
-				'Dev starts the unified local Treeseed runtime as a foreground supervisor so you can work against the integrated web, API, and supporting local surfaces.',
+				'Dev starts the unified local Treeseed runtime as a foreground supervisor so you can work against the integrated web, API, manager, worker, and supporting local surfaces.',
 				'The command keeps streaming logs and dev events until you press Ctrl+C or receive SIGTERM. Required surface failures are restarted with backoff instead of ending the supervisor.',
 			],
 			beforeYouRun: [
@@ -1221,12 +1222,13 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Keep the foreground process running while you test. Press Ctrl+C to stop the supervised stack and free the local ports.',
 			],
 			examples: [
-				example('treeseed dev', 'Start integrated local development', 'Run the default integrated local runtime and keep supervising it in the foreground.'),
+				example('treeseed dev', 'Start integrated local development', 'Run web, API, manager, and worker locally and keep supervising them in the foreground.'),
 				example('treeseed dev --reset', 'Start from a fresh local runtime', 'Clear disposable local dev state, rerun setup and D1 migrations, then start the dev supervisor.'),
 				example('treeseed dev --reset --plan --json', 'Inspect reset actions', 'Emit the reset, setup, readiness, command, and watch plan without deleting local state or starting services.'),
 				example('treeseed dev --plan --json', 'Inspect the runtime plan', 'Emit a structured plan with setup steps, commands, ports, URLs, readiness checks, and watch entries.'),
+				example('treeseed dev --surfaces web,api,worker --plan --json', 'Inspect selected surfaces', 'Plan a comma-separated set of local surfaces without starting the supervisor.'),
 				example('treeseed dev --surface api --plan --json', 'Inspect the API surface', 'Plan the local API runtime without the web UI.'),
-				example('treeseed dev --surface services', 'Run processing services explicitly', 'Start the API, manager, worker, and agents loop for local service development.'),
+				example('treeseed dev --surfaces integrated,agents', 'Opt into agents diagnostics', 'Start the integrated local platform plus the agents diagnostic loop.'),
 				example('treeseed dev --surface web --port 4322 --open off', 'Run only the web surface', 'Start the Astro UI on a specific port without opening a browser.'),
 				example('trsd dev', 'Use the short alias', 'Start the same local runtime through the shorter entrypoint.'),
 				example('treeseed dev --json', 'Stream dev events', 'Emit newline-delimited events while the long-running dev process supervises local services.'),

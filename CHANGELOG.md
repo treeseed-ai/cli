@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.11] - 2026-05-13
+
+### Tests
+
+- build(build): update package metadata (83d2975d0447)
+
+### Dependencies
+
+- build(cli): update package version and @treeseed/sdk dependency (2b1177877ab3)
+- build(cli): update version and @treeseed/sdk dependency (ead315dd2ea2)
+- Release @treeseed/cli 0.8.11.
+
 ## [0.8.10] - 2026-05-13
 
 ### Tests
