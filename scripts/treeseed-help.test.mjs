@@ -161,6 +161,14 @@ test('save help documents optional generated commit message hints', async () => 
 	assert.doesNotMatch(result.output, /<message>/);
 });
 
+test('dev help documents comma-separated surfaces and integrated runtime', async () => {
+	const result = await runCli(['help', 'dev']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /--surfaces <surfaces>/);
+	assert.match(result.output, /web, API, manager, worker/);
+	assert.match(result.output, /integrated,agents/);
+});
+
 test('major workflow commands have usage, options, and examples in help', async () => {
 	for (const command of ['init', 'status', 'config', 'tasks', 'switch', 'save', 'close', 'stage', 'release', 'destroy', 'rollback', 'doctor']) {
 		const result = await runCli(['help', command]);
@@ -1193,6 +1201,19 @@ test('treeseed dev leaves live feedback disabled when feedback is off', async ()
 test('treeseed dev forwards explicit API and service surfaces', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-surfaces');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
+
+	const selectedResult = await runCli(['dev', '--surfaces', 'web,api', '--plan', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(selectedResult.exitCode, 0);
+	assert.equal(selectedResult.spawns.length, 1);
+	assert.ok(selectedResult.spawns[0].args.includes('--surfaces'));
+	assert.ok(selectedResult.spawns[0].args.includes('web,api'));
+	assert.ok(selectedResult.spawns[0].args.includes('--watch'));
 
 	const apiResult = await runCli(['dev', '--surface', 'api', '--plan', '--json'], {
 		cwd: workspaceRoot,
