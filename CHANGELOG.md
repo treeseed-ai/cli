@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.10] - 2026-05-13
+
+### Tests
+
+- build(build): sync package dependency references (736269085614)
+
+### Dependencies
+
+- Release @treeseed/cli 0.8.10.
+
 ## [0.8.9] - 2026-05-12
 
 ### Dependencies

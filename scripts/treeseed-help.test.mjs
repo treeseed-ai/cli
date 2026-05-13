@@ -1169,9 +1169,56 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/run-ts\.mjs/);
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
 	assert.deepEqual(
-		result.spawns[0].args.slice(-12),
-		['--surface', 'web', '--port', '4499', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--json'],
+		result.spawns[0].args.slice(-13),
+		['--surface', 'web', '--port', '4499', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--json', '--watch'],
 	);
+});
+
+test('treeseed dev leaves live feedback disabled when feedback is off', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-feedback-off');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+
+	const result = await runCli(['dev', '--feedback', 'off', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 1);
+	assert.ok(!result.spawns[0].args.includes('--watch'));
+});
+
+test('treeseed dev forwards explicit API and service surfaces', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-surfaces');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+
+	const apiResult = await runCli(['dev', '--surface', 'api', '--plan', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(apiResult.exitCode, 0);
+	assert.equal(apiResult.spawns.length, 1);
+	assert.ok(apiResult.spawns[0].args.includes('--surface'));
+	assert.ok(apiResult.spawns[0].args.includes('api'));
+	assert.ok(apiResult.spawns[0].args.includes('--watch'));
+
+	const servicesResult = await runCli(['dev', '--surface', 'services', '--plan', '--json', '--feedback', 'off'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(servicesResult.exitCode, 0);
+	assert.equal(servicesResult.spawns.length, 1);
+	assert.ok(servicesResult.spawns[0].args.includes('--surface'));
+	assert.ok(servicesResult.spawns[0].args.includes('services'));
+	assert.ok(!servicesResult.spawns[0].args.includes('--watch'));
 });
 
 test('treeseed dev:watch delegates to the installed core entrypoint with --watch', async () => {
