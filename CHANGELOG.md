@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.13] - 2026-05-14
+
+### Dependencies
+
+- chore(cli): bump version to 0.8.13-dev.staging.20260514T074651Z (4ad144f5abfd)
+- Release @treeseed/cli 0.8.13.
+
 ## [0.8.12] - 2026-05-14
 
 ### Dependencies
