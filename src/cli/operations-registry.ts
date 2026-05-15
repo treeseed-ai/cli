@@ -68,6 +68,15 @@ const DEV_RUNTIME_OPTIONS: TreeseedCommandOptionSpec[] = [
 	{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 ];
 
+const DEV_MANAGER_OPTIONS: TreeseedCommandOptionSpec[] = [
+	...DEV_RUNTIME_OPTIONS,
+	{ name: 'docsAutomation', flags: '--docs-automation <mode>', description: 'Control governed documentation automation for the local manager.', kind: 'enum', values: ['on', 'dry-run', 'off'] },
+	{ name: 'withWorker', flags: '--with-worker', description: 'Run the local worker alongside the manager in the same dev supervisor.', kind: 'boolean' },
+	{ name: 'workdayId', flags: '--workday-id <id>', description: 'Start or resume a specific local documentation automation workday.', kind: 'string' },
+	{ name: 'capacityBudget', flags: '--capacity-budget <credits>', description: 'Override the local workday task credit budget.', kind: 'string' },
+	{ name: 'approvalPolicy', flags: '--approval-policy <policy>', description: 'Set the local docs automation approval policy.', kind: 'enum', values: ['manual', 'low-risk-auto'] },
+];
+
 function genericWorkflowPosition(spec: Pick<TreeseedOperationMetadata, 'group' | 'name'>): string {
 	if (spec.group === 'Workflow') {
 		if (spec.name === 'switch') return 'start work';
@@ -1237,6 +1246,27 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Starts the selected local surfaces, waits for readiness, and then remains attached as the live supervisor.',
 				'Restarts required crashed surfaces with capped exponential backoff and keeps setup/readiness failures alive for retry.',
 				'Stops watchers first and then terminates service process groups when the foreground command exits.',
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'dev',
+	})],
+	['dev:manager', command({
+		options: DEV_MANAGER_OPTIONS,
+		examples: ['treeseed dev:manager', 'treeseed dev:manager --with-worker', 'treeseed dev:manager --docs-automation dry-run --plan --json'],
+		help: {
+			longSummary: [
+				'Dev:manager starts the governed local documentation automation manager through the same integrated dev supervisor used by `treeseed dev`.',
+				'It selects the manager surface by default, can supervise a local worker with `--with-worker`, and passes docs automation policy into the existing manager and worker runtime.',
+			],
+			examples: [
+				example('treeseed dev:manager', 'Start the local manager', 'Run the governed workday manager in the foreground.'),
+				example('treeseed dev:manager --with-worker', 'Start manager plus worker', 'Run scheduling and task execution in the same local supervision session.'),
+				example('treeseed dev:manager --docs-automation dry-run --plan --json', 'Inspect dry-run manager mode', 'Show the manager plan and docs automation settings without starting the supervisor.'),
+			],
+			outcomes: [
+				'Starts or plans the existing manager surface, with optional worker supervision.',
+				'Keeps manual approval as the local default and forwards docs automation mode, workday id, capacity budget, and approval policy through runtime environment variables.',
 			],
 		},
 		executionMode: 'handler',

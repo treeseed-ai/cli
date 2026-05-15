@@ -56,6 +56,7 @@ export const COMMAND_HANDLERS = {
 	status: handleStatus,
 	ci: handleCi,
 	dev: handleDev,
+	'dev:manager': handleDev,
 	'dev:watch': handleDev,
 	doctor: handleDoctor,
 	rollback: handleRollback,

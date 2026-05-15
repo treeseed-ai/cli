@@ -1242,6 +1242,61 @@ test('treeseed dev forwards explicit API and service surfaces', async () => {
 	assert.ok(!servicesResult.spawns[0].args.includes('--watch'));
 });
 
+test('treeseed dev:manager selects manager surfaces and forwards docs automation settings', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-manager');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+
+	const result = await runCli([
+		'dev:manager',
+		'--docs-automation',
+		'dry-run',
+		'--workday-id',
+		'workday-local-1',
+		'--capacity-budget',
+		'42',
+		'--approval-policy',
+		'low-risk-auto',
+		'--plan',
+		'--json',
+	], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 1);
+	assert.ok(result.spawns[0].args.includes('--surfaces'));
+	assert.ok(result.spawns[0].args.includes('manager'));
+	assert.ok(result.spawns[0].args.includes('--plan'));
+	assert.ok(result.spawns[0].args.includes('--json'));
+	assert.equal(result.spawns[0].options.env.TREESEED_DOCS_AUTOMATION_MODE, 'dry-run');
+	assert.equal(result.spawns[0].options.env.TREESEED_WORKDAY_ID, 'workday-local-1');
+	assert.equal(result.spawns[0].options.env.TREESEED_CAPACITY_BUDGET, '42');
+	assert.equal(result.spawns[0].options.env.TREESEED_WORKDAY_TASK_CREDIT_BUDGET, '42');
+	assert.equal(result.spawns[0].options.env.TREESEED_APPROVAL_POLICY, 'low-risk-auto');
+});
+
+test('treeseed dev:manager --with-worker supervises manager and worker', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-manager-worker');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+
+	const result = await runCli(['dev:manager', '--with-worker', '--plan', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 1);
+	assert.ok(result.spawns[0].args.includes('--surfaces'));
+	assert.ok(result.spawns[0].args.includes('manager,worker'));
+	assert.equal(result.spawns[0].options.env.TREESEED_DOCS_AUTOMATION_MODE, 'on');
+	assert.equal(result.spawns[0].options.env.TREESEED_APPROVAL_POLICY, 'manual');
+});
+
 test('treeseed dev:watch delegates to the installed core entrypoint with --watch', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-installed');
 	installCoreDevFixture(workspaceRoot);
