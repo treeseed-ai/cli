@@ -5,6 +5,10 @@ import { dirname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
+import {
+	TREESEED_MACHINE_KEY_PASSPHRASE_ENV,
+	unlockTreeseedSecretSessionFromEnv,
+} from '@treeseed/sdk/workflow-support';
 import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 
 for (const key of ['CI', 'ACT', 'GITHUB_ACTIONS', 'TREESEED_VERIFY_DRIVER']) {
@@ -153,6 +157,13 @@ test('treeseed command help renders without executing the command', async () => 
 
 test('auth:login defaults to central and sanitizes loopback approval links from central', async () => {
 	const workspace = makeWorkspaceRoot();
+	const previousHome = process.env.HOME;
+	const previousPassphrase = process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV];
+	const previousTransport = process.env.TREESEED_KEY_AGENT_TRANSPORT;
+	process.env.HOME = workspace;
+	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
+	process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV] = 'test-passphrase';
+	unlockTreeseedSecretSessionFromEnv(workspace);
 	const calls = [];
 	const previousFetch = globalThis.fetch;
 	globalThis.fetch = async (input) => {
@@ -189,15 +200,22 @@ test('auth:login defaults to central and sanitizes loopback approval links from 
 			cwd: workspace,
 			env: {
 				HOME: workspace,
+				[TREESEED_MACHINE_KEY_PASSPHRASE_ENV]: 'test-passphrase',
 				TREESEED_MARKET_API_BASE_URL: 'http://127.0.0.1:3000',
 			},
 		});
-		assert.equal(result.exitCode, 0);
+		assertSuccessWithDiagnostics(result, 'auth:login central default');
 		assert.equal(calls[0], 'https://api.treeseed.ai/v1/auth/device/start');
 		assert.match(result.stdout, /Open https:\/\/treeseed\.ai\/auth\/device\/approve\?user_code=ABCD-EFGH/u);
 		assert.doesNotMatch(result.stdout, /127\.0\.0\.1/u);
 	} finally {
 		globalThis.fetch = previousFetch;
+		if (previousHome === undefined) delete process.env.HOME;
+		else process.env.HOME = previousHome;
+		if (previousPassphrase === undefined) delete process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV];
+		else process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV] = previousPassphrase;
+		if (previousTransport === undefined) delete process.env.TREESEED_KEY_AGENT_TRANSPORT;
+		else process.env.TREESEED_KEY_AGENT_TRANSPORT = previousTransport;
 	}
 });
 
