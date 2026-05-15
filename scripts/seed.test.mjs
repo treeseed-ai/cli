@@ -119,6 +119,26 @@ export async function applyLocalSeedFromCli(input) {
 			appliedAt: '2026-01-01T00:00:00.000Z',
 			manifestHash: 'test-manifest-hash',
 			actionCount: alreadyApplied ? 0 : input.plan.summary.create + input.plan.summary.update,
+			capacityProviderKeys: alreadyApplied
+				? {
+					created: [],
+					existing: [{
+						providerId: 'provider-local',
+						providerKey: 'capacity-provider:treeseed/local-dev',
+						providerName: 'treeseed-local-dev',
+						keyPrefix: 'tsp_existingkey',
+					}],
+				}
+				: {
+					created: [{
+						providerId: 'provider-local',
+						providerKey: 'capacity-provider:treeseed/local-dev',
+						providerName: 'treeseed-local-dev',
+						keyPrefix: 'tsp_createdkey1',
+						plaintextKey: 'tsp_createdkey1_secret',
+					}],
+					existing: [],
+				},
 		},
 	};
 }
@@ -290,9 +310,9 @@ resources:
       repository:
         role: primary
         provider: github
-        owner: treeseed-ai
+        owner: knowledge-coop
         name: market
-        gitUrl: https://github.com/treeseed-ai/market.git
+        gitUrl: https://github.com/knowledge-coop/market.git
         defaultBranch: main
         checkoutPath: .
     - key: project:treeseed/sdk
@@ -363,6 +383,17 @@ resources:
       dailyCreditBudget: 10000
       maxConcurrentWorkdays: 2
       maxConcurrentWorkers: 4
+      registration:
+        apiKey:
+          createIfMissing: true
+          name: TreeSeed local provider security code
+          scopes:
+            - provider:heartbeat
+            - provider:tasks:claim
+            - provider:tasks:update
+            - provider:usage:report
+            - provider:lanes:read
+            - provider:registration:complete
       lanes:
         - key: lane:treeseed/local-dev/codex
           name: local-codex
@@ -389,6 +420,17 @@ resources:
       dailyCreditBudget: 5000
       maxConcurrentWorkdays: 2
       maxConcurrentWorkers: 8
+      registration:
+        apiKey:
+          createIfMissing: true
+          name: TreeSeed production provider security code
+          scopes:
+            - provider:heartbeat
+            - provider:tasks:claim
+            - provider:tasks:update
+            - provider:usage:report
+            - provider:lanes:read
+            - provider:registration:complete
       lanes:
         - key: lane:treeseed/production/codex
           name: codex-production
@@ -512,6 +554,16 @@ resources:
       maxQueuedTasks: 50
       maxQueuedCredits: 5000
   repositoryHosts:
+    - key: repository-host:treeseed/market-github
+      team: team:treeseed
+      provider: github
+      name: knowledge-coop
+      ownership: treeseed_managed
+      accountLabel: Knowledge Coop GitHub organization
+      organizationOrOwner: knowledge-coop
+      defaultVisibility: public
+      allowedProjectKinds: [market_app, package, knowledge_hub]
+      status: active
     - key: repository-host:treeseed/github
       team: team:treeseed
       provider: github
@@ -538,9 +590,9 @@ resources:
       searchText: TreeSeed market control plane starter template
       metadata:
         provider: github
-        owner: treeseed-ai
+        owner: knowledge-coop
         repository: market
-        gitUrl: https://github.com/treeseed-ai/market.git
+        gitUrl: https://github.com/knowledge-coop/market.git
   catalogArtifacts:
     - key: catalog-artifact:treeseed/market-template/1.0.0
       product: product:treeseed/market-template
@@ -550,9 +602,9 @@ resources:
       manifestKey: seeds/treeseed.yaml
       metadata:
         provider: github
-        owner: treeseed-ai
+        owner: knowledge-coop
         repository: market
-        gitUrl: https://github.com/treeseed-ai/market.git
+        gitUrl: https://github.com/knowledge-coop/market.git
   agentPools: []
 `;
 
@@ -574,9 +626,9 @@ resources:
       repository:
         role: primary
         provider: github
-        owner: treeseed-ai
+        owner: knowledge-coop
         name: market
-        gitUrl: https://github.com/treeseed-ai/market.git
+        gitUrl: https://github.com/knowledge-coop/market.git
         defaultBranch: main
   capacityProviders: []
   capacityGrants: []
@@ -605,10 +657,11 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /CREATE lane local-codex/);
 	assert.match(result.stdout, /CREATE grant treeseed\/local-dev -> treeseed/);
 	assert.match(result.stdout, /CREATE work policy market\/local/);
+	assert.match(result.stdout, /CREATE repository host github\/knowledge-coop/);
 	assert.match(result.stdout, /CREATE repository host github\/treeseed-ai/);
 	assert.match(result.stdout, /CREATE product template\/treeseed-market/);
 	assert.match(result.stdout, /CREATE catalog artifact treeseed\/market-template@1\.0\.0/);
-	assert.match(result.stdout, /  create: 14/);
+	assert.match(result.stdout, /  create: 15/);
 	assert.match(result.stdout, /  skipped: 11/);
 	assert.doesNotMatch(result.stdout, /codex-production/);
 });
@@ -650,7 +703,7 @@ test('seed json output includes skipped resources for agent review', async () =>
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 14);
+	assert.equal(payload.summary.create, 15);
 	assert.equal(payload.summary.skip, 11);
 	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 11);
 	assert.equal(payload.actions[0].key, 'team:treeseed');
@@ -666,9 +719,11 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(first.exitCode, 0, first.stderr);
 	const firstPayload = JSON.parse(first.stdout);
 	assert.equal(firstPayload.ok, true);
-	assert.equal(firstPayload.summary.create, 14);
+	assert.equal(firstPayload.summary.create, 15);
 	assert.equal(firstPayload.summary.skip, 11);
-	assert.equal(firstPayload.result.actionCount, 14);
+	assert.equal(firstPayload.result.actionCount, 15);
+	assert.equal(firstPayload.result.capacityProviderKeys.created.length, 1);
+	assert.match(firstPayload.result.capacityProviderKeys.created[0].plaintextKey, /^tsp_/);
 
 	const second = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
@@ -677,9 +732,12 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(second.exitCode, 0, second.stderr);
 	const secondPayload = JSON.parse(second.stdout);
 	assert.equal(secondPayload.summary.create, 0);
-	assert.equal(secondPayload.summary.unchanged, 14);
+	assert.equal(secondPayload.summary.unchanged, 15);
 	assert.equal(secondPayload.summary.skip, 11);
 	assert.equal(secondPayload.result.actionCount, 0);
+	assert.equal(secondPayload.result.capacityProviderKeys.created.length, 0);
+	assert.equal(secondPayload.result.capacityProviderKeys.existing.length, 1);
+	assert.equal(secondPayload.result.capacityProviderKeys.existing[0].plaintextKey, undefined);
 	assert.equal(secondPayload.actions.find((action) => action.key === 'team:treeseed').action, 'unchanged');
 });
 
@@ -712,13 +770,28 @@ test('seed staging apply uses the remote market API', async () => {
 		return jsonResponse(remoteSeedPayload({
 			mode: 'apply',
 			environments: ['staging'],
-			result: { appliedAt: '2026-01-01T00:00:00.000Z', manifestHash: 'abc', actionCount: 11 },
+			result: {
+				appliedAt: '2026-01-01T00:00:00.000Z',
+				manifestHash: 'abc',
+				actionCount: 11,
+				capacityProviderKeys: {
+					created: [{
+						providerId: 'provider-1',
+						providerKey: 'capacity-provider:treeseed/production',
+						providerName: 'treeseed-production',
+						keyPrefix: 'tsp_123456789abc',
+						plaintextKey: 'tsp_123456789abcdef',
+					}],
+					existing: [],
+				},
+			},
 		}));
 	}, () => runCli(['seed', 'treeseed', '--environments', 'staging', '--apply', '--json'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.ok, true);
 	assert.equal(payload.result.actionCount, 11);
+	assert.equal(payload.result.capacityProviderKeys.created[0].plaintextKey, 'tsp_123456789abcdef');
 });
 
 test('seed prod apply returns blocked approval response', async () => {
@@ -782,7 +855,7 @@ test('seed validation rejects duplicate keys', async () => {
 
 test('seed validation rejects missing remote git url', async () => {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('        gitUrl: https://github.com/treeseed-ai/market.git\n', ''));
+	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('        gitUrl: https://github.com/knowledge-coop/market.git\n', ''));
 	const result = await runCli(['seed', 'demo', '--validate'], { cwd: root });
 	assert.equal(result.exitCode, 1);
 	assert.match(result.stderr, /repository\.gitUrl/);
@@ -790,7 +863,7 @@ test('seed validation rejects missing remote git url', async () => {
 
 test('seed validation rejects repository owner and url mismatch', async () => {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('https://github.com/treeseed-ai/market.git', 'https://github.com/example/market.git'));
+	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('https://github.com/knowledge-coop/market.git', 'https://github.com/example/market.git'));
 	const result = await runCli(['seed', 'demo', '--validate'], { cwd: root });
 	assert.equal(result.exitCode, 1);
 	assert.match(result.stderr, /seed\.repository_metadata_mismatch/);

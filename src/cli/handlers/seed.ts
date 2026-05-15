@@ -58,12 +58,13 @@ function planFromRemotePayload(payload: Record<string, unknown>): SeedPlan {
 
 function remoteSeedResult(payload: Record<string, unknown>, command: string, exitCode = 0) {
 	const plan = planFromRemotePayload(payload);
+	const result = payload.result && typeof payload.result === 'object' ? payload.result as Record<string, unknown> : null;
 	return {
 		exitCode,
 		stdout: exitCode === 0
 			? [
 				...formatSeedPlan(plan),
-				...(payload.result && typeof payload.result === 'object'
+				...(result
 					? [
 						'',
 						'Apply:',
@@ -72,6 +73,7 @@ function remoteSeedResult(payload: Record<string, unknown>, command: string, exi
 						`  unchanged: ${plan.summary.unchanged}`,
 						`  skipped: ${plan.summary.skip}`,
 						`  failed: ${plan.summary.error}`,
+						...formatCapacityProviderKeyNotes(result),
 					]
 					: []),
 			]
@@ -83,6 +85,21 @@ function remoteSeedResult(payload: Record<string, unknown>, command: string, exi
 			ok: exitCode === 0,
 		},
 	};
+}
+
+function formatCapacityProviderKeyNotes(result: Record<string, unknown>) {
+	const capacityProviderKeys = result.capacityProviderKeys && typeof result.capacityProviderKeys === 'object'
+		? result.capacityProviderKeys as Record<string, unknown>
+		: null;
+	const created = Array.isArray(capacityProviderKeys?.created) ? capacityProviderKeys.created as Record<string, unknown>[] : [];
+	if (created.length === 0) return [];
+	return [
+		'',
+		'Provider security codes:',
+		...created.map((entry) =>
+			`  ${String(entry.providerName ?? entry.providerKey ?? entry.providerId)} (${String(entry.keyPrefix ?? 'new key')}): ${String(entry.plaintextKey ?? 'created')}`),
+		'  Copy these now. TreeSeed will not show the plaintext codes again.',
+	];
 }
 
 function remoteSeedError(error: unknown, command: string) {
@@ -279,6 +296,7 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 					`  unchanged: ${applied.plan.summary.unchanged}`,
 					`  skipped: ${applied.plan.summary.skip}`,
 					`  failed: ${applied.plan.summary.error}`,
+					...formatCapacityProviderKeyNotes(applied.result),
 				],
 			report: {
 				...applied.plan,
