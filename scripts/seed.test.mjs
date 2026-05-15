@@ -1,14 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 import { setMarketSession } from '@treeseed/sdk/market-client';
 
 const { runTreeseedCli } = await import('../dist/cli/main.js');
-
-const repoRoot = resolve(new URL('.', import.meta.url).pathname, '..', '..', '..');
 
 function tempD1Path() {
 	return mkdtempSync(resolve(tmpdir(), 'treeseed-seed-d1-'));
@@ -50,9 +48,87 @@ function writeSeed(root, name, yaml) {
 	writeFileSync(resolve(root, 'seeds', `${name}.yaml`), yaml, 'utf8');
 }
 
-function remoteSeedWorkspace() {
+function writeLocalSeedService(root) {
+	const serviceRoot = resolve(root, 'src', 'lib', 'market', 'seeds');
+	mkdirSync(serviceRoot, { recursive: true });
+	writeFileSync(resolve(root, 'src', 'package.json'), JSON.stringify({ type: 'module' }, null, 2));
+	writeFileSync(resolve(serviceRoot, 'apply.js'), `
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+function markerPath(input) {
+	const root = input.env?.TREESEED_API_D1_LOCAL_PERSIST_TO || resolve(input.projectRoot, '.treeseed-test-state');
+	mkdirSync(root, { recursive: true });
+	return resolve(root, 'seed-applied.json');
+}
+
+function unchangedPlan(plan) {
+	const actions = plan.actions.map((action) => action.action === 'create' || action.action === 'update' ? { ...action, action: 'unchanged' } : action);
+	const unchanged = actions.filter((action) => action.action === 'unchanged').length;
+	return {
+		...plan,
+		summary: {
+			...plan.summary,
+			create: 0,
+			update: 0,
+			unchanged,
+		},
+		actions,
+	};
+}
+
+export async function planLocalSeedFromCli(input) {
+	return { plan: null, diagnostics: [], manifestPath: resolve(input.projectRoot, 'seeds', input.seedName + '.yaml') };
+}
+
+export async function applyLocalSeedFromCli(input) {
+	const marker = markerPath(input);
+	const alreadyApplied = existsSync(marker);
+	const plan = alreadyApplied ? unchangedPlan(input.plan) : input.plan;
+	if (!alreadyApplied) {
+		writeFileSync(marker, JSON.stringify({ applied: true }), 'utf8');
+	}
+	return {
+		plan,
+		result: {
+			appliedAt: '2026-01-01T00:00:00.000Z',
+			manifestHash: 'test-manifest-hash',
+			actionCount: alreadyApplied ? 0 : input.plan.summary.create + input.plan.summary.update,
+		},
+	};
+}
+
+export async function exportSeedFromCli(input) {
+	return {
+		ok: true,
+		seed: input.seedName,
+		manifest: {},
+		yaml: [
+			'name: ' + input.seedName,
+			'version: 1',
+			'resources:',
+			'  repositoryHosts: []',
+			'  products: []',
+			'  catalogArtifacts: []',
+			'',
+		].join('\\n'),
+		diagnostics: [],
+	};
+}
+`, 'utf8');
+}
+
+function seedWorkspace({ localService = true } = {}) {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'treeseed', readFileSync(resolve(repoRoot, 'seeds', 'treeseed.yaml'), 'utf8'));
+	writeSeed(root, 'treeseed', CANONICAL_TREESEED_SEED);
+	if (localService) {
+		writeLocalSeedService(root);
+	}
+	return root;
+}
+
+function remoteSeedWorkspace() {
+	const root = seedWorkspace({ localService: false });
 	setMarketSession(root, {
 		marketId: 'central',
 		accessToken: 'test-token',
@@ -102,6 +178,293 @@ function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary 
 	};
 }
 
+const CANONICAL_TREESEED_SEED = `
+name: treeseed
+version: 1
+defaultEnvironments: [local]
+environments: [local, staging, prod]
+resources:
+  teams:
+    - key: team:treeseed
+      slug: treeseed
+      name: treeseed
+      displayName: TreeSeed
+      profileSummary: TreeSeed platform, market, SDK, CLI, core, and agent operations.
+  projects:
+    - key: project:treeseed/market
+      team: team:treeseed
+      slug: market
+      name: TreeSeed Market
+      kind: market_app
+      repository:
+        role: primary
+        provider: github
+        owner: treeseed-ai
+        name: market
+        gitUrl: https://github.com/treeseed-ai/market.git
+        defaultBranch: main
+        checkoutPath: .
+    - key: project:treeseed/sdk
+      team: team:treeseed
+      slug: sdk
+      name: TreeSeed SDK
+      kind: package
+      repository:
+        role: package
+        provider: github
+        owner: treeseed-ai
+        name: sdk
+        gitUrl: https://github.com/treeseed-ai/sdk.git
+        defaultBranch: main
+        checkoutPath: packages/sdk
+        submodulePath: packages/sdk
+    - key: project:treeseed/core
+      team: team:treeseed
+      slug: core
+      name: TreeSeed Core
+      kind: package
+      repository:
+        role: package
+        provider: github
+        owner: treeseed-ai
+        name: core
+        gitUrl: https://github.com/treeseed-ai/core.git
+        defaultBranch: main
+        checkoutPath: packages/core
+        submodulePath: packages/core
+    - key: project:treeseed/cli
+      team: team:treeseed
+      slug: cli
+      name: TreeSeed CLI
+      kind: package
+      repository:
+        role: package
+        provider: github
+        owner: treeseed-ai
+        name: cli
+        gitUrl: https://github.com/treeseed-ai/cli.git
+        defaultBranch: main
+        checkoutPath: packages/cli
+        submodulePath: packages/cli
+    - key: project:treeseed/agent
+      team: team:treeseed
+      slug: agent
+      name: TreeSeed Agent
+      kind: package
+      repository:
+        role: package
+        provider: github
+        owner: treeseed-ai
+        name: agent
+        gitUrl: https://github.com/treeseed-ai/agent.git
+        defaultBranch: main
+        checkoutPath: packages/agent
+        submodulePath: packages/agent
+  capacityProviders:
+    - key: capacity-provider:treeseed/local-dev
+      environments: [local]
+      team: team:treeseed
+      name: treeseed-local-dev
+      kind: local
+      provider: local
+      billingScope: team
+      monthlyCreditBudget: 100000
+      dailyCreditBudget: 10000
+      maxConcurrentWorkdays: 2
+      maxConcurrentWorkers: 4
+      lanes:
+        - key: lane:treeseed/local-dev/codex
+          name: local-codex
+          businessModel: subscription
+          modelFamily: codex
+          modelClass: coding_agent
+          unit: treeseed_credit
+          scarcityLevel: low
+        - key: lane:treeseed/local-dev/worker
+          name: local-worker
+          businessModel: local
+          modelFamily: local
+          modelClass: worker
+          unit: worker_minute
+          scarcityLevel: medium
+    - key: capacity-provider:treeseed/production
+      environments: [staging, prod]
+      team: team:treeseed
+      name: treeseed-production
+      kind: managed
+      provider: railway
+      billingScope: team
+      monthlyCreditBudget: 50000
+      dailyCreditBudget: 5000
+      maxConcurrentWorkdays: 2
+      maxConcurrentWorkers: 8
+      lanes:
+        - key: lane:treeseed/production/codex
+          name: codex-production
+          businessModel: subscription
+          modelFamily: codex
+          modelClass: coding_agent
+          unit: treeseed_credit
+          scarcityLevel: high
+        - key: lane:treeseed/production/workday-runner
+          name: workday-runner
+          businessModel: managed_runtime
+          modelFamily: railway
+          modelClass: worker_pool
+          unit: quota_minute
+          scarcityLevel: medium
+  capacityGrants:
+    - key: grant:treeseed/local-dev/all-projects
+      environments: [local]
+      provider: capacity-provider:treeseed/local-dev
+      team: team:treeseed
+      grantScope: team
+      dailyCreditLimit: 10000
+      monthlyCreditLimit: 100000
+      priorityWeight: 1
+      overflowPolicy: soft_grant
+    - key: grant:treeseed/staging/market
+      environments: [staging]
+      provider: capacity-provider:treeseed/production
+      team: team:treeseed
+      project: project:treeseed/market
+      grantScope: project
+      dailyCreditLimit: 2500
+      monthlyCreditLimit: 25000
+      priorityWeight: 8
+      overflowPolicy: approval_required
+    - key: grant:treeseed/prod/market
+      environments: [prod]
+      provider: capacity-provider:treeseed/production
+      team: team:treeseed
+      project: project:treeseed/market
+      grantScope: project
+      dailyCreditLimit: 2500
+      monthlyCreditLimit: 25000
+      priorityWeight: 10
+      overflowPolicy: approval_required
+    - key: grant:treeseed/prod/sdk
+      environments: [prod]
+      provider: capacity-provider:treeseed/production
+      team: team:treeseed
+      project: project:treeseed/sdk
+      grantScope: project
+      dailyCreditLimit: 1000
+      monthlyCreditLimit: 10000
+      priorityWeight: 6
+      overflowPolicy: approval_required
+    - key: grant:treeseed/prod/core
+      environments: [prod]
+      provider: capacity-provider:treeseed/production
+      team: team:treeseed
+      project: project:treeseed/core
+      grantScope: project
+      dailyCreditLimit: 1000
+      monthlyCreditLimit: 10000
+      priorityWeight: 6
+      overflowPolicy: approval_required
+    - key: grant:treeseed/prod/cli
+      environments: [prod]
+      provider: capacity-provider:treeseed/production
+      team: team:treeseed
+      project: project:treeseed/cli
+      grantScope: project
+      dailyCreditLimit: 500
+      monthlyCreditLimit: 5000
+      priorityWeight: 4
+      overflowPolicy: approval_required
+    - key: grant:treeseed/prod/agent
+      environments: [prod]
+      provider: capacity-provider:treeseed/production
+      team: team:treeseed
+      project: project:treeseed/agent
+      grantScope: project
+      dailyCreditLimit: 1000
+      monthlyCreditLimit: 10000
+      priorityWeight: 8
+      overflowPolicy: approval_required
+  workPolicies:
+    - key: work-policy:treeseed/local/market
+      environments: [local]
+      project: project:treeseed/market
+      environment: local
+      enabled: true
+      startCron: "0 9 * * 1-5"
+      durationMinutes: 480
+      maxRunners: 1
+      maxWorkersPerRunner: 4
+      dailyCreditBudget: 5000
+      maxQueuedTasks: 100
+      maxQueuedCredits: 10000
+    - key: work-policy:treeseed/staging/market
+      environments: [staging]
+      project: project:treeseed/market
+      environment: staging
+      enabled: true
+      startCron: "0 9 * * 1-5"
+      durationMinutes: 480
+      maxRunners: 1
+      maxWorkersPerRunner: 4
+      dailyCreditBudget: 2500
+      maxQueuedTasks: 50
+      maxQueuedCredits: 5000
+    - key: work-policy:treeseed/prod/market
+      environments: [prod]
+      project: project:treeseed/market
+      environment: prod
+      enabled: true
+      startCron: "0 9 * * 1-5"
+      durationMinutes: 480
+      maxRunners: 1
+      maxWorkersPerRunner: 4
+      dailyCreditBudget: 2500
+      maxQueuedTasks: 50
+      maxQueuedCredits: 5000
+  repositoryHosts:
+    - key: repository-host:treeseed/github
+      team: team:treeseed
+      provider: github
+      name: treeseed-ai
+      ownership: treeseed_managed
+      accountLabel: TreeSeed AI GitHub organization
+      organizationOrOwner: treeseed-ai
+      defaultVisibility: public
+      allowedProjectKinds: [market_app, package, knowledge_hub]
+      status: active
+  hubRepositories: []
+  products:
+    - key: product:treeseed/market-template
+      team: team:treeseed
+      kind: template
+      slug: treeseed-market
+      title: TreeSeed Market Starter
+      summary: First-party TreeSeed market control plane starter bundle.
+      visibility: public
+      listingEnabled: true
+      offerMode: free
+      manifestKey: seeds/treeseed.yaml
+      artifactKey: catalog/treeseed-market/1.0.0/template
+      searchText: TreeSeed market control plane starter template
+      metadata:
+        provider: github
+        owner: treeseed-ai
+        repository: market
+        gitUrl: https://github.com/treeseed-ai/market.git
+  catalogArtifacts:
+    - key: catalog-artifact:treeseed/market-template/1.0.0
+      product: product:treeseed/market-template
+      version: 1.0.0
+      kind: template
+      contentKey: catalog/treeseed-market/1.0.0/template
+      manifestKey: seeds/treeseed.yaml
+      metadata:
+        provider: github
+        owner: treeseed-ai
+        repository: market
+        gitUrl: https://github.com/treeseed-ai/market.git
+  agentPools: []
+`;
+
 const VALID_MINIMAL_SEED = `
 name: demo
 version: 1
@@ -130,14 +493,16 @@ resources:
 `;
 
 test('seed validates the canonical treeseed manifest', async () => {
-	const result = await runCli(['seed', 'treeseed', '--validate'], { cwd: repoRoot });
+	const root = seedWorkspace({ localService: false });
+	const result = await runCli(['seed', 'treeseed', '--validate'], { cwd: root });
 	assert.equal(result.exitCode, 0);
 	assert.match(result.stdout, /Seed treeseed is valid/);
 });
 
 test('seed local plan prints deterministic human output', async () => {
+	const root = seedWorkspace();
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan'], {
-		cwd: repoRoot,
+		cwd: root,
 		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
 	});
 	assert.equal(result.exitCode, 0);
@@ -184,8 +549,9 @@ test('seed staging plan includes staging capacity and work policy resources', as
 });
 
 test('seed json output includes skipped resources for agent review', async () => {
+	const root = seedWorkspace();
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan', '--json'], {
-		cwd: repoRoot,
+		cwd: root,
 		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
 	});
 	assert.equal(result.exitCode, 0);
@@ -200,9 +566,10 @@ test('seed json output includes skipped resources for agent review', async () =>
 });
 
 test('seed local apply creates resources and repeated apply reports unchanged', async () => {
+	const root = seedWorkspace();
 	const persistTo = tempD1Path();
 	const first = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
-		cwd: repoRoot,
+		cwd: root,
 		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	assert.equal(first.exitCode, 0, first.stderr);
@@ -213,7 +580,7 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(firstPayload.result.actionCount, 14);
 
 	const second = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
-		cwd: repoRoot,
+		cwd: root,
 		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	assert.equal(second.exitCode, 0, second.stderr);
@@ -226,13 +593,14 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 });
 
 test('seed export emits a productized manifest from local state', async () => {
+	const root = seedWorkspace();
 	const persistTo = tempD1Path();
 	await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
-		cwd: repoRoot,
+		cwd: root,
 		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	const result = await runCli(['seed', 'export', 'treeseed', '--team', 'treeseed', '--include-artifacts', '--json'], {
-		cwd: repoRoot,
+		cwd: root,
 		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	assert.equal(result.exitCode, 0, result.stderr);
@@ -305,8 +673,7 @@ test('seed prod apply passes approved approval request to remote market API', as
 });
 
 test('seed remote auth failures map to exit code four', async () => {
-	const root = makeWorkspaceRoot();
-	writeSeed(root, 'treeseed', readFileSync(resolve(repoRoot, 'seeds', 'treeseed.yaml'), 'utf8'));
+	const root = seedWorkspace({ localService: false });
 	const result = await runCli(['seed', 'treeseed', '--environments', 'staging', '--plan', '--json'], { cwd: root });
 	assert.equal(result.exitCode, 4);
 	const payload = JSON.parse(result.stderr);
