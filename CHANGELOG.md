@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.16] - 2026-05-15
+
+### Added
+
+- feat(auth): sanitize loopback approval URLs for central profile (741ef25fcb5e)
+
+### Tests
+
+- chore(cli): bump version and update auth:login test (dff5b16975a7)
+
+### Dependencies
+
+- Release @treeseed/cli 0.8.16.
+
 ## [0.8.15] - 2026-05-15
 
 ### Tests
