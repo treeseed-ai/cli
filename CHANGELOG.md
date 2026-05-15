@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.14] - 2026-05-15
+
+### Added
+
+- feat(seed): include capacity provider keys in seed response (116878333244)
+- feat(cli): add seed command and tests (eda43bd11d49)
+
+### Tests
+
+- chore(cli): bump version to 0.8.14-dev.staging.20260515T061135Z (174ee229a189)
+- test(cli): refactor seed tests and bump version (1fb521ed5b2b)
+- build(source): sync package dependency references (2dbbb6b04aac)
+
+### Dependencies
+
+- build(cli): bump version and remove yaml dependency (85f9674a5299)
+- Release @treeseed/cli 0.8.14.
+
 ## [0.8.13] - 2026-05-14
 
 ### Dependencies

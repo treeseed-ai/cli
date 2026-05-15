@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.8.13",
+  "version": "0.8.14",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -31,7 +31,7 @@
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
     "lint": "npm run build:dist",
-    "test": "npm run build:dist && node --test --test-concurrency=1 ./scripts/treeseed-help.test.mjs ./scripts/wrapper-package.test.mjs",
+    "test": "npm run build:dist && node --test --test-concurrency=1 ./scripts/treeseed-help.test.mjs ./scripts/seed.test.mjs ./scripts/wrapper-package.test.mjs",
     "build:dist": "node ./scripts/run-ts.mjs ./scripts/build-dist.ts",
     "prepare": "node ./scripts/prepare.mjs",
     "prepack": "npm run build:dist",
@@ -45,7 +45,7 @@
     "release:publish": "node ./scripts/run-ts.mjs ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.8.13",
+    "@treeseed/sdk": "0.8.14",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
