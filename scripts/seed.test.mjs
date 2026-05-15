@@ -5,6 +5,11 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 import { setMarketSession } from '@treeseed/sdk/market-client';
+import {
+	createDefaultTreeseedMachineConfig,
+	unlockTreeseedSecretSessionWithPassphrase,
+	writeTreeseedMachineConfig,
+} from '@treeseed/sdk/workflow-support';
 
 const { runTreeseedCli } = await import('../dist/cli/main.js');
 
@@ -14,18 +19,29 @@ function tempD1Path() {
 
 async function runCli(args, options = {}) {
 	const writes = [];
-	const exitCode = await runTreeseedCli(args, {
+	const env = {
+		...process.env,
+		NODE_ENV: 'test',
+		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
+		CI: undefined,
+		ACT: undefined,
+		GITHUB_ACTIONS: undefined,
+		TREESEED_VERIFY_DRIVER: undefined,
+		...(options.env ?? {}),
+	};
+	const previousEnv = new Map(Object.keys(env).map((key) => [key, process.env[key]]));
+	for (const [key, value] of Object.entries(env)) {
+		if (value === undefined) {
+			delete process.env[key];
+		} else {
+			process.env[key] = value;
+		}
+	}
+	let exitCode;
+	try {
+		exitCode = await runTreeseedCli(args, {
 		cwd: options.cwd ?? process.cwd(),
-		env: {
-			...process.env,
-			NODE_ENV: 'test',
-			TREESEED_KEY_AGENT_TRANSPORT: 'inline',
-			CI: undefined,
-			ACT: undefined,
-			GITHUB_ACTIONS: undefined,
-			TREESEED_VERIFY_DRIVER: undefined,
-			...(options.env ?? {}),
-		},
+		env,
 		interactiveUi: false,
 		write(output, stream) {
 			writes.push({ output, stream });
@@ -33,7 +49,16 @@ async function runCli(args, options = {}) {
 		spawn() {
 			return { status: 0 };
 		},
-	});
+		});
+	} finally {
+		for (const [key, value] of previousEnv) {
+			if (value === undefined) {
+				delete process.env[key];
+			} else {
+				process.env[key] = value;
+			}
+		}
+	}
 	return {
 		exitCode,
 		writes,
@@ -127,19 +152,85 @@ function seedWorkspace({ localService = true } = {}) {
 	return root;
 }
 
+function prepareMarketSessionStorage(root) {
+	const previousHome = process.env.HOME;
+	const previousTransport = process.env.TREESEED_KEY_AGENT_TRANSPORT;
+	process.env.HOME = root;
+	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
+	try {
+		writeTreeseedMachineConfig(root, createDefaultTreeseedMachineConfig({
+			tenantRoot: root,
+			deployConfig: {
+				name: 'Help Test',
+				slug: 'help-test',
+				siteUrl: 'https://example.com',
+			},
+			tenantConfig: undefined,
+		}));
+		unlockTreeseedSecretSessionWithPassphrase(root, 'test-passphrase', {
+			createIfMissing: true,
+			allowMigration: false,
+		});
+	} finally {
+		if (previousHome === undefined) {
+			delete process.env.HOME;
+		} else {
+			process.env.HOME = previousHome;
+		}
+		if (previousTransport === undefined) {
+			delete process.env.TREESEED_KEY_AGENT_TRANSPORT;
+		} else {
+			process.env.TREESEED_KEY_AGENT_TRANSPORT = previousTransport;
+		}
+	}
+}
+
+function remoteSeedEnv(root) {
+	return {
+		HOME: root,
+		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
+		TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+	};
+}
+
 function remoteSeedWorkspace() {
 	const root = seedWorkspace({ localService: false });
-	setMarketSession(root, {
-		marketId: 'central',
-		accessToken: 'test-token',
-		principal: {
-			id: 'user-1',
-			displayName: 'Seed User',
-			scopes: ['auth:me', 'market'],
-			roles: ['platform_admin'],
-			permissions: ['*:*:*'],
-		},
-	});
+	prepareMarketSessionStorage(root);
+	const previousHome = process.env.HOME;
+	const previousTransport = process.env.TREESEED_KEY_AGENT_TRANSPORT;
+	const previousPassphrase = process.env.TREESEED_KEY_PASSPHRASE;
+	process.env.HOME = root;
+	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
+	process.env.TREESEED_KEY_PASSPHRASE = 'test-passphrase';
+	try {
+		setMarketSession(root, {
+			marketId: 'central',
+			accessToken: 'test-token',
+			principal: {
+				id: 'user-1',
+				displayName: 'Seed User',
+				scopes: ['auth:me', 'market'],
+				roles: ['platform_admin'],
+				permissions: ['*:*:*'],
+			},
+		});
+	} finally {
+		if (previousHome === undefined) {
+			delete process.env.HOME;
+		} else {
+			process.env.HOME = previousHome;
+		}
+		if (previousTransport === undefined) {
+			delete process.env.TREESEED_KEY_AGENT_TRANSPORT;
+		} else {
+			process.env.TREESEED_KEY_AGENT_TRANSPORT = previousTransport;
+		}
+		if (previousPassphrase === undefined) {
+			delete process.env.TREESEED_KEY_PASSPHRASE;
+		} else {
+			process.env.TREESEED_KEY_PASSPHRASE = previousPassphrase;
+		}
+	}
 	return root;
 }
 
@@ -527,7 +618,7 @@ test('seed prod plan includes production resources', async () => {
 	const result = await withMockFetch(async () => jsonResponse(remoteSeedPayload({
 		environments: ['prod'],
 		summary: { create: 15, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
-	})), () => runCli(['seed', 'treeseed', '--environments', 'prod', '--plan'], { cwd: root }));
+	})), () => runCli(['seed', 'treeseed', '--environments', 'prod', '--plan'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	assert.match(result.stdout, /CREATE capacity provider treeseed-production/);
 	assert.match(result.stdout, /CREATE work policy market\/prod/);
@@ -538,7 +629,7 @@ test('seed prod plan includes production resources', async () => {
 
 test('seed staging plan includes staging capacity and work policy resources', async () => {
 	const root = remoteSeedWorkspace();
-	const result = await withMockFetch(async () => jsonResponse(remoteSeedPayload()), () => runCli(['seed', 'treeseed', '--environments', 'staging', '--plan'], { cwd: root }));
+	const result = await withMockFetch(async () => jsonResponse(remoteSeedPayload()), () => runCli(['seed', 'treeseed', '--environments', 'staging', '--plan'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	assert.match(result.stdout, /Environments: staging/);
 	assert.match(result.stdout, /CREATE capacity provider treeseed-production/);
@@ -623,7 +714,7 @@ test('seed staging apply uses the remote market API', async () => {
 			environments: ['staging'],
 			result: { appliedAt: '2026-01-01T00:00:00.000Z', manifestHash: 'abc', actionCount: 11 },
 		}));
-	}, () => runCli(['seed', 'treeseed', '--environments', 'staging', '--apply', '--json'], { cwd: root }));
+	}, () => runCli(['seed', 'treeseed', '--environments', 'staging', '--apply', '--json'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.ok, true);
@@ -646,7 +737,7 @@ test('seed prod apply returns blocked approval response', async () => {
 		}),
 		ok: false,
 		error: 'Production seed apply requires approval.',
-	}, 409), () => runCli(['seed', 'treeseed', '--environments', 'prod', '--apply', '--json'], { cwd: root }));
+	}, 409), () => runCli(['seed', 'treeseed', '--environments', 'prod', '--apply', '--json'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 2);
 	const payload = JSON.parse(result.stderr);
 	assert.equal(payload.ok, false);
@@ -664,7 +755,7 @@ test('seed prod apply passes approved approval request to remote market API', as
 			summary: { create: 15, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
 			result: { appliedAt: '2026-01-01T00:00:00.000Z', manifestHash: 'abc', actionCount: 15 },
 		}));
-	}, () => runCli(['seed', 'treeseed', '--environments', 'prod', '--apply', '--approval-request', 'approval-1', '--json'], { cwd: root }));
+	}, () => runCli(['seed', 'treeseed', '--environments', 'prod', '--apply', '--approval-request', 'approval-1', '--json'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	assert.deepEqual(requestBody.environments, ['prod']);
 	assert.equal(requestBody.approvalRequestId, 'approval-1');
@@ -674,7 +765,8 @@ test('seed prod apply passes approved approval request to remote market API', as
 
 test('seed remote auth failures map to exit code four', async () => {
 	const root = seedWorkspace({ localService: false });
-	const result = await runCli(['seed', 'treeseed', '--environments', 'staging', '--plan', '--json'], { cwd: root });
+	prepareMarketSessionStorage(root);
+	const result = await runCli(['seed', 'treeseed', '--environments', 'staging', '--plan', '--json'], { cwd: root, env: remoteSeedEnv(root) });
 	assert.equal(result.exitCode, 4);
 	const payload = JSON.parse(result.stderr);
 	assert.equal(payload.ok, false);
