@@ -1343,6 +1343,75 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 
 const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 	{
+		id: 'seed.plan',
+		name: 'seed',
+		aliases: [],
+		group: 'Validation',
+		summary: 'Validate and plan declarative Treeseed environment seeds.',
+		description: 'Load a seed manifest from seeds/<name>.yaml, validate references and environment targeting, produce a deterministic plan, apply governed seeds through the market store/API, or export a team portfolio to YAML.',
+		provider: 'default',
+		related: ['status', 'config', 'capacity', 'projects'],
+		usage: 'treeseed seed <name> [--environments local,staging,prod] [--plan|--validate|--apply] [--json]\n       treeseed seed export <name> --team <team> [--output <path>] [--json]',
+		arguments: [{ name: 'name', description: 'Seed manifest name under the project seeds directory, or `export <name>` for portfolio export.', required: true }],
+		options: [
+			{ name: 'environments', flags: '--environments <list>', description: 'Comma-separated environments to select from the manifest.', kind: 'string' },
+			{ name: 'plan', flags: '--plan', description: 'Generate a deterministic plan without applying it. This is the Phase 1 default.', kind: 'boolean' },
+			{ name: 'validate', flags: '--validate', description: 'Validate the manifest and selected environments without printing plan actions.', kind: 'boolean' },
+			{ name: 'apply', flags: '--apply', description: 'Apply local seeds directly or governed staging/production seeds through the market API.', kind: 'boolean' },
+			{ name: 'market', flags: '--market <market>', description: 'Market profile or URL for staging and production seed operations.', kind: 'string' },
+			{ name: 'host', flags: '--host <host>', description: 'Compatibility alias for --market.', kind: 'string' },
+			{ name: 'approvalRequest', flags: '--approval-request <id>', description: 'Approved production seed apply request id.', kind: 'string' },
+			{ name: 'team', flags: '--team <team>', description: 'Team slug, name, or id for seed export.', kind: 'string' },
+			{ name: 'output', flags: '--output <path>', description: 'Write exported seed YAML to this path.', kind: 'string' },
+			{ name: 'includePrivate', flags: '--include-private', description: 'Include private catalog products in seed export when authorized.', kind: 'boolean' },
+			{ name: 'includeArtifacts', flags: '--include-artifacts', description: 'Include catalog artifact version references in seed export.', kind: 'boolean' },
+			{ name: 'yes', flags: '--yes', description: 'Future-compatible non-interactive confirmation flag for local seed apply.', kind: 'boolean' },
+			{ name: 'strict', flags: '--strict', description: 'Reserved for stricter future diagnostics; Phase 1 validation is already strict.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: [
+			'treeseed seed treeseed --validate',
+			'treeseed seed treeseed --environments local --plan',
+			'trsd seed treeseed --environments prod --plan --json',
+			'trsd seed export treeseed --team treeseed --include-artifacts --json',
+		],
+		help: {
+			workflowPosition: 'validate',
+			longSummary: [
+				'Seed validates a declarative market portfolio manifest and produces a deterministic reconciliation plan.',
+				'Phase 5 also exports an existing team portfolio into a reusable YAML seed bundle without embedding secrets or artifact bytes.',
+			],
+			whenToUse: [
+				'Use this when a TreeSeed workspace needs a repeatable description of teams, projects, repositories, capacity providers, grants, and work policies.',
+				'Use `--json` when an agent or CI check needs the same plan in a stable machine-readable shape.',
+			],
+			beforeYouRun: [
+				'Run from a Treeseed project containing the requested `seeds/<name>.yaml` manifest.',
+				'Choose the target environments explicitly when reviewing staging or production resources.',
+			],
+			outcomes: [
+				'Prints validation diagnostics, a deterministic plan, an apply summary, or an exported seed manifest.',
+				'Mutates the local market store for local applies, or the selected authenticated market for staging applies and approved production applies.',
+			],
+			automationNotes: [
+				'Agents may run validation and planning safely. Production apply requires an approved seed approval request.',
+				'Skipped resources are omitted from human plan output but included in JSON actions for review.',
+			],
+			warnings: [
+				'Do not put raw secrets in seed manifests; validation rejects secret-looking fields and values.',
+				'`--apply --environments prod` is blocked until a matching approval request is approved.',
+			],
+			relatedDetails: [
+				related('projects', 'Use `projects` after Phase 2 apply work lands to inspect created projects through the market API.'),
+				related('capacity', 'Use `capacity` to inspect existing provider and grant state outside the seed planner.'),
+			],
+		},
+		helpVisible: true,
+		helpFeatured: true,
+		executionMode: 'handler',
+		handlerName: 'seed',
+	},
+	{
 		id: 'audit.hosting',
 		name: 'audit',
 		aliases: [],
