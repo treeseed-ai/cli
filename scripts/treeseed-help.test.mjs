@@ -151,6 +151,56 @@ test('treeseed command help renders without executing the command', async () => 
 	assert.equal(helpViaFlag.spawns.length, 0);
 });
 
+test('auth:login defaults to central and sanitizes loopback approval links from central', async () => {
+	const workspace = makeWorkspaceRoot();
+	const calls = [];
+	const previousFetch = globalThis.fetch;
+	globalThis.fetch = async (input) => {
+		calls.push(String(input));
+		if (String(input).endsWith('/v1/auth/device/start')) {
+			return new Response(JSON.stringify({
+				ok: true,
+				deviceCode: 'device-test',
+				userCode: 'ABCD-EFGH',
+				verificationUri: 'http://127.0.0.1:4321/auth/device/approve',
+				verificationUriComplete: 'http://127.0.0.1:4321/auth/device/approve?user_code=ABCD-EFGH',
+				intervalSeconds: 1,
+				expiresAt: new Date(Date.now() + 60_000).toISOString(),
+				expiresInSeconds: 60,
+			}), { status: 200, headers: { 'content-type': 'application/json' } });
+		}
+		return new Response(JSON.stringify({
+			ok: true,
+			status: 'approved',
+			accessToken: 'access-token',
+			refreshToken: 'refresh-token',
+			expiresAt: new Date(Date.now() + 60_000).toISOString(),
+			principal: {
+				id: 'user-1',
+				displayName: 'Test User',
+				scopes: ['auth:me', 'market'],
+				roles: ['member'],
+				permissions: [],
+			},
+		}), { status: 200, headers: { 'content-type': 'application/json' } });
+	};
+	try {
+		const result = await runCli(['auth:login'], {
+			cwd: workspace,
+			env: {
+				HOME: workspace,
+				TREESEED_MARKET_API_BASE_URL: 'http://127.0.0.1:3000',
+			},
+		});
+		assert.equal(result.exitCode, 0);
+		assert.equal(calls[0], 'https://api.treeseed.ai/v1/auth/device/start');
+		assert.match(result.stdout, /Open https:\/\/treeseed\.ai\/auth\/device\/approve\?user_code=ABCD-EFGH/u);
+		assert.doesNotMatch(result.stdout, /127\.0\.0\.1/u);
+	} finally {
+		globalThis.fetch = previousFetch;
+	}
+});
+
 test('save help documents optional generated commit message hints', async () => {
 	const result = await runCli(['help', 'save']);
 	const saveSpec = findCommandSpec('save');
