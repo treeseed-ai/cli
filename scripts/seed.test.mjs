@@ -213,6 +213,45 @@ function remoteSeedEnv(root) {
 	};
 }
 
+function prepareLocalMarketSession(root) {
+	prepareMarketSessionStorage(root);
+	const previousHome = process.env.HOME;
+	const previousTransport = process.env.TREESEED_KEY_AGENT_TRANSPORT;
+	const previousPassphrase = process.env.TREESEED_KEY_PASSPHRASE;
+	process.env.HOME = root;
+	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
+	process.env.TREESEED_KEY_PASSPHRASE = 'test-passphrase';
+	try {
+		setMarketSession(root, {
+			marketId: 'local',
+			accessToken: 'test-local-token',
+			principal: {
+				id: 'user-local',
+				displayName: 'Local Seed User',
+				scopes: ['auth:me', 'market'],
+				roles: ['platform_admin'],
+				permissions: ['*:*:*'],
+			},
+		});
+	} finally {
+		if (previousHome === undefined) {
+			delete process.env.HOME;
+		} else {
+			process.env.HOME = previousHome;
+		}
+		if (previousTransport === undefined) {
+			delete process.env.TREESEED_KEY_AGENT_TRANSPORT;
+		} else {
+			process.env.TREESEED_KEY_AGENT_TRANSPORT = previousTransport;
+		}
+		if (previousPassphrase === undefined) {
+			delete process.env.TREESEED_KEY_PASSPHRASE;
+		} else {
+			process.env.TREESEED_KEY_PASSPHRASE = previousPassphrase;
+		}
+	}
+}
+
 function remoteSeedWorkspace() {
 	const root = seedWorkspace({ localService: false });
 	prepareMarketSessionStorage(root);
@@ -644,9 +683,10 @@ test('seed validates the canonical treeseed manifest', async () => {
 
 test('seed local plan prints deterministic human output', async () => {
 	const root = seedWorkspace();
+	prepareLocalMarketSession(root);
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan'], {
 		cwd: root,
-		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
 	});
 	assert.equal(result.exitCode, 0);
 	assert.match(result.stdout, /Seed: treeseed/);
@@ -694,9 +734,10 @@ test('seed staging plan includes staging capacity and work policy resources', as
 
 test('seed json output includes skipped resources for agent review', async () => {
 	const root = seedWorkspace();
+	prepareLocalMarketSession(root);
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan', '--json'], {
 		cwd: root,
-		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
 	});
 	assert.equal(result.exitCode, 0);
 	const payload = JSON.parse(result.stdout);
@@ -711,10 +752,11 @@ test('seed json output includes skipped resources for agent review', async () =>
 
 test('seed local apply creates resources and repeated apply reports unchanged', async () => {
 	const root = seedWorkspace();
+	prepareLocalMarketSession(root);
 	const persistTo = tempD1Path();
 	const first = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
-		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	assert.equal(first.exitCode, 0, first.stderr);
 	const firstPayload = JSON.parse(first.stdout);
@@ -727,7 +769,7 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 
 	const second = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
-		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	assert.equal(second.exitCode, 0, second.stderr);
 	const secondPayload = JSON.parse(second.stdout);
@@ -743,14 +785,15 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 
 test('seed export emits a productized manifest from local state', async () => {
 	const root = seedWorkspace();
+	prepareLocalMarketSession(root);
 	const persistTo = tempD1Path();
 	await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
-		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	const result = await runCli(['seed', 'export', 'treeseed', '--team', 'treeseed', '--include-artifacts', '--json'], {
 		cwd: root,
-		env: { TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
 	});
 	assert.equal(result.exitCode, 0, result.stderr);
 	const payload = JSON.parse(result.stdout);

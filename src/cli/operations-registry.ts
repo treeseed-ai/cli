@@ -60,7 +60,7 @@ const DEV_RUNTIME_OPTIONS: TreeseedCommandOptionSpec[] = [
 	{ name: 'managerPort', flags: '--manager-port <port>', description: 'Port used for the local manager service URL.', kind: 'string' },
 	{ name: 'setup', flags: '--setup <mode>', description: 'Control automatic local runtime setup.', kind: 'enum', values: ['auto', 'check', 'off'] },
 	{ name: 'feedback', flags: '--feedback <mode>', description: 'Control live feedback, service restarts, and browser reload stamps.', kind: 'enum', values: ['live', 'restart', 'off'] },
-	{ name: 'open', flags: '--open <mode>', description: 'Control whether dev opens the browser after readiness.', kind: 'enum', values: ['auto', 'on', 'off'] },
+	{ name: 'open', flags: '--open <mode>', description: 'Control whether dev opens the browser after readiness. Defaults to off; use --open on to launch it.', kind: 'enum', values: ['auto', 'on', 'off'] },
 	{ name: 'plan', flags: '--plan', description: 'Print the dev runtime plan and exit without starting services.', kind: 'boolean' },
 	{ name: 'reset', flags: '--reset', description: 'Clear local dev runtime state before setup, migrations, and service startup.', kind: 'boolean' },
 	{ name: 'json', flags: '--json', description: 'Emit structured JSON or newline-delimited dev events.', kind: 'boolean' },
@@ -773,6 +773,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			longSummary: ['Auth:login authenticates the CLI against the configured Treeseed API so later provider-aware and remote-aware workflows can run without missing-credential failures.'],
 			examples: [
 				example('treeseed auth:login', 'Log in with the default host', 'Authenticate the CLI against the configured default Treeseed API host.'),
+				example('treeseed auth:login --market local', 'Log in to local dev', 'Authenticate against the local Treeseed API at TREESEED_MARKET_API_BASE_URL or http://127.0.0.1:3000.'),
 				example('treeseed auth:login --host production', 'Target a specific host id', 'Override the configured default host for this login session.'),
 				example('treeseed auth:login --json', 'Automate auth workflows', 'Emit structured auth results where supported for scripts and agents.'),
 			],
@@ -1218,7 +1219,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	})],
 	['dev', command({
 		options: DEV_RUNTIME_OPTIONS,
-		examples: ['treeseed dev', 'treeseed dev --reset', 'treeseed dev --reset --plan --json', 'treeseed dev --surfaces web,api --plan --json', 'treeseed dev --surface web --port 4322 --open off'],
+		examples: ['treeseed dev', 'treeseed dev --reset', 'treeseed dev --reset --plan --json', 'treeseed dev --surfaces web,api --plan --json', 'treeseed dev --surface web --port 4322'],
 		help: {
 			longSummary: [
 				'Dev starts the unified local Treeseed runtime as a foreground supervisor so you can work against the integrated web, API, manager, worker, and supporting local surfaces.',
@@ -1228,6 +1229,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Run from the tenant or workspace root you want to develop.',
 				'Use `--plan --json` when you want to inspect selected surfaces, commands, setup steps, readiness checks, watched paths, and restart policy without starting services.',
 				'Use `--reset` when you want a fresh local D1 database, Mailpit inbox, generated worker bundle, and Wrangler temp output without deleting configuration.',
+				'Dev prints the local web URL after readiness; it does not open a browser unless you pass `--open on` or `--open auto`.',
 				'Keep the foreground process running while you test. Press Ctrl+C to stop the supervised stack and free the local ports.',
 			],
 			examples: [
@@ -1238,12 +1240,13 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				example('treeseed dev --surfaces web,api,worker --plan --json', 'Inspect selected surfaces', 'Plan a comma-separated set of local surfaces without starting the supervisor.'),
 				example('treeseed dev --surface api --plan --json', 'Inspect the API surface', 'Plan the local API runtime without the web UI.'),
 				example('treeseed dev --surfaces integrated,agents', 'Opt into agents diagnostics', 'Start the integrated local platform plus the agents diagnostic loop.'),
-				example('treeseed dev --surface web --port 4322 --open off', 'Run only the web surface', 'Start the Astro UI on a specific port without opening a browser.'),
+				example('treeseed dev --surface web --port 4322', 'Run only the web surface', 'Start the Astro UI on a specific port and print the URL when ready.'),
+				example('treeseed dev --open on', 'Open the browser explicitly', 'Start the integrated runtime and launch the local web URL after readiness.'),
 				example('trsd dev', 'Use the short alias', 'Start the same local runtime through the shorter entrypoint.'),
 				example('treeseed dev --json', 'Stream dev events', 'Emit newline-delimited events while the long-running dev process supervises local services.'),
 			],
 			outcomes: [
-				'Starts the selected local surfaces, waits for readiness, and then remains attached as the live supervisor.',
+				'Starts the selected local surfaces, waits for readiness, prints the local URL, and then remains attached as the live supervisor.',
 				'Restarts required crashed surfaces with capped exponential backoff and keeps setup/readiness failures alive for retry.',
 				'Stops watchers first and then terminates service process groups when the foreground command exits.',
 			],

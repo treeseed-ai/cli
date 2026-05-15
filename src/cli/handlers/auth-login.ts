@@ -10,6 +10,32 @@ function sleep(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function localWebApprovalUrlFromApiUrl(value: string, profileId: string) {
+	const explicit = process.env.TREESEED_SITE_URL?.trim() || process.env.BETTER_AUTH_URL?.trim();
+	if (explicit && profileId === 'local') {
+		const url = new URL(value);
+		return new URL(`${url.pathname}${url.search}${url.hash}`, explicit.replace(/\/+$/u, '')).toString();
+	}
+	const url = new URL(value);
+	if (
+		profileId === 'local'
+		&& (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
+		&& url.port === '3000'
+	) {
+		url.port = '4321';
+		return url.toString();
+	}
+	return value;
+}
+
+function approvalUrlForDisplay(value: string, profileId: string) {
+	try {
+		return localWebApprovalUrlFromApiUrl(value, profileId);
+	} catch {
+		return value;
+	}
+}
+
 export const handleAuthLogin: TreeseedCommandHandler = async (invocation, context) => {
 	try {
 		const tenantRoot = marketAuthRoot(context);
@@ -18,9 +44,10 @@ export const handleAuthLogin: TreeseedCommandHandler = async (invocation, contex
 			clientName: 'treeseed-cli',
 			scopes: ['auth:me', 'market'],
 		});
+		const approvalUrl = approvalUrlForDisplay(started.verificationUriComplete, profile.id);
 
 		if (context.outputFormat !== 'json') {
-			context.write(`Open ${started.verificationUriComplete}`, 'stdout');
+			context.write(`Open ${approvalUrl}`, 'stdout');
 			context.write(`User code: ${started.userCode}`, 'stdout');
 			context.write('Waiting for approval...', 'stdout');
 		}
