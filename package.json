@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.8.14-dev.staging.20260515T054349Z",
+  "version": "0.8.14-dev.staging.20260515T055440Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -47,8 +47,7 @@
   "dependencies": {
     "@treeseed/sdk": "github:treeseed-ai/sdk#0.8.14-dev.staging.20260515T054038Z",
     "ink": "^7.0.0",
-    "react": "^19.2.5",
-    "yaml": "^2.9.0"
+    "react": "^19.2.5"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
