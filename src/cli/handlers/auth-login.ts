@@ -28,9 +28,25 @@ function localWebApprovalUrlFromApiUrl(value: string, profileId: string) {
 	return value;
 }
 
+function centralWebApprovalUrlFromApiUrl(value: string, profileId: string) {
+	if (profileId !== 'central') {
+		return value;
+	}
+	const explicit = process.env.TREESEED_CENTRAL_MARKET_WEB_URL?.trim();
+	const fallback = explicit || 'https://treeseed.ai';
+	const url = new URL(value);
+	if (
+		url.protocol === 'http:'
+		&& (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
+	) {
+		return new URL(`${url.pathname}${url.search}${url.hash}`, fallback.replace(/\/+$/u, '')).toString();
+	}
+	return value;
+}
+
 function approvalUrlForDisplay(value: string, profileId: string) {
 	try {
-		return localWebApprovalUrlFromApiUrl(value, profileId);
+		return centralWebApprovalUrlFromApiUrl(localWebApprovalUrlFromApiUrl(value, profileId), profileId);
 	} catch {
 		return value;
 	}
