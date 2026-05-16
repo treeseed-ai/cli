@@ -310,7 +310,7 @@ function jsonResponse(payload, status = 200) {
 	});
 }
 
-function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary = { create: 11, update: 0, unchanged: 0, skip: 11, delete: 0, error: 0 }, result = undefined } = {}) {
+function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary = { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 }, result = undefined } = {}) {
 	return {
 		ok: true,
 		seed: 'treeseed',
@@ -339,7 +339,7 @@ resources:
       slug: treeseed
       name: treeseed
       displayName: TreeSeed
-      profileSummary: TreeSeed platform, market, SDK, CLI, core, and agent operations.
+      profileSummary: TreeSeed platform market, integrated package, and agent operations.
   projects:
     - key: project:treeseed/market
       team: team:treeseed
@@ -354,62 +354,6 @@ resources:
         gitUrl: https://github.com/knowledge-coop/market.git
         defaultBranch: main
         checkoutPath: .
-    - key: project:treeseed/sdk
-      team: team:treeseed
-      slug: sdk
-      name: TreeSeed SDK
-      kind: package
-      repository:
-        role: package
-        provider: github
-        owner: treeseed-ai
-        name: sdk
-        gitUrl: https://github.com/treeseed-ai/sdk.git
-        defaultBranch: main
-        checkoutPath: packages/sdk
-        submodulePath: packages/sdk
-    - key: project:treeseed/core
-      team: team:treeseed
-      slug: core
-      name: TreeSeed Core
-      kind: package
-      repository:
-        role: package
-        provider: github
-        owner: treeseed-ai
-        name: core
-        gitUrl: https://github.com/treeseed-ai/core.git
-        defaultBranch: main
-        checkoutPath: packages/core
-        submodulePath: packages/core
-    - key: project:treeseed/cli
-      team: team:treeseed
-      slug: cli
-      name: TreeSeed CLI
-      kind: package
-      repository:
-        role: package
-        provider: github
-        owner: treeseed-ai
-        name: cli
-        gitUrl: https://github.com/treeseed-ai/cli.git
-        defaultBranch: main
-        checkoutPath: packages/cli
-        submodulePath: packages/cli
-    - key: project:treeseed/agent
-      team: team:treeseed
-      slug: agent
-      name: TreeSeed Agent
-      kind: package
-      repository:
-        role: package
-        provider: github
-        owner: treeseed-ai
-        name: agent
-        gitUrl: https://github.com/treeseed-ai/agent.git
-        defaultBranch: main
-        checkoutPath: packages/agent
-        submodulePath: packages/agent
   capacityProviders:
     - key: capacity-provider:treeseed/local-dev
       environments: [local]
@@ -515,46 +459,6 @@ resources:
       monthlyCreditLimit: 25000
       priorityWeight: 10
       overflowPolicy: approval_required
-    - key: grant:treeseed/prod/sdk
-      environments: [prod]
-      provider: capacity-provider:treeseed/production
-      team: team:treeseed
-      project: project:treeseed/sdk
-      grantScope: project
-      dailyCreditLimit: 1000
-      monthlyCreditLimit: 10000
-      priorityWeight: 6
-      overflowPolicy: approval_required
-    - key: grant:treeseed/prod/core
-      environments: [prod]
-      provider: capacity-provider:treeseed/production
-      team: team:treeseed
-      project: project:treeseed/core
-      grantScope: project
-      dailyCreditLimit: 1000
-      monthlyCreditLimit: 10000
-      priorityWeight: 6
-      overflowPolicy: approval_required
-    - key: grant:treeseed/prod/cli
-      environments: [prod]
-      provider: capacity-provider:treeseed/production
-      team: team:treeseed
-      project: project:treeseed/cli
-      grantScope: project
-      dailyCreditLimit: 500
-      monthlyCreditLimit: 5000
-      priorityWeight: 4
-      overflowPolicy: approval_required
-    - key: grant:treeseed/prod/agent
-      environments: [prod]
-      provider: capacity-provider:treeseed/production
-      team: team:treeseed
-      project: project:treeseed/agent
-      grantScope: project
-      dailyCreditLimit: 1000
-      monthlyCreditLimit: 10000
-      priorityWeight: 8
-      overflowPolicy: approval_required
   workPolicies:
     - key: work-policy:treeseed/local/market
       environments: [local]
@@ -600,16 +504,6 @@ resources:
       ownership: treeseed_managed
       accountLabel: Knowledge Coop GitHub organization
       organizationOrOwner: knowledge-coop
-      defaultVisibility: public
-      allowedProjectKinds: [market_app, package, knowledge_hub]
-      status: active
-    - key: repository-host:treeseed/github
-      team: team:treeseed
-      provider: github
-      name: treeseed-ai
-      ownership: treeseed_managed
-      accountLabel: TreeSeed AI GitHub organization
-      organizationOrOwner: treeseed-ai
       defaultVisibility: public
       allowedProjectKinds: [market_app, package, knowledge_hub]
       status: active
@@ -698,11 +592,10 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /CREATE grant treeseed\/local-dev -> treeseed/);
 	assert.match(result.stdout, /CREATE work policy market\/local/);
 	assert.match(result.stdout, /CREATE repository host github\/knowledge-coop/);
-	assert.match(result.stdout, /CREATE repository host github\/treeseed-ai/);
 	assert.match(result.stdout, /CREATE product template\/treeseed-market/);
 	assert.match(result.stdout, /CREATE catalog artifact treeseed\/market-template@1\.0\.0/);
-	assert.match(result.stdout, /  create: 15/);
-	assert.match(result.stdout, /  skipped: 11/);
+	assert.match(result.stdout, /  create: 10/);
+	assert.match(result.stdout, /  skipped: 7/);
 	assert.doesNotMatch(result.stdout, /codex-production/);
 });
 
@@ -710,12 +603,12 @@ test('seed prod plan includes production resources', async () => {
 	const root = remoteSeedWorkspace();
 	const result = await withMockFetch(async () => jsonResponse(remoteSeedPayload({
 		environments: ['prod'],
-		summary: { create: 15, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
+		summary: { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
 	})), () => runCli(['seed', 'treeseed', '--environments', 'prod', '--plan'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	assert.match(result.stdout, /CREATE capacity provider treeseed-production/);
 	assert.match(result.stdout, /CREATE work policy market\/prod/);
-	assert.match(result.stdout, /  create: 15/);
+	assert.match(result.stdout, /  create: 10/);
 	assert.match(result.stdout, /  skipped: 7/);
 	assert.doesNotMatch(result.stdout, /local-codex/);
 });
@@ -727,8 +620,8 @@ test('seed staging plan includes staging capacity and work policy resources', as
 	assert.match(result.stdout, /Environments: staging/);
 	assert.match(result.stdout, /CREATE capacity provider treeseed-production/);
 	assert.match(result.stdout, /CREATE work policy market\/staging/);
-	assert.match(result.stdout, /  create: 11/);
-	assert.match(result.stdout, /  skipped: 11/);
+	assert.match(result.stdout, /  create: 10/);
+	assert.match(result.stdout, /  skipped: 7/);
 	assert.doesNotMatch(result.stdout, /local-codex/);
 });
 
@@ -744,9 +637,9 @@ test('seed json output includes skipped resources for agent review', async () =>
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 15);
-	assert.equal(payload.summary.skip, 11);
-	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 11);
+	assert.equal(payload.summary.create, 10);
+	assert.equal(payload.summary.skip, 7);
+	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 7);
 	assert.equal(payload.actions[0].key, 'team:treeseed');
 });
 
@@ -761,9 +654,9 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(first.exitCode, 0, first.stderr);
 	const firstPayload = JSON.parse(first.stdout);
 	assert.equal(firstPayload.ok, true);
-	assert.equal(firstPayload.summary.create, 15);
-	assert.equal(firstPayload.summary.skip, 11);
-	assert.equal(firstPayload.result.actionCount, 15);
+	assert.equal(firstPayload.summary.create, 10);
+	assert.equal(firstPayload.summary.skip, 7);
+	assert.equal(firstPayload.result.actionCount, 10);
 	assert.equal(firstPayload.result.capacityProviderKeys.created.length, 1);
 	assert.match(firstPayload.result.capacityProviderKeys.created[0].plaintextKey, /^tsp_/);
 
@@ -774,8 +667,8 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(second.exitCode, 0, second.stderr);
 	const secondPayload = JSON.parse(second.stdout);
 	assert.equal(secondPayload.summary.create, 0);
-	assert.equal(secondPayload.summary.unchanged, 15);
-	assert.equal(secondPayload.summary.skip, 11);
+	assert.equal(secondPayload.summary.unchanged, 10);
+	assert.equal(secondPayload.summary.skip, 7);
 	assert.equal(secondPayload.result.actionCount, 0);
 	assert.equal(secondPayload.result.capacityProviderKeys.created.length, 0);
 	assert.equal(secondPayload.result.capacityProviderKeys.existing.length, 1);
@@ -843,7 +736,7 @@ test('seed prod apply returns blocked approval response', async () => {
 		...remoteSeedPayload({
 			mode: 'apply',
 			environments: ['prod'],
-			summary: { create: 15, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
+			summary: { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
 			result: {
 				blocked: true,
 				reason: 'Production seed apply requires approval.',
@@ -868,15 +761,15 @@ test('seed prod apply passes approved approval request to remote market API', as
 		return jsonResponse(remoteSeedPayload({
 			mode: 'apply',
 			environments: ['prod'],
-			summary: { create: 15, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
-			result: { appliedAt: '2026-01-01T00:00:00.000Z', manifestHash: 'abc', actionCount: 15 },
+			summary: { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
+			result: { appliedAt: '2026-01-01T00:00:00.000Z', manifestHash: 'abc', actionCount: 10 },
 		}));
 	}, () => runCli(['seed', 'treeseed', '--environments', 'prod', '--apply', '--approval-request', 'approval-1', '--json'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	assert.deepEqual(requestBody.environments, ['prod']);
 	assert.equal(requestBody.approvalRequestId, 'approval-1');
 	const payload = JSON.parse(result.stdout);
-	assert.equal(payload.result.actionCount, 15);
+	assert.equal(payload.result.actionCount, 10);
 });
 
 test('seed remote auth failures map to exit code four', async () => {
