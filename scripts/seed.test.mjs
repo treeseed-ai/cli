@@ -577,7 +577,6 @@ test('seed validates the canonical treeseed manifest', async () => {
 
 test('seed local plan prints deterministic human output', async () => {
 	const root = seedWorkspace();
-	prepareLocalMarketSession(root);
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan'], {
 		cwd: root,
 		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
@@ -597,6 +596,21 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /  create: 10/);
 	assert.match(result.stdout, /  skipped: 7/);
 	assert.doesNotMatch(result.stdout, /codex-production/);
+});
+
+test('seed local plan does not require a saved market session', async () => {
+	const root = seedWorkspace();
+	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan', '--json'], {
+		cwd: root,
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
+	});
+	assert.equal(result.exitCode, 0, result.stderr);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.ok, true);
+	assert.equal(payload.seed, 'treeseed');
+	assert.deepEqual(payload.environments, ['local']);
+	assert.equal(payload.summary.create, 10);
+	assert.equal(payload.summary.skip, 7);
 });
 
 test('seed prod plan includes production resources', async () => {
@@ -674,6 +688,18 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(secondPayload.result.capacityProviderKeys.existing.length, 1);
 	assert.equal(secondPayload.result.capacityProviderKeys.existing[0].plaintextKey, undefined);
 	assert.equal(secondPayload.actions.find((action) => action.key === 'team:treeseed').action, 'unchanged');
+});
+
+test('seed local apply requires a saved market session', async () => {
+	const root = seedWorkspace();
+	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
+		cwd: root,
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
+	});
+	assert.equal(result.exitCode, 4);
+	const payload = JSON.parse(result.stderr);
+	assert.equal(payload.ok, false);
+	assert.match(payload.error, /Not logged in to market "local"/);
 });
 
 test('seed export emits a productized manifest from local state', async () => {

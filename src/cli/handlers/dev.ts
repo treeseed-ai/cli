@@ -104,6 +104,8 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 					TREESEED_WORKDAY_TASK_CREDIT_BUDGET: capacityBudget,
 				} : {}),
 				TREESEED_APPROVAL_POLICY: approvalPolicy || 'manual',
+				TREESEED_MANAGER_CONSOLE_SUMMARY: 'true',
+				TREESEED_WORKER_CONSOLE_SUMMARY: 'true',
 			}
 			: {};
 		const workspaceRoot = findNearestTreeseedWorkspaceRoot(context.cwd);
@@ -121,7 +123,8 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			env: resolveTreeseedLaunchEnvironment({
 				tenantRoot: context.cwd,
 				scope: 'local',
-				baseEnv: { ...process.env, ...(context.env ?? {}), ...devManagerEnv },
+				baseEnv: { ...process.env, ...(context.env ?? {}) },
+				overrides: devManagerEnv,
 			}),
 			stdio: 'inherit',
 		});
