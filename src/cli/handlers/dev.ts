@@ -82,6 +82,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		}
 		forwardStringOption('host', '--host');
 		forwardStringOption('port', '--port');
+		forwardStringOption('webRuntime', '--web-runtime');
 		forwardStringOption('apiHost', '--api-host');
 		forwardStringOption('apiPort', '--api-port');
 		forwardStringOption('managerPort', '--manager-port');
@@ -90,6 +91,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardStringOption('open', '--open');
 		forwardBooleanOption('plan', '--plan');
 		forwardBooleanOption('reset', '--reset');
+		forwardBooleanOption('force', '--force');
 		forwardBooleanOption('json', '--json');
 		const docsAutomationMode = typeof invocation.args.docsAutomation === 'string' ? invocation.args.docsAutomation.trim() : '';
 		const workdayId = typeof invocation.args.workdayId === 'string' ? invocation.args.workdayId.trim() : '';
@@ -104,6 +106,8 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 					TREESEED_WORKDAY_TASK_CREDIT_BUDGET: capacityBudget,
 				} : {}),
 				TREESEED_APPROVAL_POLICY: approvalPolicy || 'manual',
+				TREESEED_MANAGER_CONSOLE_SUMMARY: 'true',
+				TREESEED_WORKER_CONSOLE_SUMMARY: 'true',
 			}
 			: {};
 		const workspaceRoot = findNearestTreeseedWorkspaceRoot(context.cwd);
@@ -121,7 +125,8 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			env: resolveTreeseedLaunchEnvironment({
 				tenantRoot: context.cwd,
 				scope: 'local',
-				baseEnv: { ...process.env, ...(context.env ?? {}), ...devManagerEnv },
+				baseEnv: { ...process.env, ...(context.env ?? {}) },
+				overrides: devManagerEnv,
 			}),
 			stdio: 'inherit',
 		});

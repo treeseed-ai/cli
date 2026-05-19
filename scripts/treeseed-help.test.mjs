@@ -233,6 +233,8 @@ test('dev help documents comma-separated surfaces and integrated runtime', async
 	const result = await runCli(['help', 'dev']);
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /--surfaces <surfaces>/);
+	assert.match(result.output, /--web-runtime <mode>/);
+	assert.match(result.output, /--force/);
 	assert.match(result.output, /web, API, manager, worker/);
 	assert.match(result.output, /integrated,agents/);
 });
@@ -1233,7 +1235,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	const workspaceRoot = makeTenantWorkspace('feature/dev-workspace');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const result = await runCli(['dev', '--surface', 'web', '--port', '4499', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--json'], {
+	const result = await runCli(['dev', '--surface', 'web', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--force', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
@@ -1245,8 +1247,8 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/run-ts\.mjs/);
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
 	assert.deepEqual(
-		result.spawns[0].args.slice(-13),
-		['--surface', 'web', '--port', '4499', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--json', '--watch'],
+		result.spawns[0].args.slice(-16),
+		['--surface', 'web', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
 	);
 });
 

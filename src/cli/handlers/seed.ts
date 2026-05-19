@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, type SeedPlan } from '@treeseed/sdk/seeds';
 import { MarketApiError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketAuthRoot, marketSelector } from './market-utils.js';
-import { resolveMarketProfile, resolveMarketSession } from '@treeseed/sdk/market-client';
+import { MarketClient, resolveMarketProfile, resolveMarketSession, setMarketSession, type MarketSession } from '@treeseed/sdk/market-client';
 
 type LocalSeedApplyRunner = (input: {
 	projectRoot: string;
@@ -43,23 +43,60 @@ async function loadLocalSeedModule(projectRoot: string): Promise<{
 	exportLocalSeedViaApiFromCli?: LocalSeedExportRunner;
 }> {
 	const apiModulePath = resolve(projectRoot, 'src', 'lib', 'market', 'seeds', 'local-api.js');
-	const moduleUrl = pathToFileURL(existsSync(apiModulePath) ? apiModulePath : resolve(projectRoot, 'src', 'lib', 'market', 'seeds', 'apply.js')).href;
-	return await import(moduleUrl) as {
+	const applyModulePath = resolve(projectRoot, 'src', 'lib', 'market', 'seeds', 'apply.js');
+	const applyModule = await import(pathToFileURL(applyModulePath).href) as {
 		applyLocalSeedFromCli?: LocalSeedApplyRunner;
-		applyLocalSeedViaApiFromCli?: LocalSeedApplyRunner;
 		planLocalSeedFromCli?: LocalSeedPlanRunner;
-		planLocalSeedViaApiFromCli?: LocalSeedPlanRunner;
 		exportSeedFromCli?: LocalSeedExportRunner;
+	};
+	if (!existsSync(apiModulePath)) {
+		return applyModule;
+	}
+	const apiModule = await import(pathToFileURL(apiModulePath).href) as {
+		applyLocalSeedViaApiFromCli?: LocalSeedApplyRunner;
+		planLocalSeedViaApiFromCli?: LocalSeedPlanRunner;
 		exportLocalSeedViaApiFromCli?: LocalSeedExportRunner;
+	};
+	return {
+		...applyModule,
+		...apiModule,
 	};
 }
 
-function requireLocalSeedSession(invocation: Parameters<TreeseedCommandHandler>[0], context: Parameters<TreeseedCommandHandler>[1]) {
+function sessionExpiresSoon(session: MarketSession) {
+	if (!session.expiresAt) return false;
+	const expiresAt = Date.parse(session.expiresAt);
+	return Number.isFinite(expiresAt) && expiresAt <= Date.now() + 60_000;
+}
+
+async function requireLocalSeedSession(invocation: Parameters<TreeseedCommandHandler>[0], context: Parameters<TreeseedCommandHandler>[1]) {
 	const selector = marketSelector(invocation) ?? 'local';
 	const profile = resolveMarketProfile(selector);
-	const session = resolveMarketSession(marketAuthRoot(context), profile.id);
+	const tenantRoot = marketAuthRoot(context);
+	const session = resolveMarketSession(tenantRoot, profile.id);
 	if (!session?.accessToken) {
 		throw new Error(`Not logged in to market "${profile.id}". Run treeseed auth:login --market ${profile.id}.`);
+	}
+	if (sessionExpiresSoon(session) && session.refreshToken) {
+		try {
+			const refreshed = await new MarketClient({ profile, userAgent: 'treeseed-cli' }).refreshToken({ refreshToken: session.refreshToken });
+			if (refreshed.ok) {
+				const nextSession = {
+					marketId: profile.id,
+					accessToken: refreshed.accessToken,
+					refreshToken: refreshed.refreshToken,
+					expiresAt: refreshed.expiresAt,
+					principal: refreshed.principal,
+				};
+				setMarketSession(tenantRoot, nextSession);
+				return { profile, session: nextSession };
+			}
+		} catch {
+			throw new Error(`Login for market "${profile.id}" expired. Run treeseed auth:login --market ${profile.id}.`);
+		}
+	}
+	if (sessionExpiresSoon(session)) {
+		throw new Error(`Login for market "${profile.id}" expired. Run treeseed auth:login --market ${profile.id}.`);
 	}
 	return { profile, session };
 }
@@ -185,7 +222,7 @@ async function handleSeedExport(invocation: Parameters<TreeseedCommandHandler>[0
 			const { client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
 			payload = await client.exportSeed(team, body);
 		} else {
-			const { session } = requireLocalSeedSession(invocation, context);
+			const { session } = await requireLocalSeedSession(invocation, context);
 			const localModule = await loadLocalSeedModule(context.cwd);
 			const exporter = localModule.exportLocalSeedViaApiFromCli ?? localModule.exportSeedFromCli;
 			if (typeof exporter !== 'function') {
@@ -267,30 +304,16 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 		};
 	}
 
-	const localAuth = planned.plan.environments.every((environment) => environment === 'local') && !wantsValidate
-		? (() => {
-			try {
-				return requireLocalSeedSession(invocation, context);
-			} catch (error) {
-				return { error };
-			}
-		})()
-		: null;
-	if (localAuth && 'error' in localAuth) {
-		return remoteSeedError(localAuth.error, 'seed');
-	}
-
 	if (!wantsApply && !wantsValidate && planned.plan.environments.length === 1 && planned.plan.environments[0] === 'local') {
 		try {
 			const localModule = await loadLocalSeedModule(context.cwd);
-			const localPlanner = localModule.planLocalSeedViaApiFromCli ?? localModule.planLocalSeedFromCli;
+			const localPlanner = localModule.planLocalSeedFromCli ?? localModule.planLocalSeedViaApiFromCli;
 			if (typeof localPlanner === 'function') {
 				const localPlanned = await localPlanner({
 					projectRoot: context.cwd,
 					seedName,
 					environments: typeof invocation.args.environments === 'string' ? invocation.args.environments : undefined,
 					mode,
-					accessToken: localAuth?.session.accessToken,
 					env: context.env,
 				});
 				if (localPlanned.plan) {
@@ -319,6 +342,12 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 			} catch (error) {
 				return remoteSeedError(error, 'seed');
 			}
+		}
+		let localAuth: Awaited<ReturnType<typeof requireLocalSeedSession>>;
+		try {
+			localAuth = await requireLocalSeedSession(invocation, context);
+		} catch (error) {
+			return remoteSeedError(error, 'seed');
 		}
 		const localModule = await loadLocalSeedModule(context.cwd);
 		const runner = localModule.applyLocalSeedViaApiFromCli ?? localModule.applyLocalSeedFromCli;
