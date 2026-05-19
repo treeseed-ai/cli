@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0] - 2026-05-19
+
+### Tests
+
+- chore(cli): update version and add dev command options (0011b0b16f9b)
+- build(build): sync package dependency references (8b72be801c42)
+- chore(cli): bump version and refactor seed test mocks (85bc3996ff41)
+
+### Dependencies
+
+- build(cli): bump version and @treeseed/sdk dependency (030e11cc4191)
+- chore(cli): bump version and update @treeseed/sdk dependency (239dceb6374a)
+- Release @treeseed/cli 0.9.0.
+
 ## [0.8.19] - 2026-05-16
 
 ### Dependencies
