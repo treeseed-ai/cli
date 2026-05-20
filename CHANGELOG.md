@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.1] - 2026-05-20
+
+### Added
+
+- feat(cli): complete capacity provider migration (f10339358792)
+
+### Fixed
+
+- fix(release): allow publish to succeed if npm scope is unprovisioned (a9e08605dd26)
+
+### Dependencies
+
+- build(build): tolerate npm scoped package permission 404 (a826d9adc50c)
+- build(build): release internal packages from stable git tags (6984f1c7de98)
+- build(build): complete capacity provider migration (e43638c2bee8)
+- Release @treeseed/cli 0.9.1.
+
 ## [0.9.0] - 2026-05-19
 
 ### Tests
