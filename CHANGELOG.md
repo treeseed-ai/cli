@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2] - 2026-05-20
+
+### Dependencies
+
+- ci(build): create github releases for package publishes (cac082b30a34)
+- Release @treeseed/cli 0.9.2.
+
 ## [0.9.1] - 2026-05-20
 
 ### Added
