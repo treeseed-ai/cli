@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { ensureLocalWorkspaceLinks, findNearestTreeseedWorkspaceRoot, resolveTreeseedLaunchEnvironment } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
+import { fail } from './utils.js';
 
 const require = createRequire(import.meta.url);
 
@@ -52,10 +53,16 @@ function resolveCoreDevEntrypoint(cwd: string) {
 
 export const handleDev: TreeseedCommandHandler = async (invocation, context) => {
 	try {
-		const managerMode = invocation.commandName === 'dev:manager';
+		if (invocation.commandName !== 'dev') {
+			return fail('`trsd dev` only starts the Market web/API dev runtime. Use `trsd capacity ...` for capacity provider lifecycle commands.');
+		}
+		const removedOptions = ['surface', 'surfaces', 'withWorker'].filter((name) => invocation.args[name] !== undefined);
+		if (removedOptions.length > 0) {
+			return fail(`\`trsd dev\` no longer accepts ${removedOptions.map((name) => `--${name.replace(/[A-Z]/gu, (char) => `-${char.toLowerCase()}`)}`).join(', ')}. It always starts fixed Market web/API surfaces; use \`trsd capacity ...\` for providers.`);
+		}
 		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
 		const watch = feedback !== 'off';
-		const passthroughArgs: string[] = [];
+		const passthroughArgs: string[] = ['--surfaces', 'web,api'];
 		const forwardStringOption = (name: string, flag: string) => {
 			const value = invocation.args[name];
 			if (typeof value === 'string' && value.trim().length > 0) {
@@ -68,24 +75,11 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			}
 		};
 
-		if (managerMode) {
-			const explicitSurfaces = typeof invocation.args.surfaces === 'string' && invocation.args.surfaces.trim()
-				? invocation.args.surfaces.trim()
-				: typeof invocation.args.surface === 'string' && invocation.args.surface.trim()
-					? invocation.args.surface.trim()
-					: null;
-			const surfaces = explicitSurfaces ?? (invocation.args.withWorker === true ? 'manager,worker' : 'manager');
-			passthroughArgs.push('--surfaces', surfaces);
-		} else {
-			forwardStringOption('surface', '--surface');
-			forwardStringOption('surfaces', '--surfaces');
-		}
 		forwardStringOption('host', '--host');
 		forwardStringOption('port', '--port');
 		forwardStringOption('webRuntime', '--web-runtime');
 		forwardStringOption('apiHost', '--api-host');
 		forwardStringOption('apiPort', '--api-port');
-		forwardStringOption('managerPort', '--manager-port');
 		forwardStringOption('setup', '--setup');
 		forwardStringOption('feedback', '--feedback');
 		forwardStringOption('open', '--open');
@@ -93,23 +87,6 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardBooleanOption('reset', '--reset');
 		forwardBooleanOption('force', '--force');
 		forwardBooleanOption('json', '--json');
-		const docsAutomationMode = typeof invocation.args.docsAutomation === 'string' ? invocation.args.docsAutomation.trim() : '';
-		const workdayId = typeof invocation.args.workdayId === 'string' ? invocation.args.workdayId.trim() : '';
-		const capacityBudget = typeof invocation.args.capacityBudget === 'string' ? invocation.args.capacityBudget.trim() : '';
-		const approvalPolicy = typeof invocation.args.approvalPolicy === 'string' ? invocation.args.approvalPolicy.trim() : '';
-		const devManagerEnv = managerMode
-			? {
-				TREESEED_DOCS_AUTOMATION_MODE: docsAutomationMode || 'on',
-				...(workdayId ? { TREESEED_WORKDAY_ID: workdayId } : {}),
-				...(capacityBudget ? {
-					TREESEED_CAPACITY_BUDGET: capacityBudget,
-					TREESEED_WORKDAY_TASK_CREDIT_BUDGET: capacityBudget,
-				} : {}),
-				TREESEED_APPROVAL_POLICY: approvalPolicy || 'manual',
-				TREESEED_MANAGER_CONSOLE_SUMMARY: 'true',
-				TREESEED_WORKER_CONSOLE_SUMMARY: 'true',
-			}
-			: {};
 		const workspaceRoot = findNearestTreeseedWorkspaceRoot(context.cwd);
 		const workspaceLinksMode = typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined;
 		const workspaceLinks = workspaceRoot
@@ -126,7 +103,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 				tenantRoot: context.cwd,
 				scope: 'local',
 				baseEnv: { ...process.env, ...(context.env ?? {}) },
-				overrides: devManagerEnv,
+				overrides: {},
 			}),
 			stdio: 'inherit',
 		});
@@ -135,18 +112,11 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			suppressJsonResult: invocation.args.json === true,
 			report: {
 				command: 'dev',
-				alias: managerMode ? 'dev:manager' : invocation.commandName,
+				alias: invocation.commandName,
 				ok: (result.status ?? 1) === 0,
 				watch,
 				executable: resolved.command,
 				args,
-				docsAutomation: managerMode ? {
-					mode: docsAutomationMode || 'on',
-					workdayId: workdayId || null,
-					capacityBudget: capacityBudget || null,
-					approvalPolicy: approvalPolicy || 'manual',
-					withWorker: invocation.args.withWorker === true,
-				} : undefined,
 				workspaceLinks,
 			},
 		};

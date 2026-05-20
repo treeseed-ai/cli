@@ -310,7 +310,7 @@ function jsonResponse(payload, status = 200) {
 	});
 }
 
-function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary = { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 }, result = undefined } = {}) {
+function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary = { create: 2, update: 0, unchanged: 0, skip: 2, delete: 0, error: 0 }, result = undefined } = {}) {
 	return {
 		ok: true,
 		seed: 'treeseed',
@@ -319,7 +319,6 @@ function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary 
 		summary,
 		actions: [
 			{ action: 'create', kind: 'team', key: 'team:treeseed', label: 'TreeSeed', environments, payload: {} },
-			{ action: 'create', kind: 'capacityProvider', key: 'capacity-provider:treeseed/production', label: 'treeseed-production', environments, payload: {} },
 			{ action: 'create', kind: 'workPolicy', key: `work-policy:treeseed/${environments[0]}/market`, label: `market/${environments[0]}`, environments, payload: {} },
 		],
 		diagnostics: [],
@@ -371,94 +370,15 @@ resources:
           createIfMissing: true
           name: TreeSeed local provider security code
           scopes:
+            - provider:register
             - provider:heartbeat
+            - provider:portfolio:read
             - provider:tasks:claim
             - provider:tasks:update
             - provider:usage:report
-            - provider:lanes:read
-            - provider:registration:complete
-      lanes:
-        - key: lane:treeseed/local-dev/codex
-          name: local-codex
-          businessModel: subscription
-          modelFamily: codex
-          modelClass: coding_agent
-          unit: treeseed_credit
-          scarcityLevel: low
-        - key: lane:treeseed/local-dev/worker
-          name: local-worker
-          businessModel: local
-          modelFamily: local
-          modelClass: worker
-          unit: worker_minute
-          scarcityLevel: medium
-    - key: capacity-provider:treeseed/production
-      environments: [staging, prod]
-      team: team:treeseed
-      name: treeseed-production
-      kind: managed
-      provider: railway
-      billingScope: team
-      monthlyCreditBudget: 50000
-      dailyCreditBudget: 5000
-      maxConcurrentWorkdays: 2
-      maxConcurrentWorkers: 8
-      registration:
-        apiKey:
-          createIfMissing: true
-          name: TreeSeed production provider security code
-          scopes:
-            - provider:heartbeat
-            - provider:tasks:claim
-            - provider:tasks:update
-            - provider:usage:report
-            - provider:lanes:read
-            - provider:registration:complete
-      lanes:
-        - key: lane:treeseed/production/codex
-          name: codex-production
-          businessModel: subscription
-          modelFamily: codex
-          modelClass: coding_agent
-          unit: treeseed_credit
-          scarcityLevel: high
-        - key: lane:treeseed/production/workday-runner
-          name: workday-runner
-          businessModel: managed_runtime
-          modelFamily: railway
-          modelClass: worker_pool
-          unit: quota_minute
-          scarcityLevel: medium
-  capacityGrants:
-    - key: grant:treeseed/local-dev/all-projects
-      environments: [local]
-      provider: capacity-provider:treeseed/local-dev
-      team: team:treeseed
-      grantScope: team
-      dailyCreditLimit: 10000
-      monthlyCreditLimit: 100000
-      priorityWeight: 1
-      overflowPolicy: soft_grant
-    - key: grant:treeseed/staging/market
-      environments: [staging]
-      provider: capacity-provider:treeseed/production
-      team: team:treeseed
-      project: project:treeseed/market
-      grantScope: project
-      dailyCreditLimit: 2500
-      monthlyCreditLimit: 25000
-      priorityWeight: 8
-      overflowPolicy: approval_required
-    - key: grant:treeseed/prod/market
-      environments: [prod]
-      provider: capacity-provider:treeseed/production
-      team: team:treeseed
-      project: project:treeseed/market
-      grantScope: project
-      dailyCreditLimit: 2500
-      monthlyCreditLimit: 25000
-      priorityWeight: 10
-      overflowPolicy: approval_required
+            - provider:reports:write
+            - provider:capabilities:write
+  capacityGrants: []
   workPolicies:
     - key: work-policy:treeseed/local/market
       environments: [local]
@@ -587,14 +507,14 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /CREATE team TreeSeed/);
 	assert.match(result.stdout, /CREATE project treeseed\/market/);
 	assert.match(result.stdout, /CREATE capacity provider treeseed-local-dev/);
-	assert.match(result.stdout, /CREATE lane local-codex/);
-	assert.match(result.stdout, /CREATE grant treeseed\/local-dev -> treeseed/);
 	assert.match(result.stdout, /CREATE work policy market\/local/);
 	assert.match(result.stdout, /CREATE repository host github\/knowledge-coop/);
 	assert.match(result.stdout, /CREATE product template\/treeseed-market/);
 	assert.match(result.stdout, /CREATE catalog artifact treeseed\/market-template@1\.0\.0/);
-	assert.match(result.stdout, /  create: 10/);
-	assert.match(result.stdout, /  skipped: 7/);
+	assert.match(result.stdout, /  create: 7/);
+	assert.match(result.stdout, /  skipped: 2/);
+	assert.doesNotMatch(result.stdout, /CREATE lane /);
+	assert.doesNotMatch(result.stdout, /CREATE grant /);
 	assert.doesNotMatch(result.stdout, /codex-production/);
 });
 
@@ -609,33 +529,34 @@ test('seed local plan does not require a saved market session', async () => {
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 10);
-	assert.equal(payload.summary.skip, 7);
+	assert.equal(payload.summary.create, 7);
+	assert.equal(payload.summary.skip, 2);
 });
 
-test('seed prod plan includes production resources', async () => {
+test('seed prod plan excludes seeded providers and grants', async () => {
 	const root = remoteSeedWorkspace();
 	const result = await withMockFetch(async () => jsonResponse(remoteSeedPayload({
 		environments: ['prod'],
-		summary: { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
 	})), () => runCli(['seed', 'treeseed', '--environments', 'prod', '--plan'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
-	assert.match(result.stdout, /CREATE capacity provider treeseed-production/);
+	assert.doesNotMatch(result.stdout, /CREATE capacity provider/);
+	assert.doesNotMatch(result.stdout, /CREATE grant/);
 	assert.match(result.stdout, /CREATE work policy market\/prod/);
-	assert.match(result.stdout, /  create: 10/);
-	assert.match(result.stdout, /  skipped: 7/);
+	assert.match(result.stdout, /  create: 2/);
+	assert.match(result.stdout, /  skipped: 2/);
 	assert.doesNotMatch(result.stdout, /local-codex/);
 });
 
-test('seed staging plan includes staging capacity and work policy resources', async () => {
+test('seed staging plan excludes seeded providers and grants', async () => {
 	const root = remoteSeedWorkspace();
 	const result = await withMockFetch(async () => jsonResponse(remoteSeedPayload()), () => runCli(['seed', 'treeseed', '--environments', 'staging', '--plan'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	assert.match(result.stdout, /Environments: staging/);
-	assert.match(result.stdout, /CREATE capacity provider treeseed-production/);
+	assert.doesNotMatch(result.stdout, /CREATE capacity provider/);
+	assert.doesNotMatch(result.stdout, /CREATE grant/);
 	assert.match(result.stdout, /CREATE work policy market\/staging/);
-	assert.match(result.stdout, /  create: 10/);
-	assert.match(result.stdout, /  skipped: 7/);
+	assert.match(result.stdout, /  create: 2/);
+	assert.match(result.stdout, /  skipped: 2/);
 	assert.doesNotMatch(result.stdout, /local-codex/);
 });
 
@@ -651,9 +572,9 @@ test('seed json output includes skipped resources for agent review', async () =>
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 10);
-	assert.equal(payload.summary.skip, 7);
-	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 7);
+	assert.equal(payload.summary.create, 7);
+	assert.equal(payload.summary.skip, 2);
+	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 2);
 	assert.equal(payload.actions[0].key, 'team:treeseed');
 });
 
@@ -668,11 +589,15 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(first.exitCode, 0, first.stderr);
 	const firstPayload = JSON.parse(first.stdout);
 	assert.equal(firstPayload.ok, true);
-	assert.equal(firstPayload.summary.create, 10);
-	assert.equal(firstPayload.summary.skip, 7);
-	assert.equal(firstPayload.result.actionCount, 10);
+	assert.equal(firstPayload.summary.create, 7);
+	assert.equal(firstPayload.summary.skip, 2);
+	assert.equal(firstPayload.result.actionCount, 7);
 	assert.equal(firstPayload.result.capacityProviderKeys.created.length, 1);
-	assert.match(firstPayload.result.capacityProviderKeys.created[0].plaintextKey, /^tsp_/);
+	assert.equal(firstPayload.result.capacityProviderKeys.created[0].plaintextKey, undefined);
+	assert.equal(firstPayload.result.capacityProviderKeys.created[0].storedInTreeseedConfig, true);
+	assert.equal(firstPayload.result.capacityProviderConnection.scope, 'local');
+	assert.match(firstPayload.result.capacityProviderConnection.redactedEnv.TREESEED_CAPACITY_PROVIDER_API_KEY, /<redacted>/);
+	assert.doesNotMatch(first.stdout, /tsp_createdkey1_secret/);
 
 	const second = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
@@ -681,8 +606,8 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(second.exitCode, 0, second.stderr);
 	const secondPayload = JSON.parse(second.stdout);
 	assert.equal(secondPayload.summary.create, 0);
-	assert.equal(secondPayload.summary.unchanged, 10);
-	assert.equal(secondPayload.summary.skip, 7);
+	assert.equal(secondPayload.summary.unchanged, 7);
+	assert.equal(secondPayload.summary.skip, 2);
 	assert.equal(secondPayload.result.actionCount, 0);
 	assert.equal(secondPayload.result.capacityProviderKeys.created.length, 0);
 	assert.equal(secondPayload.result.capacityProviderKeys.existing.length, 1);
@@ -735,25 +660,15 @@ test('seed staging apply uses the remote market API', async () => {
 			result: {
 				appliedAt: '2026-01-01T00:00:00.000Z',
 				manifestHash: 'abc',
-				actionCount: 11,
-				capacityProviderKeys: {
-					created: [{
-						providerId: 'provider-1',
-						providerKey: 'capacity-provider:treeseed/production',
-						providerName: 'treeseed-production',
-						keyPrefix: 'tsp_123456789abc',
-						plaintextKey: 'tsp_123456789abcdef',
-					}],
-					existing: [],
-				},
+				actionCount: 2,
 			},
 		}));
 	}, () => runCli(['seed', 'treeseed', '--environments', 'staging', '--apply', '--json'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.ok, true);
-	assert.equal(payload.result.actionCount, 11);
-	assert.equal(payload.result.capacityProviderKeys.created[0].plaintextKey, 'tsp_123456789abcdef');
+	assert.equal(payload.result.actionCount, 2);
+	assert.equal(payload.result.capacityProviderKeys, undefined);
 });
 
 test('seed prod apply returns blocked approval response', async () => {
@@ -762,7 +677,6 @@ test('seed prod apply returns blocked approval response', async () => {
 		...remoteSeedPayload({
 			mode: 'apply',
 			environments: ['prod'],
-			summary: { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
 			result: {
 				blocked: true,
 				reason: 'Production seed apply requires approval.',
@@ -787,15 +701,14 @@ test('seed prod apply passes approved approval request to remote market API', as
 		return jsonResponse(remoteSeedPayload({
 			mode: 'apply',
 			environments: ['prod'],
-			summary: { create: 10, update: 0, unchanged: 0, skip: 7, delete: 0, error: 0 },
-			result: { appliedAt: '2026-01-01T00:00:00.000Z', manifestHash: 'abc', actionCount: 10 },
+			result: { appliedAt: '2026-01-01T00:00:00.000Z', manifestHash: 'abc', actionCount: 2 },
 		}));
 	}, () => runCli(['seed', 'treeseed', '--environments', 'prod', '--apply', '--approval-request', 'approval-1', '--json'], { cwd: root, env: remoteSeedEnv(root) }));
 	assert.equal(result.exitCode, 0);
 	assert.deepEqual(requestBody.environments, ['prod']);
 	assert.equal(requestBody.approvalRequestId, 'approval-1');
 	const payload = JSON.parse(result.stdout);
-	assert.equal(payload.result.actionCount, 10);
+	assert.equal(payload.result.actionCount, 2);
 });
 
 test('seed remote auth failures map to exit code four', async () => {
