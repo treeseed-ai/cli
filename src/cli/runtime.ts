@@ -412,6 +412,7 @@ function commandNeedsProjectRoot(spec: TreeseedOperationSpec) {
 		'market',
 		'teams',
 		'projects',
+		'capacity',
 		'packs',
 		'template',
 	]).has(spec.name);
