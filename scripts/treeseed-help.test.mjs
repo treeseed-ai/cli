@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +71,15 @@ function npmInstallTestEnv() {
 		NODE_ENV: 'test',
 		TREESEED_TEST_NPM_INSTALL_STATUS: 'installed',
 	};
+}
+
+function makeFakeAgentPackageRoot() {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-agent-package-'));
+	mkdirSync(resolve(root, 'dist', 'provider'), { recursive: true });
+	writeFileSync(resolve(root, 'package.json'), `${JSON.stringify({ name: '@treeseed/agent', type: 'module' }, null, 2)}\n`, 'utf8');
+	writeFileSync(resolve(root, 'dist', 'provider', 'entrypoint.js'), 'console.log(JSON.stringify({ ok: true }));\n', 'utf8');
+	writeFileSync(resolve(root, 'compose.capacity-provider.yml'), 'services:\n  api:\n    image: capacity-provider:local\n', 'utf8');
+	return root;
 }
 
 async function runCli(args, options = {}) {
@@ -229,14 +239,15 @@ test('save help documents optional generated commit message hints', async () => 
 	assert.doesNotMatch(result.output, /<message>/);
 });
 
-test('dev help documents comma-separated surfaces and integrated runtime', async () => {
+test('dev help documents fixed Market web/API runtime', async () => {
 	const result = await runCli(['help', 'dev']);
 	assert.equal(result.exitCode, 0);
-	assert.match(result.output, /--surfaces <surfaces>/);
+	assert.doesNotMatch(result.output, /--surfaces <surfaces>/);
+	assert.doesNotMatch(result.output, /--surface <surface>/);
 	assert.match(result.output, /--web-runtime <mode>/);
 	assert.match(result.output, /--force/);
-	assert.match(result.output, /web, API, manager, worker/);
-	assert.match(result.output, /integrated,agents/);
+	assert.match(result.output, /web\/API/u);
+	assert.match(result.output, /capacity/u);
 });
 
 test('major workflow commands have usage, options, and examples in help', async () => {
@@ -1235,7 +1246,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	const workspaceRoot = makeTenantWorkspace('feature/dev-workspace');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const result = await runCli(['dev', '--surface', 'web', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--force', '--plan', '--json'], {
+	const result = await runCli(['dev', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--force', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
@@ -1248,7 +1259,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
 	assert.deepEqual(
 		result.spawns[0].args.slice(-16),
-		['--surface', 'web', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
+		['--surfaces', 'web,api', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
 	);
 });
 
@@ -1268,7 +1279,7 @@ test('treeseed dev leaves live feedback disabled when feedback is off', async ()
 	assert.ok(!result.spawns[0].args.includes('--watch'));
 });
 
-test('treeseed dev forwards explicit API and service surfaces', async () => {
+test('treeseed dev rejects removed surface and worker options', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-surfaces');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
@@ -1279,11 +1290,9 @@ test('treeseed dev forwards explicit API and service surfaces', async () => {
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(selectedResult.exitCode, 0);
-	assert.equal(selectedResult.spawns.length, 1);
-	assert.ok(selectedResult.spawns[0].args.includes('--surfaces'));
-	assert.ok(selectedResult.spawns[0].args.includes('web,api'));
-	assert.ok(selectedResult.spawns[0].args.includes('--watch'));
+	assert.notEqual(selectedResult.exitCode, 0);
+	assert.equal(selectedResult.spawns.length, 0);
+	assert.match(selectedResult.stderr, /Unknown option: --surfaces/u);
 
 	const apiResult = await runCli(['dev', '--surface', 'api', '--plan', '--json'], {
 		cwd: workspaceRoot,
@@ -1292,96 +1301,101 @@ test('treeseed dev forwards explicit API and service surfaces', async () => {
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(apiResult.exitCode, 0);
-	assert.equal(apiResult.spawns.length, 1);
-	assert.ok(apiResult.spawns[0].args.includes('--surface'));
-	assert.ok(apiResult.spawns[0].args.includes('api'));
-	assert.ok(apiResult.spawns[0].args.includes('--watch'));
+	assert.notEqual(apiResult.exitCode, 0);
+	assert.equal(apiResult.spawns.length, 0);
+	assert.match(apiResult.stderr, /Unknown option: --surface/u);
 
-	const servicesResult = await runCli(['dev', '--surface', 'services', '--plan', '--json', '--feedback', 'off'], {
+	const workerResult = await runCli(['dev', '--with-worker', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(servicesResult.exitCode, 0);
-	assert.equal(servicesResult.spawns.length, 1);
-	assert.ok(servicesResult.spawns[0].args.includes('--surface'));
-	assert.ok(servicesResult.spawns[0].args.includes('services'));
-	assert.ok(!servicesResult.spawns[0].args.includes('--watch'));
+	assert.notEqual(workerResult.exitCode, 0);
+	assert.equal(workerResult.spawns.length, 0);
+	assert.match(workerResult.stderr, /Unknown option: --with-worker/u);
 });
 
-test('treeseed dev:manager selects manager surfaces and forwards docs automation settings', async () => {
+test('treeseed dev:manager and dev:watch are no longer public aliases', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-manager');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const result = await runCli([
-		'dev:manager',
-		'--docs-automation',
-		'dry-run',
-		'--workday-id',
-		'workday-local-1',
-		'--capacity-budget',
-		'42',
-		'--approval-policy',
-		'low-risk-auto',
-		'--plan',
-		'--json',
-	], {
+	const manager = await runCli(['dev:manager', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 1);
-	assert.ok(result.spawns[0].args.includes('--surfaces'));
-	assert.ok(result.spawns[0].args.includes('manager'));
-	assert.ok(result.spawns[0].args.includes('--plan'));
-	assert.ok(result.spawns[0].args.includes('--json'));
-	assert.equal(result.spawns[0].options.env.TREESEED_DOCS_AUTOMATION_MODE, 'dry-run');
-	assert.equal(result.spawns[0].options.env.TREESEED_WORKDAY_ID, 'workday-local-1');
-	assert.equal(result.spawns[0].options.env.TREESEED_CAPACITY_BUDGET, '42');
-	assert.equal(result.spawns[0].options.env.TREESEED_WORKDAY_TASK_CREDIT_BUDGET, '42');
-	assert.equal(result.spawns[0].options.env.TREESEED_APPROVAL_POLICY, 'low-risk-auto');
+	assert.notEqual(manager.exitCode, 0);
+	assert.equal(manager.spawns.length, 0);
+	assert.match(manager.stderr, /Unknown treeseed command: dev:manager/u);
+
+	const watch = await runCli(['dev:watch'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.notEqual(watch.exitCode, 0);
+	assert.equal(watch.spawns.length, 0);
+	assert.match(watch.stderr, /Unknown treeseed command: dev:watch/u);
 });
 
-test('treeseed dev:manager --with-worker supervises manager and worker', async () => {
-	const workspaceRoot = makeTenantWorkspace('feature/dev-manager-worker');
-	installCoreDevFixture(workspaceRoot, { workspace: true });
+test('capacity lifecycle commands route through package-owned scripts and Compose with redacted env', async () => {
+	const agentRoot = makeFakeAgentPackageRoot();
+	const secret = 'tscp_capacity_cli_test_secret';
+	try {
+		const build = await runCli(['capacity', 'build', '--agent-package-root', agentRoot, '--json']);
+		assert.equal(build.exitCode, 0);
+		assert.equal(build.spawns.length, 1);
+		assert.equal(build.spawns[0].command, 'npm');
+		assert.deepEqual(build.spawns[0].args, ['run', 'capacity-provider:build']);
+		assert.equal(build.spawns[0].options.cwd, agentRoot);
 
-	const result = await runCli(['dev:manager', '--with-worker', '--plan', '--json'], {
-		cwd: workspaceRoot,
-		env: {
-			HOME: workspaceRoot,
-			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
-		},
-	});
-	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 1);
-	assert.ok(result.spawns[0].args.includes('--surfaces'));
-	assert.ok(result.spawns[0].args.includes('manager,worker'));
-	assert.equal(result.spawns[0].options.env.TREESEED_DOCS_AUTOMATION_MODE, 'on');
-	assert.equal(result.spawns[0].options.env.TREESEED_APPROVAL_POLICY, 'manual');
+		const up = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], {
+			env: {
+				TREESEED_CAPACITY_PROVIDER_API_KEY: secret,
+			},
+		});
+		assert.equal(up.exitCode, 0);
+		assert.equal(up.spawns.length, 1);
+		assert.equal(up.spawns[0].command, 'docker');
+		assert.deepEqual(up.spawns[0].args.slice(0, 4), ['compose', '-f', resolve(agentRoot, 'compose.capacity-provider.yml'), '-p']);
+		assert.deepEqual(up.spawns[0].args.slice(-2), ['up', '-d']);
+		assert.notEqual(up.spawns[0].options.env.TREESEED_PROVIDER_STARTUP_MODE, 'diagnostic');
+		assert.equal(up.spawns[0].options.env.TREESEED_MARKET_ID, 'local');
+		assert.equal(up.spawns[0].options.env.TREESEED_CAPACITY_PROVIDER_API_KEY, secret);
+		assert.doesNotMatch(up.output, new RegExp(secret, 'u'));
+		const upPayload = JSON.parse(up.output);
+		assert.equal(upPayload.diagnostic, false);
+		assert.equal(upPayload.redactedEnv.TREESEED_CAPACITY_PROVIDER_API_KEY.includes('<redacted>'), true);
+
+		const diagnostic = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--diagnostic', '--json']);
+		assert.equal(diagnostic.exitCode, 0);
+		assert.equal(diagnostic.spawns[0].options.env.TREESEED_PROVIDER_STARTUP_MODE, 'diagnostic');
+		assert.equal(JSON.parse(diagnostic.output).diagnostic, true);
+
+		const status = await runCli(['capacity', 'status', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json']);
+		assert.equal(status.exitCode, 0);
+		assert.equal(status.spawns.length, 1);
+		assert.deepEqual(status.spawns[0].args.slice(-1), ['ps']);
+	} finally {
+		rmSync(agentRoot, { recursive: true, force: true });
+	}
 });
 
-test('treeseed dev:watch delegates to the installed core entrypoint with --watch', async () => {
-	const workspaceRoot = makeTenantWorkspace('feature/dev-installed');
-	installCoreDevFixture(workspaceRoot);
-
-	const result = await runCli(['dev:watch'], {
-		cwd: workspaceRoot,
-		env: {
-			HOME: workspaceRoot,
-			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
-		},
-	});
-	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 1);
-	assert.match(result.spawns[0].args.join(' '), /node_modules\/@treeseed\/core\/dist\/scripts\/dev-platform\.js/);
-	assert.ok(result.spawns[0].args.includes('--watch'));
+test('capacity removes old helper-capacity actions', async () => {
+	const agentRoot = makeFakeAgentPackageRoot();
+	try {
+		const result = await runCli(['capacity', 'providers', '--agent-package-root', agentRoot]);
+		assert.notEqual(result.exitCode, 0);
+		assert.match(result.stderr, /Unknown capacity action "providers"/u);
+	} finally {
+		rmSync(agentRoot, { recursive: true, force: true });
+	}
 });
 
 test('command metadata stays aligned with help coverage', () => {
