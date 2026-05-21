@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0] - 2026-05-21
+
+### Fixed
+
+- fix(build): rehearse repair releases against stable dependencies (fafb185f9231)
+- fix(cli): allow repairVersionLine flag in release command (e0a4b78f3426)
+- fix(release): add support for repairing package release line drift (f534b061d663)
+
+### Dependencies
+
+- Release @treeseed/cli 0.10.0.
+
 ## [0.9.3] - 2026-05-21
 
 ### Dependencies
