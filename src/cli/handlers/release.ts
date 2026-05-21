@@ -9,6 +9,7 @@ function formatReleasePlanSections(payload: {
 	plannedPublishWaits?: Array<{ name?: string; workflow?: string; branch?: string; status?: string }>;
 	plannedSteps?: Array<{ id?: string; description?: string }>;
 	blockers?: string[];
+	releaseLine?: { targetLine?: unknown; highestCurrentLine?: unknown; repair?: unknown; alignedBefore?: unknown };
 }) {
 	const sections = [];
 	const selection = payload.packageSelection ?? {};
@@ -28,6 +29,17 @@ function formatReleasePlanSections(payload: {
 		sections.push({
 			title: 'Planned versions',
 			lines: versions.map(([name, version]) => `- ${name}: ${version}`),
+		});
+	}
+	if (payload.releaseLine) {
+		sections.push({
+			title: 'Release line',
+			lines: [
+				`Target: ${String(payload.releaseLine.targetLine ?? 'unknown')}`,
+				`Highest current: ${String(payload.releaseLine.highestCurrentLine ?? 'unknown')}`,
+				`Repair: ${payload.releaseLine.repair === true ? 'yes' : 'no'}`,
+				`Aligned before: ${payload.releaseLine.alignedBefore === true ? 'yes' : 'no'}`,
+			],
 		});
 	}
 	const rewrites = payload.plannedDevReferenceRewrites ?? [];
@@ -65,9 +77,12 @@ function formatReleasePlanSections(payload: {
 
 export const handleRelease: TreeseedCommandHandler = async (invocation, context) => {
 	try {
+		const repairVersionLine = invocation.args.repairVersionLine === true;
 		const bump = (['major', 'minor', 'patch'] as const).find((candidate) => invocation.args[candidate] === true) ?? 'patch';
 		const result = await createWorkflowSdk(context).release({
 			bump,
+			repairVersionLine,
+			targetVersionLine: typeof invocation.args.targetVersionLine === 'string' ? invocation.args.targetVersionLine : undefined,
 			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
@@ -89,6 +104,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			publishWait?: Array<{ name: string; status: string; conclusion?: string | null }>;
 			plannedPublishWaits?: Array<{ name?: string; workflow?: string; branch?: string; status?: string }>;
 			plannedVersions?: Record<string, string>;
+			releaseLine?: Record<string, unknown>;
 			plannedDevReferenceRewrites?: Array<{ repoName?: string; dependencyName?: string; field?: string; spec?: string; reason?: string; filePath?: string }>;
 			plannedSteps?: Array<{ id?: string; description?: string }>;
 			blockers?: string[];
@@ -113,6 +129,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Production branch', value: payload.productionBranch },
 				{ label: 'Merge strategy', value: payload.mergeStrategy },
 				{ label: 'Release level', value: payload.level },
+				{ label: 'Release line', value: String(payload.releaseLine?.targetLine ?? '(none)') },
 				{ label: 'Root version', value: payload.rootVersion ?? payload.plannedVersions?.['@treeseed/market'] ?? '(planned)' },
 				{ label: 'Release tag', value: payload.releaseTag ?? payload.rootVersion ?? payload.plannedVersions?.['@treeseed/market'] ?? '(planned)' },
 				{ label: 'Released commit', value: releasedCommit },

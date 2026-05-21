@@ -92,9 +92,9 @@ export function validateTreeseedInvocation(command: TreeseedOperationSpec, invoc
 	}
 
 	if (command.name === 'release') {
-		const selected = ['major', 'minor', 'patch'].filter((name) => invocation.args[name] === true);
+		const selected = ['major', 'minor', 'patch', 'repairVersionLine'].filter((name) => invocation.args[name] === true);
 		if (selected.length !== 1) {
-			errors.push(`Treeseed ${command.name} requires exactly one version bump flag: --major, --minor, or --patch.`);
+			errors.push(`Treeseed ${command.name} requires exactly one version bump flag: --major, --minor, --patch, or --repair-version-line.`);
 		}
 	}
 
