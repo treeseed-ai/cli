@@ -1109,11 +1109,13 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'export',
 	})],
 	['release', command({
-		usage: 'treeseed release --major|--minor|--patch',
+		usage: 'treeseed release --major|--minor|--patch|--repair-version-line',
 		options: [
 			{ name: 'major', flags: '--major', description: 'Bump to the next major version.', kind: 'boolean' },
 			{ name: 'minor', flags: '--minor', description: 'Bump to the next minor version.', kind: 'boolean' },
 			{ name: 'patch', flags: '--patch', description: 'Bump to the next patch version.', kind: 'boolean' },
+			{ name: 'repairVersionLine', flags: '--repair-version-line', description: 'Repair public package major.minor drift without enforcing patch parity.', kind: 'boolean' },
+			{ name: 'targetVersionLine', flags: '--target-version-line <major.minor>', description: 'Target release line for --repair-version-line, for example 0.10.', kind: 'string' },
 			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
 			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
@@ -1122,8 +1124,8 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed release --patch', 'treeseed release --minor', 'treeseed release --patch --fresh', 'treeseed release --patch --plan'],
-		notes: ['Requires exactly one bump flag.'],
+		examples: ['treeseed release --patch', 'treeseed release --minor', 'treeseed release --repair-version-line --target-version-line 0.10 --plan', 'treeseed release --patch --fresh'],
+		notes: ['Requires exactly one bump flag unless --repair-version-line is used.'],
 		help: {
 			workflowPosition: 'promote to production',
 			longSummary: [
@@ -1131,11 +1133,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			whenToUse: [
 				'Use this only when staging is the approved source for production promotion.',
-				'Choose exactly one bump flag so the release version reflects the intended change size.',
+				'Choose exactly one bump flag so the release version reflects the intended change size, or use --repair-version-line to repair package line drift.',
 			],
 			beforeYouRun: [
 				'Confirm staging is in the state you want to promote.',
-				'Choose one of `--major`, `--minor`, or `--patch` before running the command.',
+				'Choose one of `--major`, `--minor`, `--patch`, or `--repair-version-line` before running the command.',
 			],
 			outcomes: [
 				'Promotes the release forward and records the version bump.',
@@ -1144,10 +1146,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			examples: [
 				example('treeseed release --patch', 'Patch release', 'Promote staging to production with the next patch version.'),
 				example('treeseed release --minor', 'Minor release', 'Promote staging with the next minor version bump.'),
+				example('treeseed release --repair-version-line --target-version-line 0.10 --json', 'Repair package line drift', 'Publish only packages below the selected public package release line.'),
 				example('treeseed release --patch --json', 'Automate release tracking', 'Emit structured release output for tooling that records deployments and version changes.'),
 			],
 			warnings: [
-				'Exactly one bump flag is required.',
+				'Exactly one bump flag is required unless --repair-version-line is used.',
 				'This is a production-facing promotion command, not a dry local build operation.',
 			],
 			relatedDetails: [
