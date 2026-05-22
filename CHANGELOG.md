@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1] - 2026-05-22
+
+### Dependencies
+
+- build(build): sync package dependency references (33c2dc0b2352)
+- chore(cli): bump version and update @treeseed/sdk (b9943944852b)
+- Release @treeseed/cli 0.10.1.
+
 ## [0.10.0] - 2026-05-21
 
 ### Fixed
