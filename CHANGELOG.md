@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3] - 2026-05-23
+
+### Dependencies
+
+- build(cli): bump version to 0.10.3-dev.staging.20260523T002853Z (aa3348372a55)
+- Release @treeseed/cli 0.10.3.
+
 ## [0.10.2] - 2026-05-22
 
 ### Dependencies
