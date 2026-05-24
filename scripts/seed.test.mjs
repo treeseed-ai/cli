@@ -361,10 +361,25 @@ resources:
       kind: local
       provider: local
       billingScope: team
-      monthlyCreditBudget: 100000
-      dailyCreditBudget: 10000
+      creditBudgetMode: derived
       maxConcurrentWorkdays: 2
       maxConcurrentWorkers: 4
+      executionProviders:
+        - id: treeseed-local-codex
+          name: Local Codex capacity
+          kind: codex_subscription
+          nativeUnit: wall_minute
+          quotaVisibility: opaque
+          maxConcurrentWorkers: 4
+          resetCadence: daily
+          nativeLimits:
+            - scope: daily
+              nativeUnit: wall_minute
+              limitAmount: 480
+              reserveBufferPercent: 20
+              resetCadence: daily
+              confidence: estimated
+              source: configured
       registration:
         apiKey:
           createIfMissing: true
@@ -378,7 +393,19 @@ resources:
             - provider:usage:report
             - provider:reports:write
             - provider:capabilities:write
-  capacityGrants: []
+  capacityGrants:
+    - key: capacity-grant:treeseed/local/market
+      environments: [local]
+      provider: capacity-provider:treeseed/local-dev
+      team: team:treeseed
+      project: project:treeseed/market
+      environment: local
+      grantScope: project
+      portfolioAllocationPercent: 100
+      reservePoolPercent: 10
+      maxDailyProjectCredits: 5000
+      priorityWeight: 1
+      overflowPolicy: soft_grant
   workPolicies:
     - key: work-policy:treeseed/local/market
       environments: [local]
@@ -507,14 +534,14 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /CREATE team TreeSeed/);
 	assert.match(result.stdout, /CREATE project treeseed\/market/);
 	assert.match(result.stdout, /CREATE capacity provider treeseed-local-dev/);
+	assert.match(result.stdout, /CREATE grant treeseed\/local-dev -> treeseed\/market/);
 	assert.match(result.stdout, /CREATE work policy market\/local/);
 	assert.match(result.stdout, /CREATE repository host github\/knowledge-coop/);
 	assert.match(result.stdout, /CREATE product template\/treeseed-market/);
 	assert.match(result.stdout, /CREATE catalog artifact treeseed\/market-template@1\.0\.0/);
-	assert.match(result.stdout, /  create: 7/);
+	assert.match(result.stdout, /  create: 8/);
 	assert.match(result.stdout, /  skipped: 2/);
 	assert.doesNotMatch(result.stdout, /CREATE lane /);
-	assert.doesNotMatch(result.stdout, /CREATE grant /);
 	assert.doesNotMatch(result.stdout, /codex-production/);
 });
 
@@ -529,7 +556,7 @@ test('seed local plan does not require a saved market session', async () => {
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 7);
+	assert.equal(payload.summary.create, 8);
 	assert.equal(payload.summary.skip, 2);
 });
 
@@ -572,7 +599,7 @@ test('seed json output includes skipped resources for agent review', async () =>
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 7);
+	assert.equal(payload.summary.create, 8);
 	assert.equal(payload.summary.skip, 2);
 	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 2);
 	assert.equal(payload.actions[0].key, 'team:treeseed');
@@ -589,9 +616,9 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(first.exitCode, 0, first.stderr);
 	const firstPayload = JSON.parse(first.stdout);
 	assert.equal(firstPayload.ok, true);
-	assert.equal(firstPayload.summary.create, 7);
+	assert.equal(firstPayload.summary.create, 8);
 	assert.equal(firstPayload.summary.skip, 2);
-	assert.equal(firstPayload.result.actionCount, 7);
+	assert.equal(firstPayload.result.actionCount, 8);
 	assert.equal(firstPayload.result.capacityProviderKeys.created.length, 1);
 	assert.equal(firstPayload.result.capacityProviderKeys.created[0].plaintextKey, undefined);
 	assert.equal(firstPayload.result.capacityProviderKeys.created[0].storedInTreeseedConfig, true);
@@ -606,7 +633,7 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(second.exitCode, 0, second.stderr);
 	const secondPayload = JSON.parse(second.stdout);
 	assert.equal(secondPayload.summary.create, 0);
-	assert.equal(secondPayload.summary.unchanged, 7);
+	assert.equal(secondPayload.summary.unchanged, 8);
 	assert.equal(secondPayload.summary.skip, 2);
 	assert.equal(secondPayload.result.actionCount, 0);
 	assert.equal(secondPayload.result.capacityProviderKeys.created.length, 0);
