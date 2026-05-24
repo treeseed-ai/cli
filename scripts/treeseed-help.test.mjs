@@ -10,6 +10,7 @@ import {
 	TREESEED_MACHINE_KEY_PASSPHRASE_ENV,
 	unlockTreeseedSecretSessionFromEnv,
 } from '@treeseed/sdk/workflow-support';
+import { setMarketSession } from '@treeseed/sdk/market-client';
 import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 
 for (const key of ['CI', 'ACT', 'GITHUB_ACTIONS', 'TREESEED_VERIFY_DRIVER']) {
@@ -77,7 +78,21 @@ function makeFakeAgentPackageRoot() {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-agent-package-'));
 	mkdirSync(resolve(root, 'dist', 'provider'), { recursive: true });
 	writeFileSync(resolve(root, 'package.json'), `${JSON.stringify({ name: '@treeseed/agent', type: 'module' }, null, 2)}\n`, 'utf8');
-	writeFileSync(resolve(root, 'dist', 'provider', 'entrypoint.js'), 'console.log(JSON.stringify({ ok: true }));\n', 'utf8');
+	writeFileSync(resolve(root, 'dist', 'provider', 'entrypoint.js'), `console.log(JSON.stringify({
+	ok: true,
+	budgets: {
+		nativeCapacity: {
+			executionProviders: [{
+				id: 'local-codex',
+				name: 'Local Codex',
+				kind: 'codex_subscription',
+				nativeUnit: 'wall_minute',
+				maxConcurrentWorkers: 4,
+				nativeLimits: [{ scope: 'daily', nativeUnit: 'wall_minute', limitAmount: 480, reserveBufferPercent: 20 }],
+			}],
+		},
+	},
+}));\n`, 'utf8');
 	writeFileSync(resolve(root, 'compose.capacity-provider.yml'), 'services:\n  api:\n    image: capacity-provider:local\n', 'utf8');
 	return root;
 }
@@ -1382,9 +1397,119 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 		assert.equal(status.exitCode, 0);
 		assert.equal(status.spawns.length, 1);
 		assert.deepEqual(status.spawns[0].args.slice(-1), ['ps']);
+
+		const providerPlan = await runCli(['capacity', 'plan', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot]);
+		assert.equal(providerPlan.exitCode, 0);
+		assert.match(providerPlan.output, /Native budget file/u);
+		assert.match(providerPlan.output, /Local Codex: codex_subscription, wall_minute/u);
 	} finally {
 		rmSync(agentRoot, { recursive: true, force: true });
 	}
+});
+
+test('capacity project plan reads Market derived capacity projection', async () => {
+	const root = makeWorkspaceRoot();
+	const previousHome = process.env.HOME;
+	const previousPassphrase = process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV];
+	const previousTransport = process.env.TREESEED_KEY_AGENT_TRANSPORT;
+	process.env.HOME = root;
+	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
+	process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV] = 'test-passphrase';
+	unlockTreeseedSecretSessionFromEnv(root);
+	const previousFetch = globalThis.fetch;
+	const calls = [];
+	globalThis.fetch = async (input, init) => {
+		calls.push({ input: String(input), init });
+		assert.match(String(input), /\/v1\/projects\/project_123\/capacity-plan\?environment=local$/u);
+		assert.equal(init?.headers?.authorization, 'Bearer test-access-token');
+		return new Response(JSON.stringify({
+			ok: true,
+			payload: {
+				projectId: 'project_123',
+				environment: 'local',
+				derivedCapacity: {
+					totalDerivedAvailableCredits: 42,
+					entries: [{
+						executionProviderKind: 'codex_subscription',
+						nativeUnit: 'wall_minute',
+						configuredNativeLimit: 480,
+						observedNativeRemaining: 300,
+						activeReservedNativeAmount: 60,
+						reserveBufferPercent: 20,
+						nativeUnitsPerCredit: 10,
+						derivedAvailableCredits: 24,
+						confidence: 'high',
+					}],
+				},
+				grants: [{
+					grantScope: 'project',
+					environment: 'local',
+					portfolioAllocationPercent: 100,
+					reservePoolPercent: 10,
+					maxDailyProjectCredits: 5000,
+					overflowPolicy: 'soft_grant',
+				}],
+			},
+		}), { status: 200, headers: { 'content-type': 'application/json' } });
+	};
+	try {
+		setMarketSession(root, {
+			marketId: 'local',
+			accessToken: 'test-access-token',
+			principal: { id: 'user-1', roles: [], permissions: [] },
+		});
+		const result = await runCli(['capacity', 'plan', '--market', 'local', '--project', 'project_123', '--environment', 'local'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 0, result.stderr);
+		assert.equal(calls.length, 1);
+		assert.match(result.output, /Native projection/u);
+		assert.match(result.output, /codex_subscription:wall_minute/u);
+		assert.match(result.output, /derived 24 credits/u);
+		assert.match(result.output, /allocation 100%/u);
+	} finally {
+		globalThis.fetch = previousFetch;
+		if (previousHome === undefined) delete process.env.HOME;
+		else process.env.HOME = previousHome;
+		if (previousTransport === undefined) delete process.env.TREESEED_KEY_AGENT_TRANSPORT;
+		else process.env.TREESEED_KEY_AGENT_TRANSPORT = previousTransport;
+		if (previousPassphrase === undefined) delete process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV];
+		else process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV] = previousPassphrase;
+	}
+});
+
+test('capacity migrate to derived requires native facts and supports dry-run', async () => {
+	const missing = await runCli(['capacity', 'migrate', '--to-derived', '--dry-run']);
+	assert.notEqual(missing.exitCode, 0);
+	assert.match(missing.stderr, /Missing native capacity facts: --team, --provider, --kind, --native-unit, --limit/u);
+
+	const dryRun = await runCli([
+		'capacity',
+		'migrate',
+		'--to-derived',
+		'--team',
+		'team_123',
+		'--provider',
+		'provider_123',
+		'--kind',
+		'codex_subscription',
+		'--native-unit',
+		'wall_minute',
+		'--limit',
+		'480',
+		'--scope',
+		'daily',
+		'--portfolio-allocation-percent',
+		'100',
+		'--project',
+		'project_123',
+		'--dry-run',
+		'--json',
+	]);
+	assert.equal(dryRun.exitCode, 0, dryRun.stderr);
+	const payload = JSON.parse(dryRun.output);
+	assert.equal(payload.dryRun, true);
+	assert.equal(payload.executionProvider.nativeLimits[0].limitAmount, 480);
+	assert.equal(payload.grant.portfolioAllocationPercent, 100);
+	assert.equal(payload.grant.projectId, 'project_123');
 });
 
 test('capacity removes old helper-capacity actions', async () => {
