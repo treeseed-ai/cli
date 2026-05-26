@@ -54,11 +54,11 @@ function resolveCoreDevEntrypoint(cwd: string) {
 export const handleDev: TreeseedCommandHandler = async (invocation, context) => {
 	try {
 		if (invocation.commandName !== 'dev') {
-			return fail('`trsd dev` only starts the Market web/API dev runtime. Use `trsd capacity ...` for capacity provider lifecycle commands.');
+			return fail('`trsd dev` starts the Market web/API/dev-runner runtime. Use `trsd capacity ...` for capacity provider lifecycle commands.');
 		}
 		const removedOptions = ['surface', 'surfaces', 'withWorker'].filter((name) => invocation.args[name] !== undefined);
 		if (removedOptions.length > 0) {
-			return fail(`\`trsd dev\` no longer accepts ${removedOptions.map((name) => `--${name.replace(/[A-Z]/gu, (char) => `-${char.toLowerCase()}`)}`).join(', ')}. It always starts fixed Market web/API surfaces; use \`trsd capacity ...\` for providers.`);
+			return fail(`\`trsd dev\` no longer accepts ${removedOptions.map((name) => `--${name.replace(/[A-Z]/gu, (char) => `-${char.toLowerCase()}`)}`).join(', ')}. It always starts fixed Market web/API/dev-runner surfaces; use \`trsd capacity ...\` for providers.`);
 		}
 		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
 		const watch = feedback !== 'off';
