@@ -1,0 +1,415 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+	createDefaultTreeseedMachineConfig,
+	unlockTreeseedSecretSessionWithPassphrase,
+	writeTreeseedMachineConfig,
+} from '@treeseed/sdk/workflow-support';
+import { setMarketSession } from '@treeseed/sdk/market-client';
+import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+
+const { runTreeseedCli } = await import('../dist/cli/main.js');
+
+function prepareMarketWorkspace({ withSession = true } = {}) {
+	const root = makeWorkspaceRoot();
+	const previousHome = process.env.HOME;
+	const previousTransport = process.env.TREESEED_KEY_AGENT_TRANSPORT;
+	const previousPassphrase = process.env.TREESEED_KEY_PASSPHRASE;
+	process.env.HOME = root;
+	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
+	process.env.TREESEED_KEY_PASSPHRASE = 'test-passphrase';
+	try {
+		writeTreeseedMachineConfig(root, createDefaultTreeseedMachineConfig({
+			tenantRoot: root,
+			deployConfig: { name: 'Projects Deploy Test', slug: 'projects-deploy-test' },
+			tenantConfig: undefined,
+		}));
+		unlockTreeseedSecretSessionWithPassphrase(root, 'test-passphrase', {
+			createIfMissing: true,
+			allowMigration: false,
+		});
+		if (withSession) {
+			setMarketSession(root, {
+				marketId: 'local',
+				accessToken: 'test-local-token',
+				principal: {
+					id: 'user-local',
+					displayName: 'Local Deploy User',
+					scopes: ['auth:me', 'market'],
+					roles: ['platform_admin'],
+					permissions: ['*:*:*'],
+				},
+			});
+		}
+	} finally {
+		if (previousHome === undefined) delete process.env.HOME;
+		else process.env.HOME = previousHome;
+		if (previousTransport === undefined) delete process.env.TREESEED_KEY_AGENT_TRANSPORT;
+		else process.env.TREESEED_KEY_AGENT_TRANSPORT = previousTransport;
+		if (previousPassphrase === undefined) delete process.env.TREESEED_KEY_PASSPHRASE;
+		else process.env.TREESEED_KEY_PASSPHRASE = previousPassphrase;
+	}
+	return root;
+}
+
+async function runCli(args, options = {}) {
+	const writes = [];
+	const env = {
+		...process.env,
+		NODE_ENV: 'test',
+		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
+		TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		CI: undefined,
+		ACT: undefined,
+		GITHUB_ACTIONS: undefined,
+		TREESEED_VERIFY_DRIVER: undefined,
+		...(options.env ?? {}),
+	};
+	const previousEnv = new Map(Object.keys(env).map((key) => [key, process.env[key]]));
+	for (const [key, value] of Object.entries(env)) {
+		if (value === undefined) delete process.env[key];
+		else process.env[key] = value;
+	}
+	let exitCode;
+	try {
+		exitCode = await runTreeseedCli(args, {
+			cwd: options.cwd ?? process.cwd(),
+			env,
+			interactiveUi: false,
+			write(output, stream) {
+				writes.push({ output, stream });
+			},
+			spawn() {
+				return { status: 0 };
+			},
+		});
+	} finally {
+		for (const [key, value] of previousEnv) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	}
+	return {
+		exitCode,
+		writes,
+		stdout: writes.filter((entry) => entry.stream === 'stdout').map((entry) => entry.output).join('\n'),
+		stderr: writes.filter((entry) => entry.stream === 'stderr').map((entry) => entry.output).join('\n'),
+		output: writes.map((entry) => entry.output).join('\n'),
+	};
+}
+
+function deployment(overrides = {}) {
+	return {
+		id: 'dep_123',
+		teamId: 'team-1',
+		projectId: 'project-1',
+		environment: 'staging',
+		deploymentKind: 'code',
+		action: 'deploy_web',
+		status: 'queued',
+		platformOperationId: 'op_123',
+		retryOfDeploymentId: null,
+		resumedFromDeploymentId: null,
+		idempotencyKey: 'idem-1',
+		requestedByUserId: 'user-1',
+		sourceRef: null,
+		releaseTag: null,
+		commitSha: null,
+		triggeredByType: 'cli',
+		triggeredById: 'user-1',
+		repository: { owner: 'treeseed-ai', name: 'market' },
+		externalWorkflow: { url: 'https://github.com/treeseed-ai/market/actions/runs/1' },
+		target: {
+			url: 'https://staging.example.test',
+			runnerToken: 'runner-token-secret',
+			capacityProviderId: 'capacity-provider-secret',
+		},
+		monitor: {},
+		summary: 'Queued deploy.',
+		error: {},
+		metadata: {},
+		startedAt: '2026-05-01T10:00:00.000Z',
+		finishedAt: null,
+		createdAt: '2026-05-01T10:00:00.000Z',
+		updatedAt: '2026-05-01T10:00:00.000Z',
+		completedAt: null,
+		...overrides,
+	};
+}
+
+function monitorResult(overrides = {}) {
+	return {
+		environment: 'staging',
+		status: 'healthy',
+		checkedAt: '2026-05-01T10:05:00.000Z',
+		checks: [
+			{ key: 'latest_workflow', label: 'Latest workflow', status: 'passed', summary: 'deploy-web.yml completed successfully.', source: 'github', inspectCommand: 'gh run view 1 --repo treeseed-ai/market --log-failed' },
+			{ key: 'http_response', label: 'HTTP response', status: 'warning', summary: 'HTTP probe returned 503.', source: 'http', url: 'https://staging.example.test' },
+			{ key: 'd1_migration', label: 'D1 migration', status: 'skipped', summary: 'No D1 migration result was reported.', source: 'sdk' },
+		],
+		urls: ['https://staging.example.test/'],
+		warnings: ['HTTP probe returned 503.'],
+		...overrides,
+	};
+}
+
+function queueResponse(overrides = {}) {
+	const record = deployment(overrides);
+	return {
+		ok: true,
+		deployment: record,
+		operation: { id: record.platformOperationId, status: record.status },
+		pollUrl: `/v1/platform/operations/${record.platformOperationId}`,
+		eventsUrl: `/v1/projects/${record.projectId}/deployments/${record.id}/events`,
+		stateUrl: `/v1/projects/${record.projectId}/deployment-state`,
+	};
+}
+
+function json(payload, status = 200) {
+	return new Response(JSON.stringify(payload), {
+		status,
+		headers: { 'content-type': 'application/json' },
+	});
+}
+
+async function withFetch(handler, callback) {
+	const calls = [];
+	const previousFetch = globalThis.fetch;
+	globalThis.fetch = async (input, init = {}) => {
+		const url = new URL(String(input));
+		const body = typeof init.body === 'string' ? JSON.parse(init.body) : null;
+		const call = { method: init.method ?? 'GET', path: url.pathname + url.search, body };
+		calls.push(call);
+		return handler(call);
+	};
+	try {
+		return await callback(calls);
+	} finally {
+		globalThis.fetch = previousFetch;
+	}
+}
+
+test('projects deploy, publish, and monitor post canonical deployment bodies', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch(() => json(queueResponse()), async (calls) => {
+		const deploy = await runCli(['projects', 'deploy', 'project-1', '--market', 'local', '--environment', 'staging'], { cwd: root, env: { HOME: root } });
+		const publish = await runCli(['projects', 'publish', 'project-1', '--market', 'local', '--environment', 'staging', '--reason', 'content refresh', '--idempotency-key', 'idem-publish'], { cwd: root, env: { HOME: root } });
+		const monitor = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging', '--dry-run'], { cwd: root, env: { HOME: root } });
+
+		assert.equal(deploy.exitCode, 0);
+		assert.equal(publish.exitCode, 0);
+		assert.equal(monitor.exitCode, 0);
+		assert.deepEqual(calls.map((call) => call.body), [
+			{ environment: 'staging', action: 'deploy_web', source: 'cli' },
+			{ environment: 'staging', action: 'publish_content', source: 'cli', reason: 'content refresh', idempotencyKey: 'idem-publish' },
+			{ environment: 'staging', action: 'monitor', source: 'cli', dryRun: true },
+		]);
+		assert(calls.every((call) => call.path === '/v1/projects/project-1/deployments/web'));
+	});
+});
+
+test('production deploy and publish require --yes before calling the API', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch(() => json(queueResponse({ environment: 'prod' })), async (calls) => {
+		const blocked = await runCli(['projects', 'deploy', 'project-1', '--market', 'local', '--environment', 'prod'], { cwd: root, env: { HOME: root } });
+		assert.equal(blocked.exitCode, 1);
+		assert.match(blocked.stderr, /requires --yes/u);
+		assert.equal(calls.length, 0);
+
+		const confirmed = await runCli(['projects', 'publish', 'project-1', '--market', 'local', '--environment', 'prod', '--yes'], { cwd: root, env: { HOME: root } });
+		assert.equal(confirmed.exitCode, 0);
+		assert.deepEqual(calls[0].body, {
+			environment: 'prod',
+			action: 'publish_content',
+			source: 'cli',
+			confirmProduction: true,
+		});
+	});
+});
+
+test('projects deployments lists human and JSON output without forbidden fields', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch(() => json({ ok: true, payload: [deployment({ status: 'succeeded', completedAt: '2026-05-01T10:10:00.000Z' })] }), async () => {
+		const human = await runCli(['projects', 'deployments', 'project-1', '--market', 'local'], { cwd: root, env: { HOME: root } });
+		assert.equal(human.exitCode, 0);
+		assert.match(human.stdout, /Treeseed project deployments/u);
+		assert.match(human.stdout, /dep_123/u);
+		assert.doesNotMatch(human.output, /runner-token-secret|capacity-provider-secret|runnerToken|capacityProviderId/u);
+
+		const jsonResult = await runCli(['projects', 'deployments', 'project-1', '--market', 'local', '--json'], { cwd: root, env: { HOME: root } });
+		assert.equal(jsonResult.exitCode, 0);
+		const report = JSON.parse(jsonResult.stdout);
+		assert.equal(report.deployments[0].id, 'dep_123');
+		assert.equal(JSON.stringify(report).includes('runner-token-secret'), false);
+		assert.equal(JSON.stringify(report).includes('capacityProviderId'), false);
+	});
+});
+
+test('projects deployment inspects detail and ordered events', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch((call) => {
+		if (call.path.endsWith('/events')) {
+			return json({ ok: true, payload: [
+				{ id: 'event-1', deploymentId: 'dep_123', projectId: 'project-1', teamId: 'team-1', operationId: 'op_123', kind: 'deployment.requested', message: 'Requested.', status: 'queued', severity: 'info', sequence: 1, createdAt: '2026-05-01T10:00:00.000Z' },
+				{ id: 'event-2', deploymentId: 'dep_123', projectId: 'project-1', teamId: 'team-1', operationId: 'op_123', kind: 'deployment.succeeded', message: 'Succeeded.', status: 'succeeded', severity: 'info', sequence: 2, createdAt: '2026-05-01T10:01:00.000Z' },
+			] });
+		}
+		return json({ ok: true, payload: deployment({ status: 'succeeded', monitor: monitorResult(), completedAt: '2026-05-01T10:01:00.000Z' }) });
+	}, async () => {
+		const result = await runCli(['projects', 'deployment', 'project-1', 'dep_123', '--market', 'local'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 0);
+		assert.match(result.stdout, /Treeseed project deployment/u);
+		assert.match(result.stdout, /deployment.requested/u);
+		assert.match(result.stdout, /deployment.succeeded/u);
+		assert.match(result.stdout, /Monitor checks/u);
+		assert.match(result.stdout, /latest_workflow/u);
+		assert.doesNotMatch(result.output, /runner-token-secret|capacity-provider-secret|runnerToken|capacityProviderId/u);
+	});
+});
+
+test('projects monitor --wait prints compact monitor checks and JSON monitor result', async () => {
+	const root = prepareMarketWorkspace();
+	let pollCount = 0;
+	await withFetch((call) => {
+		if (call.method === 'POST') return json(queueResponse({ action: 'monitor', status: 'queued' }), 202);
+		pollCount += 1;
+		return json({
+			ok: true,
+			payload: deployment({
+				action: 'monitor',
+				status: pollCount < 2 ? 'monitoring' : 'succeeded',
+				monitor: pollCount < 2 ? {} : monitorResult({ status: 'degraded' }),
+				completedAt: pollCount < 2 ? null : '2026-05-01T10:05:00.000Z',
+			}),
+		});
+	}, async () => {
+		const human = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--poll-interval-ms', '1'], { cwd: root, env: { HOME: root } });
+		assert.equal(human.exitCode, 0);
+		assert.match(human.stdout, /Monitor checks/u);
+		assert.match(human.stdout, /warning\s+http_response\s+HTTP probe returned 503/u);
+
+		pollCount = 0;
+		const machine = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--poll-interval-ms', '1', '--json'], { cwd: root, env: { HOME: root } });
+		assert.equal(machine.exitCode, 0);
+		const report = JSON.parse(machine.stdout);
+		assert.equal(report.deployment.monitor.status, 'degraded');
+		assert.equal(report.deployment.monitor.checks[1].key, 'http_response');
+		assert.equal(JSON.stringify(report).includes('capacityProviderId'), false);
+	});
+});
+
+test('projects monitor --wait exits failed, timed out, and cancelled with stable codes', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch((call) => {
+		if (call.method === 'POST') return json(queueResponse({ action: 'monitor', status: 'queued' }), 202);
+		return json({
+			ok: true,
+			payload: deployment({
+				action: 'monitor',
+				status: 'failed',
+				monitor: monitorResult({
+					status: 'failed',
+					checks: [
+						{ key: 'http_response', label: 'HTTP response', status: 'failed', summary: 'HTTP probe returned 404.', source: 'http' },
+					],
+				}),
+				completedAt: '2026-05-01T10:05:00.000Z',
+			}),
+		});
+	}, async () => {
+		const result = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--poll-interval-ms', '1'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 3);
+		assert.match(result.stdout, /failed\s+http_response/u);
+	});
+
+	await withFetch((call) => {
+		if (call.method === 'POST') return json(queueResponse({ action: 'monitor', status: 'queued' }), 202);
+		return json({ ok: true, payload: deployment({ action: 'monitor', status: 'monitoring' }) });
+	}, async () => {
+		const result = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--timeout-seconds', '0.001', '--poll-interval-ms', '1'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 4);
+	});
+
+	await withFetch((call) => {
+		if (call.method === 'POST') return json(queueResponse({ action: 'monitor', status: 'queued' }), 202);
+		return json({ ok: true, payload: deployment({ action: 'monitor', status: 'cancelled' }) });
+	}, async () => {
+		const result = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--poll-interval-ms', '1'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 5);
+	});
+});
+
+test('retry, resume, and cancel use deployment mutation routes and stable exit codes', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch((call) => {
+		if (call.path.endsWith('/retry')) {
+			return json({ ok: true, originalDeployment: deployment({ status: 'failed' }), retryDeployment: deployment({ id: 'dep_retry', status: 'queued' }), operation: { id: 'op_retry', status: 'queued' } }, 202);
+		}
+		if (call.path.endsWith('/resume')) {
+			return json({ ok: false, error: { code: 'operation_not_retryable', message: 'Deployment resume is not supported until runner checkpoints are implemented.' } }, 409);
+		}
+		if (call.path.endsWith('/cancel')) {
+			return json({ ok: true, deployment: deployment({ status: 'cancelled' }), cancellation: 'completed' });
+		}
+		return json({ ok: true });
+	}, async (calls) => {
+		const retry = await runCli(['projects', 'deployment', 'retry', 'project-1', 'dep_123', '--market', 'local'], { cwd: root, env: { HOME: root } });
+		const resume = await runCli(['projects', 'deployment', 'resume', 'project-1', 'dep_123', '--market', 'local'], { cwd: root, env: { HOME: root } });
+		const cancel = await runCli(['projects', 'deployment', 'cancel', 'project-1', 'dep_123', '--market', 'local'], { cwd: root, env: { HOME: root } });
+
+		assert.equal(retry.exitCode, 0);
+		assert.equal(resume.exitCode, 1);
+		assert.match(resume.output, /resume is not supported/u);
+		assert.equal(cancel.exitCode, 5);
+		assert.deepEqual(calls.map((call) => call.path), [
+			'/v1/projects/project-1/deployments/dep_123/retry',
+			'/v1/projects/project-1/deployments/dep_123/resume',
+			'/v1/projects/project-1/deployments/dep_123/cancel',
+		]);
+	});
+});
+
+test('projects deploy --wait polls until terminal states and timeout', async () => {
+	const root = prepareMarketWorkspace();
+	let pollCount = 0;
+	await withFetch((call) => {
+		if (call.method === 'POST') return json(queueResponse({ status: 'queued' }), 202);
+		pollCount += 1;
+		return json({ ok: true, payload: deployment({ status: pollCount < 2 ? 'running' : 'succeeded', completedAt: pollCount < 2 ? null : '2026-05-01T10:02:00.000Z' }) });
+	}, async () => {
+		const result = await runCli(['projects', 'deploy', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--poll-interval-ms', '1'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 0);
+		assert.match(result.stdout, /completed/u);
+		assert(pollCount >= 2);
+	});
+
+	await withFetch((call) => {
+		if (call.method === 'POST') return json(queueResponse({ status: 'queued' }), 202);
+		return json({ ok: true, payload: deployment({ status: 'running' }) });
+	}, async () => {
+		const result = await runCli(['projects', 'deploy', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--timeout-seconds', '0.001', '--poll-interval-ms', '1'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 4);
+		assert.match(result.stdout, /wait timed out/u);
+	});
+
+	await withFetch((call) => {
+		if (call.method === 'POST') return json(queueResponse({ status: 'queued' }), 202);
+		return json({ ok: true, payload: deployment({ status: 'failed', error: { summary: 'Workflow failed.', inspectCommand: 'gh run view 1' } }) });
+	}, async () => {
+		const result = await runCli(['projects', 'deploy', 'project-1', '--market', 'local', '--environment', 'staging', '--wait', '--poll-interval-ms', '1'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 3);
+		assert.match(result.stdout, /deployment failed/u);
+		assert.match(result.stdout, /trsd projects deployment retry project-1 dep_123/u);
+	});
+});
+
+test('projects deployment commands report missing auth with exit code 2', async () => {
+	const root = prepareMarketWorkspace({ withSession: false });
+	await withFetch(() => {
+		throw new Error('fetch should not be called without auth');
+	}, async () => {
+		const result = await runCli(['projects', 'deployments', 'project-1', '--market', 'local'], { cwd: root, env: { HOME: root } });
+		assert.equal(result.exitCode, 2);
+		assert.match(result.stderr, /auth:login --market local/u);
+	});
+});

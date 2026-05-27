@@ -1,47 +1,440 @@
-import type { TreeseedCommandHandler } from '../types.js';
-import { guidedResult } from './utils.js';
+import { MarketApiError } from '@treeseed/sdk/market-client';
+import type { ProjectDeploymentEnvironment, ProjectWebDeploymentAction } from '@treeseed/sdk';
+import type { TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
+import { fail, guidedResult } from './utils.js';
 import { createMarketClientForInvocation } from './market-utils.js';
+
+const DEPLOYMENT_TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'timed_out']);
+const FORBIDDEN_OUTPUT_FIELDS = new Set([
+	'capacityProviderId',
+	'laneId',
+	'grantId',
+	'workerPoolId',
+	'runtimeHostId',
+	'railwayServiceId',
+	'runnerToken',
+]);
+
+const ACTIONS: Record<string, ProjectWebDeploymentAction> = {
+	deploy: 'deploy_web',
+	publish: 'publish_content',
+	monitor: 'monitor',
+};
+
+function stringArg(invocation: TreeseedParsedInvocation, key: string) {
+	const value = invocation.args[key];
+	return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function boolArg(invocation: TreeseedParsedInvocation, key: string) {
+	return invocation.args[key] === true;
+}
+
+function environmentArg(invocation: TreeseedParsedInvocation): ProjectDeploymentEnvironment {
+	const value = stringArg(invocation, 'environment') ?? 'staging';
+	return value === 'prod' ? 'prod' : 'staging';
+}
+
+function projectUsage(action: string) {
+	switch (action) {
+		case 'deploy':
+			return 'Usage: treeseed projects deploy <project-id> --environment staging|prod';
+		case 'publish':
+			return 'Usage: treeseed projects publish <project-id> --environment staging|prod';
+		case 'monitor':
+			return 'Usage: treeseed projects monitor <project-id> --environment staging|prod';
+		case 'deployments':
+			return 'Usage: treeseed projects deployments <project-id>';
+		case 'deployment':
+			return 'Usage: treeseed projects deployment <project-id> <deployment-id>';
+		default:
+			return 'Usage: treeseed projects [list|access|deploy|publish|monitor|deployments|deployment]';
+	}
+}
+
+function authFailure(error: unknown) {
+	if (error instanceof MarketApiError && [401, 403].includes(error.status)) {
+		return fail(error.message, 2);
+	}
+	const message = error instanceof Error ? error.message : String(error);
+	if (/not logged in|unauthori[sz]ed|forbidden/iu.test(message)) {
+		return fail(message, 2);
+	}
+	return null;
+}
+
+function deploymentApiExitCode(error: unknown) {
+	if (error instanceof MarketApiError) {
+		if ([401, 403].includes(error.status)) return 2;
+		const payload = error.payload as any;
+		const code = payload?.error?.code ?? payload?.code;
+		if (code === 'operation_not_retryable' || code === 'operation_not_cancellable') return 1;
+	}
+	return 1;
+}
+
+function redact(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map((item) => redact(item));
+	if (!value || typeof value !== 'object') return value;
+	return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+		.filter(([key]) => !FORBIDDEN_OUTPUT_FIELDS.has(key))
+		.filter(([key]) => !/(?:secret|token|password|apiKey|privateKey)/iu.test(key))
+		.map(([key, entry]) => [key, redact(entry)]));
+}
+
+function text(value: unknown, fallback = '') {
+	return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function actionLabel(action: unknown) {
+	switch (action) {
+		case 'deploy_web': return 'deploy_web';
+		case 'publish_content': return 'publish_content';
+		case 'monitor': return 'monitor';
+		default: return text(action, 'deployment');
+	}
+}
+
+function deploymentUrl(deployment: any) {
+	return text(deployment?.target?.url, text(deployment?.target?.previewUrl, ''));
+}
+
+function workflowUrl(deployment: any) {
+	return text(deployment?.externalWorkflow?.url, text(deployment?.externalWorkflow?.htmlUrl, text(deployment?.externalWorkflow?.runUrl, '')));
+}
+
+function inspectCommand(projectId: string, deploymentId: string) {
+	return `trsd projects deployment ${projectId} ${deploymentId}`;
+}
+
+function retryCommand(projectId: string, deploymentId: string) {
+	return `trsd projects deployment retry ${projectId} ${deploymentId}`;
+}
+
+function deploymentLine(deployment: any) {
+	return [
+		deployment.id,
+		deployment.environment,
+		actionLabel(deployment.action),
+		deployment.status,
+		deployment.monitor?.status ? `monitor=${deployment.monitor.status}` : '',
+		deployment.completedAt ?? deployment.finishedAt ?? deployment.updatedAt ?? '',
+		workflowUrl(deployment),
+		deploymentUrl(deployment),
+	].filter(Boolean).join('  ');
+}
+
+function waitExitCode(status: string) {
+	if (status === 'succeeded') return 0;
+	if (status === 'timed_out') return 4;
+	if (status === 'cancelled') return 5;
+	return 3;
+}
+
+function monitorExitCode(deployment: any, fallback: number) {
+	if (deployment?.monitor?.status === 'failed') return 3;
+	if (['healthy', 'degraded', 'unknown'].includes(String(deployment?.monitor?.status))) return 0;
+	return fallback;
+}
+
+function delay(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForDeployment(input: {
+	client: any;
+	projectId: string;
+	deploymentId: string;
+	timeoutSeconds: number;
+	pollIntervalMs: number;
+}) {
+	const started = Date.now();
+	let current = (await input.client.projectDeployment(input.projectId, input.deploymentId)).payload;
+	while (!DEPLOYMENT_TERMINAL_STATUSES.has(String(current.status))) {
+		if (Date.now() - started >= input.timeoutSeconds * 1000) {
+			return {
+				exitCode: 4,
+				deployment: current,
+				timedOut: true,
+			};
+		}
+		await delay(input.pollIntervalMs);
+		current = (await input.client.projectDeployment(input.projectId, input.deploymentId)).payload;
+	}
+	return {
+		exitCode: waitExitCode(String(current.status)),
+		deployment: current,
+		timedOut: false,
+	};
+}
+
+function timeoutSeconds(invocation: TreeseedParsedInvocation) {
+	const value = Number(stringArg(invocation, 'timeoutSeconds') ?? 300);
+	return Number.isFinite(value) && value > 0 ? value : 300;
+}
+
+function pollIntervalMs(invocation: TreeseedParsedInvocation) {
+	const value = Number(stringArg(invocation, 'pollIntervalMs') ?? 1000);
+	return Number.isFinite(value) && value > 0 ? value : 1000;
+}
+
+function deploymentRequestBody(invocation: TreeseedParsedInvocation, action: ProjectWebDeploymentAction, environment: ProjectDeploymentEnvironment) {
+	const body: Record<string, unknown> = {
+		environment,
+		action,
+		source: 'cli',
+	};
+	const reason = stringArg(invocation, 'reason');
+	const idempotencyKey = stringArg(invocation, 'idempotencyKey');
+	if (boolArg(invocation, 'dryRun')) body.dryRun = true;
+	if (reason) body.reason = reason;
+	if (idempotencyKey) body.idempotencyKey = idempotencyKey;
+	if (environment === 'prod' && action !== 'monitor') body.confirmProduction = true;
+	return body;
+}
+
+function monitorFacts(deployment: any) {
+	const monitor = deployment?.monitor && typeof deployment.monitor === 'object' ? deployment.monitor : null;
+	if (!monitor) return [];
+	return [
+		{ label: 'Monitor', value: monitor.status ?? null },
+		{ label: 'Checked', value: monitor.checkedAt ?? null },
+		{ label: 'Checks', value: Array.isArray(monitor.checks) ? `${monitor.checks.filter((check: any) => check.status === 'passed').length} passed, ${monitor.checks.filter((check: any) => check.status === 'warning').length} warnings, ${monitor.checks.filter((check: any) => check.status === 'failed').length} failed` : null },
+	];
+}
+
+function monitorSection(deployment: any) {
+	const checks = Array.isArray(deployment?.monitor?.checks) ? deployment.monitor.checks : [];
+	if (checks.length === 0) return [];
+	return [{
+		title: 'Monitor checks',
+		lines: checks.map((check: any) => [
+			check.status ?? 'skipped',
+			check.key ?? check.label ?? 'check',
+			check.summary ?? '',
+			check.inspectCommand ?? check.url ?? '',
+		].filter(Boolean).join('  ')),
+	}];
+}
 
 export const handleProjects: TreeseedCommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'list';
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
-	if (action === 'list') {
-		const teamId = typeof invocation.args.team === 'string' ? invocation.args.team : null;
-		const response = await client.projects(teamId);
+	let market;
+	try {
+		market = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	} catch (error) {
+		return authFailure(error) ?? fail(error instanceof Error ? error.message : String(error), 1);
+	}
+	const { profile, client } = market;
+
+	try {
+		if (action === 'list') {
+			const teamId = typeof invocation.args.team === 'string' ? invocation.args.team : null;
+			const response = await client.projects(teamId);
+			return guidedResult({
+				command: 'projects',
+				summary: 'Treeseed market projects',
+				sections: [{
+					title: 'Projects',
+					lines: response.payload.map((project: any) => `${project.id}  ${project.name ?? project.slug}  team=${project.teamId}`),
+				}],
+				report: { marketId: profile.id, teamId, projects: redact(response.payload) },
+			});
+		}
+		if (action === 'access') {
+			const projectId = invocation.positionals[1];
+			if (!projectId) return fail(projectUsage(action));
+			const response = await client.projectAccess(projectId);
+			return guidedResult({
+				command: 'projects',
+				summary: 'Treeseed market project access',
+				facts: [
+					{ label: 'Project', value: response.payload.projectId },
+					{ label: 'Staging admin', value: response.payload.team.summary.canAdminStaging },
+					{ label: 'Production admin', value: response.payload.team.summary.canAdminProduction },
+				],
+				sections: [{
+					title: 'Environments',
+					lines: response.payload.environments.map((entry) => `${entry.environment}: ${entry.role}`),
+				}],
+				report: { marketId: profile.id, access: redact(response.payload) },
+			});
+		}
+		if (action === 'connect') {
+			return fail('Use treeseed config --connect-market --market-project-id <project-id> for project pairing.');
+		}
+		if (action in ACTIONS) {
+			const projectId = invocation.positionals[1];
+			if (!projectId) return fail(projectUsage(action));
+			const environment = environmentArg(invocation);
+			const deploymentAction = ACTIONS[action];
+			if (environment === 'prod' && deploymentAction !== 'monitor' && !boolArg(invocation, 'yes')) {
+				return fail(`Production ${action} requires --yes and was not queued.`);
+			}
+			const response = await client.createProjectWebDeployment(projectId, deploymentRequestBody(invocation, deploymentAction, environment));
+			let deployment = response.deployment;
+			let waitResult: Awaited<ReturnType<typeof waitForDeployment>> | null = null;
+			if (boolArg(invocation, 'wait')) {
+				waitResult = await waitForDeployment({
+					client,
+					projectId,
+					deploymentId: deployment.id,
+					timeoutSeconds: timeoutSeconds(invocation),
+					pollIntervalMs: pollIntervalMs(invocation),
+				});
+				deployment = waitResult.deployment;
+			}
+			const exitCode = monitorExitCode(deployment, waitResult?.exitCode ?? 0);
+			const summary = waitResult
+				? waitResult.timedOut
+					? 'Treeseed project deployment wait timed out'
+					: deployment.status === 'succeeded'
+						? 'Treeseed project deployment completed'
+						: `Treeseed project deployment ${deployment.status}`
+				: 'Treeseed project deployment queued';
+			const nextSteps = [
+				inspectCommand(projectId, deployment.id),
+				...(['failed', 'timed_out', 'cancelled'].includes(deployment.status) ? [retryCommand(projectId, deployment.id)] : []),
+			];
+			return guidedResult({
+				command: 'projects',
+				summary,
+				exitCode,
+				facts: [
+					{ label: 'Project', value: projectId },
+					{ label: 'Environment', value: deployment.environment },
+					{ label: 'Action', value: deployment.action },
+					{ label: 'Deployment', value: deployment.id },
+					{ label: 'Operation', value: deployment.platformOperationId ?? (response.operation as any)?.id ?? null },
+					{ label: 'Status', value: deployment.status },
+					{ label: 'URL', value: deploymentUrl(deployment) || null },
+					{ label: 'Workflow', value: workflowUrl(deployment) || null },
+					...monitorFacts(deployment),
+				],
+				sections: monitorSection(deployment),
+				nextSteps,
+				report: {
+					marketId: profile.id,
+					projectId,
+					deployment: redact(deployment),
+					operation: redact(response.operation),
+					pollUrl: response.pollUrl,
+					eventsUrl: response.eventsUrl,
+					stateUrl: response.stateUrl,
+					wait: waitResult ? { timedOut: waitResult.timedOut, exitCode } : null,
+				},
+			});
+		}
+		if (action === 'deployments') {
+			const projectId = invocation.positionals[1];
+			if (!projectId) return fail(projectUsage(action));
+			const response = await client.projectDeployments(projectId, {
+				environment: stringArg(invocation, 'environment'),
+				limit: stringArg(invocation, 'limit'),
+			});
+			return guidedResult({
+				command: 'projects',
+				summary: 'Treeseed project deployments',
+				sections: [{
+					title: 'Deployments',
+					lines: response.payload.map(deploymentLine),
+				}],
+				report: { marketId: profile.id, projectId, deployments: redact(response.payload) },
+			});
+		}
+		if (action === 'deployment') {
+			const subaction = invocation.positionals[1];
+			const projectId = ['retry', 'resume', 'cancel'].includes(String(subaction)) ? invocation.positionals[2] : invocation.positionals[1];
+			const deploymentId = ['retry', 'resume', 'cancel'].includes(String(subaction)) ? invocation.positionals[3] : invocation.positionals[2];
+			if (!projectId || !deploymentId) return fail(projectUsage(action));
+			if (subaction === 'retry') {
+				const response = await client.retryProjectDeployment(projectId, deploymentId, {
+					...(stringArg(invocation, 'idempotencyKey') ? { idempotencyKey: stringArg(invocation, 'idempotencyKey') } : {}),
+				});
+				return guidedResult({
+					command: 'projects',
+					summary: 'Treeseed project deployment retry queued',
+					facts: [
+						{ label: 'Original deployment', value: response.originalDeployment.id },
+						{ label: 'Retry deployment', value: response.retryDeployment.id },
+						{ label: 'Operation', value: (response.operation as any)?.id ?? response.retryDeployment.platformOperationId },
+						{ label: 'Status', value: response.retryDeployment.status },
+					],
+					nextSteps: [inspectCommand(projectId, response.retryDeployment.id)],
+					report: { marketId: profile.id, projectId, originalDeployment: redact(response.originalDeployment), retryDeployment: redact(response.retryDeployment), operation: redact(response.operation) },
+				});
+			}
+			if (subaction === 'resume') {
+				try {
+					const response = await client.resumeProjectDeployment(projectId, deploymentId);
+					return guidedResult({
+						command: 'projects',
+						summary: 'Treeseed project deployment resume queued',
+						report: { marketId: profile.id, projectId, response: redact(response) as Record<string, unknown> },
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					return guidedResult({
+						command: 'projects',
+						summary: message,
+						exitCode: deploymentApiExitCode(error),
+						stderr: [message],
+						report: { marketId: profile.id, projectId, deploymentId, ok: false, error: message },
+					});
+				}
+			}
+			if (subaction === 'cancel') {
+				const response = await client.cancelProjectDeployment(projectId, deploymentId);
+				const exitCode = response.deployment.status === 'cancelled' ? 5 : 0;
+				return guidedResult({
+					command: 'projects',
+					summary: response.deployment.status === 'cancelled' ? 'Treeseed project deployment cancelled' : 'Treeseed project deployment cancellation requested',
+					exitCode,
+					facts: [
+						{ label: 'Deployment', value: response.deployment.id },
+						{ label: 'Status', value: response.deployment.status },
+						{ label: 'Cancellation', value: response.cancellation },
+					],
+					report: { marketId: profile.id, projectId, deployment: redact(response.deployment), cancellation: response.cancellation },
+				});
+			}
+			const [deploymentResponse, eventsResponse] = await Promise.all([
+				client.projectDeployment(projectId, deploymentId),
+				client.projectDeploymentEvents(projectId, deploymentId),
+			]);
+			const deployment = deploymentResponse.payload;
+			return guidedResult({
+				command: 'projects',
+				summary: 'Treeseed project deployment',
+				facts: [
+					{ label: 'Project', value: projectId },
+					{ label: 'Deployment', value: deployment.id },
+					{ label: 'Environment', value: deployment.environment },
+					{ label: 'Action', value: deployment.action },
+					{ label: 'Status', value: deployment.status },
+					{ label: 'URL', value: deploymentUrl(deployment) || null },
+					{ label: 'Workflow', value: workflowUrl(deployment) || null },
+					...monitorFacts(deployment),
+				],
+				sections: [{
+					title: 'Events',
+					lines: eventsResponse.payload.map((event) => `${event.sequence}  ${event.kind}  ${event.status ?? ''}  ${event.message}`),
+				}, ...monitorSection(deployment)],
+				nextSteps: ['failed', 'timed_out', 'cancelled'].includes(deployment.status) ? [retryCommand(projectId, deployment.id)] : [],
+				report: { marketId: profile.id, projectId, deployment: redact(deployment), events: redact(eventsResponse.payload) },
+			});
+		}
+		return fail(`Unknown projects action: ${action}`);
+	} catch (error) {
+		const auth = authFailure(error);
+		if (auth) return auth;
+		const message = error instanceof Error ? error.message : String(error);
 		return guidedResult({
 			command: 'projects',
-			summary: 'Treeseed market projects',
-			sections: [{
-				title: 'Projects',
-				lines: response.payload.map((project: any) => `${project.id}  ${project.name ?? project.slug}  team=${project.teamId}`),
-			}],
-			report: { marketId: profile.id, teamId, projects: response.payload },
+			summary: message,
+			exitCode: deploymentApiExitCode(error),
+			stderr: [message],
+			report: { marketId: profile.id, ok: false, error: message },
 		});
 	}
-	if (action === 'access') {
-		const projectId = invocation.positionals[1];
-		if (!projectId) return { exitCode: 1, stderr: ['Usage: treeseed projects access <project-id>'] };
-		const response = await client.projectAccess(projectId);
-		return guidedResult({
-			command: 'projects',
-			summary: 'Treeseed market project access',
-			facts: [
-				{ label: 'Project', value: response.payload.projectId },
-				{ label: 'Staging admin', value: response.payload.team.summary.canAdminStaging },
-				{ label: 'Production admin', value: response.payload.team.summary.canAdminProduction },
-			],
-			sections: [{
-				title: 'Environments',
-				lines: response.payload.environments.map((entry) => `${entry.environment}: ${entry.role}`),
-			}],
-			report: { marketId: profile.id, access: response.payload },
-		});
-	}
-	if (action === 'connect') {
-		return {
-			exitCode: 1,
-			stderr: ['Use treeseed config --connect-market --market-project-id <project-id> for project pairing.'],
-		};
-	}
-	return { exitCode: 1, stderr: [`Unknown projects action: ${action}`] };
 };

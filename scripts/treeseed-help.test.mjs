@@ -254,15 +254,26 @@ test('save help documents optional generated commit message hints', async () => 
 	assert.doesNotMatch(result.output, /<message>/);
 });
 
-test('dev help documents fixed Market web/API runtime', async () => {
+test('dev help documents fixed Market web/API/runner runtime', async () => {
 	const result = await runCli(['help', 'dev']);
 	assert.equal(result.exitCode, 0);
 	assert.doesNotMatch(result.output, /--surfaces <surfaces>/);
 	assert.doesNotMatch(result.output, /--surface <surface>/);
 	assert.match(result.output, /--web-runtime <mode>/);
 	assert.match(result.output, /--force/);
-	assert.match(result.output, /web\/API/u);
+	assert.match(result.output, /web\/API\/runner/u);
+	assert.match(result.output, /managed local PostgreSQL/u);
+	assert.match(result.output, /Market operations runner/u);
 	assert.match(result.output, /capacity/u);
+});
+
+test('projects help documents deployment parity commands', async () => {
+	const result = await runCli(['help', 'projects']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /deploy\|publish\|monitor\|deployments\|deployment/u);
+	assert.match(result.output, /--wait/u);
+	assert.match(result.output, /--yes/u);
+	assert.match(result.output, /Production deploy and publish require/u);
 });
 
 test('major workflow commands have usage, options, and examples in help', async () => {
