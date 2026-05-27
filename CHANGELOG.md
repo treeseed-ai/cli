@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.8] - 2026-05-27
+
+### Dependencies
+
+- chore(cli): bump version and update @treeseed/sdk (7fd2050bf66d)
+- Release @treeseed/cli 0.10.8.
+
 ## [0.10.7] - 2026-05-27
 
 ### Tests
