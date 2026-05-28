@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.15] - 2026-05-28
+
+### Dependencies
+
+- build(build): force fresh deployed-resource verification on staging save (f150407744a0)
+- build(build): refresh Railway topology during verification (e1eab6ffd17e)
+- Release @treeseed/cli 0.10.15.
+
 ## [0.10.14] - 2026-05-28
 
 ### Dependencies
