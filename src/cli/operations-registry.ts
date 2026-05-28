@@ -1162,18 +1162,19 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'release',
 	})],
 	['destroy', command({
-		usage: 'treeseed destroy --environment <local|staging|prod> [--plan|--dry-run] [--force] [--skip-confirmation] [--confirm <slug>] [--remove-build-artifacts]',
+		usage: 'treeseed destroy --environment <local|staging|prod> [--plan|--dry-run] [--delete-data] [--force] [--skip-confirmation] [--confirm <slug>] [--remove-build-artifacts]',
 		options: [
 			{ name: 'environment', flags: '--environment <scope>', description: 'Select the persistent environment to destroy.', kind: 'enum', values: ['local', 'staging', 'prod'] },
 			{ name: 'plan', flags: '--plan', description: 'Compute the destroy plan without mutating the environment.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'deleteData', flags: '--delete-data', description: 'Also delete data repositories such as PostgreSQL, D1, and R2 for the target environment.', kind: 'boolean' },
 			{ name: 'force', flags: '--force', description: 'Force worker deletion when supported.', kind: 'boolean' },
 			{ name: 'skipConfirmation', flags: '--skip-confirmation', description: 'Skip the interactive confirmation prompt.', kind: 'boolean' },
 			{ name: 'confirm', flags: '--confirm <slug>', description: 'Provide the expected slug confirmation non-interactively.', kind: 'string' },
 			{ name: 'removeBuildArtifacts', flags: '--remove-build-artifacts', description: 'Also remove local build artifacts after destroy.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed destroy --environment staging --plan', 'treeseed destroy --environment prod --confirm example --skip-confirmation'],
+		examples: ['treeseed destroy --environment staging --delete-data --plan', 'treeseed destroy --environment prod --delete-data --confirm example --skip-confirmation'],
 		notes: ['Only for persistent environments. Task cleanup belongs to treeseed close.', 'This command is destructive and requires explicit confirmation.'],
 		help: {
 			workflowPosition: 'tear down environment',
@@ -1183,6 +1184,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			whenToUse: [
 				'Use this when a persistent environment should be intentionally removed rather than rolled back or updated.',
 				'Use `--plan` first when you want to inspect the destroy plan without committing to it.',
+				'Use `--delete-data` only when PostgreSQL, D1, and R2 data repositories should be removed instead of preserved.',
 			],
 			beforeYouRun: [
 				'Confirm the environment scope exactly. This command does not target task-branch cleanup; it targets persistent environments only.',
@@ -1193,9 +1195,9 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Optionally removes local build artifacts if requested.',
 			],
 			examples: [
-				example('treeseed destroy --environment staging --plan', 'Preview the destroy plan', 'Inspect what would be removed from staging without actually performing the destroy.'),
-				example('treeseed destroy --environment prod --confirm example --skip-confirmation', 'Run a deliberate non-interactive destroy', 'Provide the expected slug explicitly when operating in a scripted or no-prompt environment.'),
-				example('treeseed destroy --environment local --remove-build-artifacts', 'Remove a local environment and its artifacts', 'Destroy the local environment and also delete local build outputs.'),
+				example('treeseed destroy --environment staging --delete-data --plan', 'Preview the full destroy plan', 'Inspect what would be removed from staging, including data repositories, without actually performing the destroy.'),
+				example('treeseed destroy --environment prod --delete-data --confirm example --skip-confirmation', 'Run a deliberate non-interactive destroy', 'Provide the expected slug explicitly when operating in a scripted or no-prompt environment.'),
+				example('treeseed destroy --environment local --delete-data --remove-build-artifacts', 'Remove a local environment and its artifacts', 'Destroy the local environment and also delete local runtime data and build outputs.'),
 			],
 			warnings: [
 				'This command is destructive.',
