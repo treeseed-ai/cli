@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.13] - 2026-05-28
+
+### Dependencies
+
+- build(build): stabilize clean redeploy railway volume verification (3fe92b104698)
+- build(build): handle already mounted railway volumes during clean (a9c8734d2030)
+- build(build): attach railway runner volume before verifying mount (5fbc17a1ae62)
+- build(build): wait for railway service instance config to settle (5182400118d1)
+- Release @treeseed/cli 0.10.13.
+
 ## [0.10.12] - 2026-05-28
 
 ### Dependencies
