@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.16] - 2026-05-28
+
+### Dependencies
+
+- build(build): avoid live queue lookup during destroy dry runs (d1656120ecca)
+- build(build): harden provider cleanup api calls for clean destroy (f375e4b9409e)
+- build(build): wait for delayed Railway service instances before (fc9762f2201a)
+- Release @treeseed/cli 0.10.16.
+
 ## [0.10.15] - 2026-05-28
 
 ### Dependencies
