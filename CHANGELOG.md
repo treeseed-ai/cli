@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.10.17] - 2026-06-02
+
+### Tests
+
+- chore(cli): bump version and update configuration entries (388f8a60fcb5)
+
+### Dependencies
+
+- build(cli): bump version and update @treeseed/sdk (622fb1f70996)
+- chore(cli): bump version and update @treeseed/sdk (7af40a2f48e5)
+- build(cli): update version and @treeseed/sdk dependency (bb18012ed76d)
+- chore(deps): bump version and update @treeseed/sdk (82c9279a8b69)
+- build(cli): bump version and @treeseed/sdk dependency (34620418aa4d)
+- build(cli): bump version and @treeseed/sdk dependency (e3836a031327)
+- build(build): avoid Railway volume update after attach (e1857a1fbe35)
+- build(build): harden Railway runner volume reconciliation (f0a9afba8548)
+- Release @treeseed/cli 0.10.17.
+
 ## [0.10.16] - 2026-05-28
 
 ### Dependencies

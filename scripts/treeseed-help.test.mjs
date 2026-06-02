@@ -884,14 +884,13 @@ test('config ui startup includes required advanced hosted entries that still nee
 				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 			prod: [
-				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'forms', cluster: 'turnstile', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'prod', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 		},
 	};
 	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
 	assert.deepEqual(
 		pages.map((page) => `${page.entry.id}:${page.scope}`),
-		['TREESEED_TURNSTILE_SECRET_KEY:prod', 'TREESEED_SMTP_HOST:local'],
+		['TREESEED_SMTP_HOST:local'],
 	);
 });
 
@@ -1072,8 +1071,8 @@ test('config ui startup keeps clustered variables adjacent across scopes and pre
 		entriesByScope: {
 			local: [],
 			staging: [
-				{ id: 'TREESEED_PUBLIC_TURNSTILE_SITE_KEY', label: 'Turnstile site key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'TREESEED_TURNSTILE_SECRET_KEY', label: 'Turnstile secret key', group: 'turnstile', cluster: 'turnstile', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_SMTP_HOST', label: 'SMTP host', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_SMTP_PASSWORD', label: 'SMTP password', group: 'smtp', cluster: 'smtp', onboardingFeature: null, startupProfile: 'optional', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 			prod: [],
 		},
@@ -1083,8 +1082,8 @@ test('config ui startup keeps clustered variables adjacent across scopes and pre
 		.filter((page) => page.kind === 'entry')
 		.map((page) => `${page.entry.id}:${page.scope}`);
 	assert.deepEqual(entryIds, [
-		'TREESEED_TURNSTILE_SECRET_KEY:staging',
-		'TREESEED_PUBLIC_TURNSTILE_SITE_KEY:staging',
+		'TREESEED_SMTP_HOST:staging',
+		'TREESEED_SMTP_PASSWORD:staging',
 	]);
 });
 
