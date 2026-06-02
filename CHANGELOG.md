@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.18] - 2026-06-02
+
+### Dependencies
+
+- chore(cli): bump version and update @treeseed/sdk (374fdbb49d3b)
+- build(cli): bump version and update @treeseed/sdk (1f702cff772a)
+- Release @treeseed/cli 0.10.18.
+
 ## [0.10.17] - 2026-06-02
 
 ### Tests
