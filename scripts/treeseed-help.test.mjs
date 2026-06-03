@@ -49,6 +49,19 @@ function resolveSdkConfigRuntimePath() {
 	throw new Error('Unable to resolve SDK config runtime source or dist file for the CLI regression test.');
 }
 
+function resolveSdkCatalogFixturePath() {
+	const workspaceCandidate = resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json');
+	if (existsSync(workspaceCandidate)) {
+		return workspaceCandidate;
+	}
+	const sdkPackageRoot = dirname(require.resolve('@treeseed/sdk/package.json'));
+	const packageCandidate = resolve(sdkPackageRoot, 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json');
+	if (existsSync(packageCandidate)) {
+		return packageCandidate;
+	}
+	throw new Error('Unable to resolve SDK template catalog fixture for the CLI regression test.');
+}
+
 function assertSuccessWithDiagnostics(result, label) {
 	if (result.exitCode !== 0) {
 		console.error(`[${label}] stdout:\n${result.stdout}`);
@@ -278,7 +291,7 @@ test('init help documents repeatable launch host bindings', async () => {
 test('template show renders starter launch requirements', async () => {
 	const result = await runCli(['template', 'show', 'starter-research'], {
 		env: {
-			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolveSdkCatalogFixturePath()}`,
 		},
 	});
 	assertSuccessWithDiagnostics(result, 'template show starter-research');
@@ -294,7 +307,7 @@ test('template show renders starter launch requirements', async () => {
 test('template show renders Market control-plane resource requirements', async () => {
 	const result = await runCli(['template', 'show', 'market-control-plane'], {
 		env: {
-			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolveSdkCatalogFixturePath()}`,
 		},
 	});
 	assertSuccessWithDiagnostics(result, 'template show market-control-plane');
@@ -327,7 +340,7 @@ test('init applies local launch host bindings through generated config', async (
 	], {
 		cwd: workspace,
 		env: {
-			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolveSdkCatalogFixturePath()}`,
 		},
 	});
 	assertSuccessWithDiagnostics(result, 'init --host');
@@ -358,7 +371,7 @@ test('init rejects invalid local launch host specs before scaffolding', async ()
 	], {
 		cwd: workspace,
 		env: {
-			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolveSdkCatalogFixturePath()}`,
 		},
 	});
 	assert.equal(result.exitCode, 1);
