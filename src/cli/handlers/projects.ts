@@ -1,4 +1,5 @@
 import { MarketApiError } from '@treeseed/sdk/market-client';
+import { parseProjectLaunchHostBindingSpecs } from '@treeseed/sdk';
 import type { ProjectDeploymentEnvironment, ProjectWebDeploymentAction } from '@treeseed/sdk';
 import type { TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
 import { fail, guidedResult } from './utils.js';
@@ -47,8 +48,10 @@ function projectUsage(action: string) {
 			return 'Usage: treeseed projects deployments <project-id>';
 		case 'deployment':
 			return 'Usage: treeseed projects deployment <project-id> <deployment-id>';
+		case 'hosts':
+			return 'Usage: treeseed projects hosts [audit|replace|resync|rotate] <project-id> [--host <requirement=provider:host-id|managed>]';
 		default:
-			return 'Usage: treeseed projects [list|access|deploy|publish|monitor|deployments|deployment]';
+			return 'Usage: treeseed projects [list|access|hosts|deploy|publish|monitor|deployments|deployment]';
 	}
 }
 
@@ -122,6 +125,60 @@ function deploymentLine(deployment: any) {
 		workflowUrl(deployment),
 		deploymentUrl(deployment),
 	].filter(Boolean).join('  ');
+}
+
+function normalizeRepeatable(value: unknown) {
+	if (Array.isArray(value)) return value.map(String).filter((entry) => entry.trim());
+	return typeof value === 'string' && value.trim() ? [value.trim()] : [];
+}
+
+function hostBindingLine(entry: any) {
+	const binding = entry?.binding ?? {};
+	const audit = entry?.audit ?? {};
+	return [
+		entry.requirementKey,
+		entry.required ? 'required' : 'optional',
+		entry.type,
+		binding.provider ?? '(none)',
+		binding.hostId ?? binding.managedHostKey ?? '(not selected)',
+		audit.status ?? 'ok',
+	].filter(Boolean).join('  ');
+}
+
+function operationFacts(projectId: string, response: any) {
+	const operation = response.operation ?? null;
+	return [
+		{ label: 'Project', value: projectId },
+		{ label: 'Operation', value: operation?.id ?? null },
+		{ label: 'Status', value: operation?.status ?? null },
+		{ label: 'Poll', value: operation?.pollUrl ?? null },
+	].filter((fact) => fact.value != null && fact.value !== '');
+}
+
+function hostBindingForMarket(parsed: ReturnType<typeof parseProjectLaunchHostBindingSpecs>, requirementKey: string) {
+	const summary = parsed.summaries.find((entry) => entry.requirementKey === requirementKey)
+		?? parsed.omitted.find((entry) => entry.requirementKey === requirementKey);
+	const binding = parsed.hostBindings[requirementKey];
+	if (summary?.mode === 'none') {
+		return {
+			requirementKey,
+			requirementKind: 'host',
+			type: summary.type,
+			provider: summary.provider ?? '',
+			hostId: null,
+			managedHostKey: null,
+			mode: 'none',
+			selectedBy: 'user',
+		};
+	}
+	if (!binding || !summary) return null;
+	return {
+		...binding,
+		hostId: summary.mode === 'team_owned' ? summary.alias : null,
+		managedHostKey: summary.mode === 'treeseed_managed' ? (summary.alias === 'managed' ? binding.managedHostKey : summary.alias) : null,
+		displayName: summary.displayName,
+		environmentScopes: binding.environmentScopes?.filter((scope) => scope !== 'local') ?? ['staging', 'prod'],
+	};
 }
 
 function waitExitCode(status: string) {
@@ -258,6 +315,92 @@ export const handleProjects: TreeseedCommandHandler = async (invocation, context
 					lines: response.payload.environments.map((entry) => `${entry.environment}: ${entry.role}`),
 				}],
 				report: { marketId: profile.id, access: redact(response.payload) },
+			});
+		}
+		if (action === 'hosts') {
+			const subaction = ['audit', 'replace', 'resync', 'rotate'].includes(String(invocation.positionals[1]))
+				? String(invocation.positionals[1])
+				: 'list';
+			const projectId = subaction === 'list' ? invocation.positionals[1] : invocation.positionals[2];
+			if (!projectId) return fail(projectUsage(action));
+			if (subaction === 'list') {
+				const response = await client.projectHosts(projectId);
+				const view = (response.payload as any).view ?? {};
+				return guidedResult({
+					command: 'projects',
+					summary: 'Treeseed project host bindings',
+					facts: [
+						{ label: 'Project', value: projectId },
+						{ label: 'Status', value: view.summary?.status ?? 'ok' },
+						{ label: 'Requirements', value: view.summary?.total ?? 0 },
+					],
+					sections: [{
+						title: 'Host requirements',
+						lines: (view.requirements ?? []).map(hostBindingLine),
+					}],
+					report: { marketId: profile.id, projectId, hosts: redact(response.payload) },
+				});
+			}
+			if (subaction === 'audit') {
+				const response = await client.auditProjectHosts(projectId, {
+					idempotencyKey: stringArg(invocation, 'idempotencyKey'),
+				});
+				const view = (response.payload as any).view ?? {};
+				return guidedResult({
+					command: 'projects',
+					summary: 'Treeseed project host audit',
+					facts: [
+						{ label: 'Project', value: projectId },
+						{ label: 'Status', value: view.summary?.status ?? 'ok' },
+						{ label: 'Warnings', value: view.summary?.warnings ?? 0 },
+						{ label: 'Blocked', value: view.summary?.blocked ?? 0 },
+					],
+					sections: [{
+						title: 'Diagnostics',
+						lines: (view.diagnostics ?? []).map((entry: any) => `${entry.status}  ${entry.requirementKey ?? ''}  ${entry.message}`),
+					}],
+					report: { marketId: profile.id, projectId, audit: redact(response.payload) },
+				});
+			}
+			const hostSpecs = normalizeRepeatable(invocation.args.host);
+			const hostSnapshot = await client.projectHosts(projectId);
+			const launchRequirements = (hostSnapshot.payload as any).launchRequirements ?? null;
+			let requirementKey = stringArg(invocation, 'requirement');
+			let hostBinding: Record<string, unknown> | null = null;
+			if (subaction === 'replace') {
+				if (hostSpecs.length !== 1) return fail('Host replacement requires exactly one --host <requirement=provider:host-id|managed> spec.');
+				try {
+					const parsed = parseProjectLaunchHostBindingSpecs({ specs: hostSpecs, launchRequirements });
+					requirementKey = requirementKey ?? parsed.summaries[0]?.requirementKey ?? parsed.omitted[0]?.requirementKey ?? null;
+					if (!requirementKey) return fail('Host replacement could not determine a launch requirement key.');
+					hostBinding = hostBindingForMarket(parsed, requirementKey);
+					if (!hostBinding) return fail('Host replacement could not normalize the selected host binding.');
+				} catch (error) {
+					return fail(error instanceof Error ? error.message : String(error));
+				}
+			}
+			if (!requirementKey) return fail(`${subaction} requires --requirement <key>.`);
+			const body = {
+				...(hostBinding ? { hostBinding } : {}),
+				...(stringArg(invocation, 'sensitivePassphrase') ? { sensitivePassphrase: stringArg(invocation, 'sensitivePassphrase') } : {}),
+				...(stringArg(invocation, 'idempotencyKey') ? { idempotencyKey: stringArg(invocation, 'idempotencyKey') } : {}),
+			};
+			const response = subaction === 'replace'
+				? await client.replaceProjectHost(projectId, requirementKey, body)
+				: subaction === 'resync'
+					? await client.resyncProjectHost(projectId, requirementKey, body)
+					: await client.rotateProjectHost(projectId, requirementKey, body);
+			const view = (response.payload as any).view ?? {};
+			return guidedResult({
+				command: 'projects',
+				summary: `Treeseed project host ${subaction} queued`,
+				facts: operationFacts(projectId, response),
+				sections: [{
+					title: 'Host requirements',
+					lines: (view.requirements ?? []).map(hostBindingLine),
+				}],
+				nextSteps: response.operation?.id ? [`trsd projects hosts ${projectId}`, `trsd operations ${response.operation.id}`] : [`trsd projects hosts ${projectId}`],
+				report: { marketId: profile.id, projectId, response: redact(response) as Record<string, unknown> },
 			});
 		}
 		if (action === 'connect') {

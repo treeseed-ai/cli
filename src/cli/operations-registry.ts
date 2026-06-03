@@ -2,6 +2,7 @@ import {
 	findTreeseedOperation as findSdkOperation,
 	TRESEED_OPERATION_SPECS as SDK_OPERATION_SPECS,
 } from '@treeseed/sdk/operations';
+import { TREESEED_DEFAULT_STARTER_TEMPLATE_ID } from '@treeseed/sdk';
 import type {
 	TreeseedCommandArgumentSpec,
 	TreeseedCommandHelpSpec,
@@ -894,14 +895,14 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'version', flags: '--version <version>', description: 'Artifact version for market template install.', kind: 'string' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed template', 'treeseed template list', 'treeseed template show starter-basic', 'treeseed template validate'],
+		examples: ['treeseed template', 'treeseed template list', `treeseed template show ${TREESEED_DEFAULT_STARTER_TEMPLATE_ID}`, 'treeseed template validate'],
 		help: {
 			longSummary: [
 					'Template exposes local starter catalog actions and market-backed search/install actions. Market search/install uses an integrated catalog from central and configured specialized markets, with every result labeled by source market.',
 			],
 			examples: [
 				example('treeseed template', 'Default to the catalog list', 'Show the available starters without specifying an action.'),
-				example('treeseed template show starter-basic', 'Inspect a single starter', 'View the details of one starter template.'),
+				example(`treeseed template show ${TREESEED_DEFAULT_STARTER_TEMPLATE_ID}`, 'Inspect a single starter', 'View the details of one starter template.'),
 				example('treeseed template validate', 'Validate the current template set', 'Run template validation to confirm the catalog is internally consistent.'),
 			],
 		},
@@ -927,15 +928,19 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['init', command({
 		arguments: [{ name: 'directory', description: 'Target directory for the new tenant.', required: true }],
 		options: [
-			{ name: 'template', flags: '--template <starter-id>', description: 'Select the starter template id to generate. Defaults to starter-basic.', kind: 'string' },
+			{ name: 'template', flags: '--template <starter-id>', description: `Select the starter template id to generate. Defaults to ${TREESEED_DEFAULT_STARTER_TEMPLATE_ID}.`, kind: 'string' },
 			{ name: 'name', flags: '--name <site-name>', description: 'Override the generated site name.', kind: 'string' },
 			{ name: 'slug', flags: '--slug <slug>', description: 'Override the generated package and tenant slug.', kind: 'string' },
 			{ name: 'siteUrl', flags: '--site-url <url>', description: 'Set the initial public site URL.', kind: 'string' },
 			{ name: 'contactEmail', flags: '--contact-email <email>', description: 'Set the site contact address.', kind: 'string' },
 			{ name: 'repo', flags: '--repo <url>', description: 'Set the repository URL.', kind: 'string' },
 			{ name: 'discord', flags: '--discord <url>', description: 'Set the Discord/community URL.', kind: 'string' },
+			{ name: 'host', flags: '--host <requirement=provider:alias>', description: 'Bind a template launch requirement locally. Repeat for multiple requirements, or use requirement=none for optional hosts.', kind: 'string', repeatable: true },
 		],
-		examples: ['treeseed init docs-site --template starter-basic --name "Docs Site" --site-url https://docs.example.com'],
+		examples: [
+			`treeseed init docs-site --template ${TREESEED_DEFAULT_STARTER_TEMPLATE_ID} --name "Docs Site" --site-url https://docs.example.com`,
+			`treeseed init docs-site --template ${TREESEED_DEFAULT_STARTER_TEMPLATE_ID} --host sourceRepository=github:acme --host publicWeb=cloudflare:managed`,
+		],
 		notes: ['Runs outside an existing repo or from any branch.'],
 		help: {
 			workflowPosition: 'create workspace',
@@ -955,7 +960,8 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Seeds the project metadata fields requested through the CLI flags.',
 			],
 			examples: [
-				example('treeseed init docs-site --template starter-basic --name "Docs Site" --site-url https://docs.example.com', 'Create a starter site', 'Scaffold a new tenant using the basic starter and explicit branding metadata.'),
+				example(`treeseed init docs-site --template ${TREESEED_DEFAULT_STARTER_TEMPLATE_ID} --name "Docs Site" --site-url https://docs.example.com`, 'Create a starter site', 'Scaffold a new tenant using the default starter and explicit branding metadata.'),
+				example(`treeseed init docs-site --template ${TREESEED_DEFAULT_STARTER_TEMPLATE_ID} --host sourceRepository=github:acme --host publicWeb=cloudflare:managed`, 'Bind launch hosts locally', 'Apply host-derived starter config during scaffold without calling Market inventory APIs.'),
 				example('treeseed init workbench --slug workbench --contact-email ops@example.com', 'Control project identity fields', 'Initialize a tenant while overriding slug and contact metadata at creation time.'),
 				example('treeseed init docs-site --repo https://github.com/example/docs-site --discord https://discord.gg/example', 'Seed community and repository metadata', 'Attach repository and community URLs during project initialization.'),
 			],
@@ -1545,11 +1551,11 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		name: 'projects',
 		aliases: [],
 		group: 'Utilities',
-		summary: 'Inspect projects and run web deployment operations from the selected market.',
-		description: 'List market projects, inspect access, and queue or inspect project web deployment operations through the Market API.',
+		summary: 'Inspect projects, project hosts, and web deployment operations from the selected market.',
+		description: 'List market projects, inspect access and host bindings, and queue project host or web deployment operations through the Market API.',
 		provider: 'default',
 		related: ['market', 'teams', 'config'],
-		usage: 'treeseed projects [list|access|deploy|publish|monitor|deployments|deployment]',
+		usage: 'treeseed projects [list|access|hosts|deploy|publish|monitor|deployments|deployment]',
 		arguments: [
 			{ name: 'action', description: 'Projects action.', required: false },
 			{ name: 'project-id', description: 'Project id for deployment and access actions.', required: false },
@@ -1565,6 +1571,9 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 			{ name: 'dryRun', flags: '--dry-run', description: 'Queue a dry-run deployment request when supported.', kind: 'boolean' },
 			{ name: 'reason', flags: '--reason <text>', description: 'Presentation-safe reason stored on the deployment request.', kind: 'string' },
 			{ name: 'idempotencyKey', flags: '--idempotency-key <key>', description: 'Deterministic idempotency key for the deployment request.', kind: 'string' },
+			{ name: 'requirement', flags: '--requirement <key>', description: 'Launch host requirement key for project host resync or rotate operations.', kind: 'string' },
+			{ name: 'host', flags: '--host <requirement=provider:host-id>', description: 'Replacement host binding for `projects hosts replace`. Use requirement=provider:managed for a managed host or requirement=none for optional hosts.', kind: 'string', repeatable: true },
+			{ name: 'sensitivePassphrase', flags: '--sensitive-passphrase <passphrase>', description: 'One-time unlock passphrase for team-owned host credentials. Avoid this in shell history; prefer interactive UI when possible.', kind: 'string' },
 			{ name: 'yes', flags: '--yes', description: 'Required confirmation for production deploy and publish actions.', kind: 'boolean' },
 			{ name: 'limit', flags: '--limit <count>', description: 'Maximum number of deployments to list.', kind: 'string' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
@@ -1572,14 +1581,17 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		examples: [
 			'treeseed projects list',
 			'treeseed projects access project_123',
+			'treeseed projects hosts project_123',
+			'treeseed projects hosts audit project_123',
+			'treeseed projects hosts replace project_123 --host publicWeb=cloudflare:web-host-123',
 			'treeseed projects deploy project_123 --environment staging --wait',
 			'treeseed projects publish project_123 --environment prod --yes',
 			'treeseed projects deployments project_123 --json',
 			'treeseed projects deployment project_123 dep_123',
 		],
 		help: {
-			longSummary: ['Projects reads project, access, and deployment state from the selected market API using the SDK market client.'],
-			whenToUse: ['Use this to inspect projects, queue staging or production web deployment operations, and inspect the same deployment state shown in the Market UI.'],
+			longSummary: ['Projects reads project, host binding, access, and deployment state from the selected market API using the SDK market client.'],
+			whenToUse: ['Use this to inspect projects, audit or replace launch host bindings, queue staging or production web deployment operations, and inspect the same state shown in the Market UI.'],
 			beforeYouRun: ['Authenticate to the market with `treeseed auth:login --market <selector>` and know the project id before queueing deployment work.'],
 			automationNotes: ['Use `--json` to capture project lists, deployment records, events, and wait results for automation.'],
 			warnings: ['Production deploy and publish require `--yes`; without it the CLI exits before calling the API.'],

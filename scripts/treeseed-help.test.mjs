@@ -267,6 +267,105 @@ test('dev help documents fixed Market web/API/runner runtime', async () => {
 	assert.match(result.output, /capacity/u);
 });
 
+test('init help documents repeatable launch host bindings', async () => {
+	const result = await runCli(['help', 'init']);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /--host <requirement=provider:alias>/u);
+	assert.match(result.output, /sourceRepository=github:acme/u);
+	assert.match(result.output, /publicWeb=cloudflare:managed/u);
+});
+
+test('template show renders starter launch requirements', async () => {
+	const result = await runCli(['template', 'show', 'starter-research'], {
+		env: {
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'template show starter-research');
+	assert.match(result.stdout, /Required Hosts/u);
+	assert.match(result.stdout, /sourceRepository/u);
+	assert.match(result.stdout, /publicWeb/u);
+	assert.match(result.stdout, /Optional Hosts/u);
+	assert.match(result.stdout, /transactionalEmail/u);
+	assert.match(result.stdout, /Config Writes/u);
+	assert.match(result.stdout, /Environment Targets/u);
+});
+
+test('template show renders Market control-plane resource requirements', async () => {
+	const result = await runCli(['template', 'show', 'market-control-plane'], {
+		env: {
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'template show market-control-plane');
+	assert.match(result.stdout, /Status:\s+draft/u);
+	assert.match(result.stdout, /Resources/u);
+	assert.match(result.stdout, /marketDatabase: database required via railway-postgres/u);
+	assert.match(result.stdout, /api: service required via railway/u);
+	assert.match(result.stdout, /marketOperationsRunner: service required via railway/u);
+	assert.match(result.stdout, /TREESEED_MARKET_DATABASE_URL/u);
+	assert.match(result.stdout, /TREESEED_PLATFORM_RUNNER_TOKEN/u);
+});
+
+test('init applies local launch host bindings through generated config', async () => {
+	const workspace = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-init-hosts-'));
+	const result = await runCli([
+		'init',
+		'generated',
+		'--template',
+		'starter-research',
+		'--name',
+		'Generated Research',
+		'--site-url',
+		'https://research.example.com',
+		'--host',
+		'sourceRepository=github:acme',
+		'--host',
+		'publicWeb=cloudflare:managed',
+		'--host',
+		'transactionalEmail=none',
+	], {
+		cwd: workspace,
+		env: {
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+		},
+	});
+	assertSuccessWithDiagnostics(result, 'init --host');
+	const siteConfig = readFileSync(resolve(workspace, 'generated', 'treeseed.site.yaml'), 'utf8');
+	const envConfig = readFileSync(resolve(workspace, 'generated', 'src', 'env.yaml'), 'utf8');
+	const templateState = readFileSync(resolve(workspace, 'generated', '.treeseed', 'template-state.json'), 'utf8');
+	assert.match(siteConfig, /sourceRepository/u);
+	assert.match(siteConfig, /provider: github/u);
+	assert.match(siteConfig, /owner: acme/u);
+	assert.match(siteConfig, /publicWeb/u);
+	assert.match(siteConfig, /provider: cloudflare/u);
+	assert.match(siteConfig, /domain: research\.example\.com/u);
+	assert.match(envConfig, /sourceRequirement: sourceRepository/u);
+	assert.match(envConfig, /sourceProvider: github/u);
+	assert.match(templateState, /hostBindingPlans/u);
+	assert.doesNotMatch(`${siteConfig}\n${envConfig}\n${templateState}`, /secret-value|password123|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,}/u);
+});
+
+test('init rejects invalid local launch host specs before scaffolding', async () => {
+	const workspace = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-init-hosts-invalid-'));
+	const result = await runCli([
+		'init',
+		'generated',
+		'--template',
+		'starter-research',
+		'--host',
+		'publicWeb=smtp:postmark',
+	], {
+		cwd: workspace,
+		env: {
+			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolve(repoRoot, 'packages', 'sdk', 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json')}`,
+		},
+	});
+	assert.equal(result.exitCode, 1);
+	assert.match(result.stderr, /publicWeb requires provider cloudflare/u);
+	assert.equal(existsSync(resolve(workspace, 'generated')), false);
+});
+
 test('projects help documents deployment parity commands', async () => {
 	const result = await runCli(['help', 'projects']);
 	assert.equal(result.exitCode, 0);
