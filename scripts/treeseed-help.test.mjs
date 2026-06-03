@@ -54,7 +54,10 @@ function resolveSdkCatalogFixturePath() {
 	if (existsSync(workspaceCandidate)) {
 		return workspaceCandidate;
 	}
-	const sdkPackageRoot = dirname(require.resolve('@treeseed/sdk/package.json'));
+	let sdkPackageRoot = dirname(require.resolve('@treeseed/sdk/operations'));
+	while (!existsSync(resolve(sdkPackageRoot, 'package.json')) && dirname(sdkPackageRoot) !== sdkPackageRoot) {
+		sdkPackageRoot = dirname(sdkPackageRoot);
+	}
 	const packageCandidate = resolve(sdkPackageRoot, 'src', 'treeseed', 'template-catalog', 'catalog.fixture.json');
 	if (existsSync(packageCandidate)) {
 		return packageCandidate;
