@@ -202,8 +202,8 @@ function marketControlPlaneLaunchRequirements() {
 			},
 		],
 		secrets: [
-			{ kind: 'secret', key: 'marketDatabaseUrl', env: 'TREESEED_MARKET_DATABASE_URL', required: true, targets: ['railway-secret'], source: 'selected-host' },
-			{ kind: 'secret', key: 'platformRunnerToken', env: 'TREESEED_PLATFORM_RUNNER_TOKEN', required: true, targets: ['railway-secret'], source: 'generated' },
+			{ kind: 'secret', key: 'marketDatabaseUrl', env: 'TREESEED_MARKET_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
+			{ kind: 'secret', key: 'platformRunnerToken', env: 'TREESEED_PLATFORM_RUNNER_TOKEN', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'generated' },
 		],
 	};
 }
