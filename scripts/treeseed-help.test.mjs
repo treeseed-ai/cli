@@ -453,6 +453,25 @@ test('dev help documents fixed Market web/API/runner runtime', async () => {
 	assert.match(result.output, /capacity/u);
 });
 
+test('dev managed subcommands render focused help pages', async () => {
+	const logsViaHelp = await runCli(['help', 'dev', 'logs']);
+	const logsViaFlag = await runCli(['dev', 'logs', '--help']);
+	assert.equal(logsViaHelp.exitCode, 0);
+	assert.equal(logsViaFlag.exitCode, 0);
+	assert.match(logsViaHelp.output, /dev logs  Read managed dev logs\./);
+	assert.match(logsViaHelp.output, /treeseed dev logs \[--follow\] \[--json\]/);
+	assert.match(logsViaHelp.output, /--follow/);
+	assert.doesNotMatch(logsViaHelp.output, /--web-runtime <mode>/);
+	assert.equal(logsViaHelp.output, logsViaFlag.output);
+	assert.equal(logsViaFlag.spawns.length, 0);
+
+	const start = await runCli(['help', 'dev', 'start']);
+	assert.equal(start.exitCode, 0);
+	assert.match(start.output, /dev start  Start a detached worktree-scoped dev instance\./);
+	assert.match(start.output, /--web-runtime <mode>/);
+	assert.match(start.output, /--force-conflicts/);
+});
+
 test('init help documents repeatable launch host bindings', async () => {
 	const result = await runCli(['help', 'init']);
 	assert.equal(result.exitCode, 0);
@@ -1587,6 +1606,48 @@ test('treeseed dev leaves live feedback disabled when feedback is off', async ()
 	assert.equal(result.exitCode, 0);
 	assert.equal(result.spawns.length, 1);
 	assert.ok(!result.spawns[0].args.includes('--watch'));
+});
+
+test('treeseed dev forwards managed subcommands with dev subcommand syntax', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-managed-subcommands');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+
+	const start = await runCli(['dev', 'start', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(start.exitCode, 0);
+	assert.equal(start.spawns.length, 1);
+	assert.match(start.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
+	assert.deepEqual(
+		start.spawns[0].args.slice(-9),
+		['start', '--surfaces', 'web,api', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'],
+	);
+	assert.ok(!start.spawns[0].args.includes('--watch'));
+
+	const status = await runCli(['dev', 'status', '--all', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(status.exitCode, 0);
+	assert.equal(status.spawns.length, 1);
+	assert.deepEqual(status.spawns[0].args.slice(-5), ['status', '--surfaces', 'web,api', '--all', '--json']);
+
+	const logs = await runCli(['dev', 'logs', '--follow'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(logs.exitCode, 0);
+	assert.deepEqual(logs.spawns[0].args.slice(-4), ['logs', '--surfaces', 'web,api', '--follow']);
 });
 
 test('treeseed dev rejects removed surface and worker options', async () => {
