@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.21] - 2026-06-04
+
+### Tests
+
+- build(source): sync package dependency references (bb99d336957a)
+
+### Dependencies
+
+- build(cli): update version and @treeseed/sdk dependency (9e5ac6c37d78)
+- Release @treeseed/cli 0.10.21.
+
 ## [0.10.20] - 2026-06-04
 
 ### Infrastructure

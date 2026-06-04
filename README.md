@@ -45,6 +45,7 @@ The main workflow commands exposed by the current CLI are:
 - `treeseed tasks [--json]`
 - `treeseed switch <branch-name> [--preview]`
 - `treeseed dev`
+- `treeseed dev start|status|logs|stop|restart`
 - `treeseed save [--preview] [--plan] "<commit message>"`
 - `treeseed stage "<resolution message>"`
 - `treeseed close "<close reason>"`
@@ -65,12 +66,34 @@ treeseed config
 treeseed switch feature/search-improvements --plan
 treeseed switch feature/search-improvements --preview
 treeseed dev
+treeseed dev start --web-runtime local
 treeseed save --preview "feat: add search filters"
 treeseed stage "feat: add search filters"
 treeseed release --patch
 treeseed recover
 treeseed status --json
 ```
+
+## Development Server Instances
+
+`treeseed dev` remains the foreground local runtime supervisor. It delegates to `@treeseed/core`, starts the Market web/API/control-plane development surface, streams output in the active terminal, and exits when the shell-owned process is stopped.
+
+Managed dev instances use subcommands:
+
+```bash
+treeseed dev start --web-runtime local --json
+treeseed dev status --json
+treeseed dev status --all --json
+treeseed dev logs --follow
+treeseed dev stop --json
+treeseed dev restart --web-runtime local --json
+```
+
+Managed instances are scoped to the current physical worktree. The core runtime writes `.treeseed/dev/instances/<scope>.json`, `.treeseed/dev/pids/<scope>.pid`, and `.treeseed/logs/dev-<scope>.jsonl` in that worktree. A repository-family index under the git common dir makes sibling worktree instances discoverable to humans and AI agents.
+
+`--force` replaces only the current worktree instance. `--force-conflicts` is the explicit cross-worktree port-owner escape hatch. Additional worktrees receive stable alternate port blocks and worktree-specific local PostgreSQL/Mailpit names, so many agents can run development sessions in the same repository family.
+
+For the complete architecture, see the root workspace document `docs/local-dev-instances.md`.
 
 ## Agent-Safe Workflow
 

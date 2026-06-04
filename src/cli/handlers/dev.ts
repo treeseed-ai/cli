@@ -62,6 +62,11 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		}
 		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
 		const watch = feedback !== 'off';
+		const subcommand = typeof invocation.positionals[0] === 'string' ? invocation.positionals[0] : '';
+		const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
+		if (subcommand && !managedSubcommands.has(subcommand)) {
+			return fail(`Unknown dev subcommand "${subcommand}". Use start, status, logs, stop, or restart.`);
+		}
 		const passthroughArgs: string[] = ['--surfaces', 'web,api'];
 		const forwardStringOption = (name: string, flag: string) => {
 			const value = invocation.args[name];
@@ -86,6 +91,9 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardBooleanOption('plan', '--plan');
 		forwardBooleanOption('reset', '--reset');
 		forwardBooleanOption('force', '--force');
+		forwardBooleanOption('forceConflicts', '--force-conflicts');
+		forwardBooleanOption('all', '--all');
+		forwardBooleanOption('follow', '--follow');
 		forwardBooleanOption('json', '--json');
 		const workspaceRoot = findNearestTreeseedWorkspaceRoot(context.cwd);
 		const workspaceLinksMode = typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined;
@@ -96,7 +104,12 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			context.write(`[workspace][link] Linked ${workspaceLinks.created.length} local workspace package paths.`, 'stdout');
 		}
 		const resolved = resolveCoreDevEntrypoint(context.cwd);
-		const args = watch ? [...resolved.args, ...passthroughArgs, '--watch'] : [...resolved.args, ...passthroughArgs];
+		const args = [
+			...resolved.args,
+			...(subcommand ? [subcommand] : []),
+			...passthroughArgs,
+			...(watch && !subcommand ? ['--watch'] : []),
+		];
 		const result = context.spawn(resolved.command, args, {
 			cwd: context.cwd,
 			env: resolveTreeseedLaunchEnvironment({

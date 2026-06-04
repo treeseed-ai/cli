@@ -35,6 +35,31 @@ function shouldRenderCommandHelp(spec: TreeseedOperationSpec, argv: string[]) {
 	return treeseedArgs.some(isHelpFlag);
 }
 
+function resolveNestedDevHelpTarget(argv: string[]) {
+	const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
+	const subcommand = argv.find((arg) => !arg.startsWith('-') && managedSubcommands.has(arg));
+	return subcommand ? `dev ${subcommand}` : null;
+}
+
+function resolveCommandHelpTarget(spec: TreeseedOperationSpec, argv: string[]) {
+	if (spec.name === 'dev') {
+		return resolveNestedDevHelpTarget(argv) ?? spec.name;
+	}
+	return spec.name;
+}
+
+function resolveExplicitHelpTarget(args: string[]) {
+	const helpArgs = args.filter((arg) => !arg.startsWith('-'));
+	if (helpArgs.length === 0) return null;
+	for (let length = Math.min(3, helpArgs.length); length > 0; length -= 1) {
+		const candidate = helpArgs.slice(0, length).join(' ');
+		if (findTreeseedOperation(candidate)) {
+			return candidate;
+		}
+	}
+	return helpArgs[0] ?? null;
+}
+
 function isNoColorFlag(value: string | undefined) {
 	return value === '--no-color';
 }
@@ -354,13 +379,14 @@ export class TreeseedOperationsSdk {
 		}
 
 		if (shouldRenderCommandHelp(spec, argv)) {
+			const helpTarget = resolveCommandHelpTarget(spec, argv);
 			if (shouldUseInkHelp(context)) {
-				const helpExitCode = await renderTreeseedHelpInk(spec.name, context);
+				const helpExitCode = await renderTreeseedHelpInk(helpTarget, context);
 				if (typeof helpExitCode === 'number') {
 					return helpExitCode;
 				}
 			}
-			context.write(renderTreeseedHelp(spec.name), 'stdout');
+			context.write(renderTreeseedHelp(helpTarget), 'stdout');
 			return 0;
 		}
 
@@ -376,7 +402,7 @@ export class TreeseedOperationsSdk {
 		const [firstArg, ...restArgs] = argv;
 
 		if (!firstArg || isHelpFlag(firstArg) || firstArg === 'help') {
-			const commandName = firstArg === 'help' ? (restArgs[0] ?? null) : null;
+			const commandName = firstArg === 'help' ? resolveExplicitHelpTarget(restArgs) : null;
 			if (shouldUseInkHelp(context)) {
 				const helpExitCode = await renderTreeseedHelpInk(commandName, context);
 				if (typeof helpExitCode === 'number') {
