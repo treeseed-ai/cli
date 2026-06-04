@@ -42,7 +42,10 @@ function formatPrintEnvReports(payload: Record<string, any>) {
 		lines.push(`Resolved environment values for ${report.scope}`);
 		lines.push(payload.secretsRevealed ? 'Secrets are shown.' : 'Secret values are masked.');
 		for (const entry of report.environment?.entries ?? []) {
-			lines.push(`${entry.id}=${entry.displayValue} (${entry.source})`);
+			const hostSource = entry.sourceRequirement
+				? ` requirement=${entry.sourceRequirement}${entry.sourceProvider ? ` provider=${entry.sourceProvider}` : ''}${entry.sourceHostType ? ` hostType=${entry.sourceHostType}` : ''}`
+				: '';
+			lines.push(`${entry.id}=${entry.displayValue} (${entry.source}${hostSource})`);
 		}
 		lines.push('');
 		lines.push(`Provider connection checks for ${report.scope}`);

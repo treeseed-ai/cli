@@ -45,6 +45,9 @@ type ConfigEntry = {
 	purposes: string[];
 	storage: 'shared' | 'scoped';
 	validation?: ConfigValidation;
+	sourceRequirement?: string;
+	sourceHostType?: string | null;
+	sourceProvider?: string | null;
 	scope: Exclude<ConfigScope, 'all'>;
 	sharedScopes: Array<Exclude<ConfigScope, 'all'>>;
 	required: boolean;
@@ -483,6 +486,9 @@ function buildStartupDetailLines(step: ConfigWizardStep | null, draftValue: stri
 		`Applies to: ${step.scopes.join(', ')}`,
 		`Required in: ${step.requiredScopes.join(', ')}`,
 		`Storage: ${step.entry.storage}`,
+		...(step.entry.sourceRequirement ? [
+			`Host source: ${step.entry.sourceRequirement}${step.entry.sourceProvider ? ` (${step.entry.sourceProvider})` : ''}${step.entry.sourceHostType ? ` / ${step.entry.sourceHostType}` : ''}`,
+		] : []),
 		'',
 		`Current value: ${formatDisplayValue(step, step.currentValue, '(unset)')}`,
 		`Suggested value: ${formatDisplayValue(step, step.suggestedValue, '(none)')}`,
@@ -504,6 +510,9 @@ function buildFullDetailLines(page: ConfigPage | null, draftValue: string) {
 		`Scope: ${page.scopes.join(', ')}`,
 		`Storage: ${page.entry.storage} | ${page.required ? 'required' : 'optional'}`,
 		`Group: ${page.entry.group}`,
+		...(page.entry.sourceRequirement ? [
+			`Host source: ${page.entry.sourceRequirement}${page.entry.sourceProvider ? ` (${page.entry.sourceProvider})` : ''}${page.entry.sourceHostType ? ` / ${page.entry.sourceHostType}` : ''}`,
+		] : []),
 		'',
 		`Current: ${formatDisplayValue(page, page.currentValue, '(unset)')}`,
 		`Suggested: ${formatDisplayValue(page, page.suggestedValue, '(none)')}`,

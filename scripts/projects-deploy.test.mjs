@@ -165,6 +165,56 @@ function queueResponse(overrides = {}) {
 	};
 }
 
+function projectHostsPayload(overrides = {}) {
+	return {
+		projectId: 'project-1',
+		teamId: 'team-1',
+		launchRequirements: {
+			hosts: [
+				{
+					kind: 'host',
+					key: 'sourceRepository',
+					type: 'repository',
+					required: true,
+					compatibleProviders: ['github'],
+					displayName: 'Source repository',
+					purpose: 'Creates repositories.',
+				},
+				{
+					kind: 'host',
+					key: 'publicWeb',
+					type: 'web',
+					required: true,
+					compatibleProviders: ['cloudflare'],
+					displayName: 'Public web',
+					purpose: 'Deploys web.',
+				},
+			],
+		},
+		view: {
+			summary: { status: 'ok', total: 2, warnings: 0, blocked: 0 },
+			requirements: [
+				{
+					requirementKey: 'sourceRepository',
+					required: true,
+					type: 'repository',
+					binding: { provider: 'github', hostId: 'repo-host-1', managedHostKey: null },
+					audit: { status: 'ok' },
+				},
+				{
+					requirementKey: 'publicWeb',
+					required: true,
+					type: 'web',
+					binding: { provider: 'cloudflare', hostId: null, managedHostKey: 'treeseed-managed-web' },
+					audit: { status: 'ok' },
+				},
+			],
+			diagnostics: [],
+		},
+		...overrides,
+	};
+}
+
 function json(payload, status = 200) {
 	return new Response(JSON.stringify(payload), {
 		status,
@@ -205,6 +255,41 @@ test('projects deploy, publish, and monitor post canonical deployment bodies', a
 			{ environment: 'staging', action: 'monitor', source: 'cli', dryRun: true },
 		]);
 		assert(calls.every((call) => call.path === '/v1/projects/project-1/deployments/web'));
+	});
+});
+
+test('projects hosts lists, audits, and queues replacement through canonical host binding API', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch((call) => {
+		if (call.path === '/v1/projects/project-1/hosts' && call.method === 'GET') {
+			return json({ ok: true, payload: projectHostsPayload() });
+		}
+		if (call.path === '/v1/projects/project-1/hosts/audit') {
+			return json({ ok: true, payload: projectHostsPayload({ hostBindingAudit: { checkedAt: '2026-06-03T00:00:00.000Z' } }) });
+		}
+		if (call.path === '/v1/projects/project-1/hosts/publicWeb/replace') {
+			return json({
+				ok: true,
+				payload: projectHostsPayload(),
+				operation: { id: 'op-hosts-1', status: 'queued', pollUrl: '/v1/platform/operations/op-hosts-1' },
+			}, 202);
+		}
+		return json({ ok: false, error: `Unexpected path ${call.path}` }, 404);
+	}, async (calls) => {
+		const list = await runCli(['projects', 'hosts', 'project-1', '--market', 'local'], { cwd: root, env: { HOME: root } });
+		const audit = await runCli(['projects', 'hosts', 'audit', 'project-1', '--market', 'local'], { cwd: root, env: { HOME: root } });
+		const replace = await runCli(['projects', 'hosts', 'replace', 'project-1', '--market', 'local', '--host', 'publicWeb=cloudflare:web-host-2'], { cwd: root, env: { HOME: root } });
+
+		assert.equal(list.exitCode, 0);
+		assert.match(list.stdout, /Treeseed project host bindings/u);
+		assert.equal(audit.exitCode, 0);
+		assert.match(audit.stdout, /Treeseed project host audit/u);
+		assert.equal(replace.exitCode, 0);
+		assert.match(replace.stdout, /Treeseed project host replace queued/u);
+		const replaceCall = calls.find((call) => call.path === '/v1/projects/project-1/hosts/publicWeb/replace');
+		assert.equal(replaceCall.body.hostBinding.hostId, 'web-host-2');
+		assert.equal(replaceCall.body.hostBinding.provider, 'cloudflare');
+		assert.equal(JSON.stringify(replaceCall.body).includes('passphrase'), false);
 	});
 });
 
