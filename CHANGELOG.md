@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.10.19] - 2026-06-04
+
+### Tests
+
+- chore(cli): bump version and update secret sensitivity in tests (9d816bed5162)
+- chore(cli): bump version and refactor help test fixture resolution (90fe198d89cd)
+- test(scripts): update SDK package root resolution logic (04ee9b423856)
+- refactor(tests): improve SDK template catalog fixture resolution (c7c616ea866f)
+- build(source): sync package dependency references (538372952d7a)
+
+### Dependencies
+
+- chore(cli): bump version and update @treeseed/sdk (d396d21e0e3a)
+- chore(cli): bump version and update @treeseed/sdk dependency (033bc3d908a1)
+- chore(deps): bump version and update @treeseed/sdk (8412542fd402)
+- chore(cli): bump version and dependencies (b0a87b5c2ead)
+- chore(cli): bump version and update @treeseed/sdk (306b51a031ce)
+- build(cli): bump version and update @treeseed/sdk dependency (f9a436306093)
+- Release @treeseed/cli 0.10.19.
+
 ## [0.10.18] - 2026-06-02
 
 ### Dependencies
