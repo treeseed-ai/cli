@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.20] - 2026-06-04
+
+### Infrastructure
+
+- ci(build): record repository changes (a81b6c4559ac)
+
+### Dependencies
+
+- Release @treeseed/cli 0.10.20.
+
 ## [0.10.19] - 2026-06-04
 
 ### Tests
