@@ -216,9 +216,9 @@ function resolveSdkCatalogFixturePath() {
 	testTemplateCatalogPath = resolve(catalogRoot, 'catalog.fixture.json');
 	writeFileSync(testTemplateCatalogPath, `${JSON.stringify({
 		items: [
-			templateCatalogItemBase('starter-research', 'TreeSeed Research', 'Research starter.', {
+			templateCatalogItemBase('research', 'TreeSeed Research', 'Research starter.', {
 				kind: 'git',
-				repoUrl: 'https://github.com/treeseed-ai/starter-research.git',
+				repoUrl: 'https://github.com/treeseed-templates/research.git',
 				directory: '.',
 				ref: 'staging',
 				integrity: 'cli-test',
@@ -481,12 +481,12 @@ test('init help documents repeatable launch host bindings', async () => {
 });
 
 test('template show renders starter launch requirements', async () => {
-	const result = await runCli(['template', 'show', 'starter-research'], {
+	const result = await runCli(['template', 'show', 'research'], {
 		env: {
 			TREESEED_TEMPLATE_CATALOG_URL: `file:${resolveSdkCatalogFixturePath()}`,
 		},
 	});
-	assertSuccessWithDiagnostics(result, 'template show starter-research');
+	assertSuccessWithDiagnostics(result, 'template show research');
 	assert.match(result.stdout, /Required Hosts/u);
 	assert.match(result.stdout, /sourceRepository/u);
 	assert.match(result.stdout, /publicWeb/u);
@@ -518,7 +518,7 @@ test('init applies local launch host bindings through generated config', async (
 		'init',
 		'generated',
 		'--template',
-		'starter-research',
+		'research',
 		'--name',
 		'Generated Research',
 		'--site-url',
@@ -557,7 +557,7 @@ test('init rejects invalid local launch host specs before scaffolding', async ()
 		'init',
 		'generated',
 		'--template',
-		'starter-research',
+		'research',
 		'--host',
 		'publicWeb=smtp:postmark',
 	], {
