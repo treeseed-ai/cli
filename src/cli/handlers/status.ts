@@ -53,6 +53,9 @@ function environmentLines(state: Record<string, any>, scope: Scope) {
 }
 
 function statusFacts(state: Record<string, any>, live: boolean) {
+	const packageKinds = Array.isArray(state.packageSync?.packages)
+		? [...new Set(state.packageSync.packages.map((pkg: any) => pkg.kind).filter(Boolean))].join(', ')
+		: '';
 	return [
 		{ label: 'Mode', value: live ? 'saved state + live provider checks' : 'saved state' },
 		{ label: 'Workspace root', value: state.workspaceRoot ? 'yes' : 'no' },
@@ -62,6 +65,7 @@ function statusFacts(state: Record<string, any>, live: boolean) {
 		{ label: 'Mapped environment', value: state.environment },
 		{ label: 'Dirty worktree', value: state.dirtyWorktree ? 'yes' : 'no' },
 		{ label: 'Package mode', value: state.packageSync.mode },
+		{ label: 'Package adapters', value: packageKinds || '(none)' },
 		{ label: 'Dependency mode', value: state.packageSync.dependencyMode ?? '(unknown)' },
 		{ label: 'Full package checkout', value: state.packageSync.completeCheckout ? 'yes' : 'no' },
 		{ label: 'Package branch aligned', value: state.packageSync.aligned ? 'yes' : 'no' },
@@ -115,6 +119,13 @@ export const handleStatus: TreeseedCommandHandler = async (invocation, context) 
 					title: scope.label,
 					lines: environmentLines(state, scope.id),
 				})),
+				{
+					title: 'Package adapters',
+					lines: Array.isArray(state.packageSync?.packages) && state.packageSync.packages.length > 0
+						? state.packageSync.packages.map((pkg: any) =>
+							`${pkg.id}: ${pkg.kind}${pkg.version ? ` @ ${pkg.version}` : ''}${pkg.publishTarget ? ` -> ${pkg.publishTarget}` : ''}`)
+						: ['No package adapters discovered.'],
+				},
 				{
 					title: 'Managed services',
 					lines: Object.entries(state.managedServices ?? {}).map(([name, service]: [string, any]) =>
