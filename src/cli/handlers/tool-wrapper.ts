@@ -113,6 +113,31 @@ function railwayCommandUsesProjectFiles(args: string[]) {
 	return ['up', 'dev', 'develop', 'run', 'local', 'shell'].includes(command);
 }
 
+function railwayCommandNeedsProjectContext(args: string[]) {
+	const command = args[0] ?? '';
+	if (!command) return false;
+	if (args.includes('--help') || args.includes('-h')) return false;
+	return ![
+		'account',
+		'completion',
+		'environment',
+		'environments',
+		'help',
+		'init',
+		'link',
+		'login',
+		'logout',
+		'open',
+		'project',
+		'projects',
+		'team',
+		'teams',
+		'whoami',
+		'workspace',
+		'workspaces',
+	].includes(command);
+}
+
 export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) => {
 	let isolatedRailwayCwd: string | null = null;
 	try {
@@ -147,7 +172,7 @@ export const handleToolWrapper: TreeseedCommandHandler = (invocation, context) =
 		}
 
 		const targetArgs = invocation.positionals;
-		if (toolName === 'railway' && scope !== 'local' && targetArgs[0] !== 'link') {
+		if (toolName === 'railway' && scope !== 'local' && railwayCommandNeedsProjectContext(targetArgs)) {
 			const environmentName = railwayEnvironmentName(scope);
 			const projectId = managedEnv.TREESEED_RAILWAY_PROJECT_ID || railwayProjectIdFromDeployState(context.cwd, scope);
 			const railwayCwd = railwayCommandUsesProjectFiles(targetArgs)

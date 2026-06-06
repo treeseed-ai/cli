@@ -648,6 +648,23 @@ test('railway wrapper selects the requested Railway environment before forwardin
 	assert.match(result.spawns[1].options.env.XDG_CONFIG_HOME, /treeseed-railway-prod-/);
 });
 
+test('railway wrapper forwards workspace project probes without preselecting project context', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['railway', '--environment', 'staging', '--', 'project', 'list', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			RAILWAY_API_TOKEN: 'railway-token',
+			TREESEED_RAILWAY_PROJECT_ID: 'f593a85c-38a2-4e76-a90b-2c20ecf81d6e',
+		},
+	});
+
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 1);
+	assert.deepEqual(result.spawns[0].args.slice(-3), ['project', 'list', '--json']);
+	assert.equal(result.spawns[0].options.cwd, workspaceRoot);
+});
+
 test('export help includes the directory argument', async () => {
 	const result = await runCli(['help', 'export']);
 	assert.equal(result.exitCode, 0);
