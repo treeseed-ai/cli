@@ -1,5 +1,6 @@
 import { TreeseedWorkflowError, TreeseedWorkflowSdk, type TreeseedWorkflowContext, type TreeseedWorkflowNextStep, type TreeseedWorkflowResult } from '@treeseed/sdk/workflow';
 import { TreeseedKeyAgentError } from '@treeseed/sdk/workflow-support';
+import { compileTreeseedHostingGraph, serializeHostingUnit, type TreeseedHostingEnvironment } from '@treeseed/sdk/hosting';
 import type { TreeseedCommandContext, TreeseedCommandResult } from '../types.js';
 
 export function createWorkflowSdk(context: TreeseedCommandContext, overrides: Partial<TreeseedWorkflowContext> = {}) {
@@ -140,4 +141,43 @@ export function renderWorkflowNextSteps(result: TreeseedWorkflowResult) {
 		const command = renderWorkflowNextStep(step);
 		return step.reason ? `${command}  # ${step.reason}` : command;
 	});
+}
+
+export function resolveWorkflowHostingGraph(context: TreeseedCommandContext, environment: TreeseedHostingEnvironment) {
+	try {
+		const graph = compileTreeseedHostingGraph({
+			tenantRoot: context.cwd,
+			environment,
+		});
+		return {
+			environment: graph.environment,
+			placements: graph.placements,
+			units: graph.units.map((unit) => serializeHostingUnit(unit)),
+			warnings: graph.warnings,
+		};
+	} catch (error) {
+		return {
+			environment,
+			error: error instanceof Error ? error.message : String(error),
+			placements: [],
+			units: [],
+			warnings: [],
+		};
+	}
+}
+
+export function hostingGraphSections(hostingGraph: ReturnType<typeof resolveWorkflowHostingGraph>) {
+	if (hostingGraph.error) {
+		return [{
+			title: 'Hosting graph',
+			lines: [hostingGraph.error],
+		}];
+	}
+	return [{
+		title: 'Hosting graph',
+		lines: hostingGraph.placements.length > 0
+			? hostingGraph.placements.map((placement) =>
+				`${placement.label}: ${placement.serviceIds.join(', ')} on ${placement.hostIds.join(', ')}`)
+			: ['No hosting placements resolved.'],
+	}];
 }

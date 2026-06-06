@@ -1,6 +1,6 @@
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
-import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from './workflow.js';
+import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
 
 export const handleStage: TreeseedCommandHandler = async (invocation, context) => {
 	try {
@@ -30,6 +30,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			worktreePath?: string | null;
 		};
 		const mergedPackages = payload.repos.filter((repo) => repo.merged).length;
+		const hostingGraph = resolveWorkflowHostingGraph(context, 'staging');
 		return guidedResult({
 			command: invocation.commandName || 'stage',
 			summary: result.executionMode === 'plan' ? 'Treeseed stage plan ready.' : 'Treeseed stage completed successfully.',
@@ -48,8 +49,12 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? payload.mergeTarget },
 			],
+			sections: result.executionMode === 'plan' ? hostingGraphSections(hostingGraph) : [],
 			nextSteps: renderWorkflowNextSteps(result),
-			report: result,
+			report: {
+				...result,
+				hostingGraph,
+			},
 		});
 	} catch (error) {
 		return workflowErrorResult(error);

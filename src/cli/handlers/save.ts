@@ -1,6 +1,6 @@
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
-import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from './workflow.js';
+import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
 
 type SavePlanRepo = {
 	name: string;
@@ -147,6 +147,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 		const plannedRepos = result.executionMode === 'plan'
 			? (payload.repositoryPlan?.repos ?? payload.repos ?? []).map((repo) => repo.name).join(', ')
 			: '';
+		const hostingGraph = resolveWorkflowHostingGraph(context, payload.scope === 'prod' ? 'prod' : payload.scope === 'staging' ? 'staging' : 'local');
 		return guidedResult({
 			command: invocation.commandName || 'save',
 			summary: result.executionMode === 'plan'
@@ -178,6 +179,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 			],
 			sections: result.executionMode === 'plan' ? [
+				...hostingGraphSections(hostingGraph),
 				...(payload.plannedSteps?.length
 					? [{ title: 'Dependency mode transitions', lines: payload.plannedSteps
 						.filter((step) => /workspace-(?:link|unlink)/u.test(String(step.id ?? '')))
@@ -186,7 +188,10 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				...formatSavePlanSections(payload.repositoryPlan),
 			] : [],
 			nextSteps: renderWorkflowNextSteps(result),
-			report: result,
+			report: {
+				...result,
+				hostingGraph,
+			},
 		});
 	} catch (error) {
 		return workflowErrorResult(error);

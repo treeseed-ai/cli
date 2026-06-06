@@ -31,12 +31,14 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 			dryRun: invocation.args.dryRun === true,
 			force: invocation.args.force === true,
 			deleteData: invocation.args.deleteData === true,
+			sweepTreeseed: invocation.args.sweepTreeseed === true,
 			removeBuildArtifacts: invocation.args.removeBuildArtifacts === true,
 		});
 		const payload = result.payload as {
 			scope: string;
 			dryRun: boolean;
 			deleteData?: boolean;
+			sweepTreeseed?: boolean;
 			removeBuildArtifacts: boolean;
 		};
 		return guidedResult({
@@ -48,6 +50,7 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Environment', value: payload.scope },
 				{ label: 'Dry run', value: payload.dryRun ? 'yes' : 'no' },
 				{ label: 'Delete data', value: payload.deleteData ? 'yes' : 'no' },
+				{ label: 'Sweep TreeSeed resources', value: payload.sweepTreeseed ? 'yes' : 'no' },
 				{ label: 'Removed build artifacts', value: payload.removeBuildArtifacts ? 'yes' : 'no' },
 			],
 			nextSteps: renderWorkflowNextSteps(result),

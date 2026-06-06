@@ -1,6 +1,6 @@
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
-import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from './workflow.js';
+import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
 
 function formatReleasePlanSections(payload: {
 	packageSelection?: { changed?: string[]; dependents?: string[]; selected?: string[] };
@@ -120,6 +120,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const releasedCommit = typeof payload.releasedCommit === 'string' && payload.releasedCommit.length > 0
 			? payload.releasedCommit.slice(0, 12)
 			: result.executionMode === 'plan' ? 'planned' : 'not available';
+		const hostingGraph = resolveWorkflowHostingGraph(context, 'prod');
 		return guidedResult({
 			command: invocation.commandName || 'release',
 			summary: result.executionMode === 'plan' ? 'Treeseed release plan ready.' : 'Treeseed release completed successfully.',
@@ -143,9 +144,15 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? (result.executionMode === 'plan' ? payload.stagingBranch : '(unknown)') },
 			],
-			sections: result.executionMode === 'plan' ? formatReleasePlanSections(payload) : [],
+			sections: result.executionMode === 'plan' ? [
+				...hostingGraphSections(hostingGraph),
+				...formatReleasePlanSections(payload),
+			] : [],
 			nextSteps: renderWorkflowNextSteps(result),
-			report: result,
+			report: {
+				...result,
+				hostingGraph,
+			},
 		});
 	} catch (error) {
 		return workflowErrorResult(error);

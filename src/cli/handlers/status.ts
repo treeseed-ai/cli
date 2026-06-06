@@ -1,3 +1,4 @@
+import { compileTreeseedHostingGraph, serializeHostingUnit } from '@treeseed/sdk/hosting';
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
 import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from './workflow.js';
@@ -97,11 +98,33 @@ export const handleStatus: TreeseedCommandHandler = async (invocation, context) 
 		const history = invocation.args.history === 'all' ? 'all' : 'recent';
 		const result = await createWorkflowSdk(context).status({ live, history });
 		const state = result.payload as Record<string, any>;
+		let hostingGraph: Record<string, any> | null = null;
+		try {
+			const graph = compileTreeseedHostingGraph({
+				tenantRoot: context.cwd,
+				environment: state.environment === 'prod' || state.environment === 'production'
+					? 'prod'
+					: state.environment === 'staging'
+						? 'staging'
+						: 'local',
+			});
+			hostingGraph = {
+				environment: graph.environment,
+				placements: graph.placements,
+				units: graph.units.map((unit) => serializeHostingUnit(unit)),
+			};
+			state.hostingGraph = hostingGraph;
+		} catch (error) {
+			state.hostingGraph = {
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
 		const nextSteps = renderWorkflowNextSteps(result);
 		const report = {
 			...result,
 			state,
 			live,
+			hostingGraph,
 		};
 		if (await renderTreeseedStatusInk(state, context)) {
 			return {
@@ -119,6 +142,13 @@ export const handleStatus: TreeseedCommandHandler = async (invocation, context) 
 					title: scope.label,
 					lines: environmentLines(state, scope.id),
 				})),
+				{
+					title: 'Hosting graph',
+					lines: hostingGraph?.placements
+						? hostingGraph.placements.map((placement: any) =>
+							`${placement.label}: ${placement.serviceIds.join(', ')} on ${placement.hostIds.join(', ')}`)
+						: [state.hostingGraph?.error ?? 'No hosting graph available.'],
+				},
 				{
 					title: 'Package adapters',
 					lines: Array.isArray(state.packageSync?.packages) && state.packageSync.packages.length > 0
