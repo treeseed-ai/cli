@@ -119,6 +119,17 @@ function resolveWorkspaceRuntimePackageRoots() {
 	return roots;
 }
 
+function ensureWorkspaceRuntimePackageLinks() {
+	for (const [packageName, runtimePackageRoot] of resolveWorkspaceRuntimePackageRoots()) {
+		const linkPath = resolve(packageRoot, 'node_modules', ...packageName.split('/'));
+		if (existsSync(linkPath)) {
+			continue;
+		}
+		mkdirSync(dirname(linkPath), { recursive: true });
+		symlinkSync(runtimePackageRoot, linkPath, 'dir');
+	}
+}
+
 function collectRuntimeDependenciesForPackaging() {
 	const dependencyNames = new Set<string>(runtimeDependencyNames());
 	const workspaceRuntimePackageRoots = resolveWorkspaceRuntimePackageRoots();
@@ -273,6 +284,7 @@ function assertPackageDependencyShape() {
 }
 
 assertNoLocalDependencyLinks();
+ensureWorkspaceRuntimePackageLinks();
 run('npm', ['run', 'lint']);
 assertPackageDependencyShape();
 scanDirectory(resolve(packageRoot, 'dist'));
