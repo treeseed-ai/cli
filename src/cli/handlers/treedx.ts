@@ -46,7 +46,7 @@ async function status(invocation: TreeseedParsedInvocation, context: Parameters<
 	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
 	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
 		client,
-		`/v1/teams/${encodeURIComponent(team)}/treedb`,
+		`/v1/teams/${encodeURIComponent(team)}/treedx`,
 		{ requireAuth: true },
 	);
 	const payload = response.payload;
@@ -55,7 +55,7 @@ async function status(invocation: TreeseedParsedInvocation, context: Parameters<
 	const instance = recordValue(payload, 'instance') as Record<string, unknown> | null;
 	return guidedResult({
 		command: 'db status',
-		summary: instance ? 'TreeDB binding is configured.' : 'No TreeDB binding is configured.',
+		summary: instance ? 'TreeDX binding is configured.' : 'No TreeDX binding is configured.',
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: team },
@@ -82,14 +82,14 @@ async function provision(invocation: TreeseedParsedInvocation, context: Paramete
 	};
 	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
 		client,
-		`/v1/teams/${encodeURIComponent(team)}/treedb/provision`,
+		`/v1/teams/${encodeURIComponent(team)}/treedx/provision`,
 		{ method: 'POST', body, requireAuth: true },
 	);
 	const json = jsonResult(invocation, context, { ok: true, market: profile.id, team, payload: response.payload });
 	if (json) return json;
 	return guidedResult({
 		command: 'db provision',
-		summary: body.publicRead ? 'Attached the team to the public TreeSeed federation.' : 'Queued a private managed TreeDB binding.',
+		summary: body.publicRead ? 'Attached the team to the public TreeSeed federation.' : 'Queued a private managed TreeDX binding.',
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: team },
@@ -106,7 +106,7 @@ async function connect(invocation: TreeseedParsedInvocation, context: Parameters
 	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
 	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
 		client,
-		`/v1/teams/${encodeURIComponent(team)}/treedb`,
+		`/v1/teams/${encodeURIComponent(team)}/treedx`,
 		{
 			method: 'PUT',
 			body: {
@@ -124,11 +124,11 @@ async function connect(invocation: TreeseedParsedInvocation, context: Parameters
 	if (json) return json;
 	return guidedResult({
 		command: 'db connect',
-		summary: 'Connected a TreeDB primary binding.',
+		summary: 'Connected a TreeDX primary binding.',
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: team },
-			{ label: 'TreeDB URL', value: url },
+			{ label: 'TreeDX URL', value: url },
 		],
 		report: { ok: true, market: profile.id, team, payload: response.payload },
 	});
@@ -141,12 +141,12 @@ async function mirrors(invocation: TreeseedParsedInvocation, context: Parameters
 	const create = stringArg(invocation, 'name') || stringArg(invocation, 'targetUrl');
 	const response = await marketRequest<{ ok: true; payload: unknown }>(
 		client,
-		`/v1/teams/${encodeURIComponent(team)}/treedb/mirrors`,
+		`/v1/teams/${encodeURIComponent(team)}/treedx/mirrors`,
 		create
 			? {
 				method: 'POST',
 				body: {
-					name: stringArg(invocation, 'name') ?? 'TreeDB mirror',
+					name: stringArg(invocation, 'name') ?? 'TreeDX mirror',
 					targetUrl: stringArg(invocation, 'targetUrl'),
 					targetKind: stringArg(invocation, 'targetKind') ?? 'git',
 					direction: stringArg(invocation, 'direction') ?? 'bidirectional',
@@ -163,7 +163,7 @@ async function mirrors(invocation: TreeseedParsedInvocation, context: Parameters
 		: [`${(payload as any).name}: ${(payload as any).status}`];
 	return guidedResult({
 		command: 'db mirrors',
-		summary: create ? 'Created TreeDB mirror record.' : 'TreeDB mirrors listed.',
+		summary: create ? 'Created TreeDX mirror record.' : 'TreeDX mirrors listed.',
 		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Team', value: team }],
 		sections: [{ title: 'Mirrors', lines }],
 		report: { ok: true, market: profile.id, team, payload },
@@ -177,7 +177,7 @@ async function shares(invocation: TreeseedParsedInvocation, context: Parameters<
 	const create = stringArg(invocation, 'scope') || stringArg(invocation, 'library') || boolArg(invocation, 'public');
 	const response = await marketRequest<{ ok: true; payload: unknown }>(
 		client,
-		`/v1/teams/${encodeURIComponent(team)}/treedb/shares`,
+		`/v1/teams/${encodeURIComponent(team)}/treedx/shares`,
 		create
 			? {
 				method: 'POST',
@@ -200,7 +200,7 @@ async function shares(invocation: TreeseedParsedInvocation, context: Parameters<
 		: [`${(payload as any).scope}: ${(payload as any).status}`];
 	return guidedResult({
 		command: 'db shares',
-		summary: create ? 'Created TreeDB share record.' : 'TreeDB shares listed.',
+		summary: create ? 'Created TreeDX share record.' : 'TreeDX shares listed.',
 		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Team', value: team }],
 		sections: [{ title: 'Shares', lines }],
 		report: { ok: true, market: profile.id, team, payload },
@@ -214,7 +214,7 @@ async function library(invocation: TreeseedParsedInvocation, context: Parameters
 	const bind = stringArg(invocation, 'library') || stringArg(invocation, 'instance');
 	const response = await marketRequest<{ ok: true; payload: unknown }>(
 		client,
-		`/v1/projects/${encodeURIComponent(project)}/treedb-library`,
+		`/v1/projects/${encodeURIComponent(project)}/treedx-library`,
 		bind
 			? {
 				method: 'POST',
@@ -232,7 +232,7 @@ async function library(invocation: TreeseedParsedInvocation, context: Parameters
 	if (json) return json;
 	return guidedResult({
 		command: 'db library',
-		summary: bind ? 'Project TreeDB library binding saved.' : 'Project TreeDB library binding loaded.',
+		summary: bind ? 'Project TreeDX library binding saved.' : 'Project TreeDX library binding loaded.',
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Project', value: project },
@@ -265,7 +265,7 @@ async function topology(invocation: TreeseedParsedInvocation, context: Parameter
 			{ label: 'Project', value: project },
 		],
 		sections: [
-			{ title: 'Content', lines: [`${recordValue(content, 'accessMode')} ${JSON.stringify(recordValue(content, 'treeDb') ?? {})}`] },
+			{ title: 'Content', lines: [`${recordValue(content, 'accessMode')} ${JSON.stringify(recordValue(content, 'treeDx') ?? {})}`] },
 			{ title: 'Site', lines: [`${recordValue(site, 'accessMode')} ${recordValue(site, 'url') ?? recordValue(site, 'name') ?? ''} -> ${recordValue(site, 'volumePath') ?? recordValue(site, 'checkoutPath') ?? ''}`] },
 			{ title: 'Project', lines: parent ? [`${recordValue(parent, 'accessMode')} ${recordValue(parent, 'url') ?? recordValue(parent, 'name') ?? ''} -> ${recordValue(parent, 'volumePath') ?? recordValue(parent, 'checkoutPath') ?? ''}`] : ['No parent project repository configured.'] },
 		],
@@ -288,7 +288,7 @@ async function publish(invocation: TreeseedParsedInvocation, context: Parameters
 				environment,
 				action: 'publish_content',
 				source: 'cli',
-				reason: stringArg(invocation, 'reason') ?? 'TreeDB content publish',
+				reason: stringArg(invocation, 'reason') ?? 'TreeDX content publish',
 				confirmProduction: environment === 'prod',
 				dryRun: boolArg(invocation, 'dryRun'),
 			},
@@ -301,7 +301,7 @@ async function publish(invocation: TreeseedParsedInvocation, context: Parameters
 	const operation = recordValue(response.payload, 'operation') as Record<string, unknown> | undefined;
 	return guidedResult({
 		command: 'db publish',
-		summary: 'TreeDB content publish queued.',
+		summary: 'TreeDX content publish queued.',
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Project', value: project },
@@ -313,7 +313,7 @@ async function publish(invocation: TreeseedParsedInvocation, context: Parameters
 	});
 }
 
-export const handleTreeDb: TreeseedCommandHandler = async (invocation, context) => {
+export const handleTreeDx: TreeseedCommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'status';
 	try {
 		if (action === 'status') return status(invocation, context);

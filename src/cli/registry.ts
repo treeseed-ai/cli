@@ -24,7 +24,7 @@ import { handleMarket } from './handlers/market.js';
 import { handleTeams } from './handlers/teams.js';
 import { handleProjects } from './handlers/projects.js';
 import { handleCapacity } from './handlers/capacity.js';
-import { handleTreeDb } from './handlers/treedb.js';
+import { handleTreeDx } from './handlers/treedx.js';
 import { handleHosting } from './handlers/hosting.js';
 import { handlePacks } from './handlers/packs.js';
 import { handleToolWrapper } from './handlers/tool-wrapper.js';
@@ -80,7 +80,7 @@ export const COMMAND_HANDLERS = {
 	teams: handleTeams,
 	projects: handleProjects,
 	capacity: handleCapacity,
-	db: handleTreeDb,
+	db: handleTreeDx,
 	hosting: handleHosting,
 	packs: handlePacks,
 	gh: handleToolWrapper,

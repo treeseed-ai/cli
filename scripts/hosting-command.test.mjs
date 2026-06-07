@@ -95,9 +95,9 @@ test('hosting plan emits placement-first JSON for staging', async () => {
 	assert.equal(payload.environment, 'staging');
 	assert.ok(payload.placements.some((placement) => placement.placement === 'knowledge-library'));
 	assert.ok(payload.units.some((entry) =>
-		entry.unit.id === 'public-treedb-node'
+		entry.unit.id === 'public-treedx-node'
 		&& entry.unit.hostId === 'railway'
-		&& entry.unit.projectGroupId === 'public-treedb-federation'));
+		&& entry.unit.projectGroupId === 'public-treedx-federation'));
 });
 
 test('hosting apply is dry-run by default', async () => {
