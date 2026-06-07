@@ -37,7 +37,7 @@ services:
     railway:
       projectName: treeseed-market
       serviceName: treeseed-market-api
-      rootDir: packages/api
+      rootDir: .
       buildCommand: npm run build
       startCommand: npm run start:api
   marketDatabase:
@@ -52,7 +52,7 @@ services:
     rootDir: packages/api
     railway:
       serviceName: treeseed-market-operations-runner
-      rootDir: packages/api
+      rootDir: .
       buildCommand: npm run build
       startCommand: npm run start:runner
       volumeMountPath: /data
