@@ -1,5 +1,6 @@
 import {
 	collectTreeseedHostedServiceChecks,
+	collectTreeseedLiveHostedServiceChecks,
 	formatTreeseedHostingAuditReport,
 	runTreeseedHostingAudit,
 	type TreeseedHostingAuditEnvironment,
@@ -58,10 +59,18 @@ export const handleAudit: TreeseedCommandHandler = async (invocation, context) =
 			hostKinds: normalizeHostKinds(invocation.args.hostKinds ?? invocation.args.hosts),
 			write: context.write,
 		});
-		const hostedServices = collectTreeseedHostedServiceChecks({
-			tenantRoot: context.cwd,
-			target: report.environment === 'prod' ? 'prod' : report.environment === 'local' ? 'local' : 'staging',
-		});
+		const hostedTarget = report.environment === 'prod' ? 'prod' : report.environment === 'local' ? 'local' : 'staging';
+		const hostedServices = invocation.args.live === true
+			? await collectTreeseedLiveHostedServiceChecks({
+				tenantRoot: context.cwd,
+				target: hostedTarget,
+				strict: false,
+				env: context.env,
+			})
+			: collectTreeseedHostedServiceChecks({
+				tenantRoot: context.cwd,
+				target: hostedTarget,
+			});
 		const counts = statusCounts(report.checks);
 		if (context.outputFormat === 'json') {
 			return {

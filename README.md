@@ -21,12 +21,13 @@ npm install @treeseed/cli @treeseed/core @treeseed/sdk
 
 Workflow guarantees:
 
-- `treeseed` is the only supported project-management surface for market and any checked-out `packages/sdk`, `packages/core`, and `packages/cli` repos.
+- `treeseed` is the only supported project-management surface for market and any checked-out `packages/sdk`, `packages/core`, `packages/agent`, `packages/api`, `packages/cli`, and `packages/treedx` repos.
 - `treeseed switch` requires clean worktrees, mirrors the task branch into checked-out package repos, and only pushes the market branch on branch creation.
-- `treeseed save` is the canonical recursive checkpoint command: it verifies, commits, and pushes dirty package repos in dependency order before saving the market repo.
-- `treeseed stage` squash-merges task branches into `staging` across package repos first, refreshes market submodule pointers to package `staging` heads, then stages the market repo.
+- `treeseed save` is the canonical recursive checkpoint command: it verifies, commits, and pushes dirty package repos in dependency order before saving the market repo. Local verification can reuse successful cache entries when package HEADs and lockfiles are unchanged.
+- `treeseed stage` runs deployment readiness before hosted mutation, squash-merges task branches into `staging` across package repos first, refreshes market submodule pointers to package `staging` heads, then stages the market repo.
 - `treeseed close` recursively archives and deletes matching task branches across market and checked-out package repos.
-- `treeseed release` only bumps, tags, and publishes changed packages plus internal dependents, then syncs market production to package `main` heads.
+- `treeseed release` runs deployment readiness before version bumps, only bumps/tags/publishes changed packages plus internal dependents, then syncs market production to package `main` heads.
+- `treeseed ready`, `treeseed hosting plan/apply/verify`, `treeseed audit hosting --live`, `treeseed doctor --live --hosted-services`, and `treeseed operations smoke` are the fail-fast operator tools for hosted deployment readiness.
 - Every mutating workflow command supports `--plan`; `--dry-run` is only an alias where it still exists for compatibility.
 - Interrupted workflow runs are journaled under `.treeseed/workflow`; use `treeseed recover` to inspect them and `treeseed resume <run-id>` to continue a resumable run.
 
@@ -42,14 +43,18 @@ The main workflow commands exposed by the current CLI are:
 
 - `treeseed status [--json]`
 - `treeseed config`
+- `treeseed ready <local|staging|prod> [--json]`
 - `treeseed tasks [--json]`
 - `treeseed switch <branch-name> [--preview]`
 - `treeseed dev`
 - `treeseed dev start|status|logs|stop|restart`
+- `treeseed hosting plan|apply|verify --environment <local|staging|prod> [--service <id>] [--live]`
+- `treeseed audit hosting --environment <local|staging|prod> [--live]`
+- `treeseed operations smoke --environment <staging|prod> --service marketOperationsRunner`
 - `treeseed save [--preview] [--plan] "<commit message>"`
-- `treeseed stage "<resolution message>"`
+- `treeseed stage [--plan] [--verify-deployed-resources] "<resolution message>"`
 - `treeseed close "<close reason>"`
-- `treeseed release --major|--minor|--patch [--plan]`
+- `treeseed release --major|--minor|--patch [--plan] [--verify-deployed-resources]`
 - `treeseed resume <run-id>`
 - `treeseed recover`
 - `treeseed destroy --environment <local|staging|prod> [--plan]`
@@ -67,11 +72,22 @@ treeseed switch feature/search-improvements --plan
 treeseed switch feature/search-improvements --preview
 treeseed dev
 treeseed dev start --web-runtime local
-treeseed save --preview "feat: add search filters"
-treeseed stage "feat: add search filters"
-treeseed release --patch
+treeseed ready local --json
+treeseed save --verify local --json "feat: add search filters"
+treeseed stage --plan --json "feat: add search filters"
+treeseed stage --verify-deployed-resources --json "feat: add search filters"
+treeseed release --patch --verify-deployed-resources --plan --json
 treeseed recover
 treeseed status --json
+```
+
+Hosted diagnostics:
+
+```bash
+treeseed ready staging --json
+treeseed hosting plan --environment staging --service api --json
+treeseed hosting verify --environment staging --service marketOperationsRunner --live --json
+treeseed operations smoke --environment staging --service marketOperationsRunner --json
 ```
 
 ## Development Server Instances
@@ -101,9 +117,9 @@ Use planning mode before any destructive or multi-repo mutation:
 
 ```bash
 treeseed switch feature/search-improvements --plan --json
-treeseed save --plan "feat: add search filters" --json
-treeseed stage --plan "feat: add search filters" --json
-treeseed release --patch --plan --json
+treeseed save --plan --json "feat: add search filters"
+treeseed stage --plan --json "feat: add search filters"
+treeseed release --patch --verify-deployed-resources --plan --json
 ```
 
 If a workflow stops partway through, inspect the journaled state and resume from the recorded run:

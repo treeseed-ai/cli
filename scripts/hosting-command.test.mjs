@@ -116,3 +116,13 @@ test('hosting apply is dry-run by default', async () => {
 	assert.ok(payload.results.length > 0);
 	assert.equal(payload.results.every((entry) => entry.verification.verified), true);
 });
+
+test('hosting plan can target API service only', async () => {
+	const cwd = makeMarketWorkspace();
+	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--service', 'api', '--json'], cwd);
+	assert.equal(result.exitCode, 0);
+	const payload = parseJsonOutput(result.stdout);
+
+	assert.deepEqual(payload.units.map((entry) => entry.unit.id), ['api']);
+	assert.equal(payload.units[0].unit.config.rootDir, 'packages/api');
+});

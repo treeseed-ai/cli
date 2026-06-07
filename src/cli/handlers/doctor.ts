@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { TreeseedCommandHandler } from '../types.js';
-import { collectCliPreflight, collectTreeseedHostedServiceChecks } from '@treeseed/sdk/workflow-support';
+import { collectCliPreflight, collectTreeseedDeploymentReadiness, collectTreeseedHostedServiceChecks } from '@treeseed/sdk/workflow-support';
 import { guidedResult } from './utils.js';
 import { applyTreeseedSafeRepairs } from '../repair.js';
 import { createWorkflowSdk, workflowErrorResult } from './workflow.js';
@@ -15,6 +15,10 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 			tenantRoot: context.cwd,
 			target: state.branchRole === 'production' || state.branchName === 'main' ? 'prod' : state.branchRole === 'staging' || state.branchName === 'staging' ? 'staging' : 'local',
 		})
+		: null;
+	const hostedTarget = state.branchRole === 'production' || state.branchName === 'main' ? 'prod' : state.branchRole === 'staging' || state.branchName === 'staging' ? 'staging' : 'local';
+	const deploymentReadiness = invocation.args.live === true || invocation.args.hostedServices === true
+		? collectTreeseedDeploymentReadiness({ tenantRoot: context.cwd, environment: hostedTarget })
 		: null;
 	const performedFixes = invocation.args.fix === true && state.deployConfigPresent
 		? applyTreeseedSafeRepairs(state.cwd)
@@ -80,6 +84,7 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 			{ label: 'Branch', value: state.branchName ?? '(none)' },
 			{ label: 'Workspace root', value: state.workspaceRoot ? 'yes' : 'no' },
 			...(hostedServices ? [{ label: 'Hosted checks', value: `${hostedServices.summary.passed} passed, ${hostedServices.summary.warning} warnings, ${hostedServices.summary.failed} failed, ${hostedServices.summary.skipped} skipped` }] : []),
+			...(deploymentReadiness ? [{ label: 'Deployment readiness', value: `${deploymentReadiness.summary.passed} passed, ${deploymentReadiness.summary.failed} failed` }] : []),
 		],
 		nextSteps: [
 			...mustFixNow.map((item) => item),
@@ -93,6 +98,7 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 			mustFixNow,
 			optional,
 			hostedServices,
+			deploymentReadiness,
 		},
 		exitCode: mustFixNow.length === 0 ? 0 : 1,
 	});

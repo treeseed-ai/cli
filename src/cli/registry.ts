@@ -26,6 +26,8 @@ import { handleProjects } from './handlers/projects.js';
 import { handleCapacity } from './handlers/capacity.js';
 import { handleTreeDx } from './handlers/treedx.js';
 import { handleHosting } from './handlers/hosting.js';
+import { handleReady } from './handlers/ready.js';
+import { handleOperations } from './handlers/operations.js';
 import { handlePacks } from './handlers/packs.js';
 import { handleToolWrapper } from './handlers/tool-wrapper.js';
 import {
@@ -82,6 +84,8 @@ export const COMMAND_HANDLERS = {
 	capacity: handleCapacity,
 	db: handleTreeDx,
 	hosting: handleHosting,
+	ready: handleReady,
+	operations: handleOperations,
 	packs: handlePacks,
 	gh: handleToolWrapper,
 	railway: handleToolWrapper,

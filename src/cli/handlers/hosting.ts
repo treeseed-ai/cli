@@ -7,6 +7,7 @@ import {
 	serializeHostingUnit,
 	type TreeseedHostingEnvironment,
 } from '@treeseed/sdk/hosting';
+import { collectTreeseedLiveHostedServiceChecks as collectLiveChecks } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
 import { workflowErrorResult } from './workflow.js';
@@ -27,6 +28,11 @@ function subcommandFor(value: unknown) {
 	return subcommand as 'plan' | 'apply' | 'verify' | 'status';
 }
 
+function listArg(value: unknown) {
+	const raw = Array.isArray(value) ? value : value === undefined || value === null || value === '' ? [] : [value];
+	return [...new Set(raw.flatMap((entry) => String(entry).split(',')).map((entry) => entry.trim()).filter(Boolean))];
+}
+
 function renderUnitLine(entry: { unit: ReturnType<typeof serializeHostingUnit>; plan?: { action?: string }; verification?: { verified?: boolean } }) {
 	return `${entry.unit.id}: ${entry.unit.serviceType} -> ${entry.unit.hostId} (${entry.unit.placement})${entry.plan?.action ? ` ${entry.plan.action}` : ''}${entry.verification ? ` verified=${entry.verification.verified ? 'yes' : 'no'}` : ''}`;
 }
@@ -36,9 +42,17 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 		const subcommand = subcommandFor(invocation.positionals[0]);
 		const environment = environmentFor(invocation.args.environment);
 		const dryRun = invocation.args.dryRun !== false && invocation.args.execute !== true;
+		const filter = {
+			serviceIds: listArg(invocation.args.service),
+			placements: listArg(invocation.args.placement) as any,
+			hosts: listArg(invocation.args.host),
+		};
+		const filterInput = filter.serviceIds.length || filter.placements.length || filter.hosts.length
+			? { filter }
+			: {};
 
 		if (subcommand === 'status') {
-			const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment });
+			const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, ...filterInput });
 			const units = graph.units.map((unit) => serializeHostingUnit(unit));
 			return guidedResult({
 				command: 'hosting status',
@@ -74,8 +88,16 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 		}
 
 		if (subcommand === 'plan' || subcommand === 'verify') {
-			const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, dryRun: true });
+			const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, dryRun: true, ...filterInput });
 			const report = serializeHostingPlan(plan);
+			const liveHostedServices = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
+				? await collectLiveChecks({
+					tenantRoot: context.cwd,
+					target: environment,
+					strict: false,
+					env: context.env,
+				})
+				: null;
 			return guidedResult({
 				command: `hosting ${subcommand}`,
 				summary: `${subcommand === 'verify' ? 'Verified' : 'Planned'} hosting graph for ${environment}`,
@@ -96,11 +118,11 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 						lines: report.units.map((entry) => renderUnitLine(entry)),
 					},
 				],
-				report,
+				report: liveHostedServices ? { ...report, hostedServices: liveHostedServices } : report,
 			});
 		}
 
-		const result = await applyTreeseedHostingGraph({ tenantRoot: context.cwd, environment, dryRun });
+		const result = await applyTreeseedHostingGraph({ tenantRoot: context.cwd, environment, dryRun, ...filterInput });
 		const report = serializeHostingApplyResult(result);
 		return guidedResult({
 			command: 'hosting apply',
@@ -127,4 +149,3 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 		return workflowErrorResult(error);
 	}
 };
-
