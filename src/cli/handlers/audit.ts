@@ -1,4 +1,5 @@
 import {
+	collectTreeseedHostedServiceChecks,
 	formatTreeseedHostingAuditReport,
 	runTreeseedHostingAudit,
 	type TreeseedHostingAuditEnvironment,
@@ -57,12 +58,19 @@ export const handleAudit: TreeseedCommandHandler = async (invocation, context) =
 			hostKinds: normalizeHostKinds(invocation.args.hostKinds ?? invocation.args.hosts),
 			write: context.write,
 		});
+		const hostedServices = collectTreeseedHostedServiceChecks({
+			tenantRoot: context.cwd,
+			target: report.environment === 'prod' ? 'prod' : report.environment === 'local' ? 'local' : 'staging',
+		});
 		const counts = statusCounts(report.checks);
 		if (context.outputFormat === 'json') {
 			return {
 				exitCode: report.ok ? 0 : 1,
 				stdout: [],
-				report,
+				report: {
+					...report,
+					hostedServices,
+				},
 			};
 		}
 		return guidedResult({
@@ -75,9 +83,20 @@ export const handleAudit: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Passed', value: counts.passed ?? 0 },
 				{ label: 'Warnings', value: (counts.warning ?? 0) + report.warnings.length },
 				{ label: 'Failed', value: counts.failed ?? 0 },
+				{ label: 'Hosted checks', value: `${hostedServices.summary.passed} passed, ${hostedServices.summary.warning} warnings, ${hostedServices.summary.failed} failed, ${hostedServices.summary.skipped} skipped` },
+			],
+			sections: [
+				{
+					title: 'Hosted service checks',
+					lines: hostedServices.checks.map((check) =>
+						`${check.provider} ${check.serviceKey ?? check.serviceType} ${check.description}: ${check.status}${check.issues.length ? ` (${check.issues.join('; ')})` : ''}`),
+				},
 			],
 			nextSteps: report.nextActions,
-			report,
+			report: {
+				...report,
+				hostedServices,
+			},
 			exitCode: report.ok ? 0 : 1,
 		});
 	} catch (error) {

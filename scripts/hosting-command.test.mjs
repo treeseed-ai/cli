@@ -33,11 +33,13 @@ services:
   api:
     enabled: true
     provider: railway
+    rootDir: packages/api
     railway:
       projectName: treeseed-market
       serviceName: treeseed-market-api
-      buildCommand: npm run build:api
-      startCommand: node ./src/api/server.js
+      rootDir: packages/api
+      buildCommand: npm run build
+      startCommand: npm run start:api
   marketDatabase:
     enabled: true
     provider: railway
@@ -47,8 +49,12 @@ services:
   marketOperationsRunner:
     enabled: true
     provider: railway
+    rootDir: packages/api
     railway:
       serviceName: treeseed-market-operations-runner
+      rootDir: packages/api
+      buildCommand: npm run build
+      startCommand: npm run start:runner
       volumeMountPath: /data
 smtp:
   enabled: true

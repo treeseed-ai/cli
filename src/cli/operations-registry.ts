@@ -720,9 +720,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['doctor', command({
 		options: [
 			{ name: 'fix', flags: '--fix', description: 'Apply safe local repairs before rerunning diagnostics.', kind: 'boolean' },
+			{ name: 'live', flags: '--live', description: 'Include read-only live provider and hosted service checks.', kind: 'boolean' },
+			{ name: 'hostedServices', flags: '--hosted-services', description: 'Include config-driven hosted service checks.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed doctor', 'treeseed doctor --fix --json'],
+		examples: ['treeseed doctor', 'treeseed doctor --live --json', 'treeseed doctor --fix --json'],
 		help: {
 			workflowPosition: 'validate',
 			longSummary: [
@@ -731,6 +733,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			whenToUse: [
 				'Use this when other commands are failing or when onboarding a machine and you want a readiness report.',
 				'Use `--fix` when you want Treeseed to apply safe local repairs before rerunning diagnostics.',
+				'Use `--live` or `--hosted-services` before staging or release when Railway, Cloudflare, and DNS resources should be checked from configuration.',
 			],
 			outcomes: [
 				'Reports readiness issues and what must be fixed immediately.',
@@ -738,6 +741,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			examples: [
 				example('treeseed doctor', 'Run diagnostics only', 'Inspect the current machine and workspace without making repairs.'),
+				example('treeseed doctor --live --json', 'Check hosted services', 'Include config-driven hosted service checks in JSON diagnostics.'),
 				example('treeseed doctor --fix', 'Repair safe local issues', 'Apply safe fixes first and then rerun diagnostics.'),
 				example('treeseed doctor --fix --json', 'Integrate diagnostics with automation', 'Emit structured diagnostics and repair results for scripts or agents.'),
 			],
@@ -1183,12 +1187,13 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
 			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+			{ name: 'verifyDeployedResources', flags: '--verify-deployed-resources', description: 'Force production deployment checks to verify provider resources before release returns.', kind: 'boolean' },
 			{ name: 'fresh', flags: '--fresh', description: 'Start a new release instead of auto-resuming stale failed release runs.', kind: 'boolean' },
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive release plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed release --patch', 'treeseed release --minor', 'treeseed release --repair-version-line --target-version-line 0.10 --plan', 'treeseed release --patch --fresh'],
+		examples: ['treeseed release --patch', 'treeseed release --minor --verify-deployed-resources', 'treeseed release --repair-version-line --target-version-line 0.10 --plan', 'treeseed release --patch --fresh'],
 		notes: ['Requires exactly one bump flag unless --repair-version-line is used.'],
 		help: {
 			workflowPosition: 'promote to production',
@@ -1198,6 +1203,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			whenToUse: [
 				'Use this only when staging is the approved source for production promotion.',
 				'Choose exactly one bump flag so the release version reflects the intended change size, or use --repair-version-line to repair package line drift.',
+				'Use `--verify-deployed-resources` when production provider resources must be checked before the release returns.',
 			],
 			beforeYouRun: [
 				'Confirm staging is in the state you want to promote.',
@@ -1209,7 +1215,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			examples: [
 				example('treeseed release --patch', 'Patch release', 'Promote staging to production with the next patch version.'),
-				example('treeseed release --minor', 'Minor release', 'Promote staging with the next minor version bump.'),
+				example('treeseed release --minor --verify-deployed-resources', 'Minor release with hosted checks', 'Promote staging with the next minor version bump and verify production provider resources.'),
 				example('treeseed release --repair-version-line --target-version-line 0.10 --json', 'Repair package line drift', 'Publish only packages below the selected public package release line.'),
 				example('treeseed release --patch --json', 'Automate release tracking', 'Emit structured release output for tooling that records deployments and version changes.'),
 			],
