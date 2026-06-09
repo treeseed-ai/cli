@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 
@@ -53,6 +53,42 @@ services:
       serviceTargets:
         - api
         - operationsRunner
+`, 'utf8');
+	mkdirSync(resolve(root, 'src'), { recursive: true });
+	writeFileSync(resolve(root, 'src', 'env.yaml'), `entries:
+  TREESEED_WEB_SERVICE_SECRET:
+    label: API service caller secret
+    group: auth
+    description: Shared secret used by trusted web clients to authenticate internal calls to the Treeseed API.
+    howToGet: Generate a strong random secret and configure the same value on callers and the API service.
+    sensitivity: secret
+    targets:
+      - local-runtime
+      - railway-secret
+      - github-secret
+      - cloudflare-secret
+    appTargets:
+      - api
+    serviceTargets:
+      - api
+    scopes:
+      - local
+      - staging
+      - prod
+    storage: shared
+    requirement: required
+    purposes:
+      - dev
+      - deploy
+      - config
+    validation:
+      kind: nonempty
+    sourcePriority:
+      - machine-config
+      - process-env
+    defaultValueRef: generatedSecret
+    localDefaultValueRef: generatedSecret
+    relevanceRef: apiSurfaceEnabled
 `, 'utf8');
 	return root;
 }
