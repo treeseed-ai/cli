@@ -13,7 +13,7 @@ slug: treeseed-market
 siteUrl: https://treeseed.ai
 contactEmail: hello@treeseed.ai
 hosting:
-  kind: market_control_plane
+  kind: treeseed_control_plane
 runtime:
   mode: treeseed_managed
 surfaces:
@@ -46,7 +46,7 @@ services:
       healthcheckPath: /healthz
       runtimeMode: service
       volumeMountPath: /data
-  apiDatabase:
+  treeseedDatabase:
     enabled: true
     provider: railway
     railway:

@@ -13,7 +13,7 @@ slug: treeseed-market
 siteUrl: https://treeseed.ai
 contactEmail: hello@treeseed.email
 hosting:
-  kind: market_control_plane
+  kind: treeseed_control_plane
   teamId: treeseed
   projectId: market
 hub:
@@ -40,7 +40,7 @@ services:
       rootDir: packages/api
       buildCommand: npm run build
       startCommand: npm run start:api
-  apiDatabase:
+  treeseedDatabase:
     enabled: true
     provider: railway
     railway:
@@ -95,7 +95,7 @@ slug: treeseed-api
 siteUrl: https://api.treeseed.ai
 contactEmail: hello@treeseed.email
 hosting:
-  kind: market_control_plane
+  kind: treeseed_control_plane
 runtime:
   mode: treeseed_managed
 surfaces:
@@ -126,7 +126,7 @@ services:
       volumeMountPath: /data
       runnerPool:
         bootstrapCount: 1
-  apiDatabase:
+  treeseedDatabase:
     enabled: true
     provider: railway
     railway:

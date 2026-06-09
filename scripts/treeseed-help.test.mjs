@@ -1082,6 +1082,7 @@ test('config supports explicit non-interactive application without json output',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
 			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
 			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
@@ -1754,7 +1755,7 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 		assert.deepEqual(up.spawns[0].args.slice(0, 4), ['compose', '-f', resolve(agentRoot, 'compose.capacity-provider.yml'), '-p']);
 		assert.deepEqual(up.spawns[0].args.slice(-2), ['up', '-d']);
 		assert.notEqual(up.spawns[0].options.env.TREESEED_PROVIDER_STARTUP_MODE, 'diagnostic');
-		assert.equal(up.spawns[0].options.env.TREESEED_MARKET_ID, 'local');
+		assert.equal(up.spawns[0].options.env.TREESEED_MANAGER_ID, 'local');
 		assert.equal(up.spawns[0].options.env.TREESEED_CAPACITY_PROVIDER_API_KEY, secret);
 		assert.doesNotMatch(up.output, new RegExp(secret, 'u'));
 		const upPayload = JSON.parse(up.output);
