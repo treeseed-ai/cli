@@ -113,6 +113,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			ciMode?: string;
 			fresh?: boolean;
 			workflowGates?: Array<Record<string, unknown>>;
+			applicationSelection?: { selected?: string[]; skipped?: Array<{ appId?: string; reason?: string }> };
 			worktreePath?: string | null;
 		};
 		const publishWait = payload.publishWait ?? [];
@@ -121,7 +122,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const releasedCommit = typeof payload.releasedCommit === 'string' && payload.releasedCommit.length > 0
 			? payload.releasedCommit.slice(0, 12)
 			: result.executionMode === 'plan' ? 'planned' : 'not available';
-		const hostingGraph = resolveWorkflowHostingGraph(context, 'prod');
+		const hostingGraph = resolveWorkflowHostingGraph(context, 'prod', payload.applicationSelection);
 		return guidedResult({
 			command: invocation.commandName || 'release',
 			summary: result.executionMode === 'plan' ? 'Treeseed release plan ready.' : 'Treeseed release completed successfully.',
@@ -140,6 +141,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: result.executionMode === 'plan' ? 'Packages planned' : 'Released packages', value: String((payload.touchedPackages ?? payload.packageSelection.selected).length) },
 				{ label: 'Publish waits', value: result.executionMode === 'plan' ? String(plannedPublishes) : String(completedPublishes) },
 				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },
+				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Fresh release', value: payload.fresh === true ? 'yes' : 'no' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },

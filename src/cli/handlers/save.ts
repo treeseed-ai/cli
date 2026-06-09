@@ -134,6 +134,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			ciMode?: string;
 			verifyMode?: string;
 			workflowGates?: Array<{ status?: string; conclusion?: string | null }>;
+			applicationSelection?: { selected?: string[]; skipped?: Array<{ appId?: string; reason?: string }> };
 			worktreeMode?: string;
 			worktreePath?: string | null;
 		};
@@ -147,7 +148,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 		const plannedRepos = result.executionMode === 'plan'
 			? (payload.repositoryPlan?.repos ?? payload.repos ?? []).map((repo) => repo.name).join(', ')
 			: '';
-		const hostingGraph = resolveWorkflowHostingGraph(context, payload.scope === 'prod' ? 'prod' : payload.scope === 'staging' ? 'staging' : 'local');
+		const hostingGraph = resolveWorkflowHostingGraph(context, payload.scope === 'prod' ? 'prod' : payload.scope === 'staging' ? 'staging' : 'local', payload.applicationSelection);
 		return guidedResult({
 			command: invocation.commandName || 'save',
 			summary: result.executionMode === 'plan'
@@ -175,6 +176,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				{ label: 'Market pushed', value: payload.rootRepo?.pushed ? 'yes' : 'no' },
 				{ label: 'Preview action', value: payload.previewAction?.status ?? 'skipped' },
 				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },
+				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 			],

@@ -22,6 +22,8 @@ npm install @treeseed/cli @treeseed/core @treeseed/sdk
 Workflow guarantees:
 
 - `treeseed` is the only supported project-management surface for market and any checked-out `packages/sdk`, `packages/core`, `packages/agent`, `packages/api`, `packages/cli`, and `packages/treedx` repos.
+- Any command that mutates hosting, provider config, package workflow state, local runtime infrastructure, capacity-provider state, TreeDX hosting/image consumption, staging, or release must route through the SDK-owned reconciliation platform documented in the root `docs/reconciliation-platform.md`.
+- `treeseed hosting`, `treeseed config`, `treeseed stage`, `treeseed release`, `treeseed dev`, `treeseed capacity`, `treeseed package image`, and `treeseed reconcile test-live` report canonical desired-state reconciliation data when they touch infrastructure.
 - `treeseed switch` requires clean worktrees, mirrors the task branch into checked-out package repos, and only pushes the market branch on branch creation.
 - `treeseed save` is the canonical recursive checkpoint command: it verifies, commits, and pushes dirty package repos in dependency order before saving the market repo. Local verification can reuse successful cache entries when package HEADs and lockfiles are unchanged.
 - `treeseed stage` runs deployment readiness before hosted mutation, squash-merges task branches into `staging` across package repos first, refreshes market submodule pointers to package `staging` heads, then stages the market repo.
@@ -49,8 +51,9 @@ The main workflow commands exposed by the current CLI are:
 - `treeseed dev`
 - `treeseed dev start|status|logs|stop|restart`
 - `treeseed hosting plan|apply|verify --environment <local|staging|prod> [--service <id>] [--live]`
+- `treeseed reconcile test-live --provider <railway|cloudflare|github|local|all> --environment <local|staging|prod>`
 - `treeseed audit hosting --environment <local|staging|prod> [--live]`
-- `treeseed operations smoke --environment <staging|prod> --service marketOperationsRunner`
+- `treeseed operations smoke --environment <staging|prod> --service operationsRunner`
 - `treeseed save [--preview] [--plan] "<commit message>"`
 - `treeseed stage [--plan] [--verify-deployed-resources] "<resolution message>"`
 - `treeseed close "<close reason>"`
@@ -86,8 +89,8 @@ Hosted diagnostics:
 ```bash
 treeseed ready staging --json
 treeseed hosting plan --environment staging --service api --json
-treeseed hosting verify --environment staging --service marketOperationsRunner --live --json
-treeseed operations smoke --environment staging --service marketOperationsRunner --json
+treeseed hosting verify --environment staging --service operationsRunner --live --json
+treeseed operations smoke --environment staging --service operationsRunner --json
 ```
 
 ## Development Server Instances

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { ensureLocalWorkspaceLinks, findNearestTreeseedWorkspaceRoot, resolveTreeseedLaunchEnvironment } from '@treeseed/sdk/workflow-support';
+import { discoverTreeseedApplications } from '@treeseed/sdk/hosting';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
 import { fail } from './utils.js';
@@ -62,12 +63,27 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		}
 		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
 		const watch = feedback !== 'off';
+		const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim()
+			? invocation.args.app.trim()
+			: undefined;
+		const apiMode = typeof invocation.args.api === 'string' && invocation.args.api.trim()
+			? invocation.args.api.trim()
+			: 'auto';
 		const subcommand = typeof invocation.positionals[0] === 'string' ? invocation.positionals[0] : '';
 		const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
 		if (subcommand && !managedSubcommands.has(subcommand)) {
 			return fail(`Unknown dev subcommand "${subcommand}". Use start, status, logs, stop, or restart.`);
 		}
-		const passthroughArgs: string[] = ['--surfaces', 'web,api'];
+		const discoveredApps = discoverTreeseedApplications(context.cwd);
+		const hasApiApp = discoveredApps.some((app) => app.id === 'api');
+		const selectedSurfaces = appId === 'api'
+			? 'api'
+			: appId === 'web' || apiMode === 'remote'
+				? 'web'
+				: hasApiApp
+					? 'web,api'
+					: 'web';
+		const passthroughArgs: string[] = ['--surfaces', selectedSurfaces];
 		const forwardStringOption = (name: string, flag: string) => {
 			const value = invocation.args[name];
 			if (typeof value === 'string' && value.trim().length > 0) {
@@ -131,6 +147,14 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 				executable: resolved.command,
 				args,
 				workspaceLinks,
+				appId: appId ?? null,
+				apiMode,
+				discoveredApps: discoveredApps.map((app) => ({
+					id: app.id,
+					relativeRoot: app.relativeRoot,
+					roles: app.roles,
+				})),
+				selectedSurfaces,
 			},
 		};
 	} catch (error) {

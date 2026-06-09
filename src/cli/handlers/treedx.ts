@@ -1,5 +1,6 @@
 import type { TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
 import { createMarketClientForInvocation } from './market-utils.js';
+import { runPackageImageCommand } from './package-image.js';
 import { fail, guidedResult } from './utils.js';
 
 function stringArg(invocation: TreeseedParsedInvocation, key: string) {
@@ -313,6 +314,10 @@ async function publish(invocation: TreeseedParsedInvocation, context: Parameters
 	});
 }
 
+async function image(invocation: TreeseedParsedInvocation, context: Parameters<TreeseedCommandHandler>[1]) {
+	return runPackageImageCommand(invocation, context, { packageId: 'treedx', commandName: 'db image' });
+}
+
 export const handleTreeDx: TreeseedCommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'status';
 	try {
@@ -324,7 +329,8 @@ export const handleTreeDx: TreeseedCommandHandler = async (invocation, context) 
 		if (action === 'library') return library(invocation, context);
 		if (action === 'topology') return topology(invocation, context);
 		if (action === 'publish') return publish(invocation, context);
-		return fail('Unknown db action. Use status, provision, connect, mirrors, shares, library, topology, or publish.');
+		if (action === 'image') return image(invocation, context);
+		return fail('Unknown db action. Use status, provision, connect, mirrors, shares, library, topology, publish, or image.');
 	} catch (error) {
 		return fail(error instanceof Error ? error.message : String(error));
 	}

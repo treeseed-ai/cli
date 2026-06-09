@@ -143,14 +143,17 @@ export function renderWorkflowNextSteps(result: TreeseedWorkflowResult) {
 	});
 }
 
-export function resolveWorkflowHostingGraph(context: TreeseedCommandContext, environment: TreeseedHostingEnvironment) {
+export function resolveWorkflowHostingGraph(context: TreeseedCommandContext, environment: TreeseedHostingEnvironment, applicationSelection?: { selected?: string[] }) {
 	try {
+		const selectedApps = Array.isArray(applicationSelection?.selected) ? applicationSelection.selected.filter((app) => typeof app === 'string') : [];
 		const graph = compileTreeseedHostingGraph({
 			tenantRoot: context.cwd,
 			environment,
+			appId: selectedApps.length === 1 ? selectedApps[0] : undefined,
 		});
 		return {
 			environment: graph.environment,
+			selectedApplications: selectedApps,
 			placements: graph.placements,
 			units: graph.units.map((unit) => serializeHostingUnit(unit)),
 			warnings: graph.warnings,
@@ -158,6 +161,7 @@ export function resolveWorkflowHostingGraph(context: TreeseedCommandContext, env
 	} catch (error) {
 		return {
 			environment,
+			selectedApplications: [],
 			error: error instanceof Error ? error.message : String(error),
 			placements: [],
 			units: [],

@@ -27,32 +27,32 @@ services:
     provider: railway
     rootDir: packages/api
     railway:
-      projectName: treeseed-market
-      serviceName: treeseed-market-api
+      projectName: treeseed-api
+      serviceName: treeseed-api
       rootDir: ${rootDir}
       buildCommand: npm run build
       startCommand: npm run start:api
       healthcheckPath: /healthz
-  marketOperationsRunner:
+  operationsRunner:
     enabled: true
     provider: railway
     rootDir: packages/api
     railway:
-      projectName: treeseed-market
-      serviceName: treeseed-market-operations-runner
+      projectName: treeseed-api
+      serviceName: treeseed-api-operations-runner-01
       rootDir: packages/api
       buildCommand: npm run build
       startCommand: npm run start:runner
       healthcheckPath: /healthz
       runtimeMode: service
       volumeMountPath: /data
-  marketDatabase:
+  apiDatabase:
     enabled: true
     provider: railway
     railway:
       serviceTargets:
         - api
-        - marketOperationsRunner
+        - operationsRunner
 `, 'utf8');
 	return root;
 }

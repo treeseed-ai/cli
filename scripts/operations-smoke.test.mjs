@@ -33,10 +33,10 @@ function parseJsonOutput(output) {
 }
 
 test('operations smoke emits redacted JSON failure without service secret', async () => {
-	const result = await runCli(['operations', 'smoke', '--environment', 'staging', '--service', 'marketOperationsRunner', '--json'], makeWorkspaceRoot());
+	const result = await runCli(['operations', 'smoke', '--environment', 'staging', '--service', 'operationsRunner', '--json'], makeWorkspaceRoot());
 	assert.equal(result.exitCode, 1);
 	const payload = parseJsonOutput(result.output);
 	assert.equal(payload.ok, false);
-	assert.match(payload.issues.join(' '), /Missing Market API service credential/u);
+	assert.match(payload.issues.join(' '), /Missing API service credential/u);
 	assert.doesNotMatch(JSON.stringify(payload), /TREESEED_WEB_SERVICE_SECRET|secret-value/u);
 });

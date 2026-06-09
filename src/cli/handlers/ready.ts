@@ -3,7 +3,7 @@ import {
 	collectTreeseedLiveHostedServiceChecks,
 	collectTreeseedHostedServiceChecks,
 	formatTreeseedReadinessReport,
-	runTreeseedMarketRunnerSmoke,
+	runTreeseedOperationsRunnerSmoke,
 } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
@@ -38,7 +38,7 @@ export const handleReady: TreeseedCommandHandler = async (invocation, context) =
 			})
 			: collectTreeseedHostedServiceChecks({ tenantRoot: context.cwd, target: environment });
 		const runnerSmoke = live && environment !== 'local' && readiness.ok
-			? await runTreeseedMarketRunnerSmoke({
+			? await runTreeseedOperationsRunnerSmoke({
 				tenantRoot: context.cwd,
 				environment,
 				env: context.env,
@@ -52,8 +52,8 @@ export const handleReady: TreeseedCommandHandler = async (invocation, context) =
 				.filter((check) => check.status === 'failed' && check.remediation)
 				.map((check) => check.remediation!),
 			...(runnerSmoke && !runnerSmoke.ok ? [
-				`npx trsd operations smoke --environment ${environment} --service marketOperationsRunner --json`,
-				`npx trsd hosting verify --environment ${environment} --service marketOperationsRunner --live --json`,
+				`npx trsd operations smoke --environment ${environment} --service operationsRunner --json`,
+				`npx trsd hosting verify --environment ${environment} --service operationsRunner --live --json`,
 			] : []),
 		];
 		const report = {

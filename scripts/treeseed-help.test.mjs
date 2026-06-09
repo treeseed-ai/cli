@@ -164,14 +164,14 @@ function marketControlPlaneLaunchRequirements() {
 		resources: [
 			{
 				kind: 'resource',
-				key: 'marketDatabase',
+				key: 'apiDatabase',
 				type: 'database',
 				required: true,
 				compatibleProviders: ['railway-postgres'],
 				displayName: 'Market database',
 				purpose: 'Store Market state.',
 				configWrites: [
-					{ target: 'treeseed.site.yaml', path: 'services.marketDatabase.provider', valueFrom: 'selectedResource.provider' },
+					{ target: 'treeseed.site.yaml', path: 'services.apiDatabase.provider', valueFrom: 'selectedResource.provider' },
 				],
 				environmentWrites: [
 					{ env: 'TREESEED_MARKET_DATABASE_URL', valueFrom: 'selectedResource.connectionUrl', targets: ['railway-secret'], scopes: ['staging', 'prod'], sensitivity: 'secret' },
@@ -183,17 +183,17 @@ function marketControlPlaneLaunchRequirements() {
 				type: 'service',
 				required: true,
 				compatibleProviders: ['railway'],
-				displayName: 'Market API',
-				purpose: 'Run the Market API service.',
+				displayName: 'API',
+				purpose: 'Run the API service.',
 				configWrites: [],
 			},
 			{
 				kind: 'resource',
-				key: 'marketOperationsRunner',
+				key: 'operationsRunner',
 				type: 'service',
 				required: true,
 				compatibleProviders: ['railway'],
-				displayName: 'Market operations runner',
+				displayName: 'Treeseed operations runner',
 				purpose: 'Run Market operations.',
 				configWrites: [],
 				environmentWrites: [
@@ -202,7 +202,7 @@ function marketControlPlaneLaunchRequirements() {
 			},
 		],
 		secrets: [
-			{ kind: 'secret', key: 'marketDatabaseUrl', env: 'TREESEED_MARKET_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
+			{ kind: 'secret', key: 'apiDatabaseUrl', env: 'TREESEED_MARKET_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
 			{ kind: 'secret', key: 'platformRunnerToken', env: 'TREESEED_PLATFORM_RUNNER_TOKEN', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'generated' },
 		],
 	};
@@ -449,7 +449,7 @@ test('dev help documents fixed Market web/API/runner runtime', async () => {
 	assert.match(result.output, /--force/);
 	assert.match(result.output, /web\/API\/runner/u);
 	assert.match(result.output, /managed local PostgreSQL/u);
-	assert.match(result.output, /Market operations runner/u);
+	assert.match(result.output, /Treeseed operations runner/u);
 	assert.match(result.output, /capacity/u);
 });
 
@@ -505,9 +505,9 @@ test('template show renders Market control-plane resource requirements', async (
 	assertSuccessWithDiagnostics(result, 'template show market-control-plane');
 	assert.match(result.stdout, /Status:\s+draft/u);
 	assert.match(result.stdout, /Resources/u);
-	assert.match(result.stdout, /marketDatabase: database required via railway-postgres/u);
+	assert.match(result.stdout, /apiDatabase: database required via railway-postgres/u);
 	assert.match(result.stdout, /api: service required via railway/u);
-	assert.match(result.stdout, /marketOperationsRunner: service required via railway/u);
+	assert.match(result.stdout, /operationsRunner: service required via railway/u);
 	assert.match(result.stdout, /TREESEED_MARKET_DATABASE_URL/u);
 	assert.match(result.stdout, /TREESEED_PLATFORM_RUNNER_TOKEN/u);
 });
@@ -1605,7 +1605,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
 	assert.deepEqual(
 		result.spawns[0].args.slice(-16),
-		['--surfaces', 'web,api', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
+		['--surfaces', 'web', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
 	);
 });
 
@@ -1641,7 +1641,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	assert.match(start.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
 	assert.deepEqual(
 		start.spawns[0].args.slice(-9),
-		['start', '--surfaces', 'web,api', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'],
+		['start', '--surfaces', 'web', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'],
 	);
 	assert.ok(!start.spawns[0].args.includes('--watch'));
 
@@ -1654,7 +1654,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	});
 	assert.equal(status.exitCode, 0);
 	assert.equal(status.spawns.length, 1);
-	assert.deepEqual(status.spawns[0].args.slice(-5), ['status', '--surfaces', 'web,api', '--all', '--json']);
+	assert.deepEqual(status.spawns[0].args.slice(-5), ['status', '--surfaces', 'web', '--all', '--json']);
 
 	const logs = await runCli(['dev', 'logs', '--follow'], {
 		cwd: workspaceRoot,
@@ -1664,7 +1664,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 		},
 	});
 	assert.equal(logs.exitCode, 0);
-	assert.deepEqual(logs.spawns[0].args.slice(-4), ['logs', '--surfaces', 'web,api', '--follow']);
+	assert.deepEqual(logs.spawns[0].args.slice(-4), ['logs', '--surfaces', 'web', '--follow']);
 });
 
 test('treeseed dev rejects removed surface and worker options', async () => {
