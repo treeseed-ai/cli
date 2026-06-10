@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -120,7 +120,22 @@ export function colorizeTreeseedCliOutput(output: string, colorEnabled = true) {
 
 function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 	if (!output) return;
-	(stream === 'stderr' ? process.stderr : process.stdout).write(`${output}\n`);
+	const fd = stream === 'stderr' ? process.stderr.fd : process.stdout.fd;
+	const buffer = Buffer.from(`${output}\n`);
+	let offset = 0;
+	const retryBuffer = new SharedArrayBuffer(4);
+	const retryView = new Int32Array(retryBuffer);
+	while (offset < buffer.length) {
+		try {
+			offset += writeSync(fd, buffer, offset, Math.min(buffer.length - offset, 16_384));
+		} catch (error) {
+			if (error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'EAGAIN') {
+				Atomics.wait(retryView, 0, 0, 10);
+				continue;
+			}
+			throw error;
+		}
+	}
 }
 
 function defaultSpawn(command: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; stdio?: 'inherit' }) {
