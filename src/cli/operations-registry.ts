@@ -456,9 +456,12 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			longSummary: [
 				'Save is the main task-branch checkpoint command. It verifies, commits, syncs, pushes, and can refresh the task preview so the branch remains in a clean, reviewable state.',
 				'Use it instead of ad hoc manual git-and-preview sequences when you want the standard Treeseed task-save behavior.',
+				'Save has two lanes. The default fast lane is for routine integrated checkpoints. The explicit promotion lane is for checkpoints that should wait for hosted gates and strict release-candidate proof.',
 			],
 			whenToUse: [
 				'Use this after a meaningful unit of work on a task branch.',
+				'Use the default fast lane for routine code, docs, and low-risk package checkpoints where local lockfile validation and lightweight release-candidate checks are enough.',
+				'Use `--verify local` when a fast-lane checkpoint should also run package-local verification before pushing.',
 				'Use `--preview` when the branch preview should be refreshed as part of the save operation.',
 				'Use `--lane promotion` when a save should wait for hosted gates and strict release-candidate checks like a promotion rehearsal.',
 				'Use `--verify-deployed-resources` on staging or production branches when the checkpoint should wait for deployed provider resources to be verified.',
@@ -472,15 +475,21 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			outcomes: [
 				'Verifies and commits current work using a generated commit message.',
 				'Syncs and pushes branch state.',
+				'Fast lane saves dependency-ordered repos without hosted CI/deploy waits or strict clean-install rehearsal unless another option requests them.',
+				'Promotion lane waits for hosted gates on staging and uses strict release-candidate checks by default.',
 				'Optionally refreshes preview infrastructure if requested.',
 			],
 			examples: [
-				example('treeseed save', 'Generated checkpoint', 'Verify, commit, and push the current task branch with a generated message.'),
+				example('treeseed save', 'Fast checkpoint', 'Commit and push the current task branch through the default fast lane.'),
 				example('treeseed save "add search filters"', 'Checkpoint with a hint', 'Feed a short hint into commit-message generation without replacing the generated message.'),
+				example('treeseed save --verify local "add search filters"', 'Fast checkpoint with local verification', 'Keep hosted waits off while running package-local verification before pushing.'),
+				example('treeseed save --lane promotion "prove dependency topology"', 'Promotion-grade checkpoint', 'Wait for hosted staging gates and strict release-candidate proof before returning.'),
 				example('treeseed save --preview', 'Checkpoint plus preview refresh', 'Include preview refresh when the save should update the branch environment.'),
 				example('treeseed save --hotfix "fix production form submit"', 'Explicit hotfix save', 'Allow a save from main when the work is a deliberate hotfix path.', { why: 'Use sparingly and only when the workflow intentionally bypasses the usual task-branch rule.' }),
 			],
 			warnings: [
+				'Fast lane is intentionally optimized for iteration. Use `stage`, `release`, or `save --lane promotion` when hosted proof is required.',
+				'`--verify local` can still be expensive because package-local verify scripts may run builds, unit tests, and smoke tests even though hosted gates remain off.',
 				'`--hotfix` deliberately loosens the normal task-branch safety model. Keep it exceptional.',
 			],
 			relatedDetails: [

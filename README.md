@@ -25,7 +25,7 @@ Workflow guarantees:
 - Any command that mutates hosting, provider config, package workflow state, local runtime infrastructure, capacity-provider state, TreeDX hosting/image consumption, staging, or release must route through the SDK-owned reconciliation platform documented in the root `docs/reconciliation-platform.md`.
 - `treeseed hosting`, `treeseed config`, `treeseed stage`, `treeseed release`, `treeseed dev`, `treeseed capacity`, `treeseed package image`, and `treeseed reconcile test-live` report canonical desired-state reconciliation data when they touch infrastructure.
 - `treeseed switch` requires clean worktrees, mirrors the task branch into checked-out package repos, and only pushes the market branch on branch creation.
-- `treeseed save` is the canonical recursive checkpoint command: it verifies, commits, and pushes dirty package repos in dependency order before saving the market repo. Local verification can reuse successful cache entries when package HEADs and lockfiles are unchanged.
+- `treeseed save` is the canonical recursive checkpoint command: it commits and pushes dirty package repos in dependency order before saving the market repo. It defaults to the fast save lane, which is optimized for frequent integrated development checkpoints without hosted CI/deploy waits or strict clean-install rehearsal.
 - `treeseed stage` runs deployment readiness before hosted mutation, squash-merges task branches into `staging` across package repos first, refreshes market submodule pointers to package `staging` heads, then stages the market repo.
 - `treeseed close` recursively archives and deletes matching task branches across market and checked-out package repos.
 - `treeseed release` runs deployment readiness before version bumps, only bumps/tags/publishes changed packages plus internal dependents, then syncs market production to package `main` heads.
@@ -54,7 +54,7 @@ The main workflow commands exposed by the current CLI are:
 - `treeseed reconcile test-live --provider <railway|cloudflare|github|local|all> --environment <local|staging|prod>`
 - `treeseed audit hosting --environment <local|staging|prod> [--live]`
 - `treeseed operations smoke --environment <staging|prod> --service operationsRunner`
-- `treeseed save [--preview] [--plan] "<commit message>"`
+- `treeseed save [--lane fast|promotion] [--preview] [--plan] "<commit message>"`
 - `treeseed stage [--plan] [--verify-deployed-resources] "<resolution message>"`
 - `treeseed close "<close reason>"`
 - `treeseed release --major|--minor|--patch [--plan] [--verify-deployed-resources]`
@@ -76,7 +76,9 @@ treeseed switch feature/search-improvements --preview
 treeseed dev
 treeseed dev start --web-runtime local
 treeseed ready local --json
+treeseed save --json "feat: add search filters"
 treeseed save --verify local --json "feat: add search filters"
+treeseed save --lane promotion --json "feat: add search filters"
 treeseed stage --plan --json "feat: add search filters"
 treeseed stage --verify-deployed-resources --json "feat: add search filters"
 treeseed release --patch --verify-deployed-resources --plan --json
@@ -92,6 +94,57 @@ treeseed hosting plan --environment staging --service api --json
 treeseed hosting verify --environment staging --service operationsRunner --live --json
 treeseed operations smoke --environment staging --service operationsRunner --json
 ```
+
+## Save Lanes
+
+`treeseed save` has two workflow lanes. The lane controls how much proof is gathered during a checkpoint; it does not change package dependency ordering, version/tag updates, internal dependency rewrites, submodule pointer updates, lockfile validation, or workflow journaling.
+
+### Fast Lane
+
+Fast lane is the default:
+
+```bash
+treeseed save --json "describe the checkpoint"
+treeseed save --lane fast --json "describe the checkpoint"
+```
+
+Use fast lane for normal development checkpoints. It saves package repositories in dependency order, updates internal Git refs and package lockfiles, restores workspace links before root verification, and runs lightweight release-candidate checks. On staging it defaults hosted CI to `off` and release-candidate mode to `hybrid`, so it does not wait for GitHub hosted workflows, Cloudflare Pages, Railway deployments, or strict clean-install rehearsal unless another option explicitly asks for them.
+
+Fast lane is the right default for:
+
+- routine code or documentation checkpoints
+- frequent AI-agent saves where preserving progress matters more than hosted proof
+- changes already covered by focused local tests
+- low-risk package dependency ref updates where lockfile dry-run validation is enough for the checkpoint
+
+Add `--verify local` when the checkpoint should run package-local verification before pushing:
+
+```bash
+treeseed save --verify local --json "describe the checkpoint"
+```
+
+This keeps the fast lane's hosted behavior, but local package/project verify scripts may still be expensive because dirty packages and dependents can run their own release verification, unit tests, builds, or smoke tests.
+
+### Promotion Lane
+
+Promotion lane is explicit:
+
+```bash
+treeseed save --lane promotion --json "describe the checkpoint"
+```
+
+Use promotion lane when a save should behave like a staging or release rehearsal. On staging it defaults hosted CI to `hosted` and release-candidate mode to `strict`, so the save waits for hosted workflow gates and performs strict release-candidate proof.
+
+Promotion lane is appropriate for:
+
+- risky changes to dependency topology, package manifests, release scripts, hosting manifests, or workflow orchestration
+- checkpoints immediately before a staging handoff where hosted CI/CD proof is desired
+- debugging hosted deployment behavior
+- proving that a package set is ready for the stricter `stage` or `release` path
+
+For narrower control, `--release-candidate strict` requests strict release-candidate checks without switching the whole save to promotion lane, and `--verify-deployed-resources` requests hosted provider resource checks when the checkpoint specifically needs live resource proof.
+
+`treeseed stage` and `treeseed release` remain promotion-grade by default. The fast lane is intentionally only the default for ordinary `save`.
 
 ## Development Server Instances
 
