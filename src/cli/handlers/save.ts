@@ -96,6 +96,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			verifyMode: typeof invocation.args.verifyMode === 'string' ? invocation.args.verifyMode as 'fast' | 'local' | 'hosted' | 'both' | 'skip' : undefined,
+			releaseCandidate: typeof invocation.args.releaseCandidate === 'string' ? invocation.args.releaseCandidate as 'hybrid' | 'strict' | 'skip' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
@@ -133,6 +134,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			previewAction?: { status: string };
 			ciMode?: string;
 			verifyMode?: string;
+			releaseCandidateMode?: string;
 			workflowGates?: Array<{ status?: string; conclusion?: string | null }>;
 			applicationSelection?: { selected?: string[]; skipped?: Array<{ appId?: string; reason?: string }> };
 			worktreeMode?: string;
@@ -176,6 +178,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				{ label: 'Market pushed', value: payload.rootRepo?.pushed ? 'yes' : 'no' },
 				{ label: 'Preview action', value: payload.previewAction?.status ?? 'skipped' },
 				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },
+				{ label: 'Release candidate', value: payload.releaseCandidateMode ?? 'n/a' },
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
