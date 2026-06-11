@@ -94,6 +94,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			hotfix: invocation.args.hotfix === true,
 			preview: invocation.args.preview === true,
 			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
+			lane: typeof invocation.args.lane === 'string' ? invocation.args.lane as 'fast' | 'promotion' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			verifyMode: typeof invocation.args.verifyMode === 'string' ? invocation.args.verifyMode as 'fast' | 'local' | 'hosted' | 'both' | 'skip' : undefined,
 			releaseCandidate: typeof invocation.args.releaseCandidate === 'string' ? invocation.args.releaseCandidate as 'hybrid' | 'strict' | 'skip' : undefined,
@@ -132,6 +133,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			};
 			plannedSteps?: Array<{ id?: string; description?: string }>;
 			previewAction?: { status: string };
+			lane?: string;
 			ciMode?: string;
 			verifyMode?: string;
 			releaseCandidateMode?: string;
@@ -177,6 +179,7 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 				},
 				{ label: 'Market pushed', value: payload.rootRepo?.pushed ? 'yes' : 'no' },
 				{ label: 'Preview action', value: payload.previewAction?.status ?? 'skipped' },
+				{ label: 'Lane', value: payload.lane ?? 'fast' },
 				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },
 				{ label: 'Release candidate', value: payload.releaseCandidateMode ?? 'n/a' },
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },

@@ -440,6 +440,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'hotfix', flags: '--hotfix', description: 'Allow save on main for an explicit hotfix.', kind: 'boolean' },
 			{ name: 'preview', flags: '--preview', description: 'Create or refresh the branch preview during save.', kind: 'boolean' },
 			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
+			{ name: 'lane', flags: '--lane <mode>', description: 'Select save lane: fast local checkpoint or promotion-grade hosted checks.', kind: 'enum', values: ['fast', 'promotion'] },
 			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
 			{ name: 'verifyMode', flags: '--verify <mode>', description: 'Control save verification depth.', kind: 'enum', values: ['fast', 'local', 'hosted', 'both', 'skip'] },
 			{ name: 'releaseCandidate', flags: '--release-candidate <mode>', description: 'Control staging save release-candidate checks.', kind: 'enum', values: ['hybrid', 'strict', 'skip'] },
@@ -449,7 +450,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed save', 'treeseed save "add search filters"', 'treeseed save --preview', 'treeseed save --release-candidate strict', 'treeseed save --plan', 'treeseed save --hotfix "fix production form submit"'],
+		examples: ['treeseed save', 'treeseed save "add search filters"', 'treeseed save --preview', 'treeseed save --lane promotion', 'treeseed save --release-candidate strict', 'treeseed save --plan', 'treeseed save --hotfix "fix production form submit"'],
 		help: {
 			workflowPosition: 'checkpoint work',
 			longSummary: [
@@ -459,6 +460,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			whenToUse: [
 				'Use this after a meaningful unit of work on a task branch.',
 				'Use `--preview` when the branch preview should be refreshed as part of the save operation.',
+				'Use `--lane promotion` when a save should wait for hosted gates and strict release-candidate checks like a promotion rehearsal.',
 				'Use `--verify-deployed-resources` on staging or production branches when the checkpoint should wait for deployed provider resources to be verified.',
 				'Use `--release-candidate strict` on staging when dependency topology changed and you want a full clean-install rehearsal even if the cache says hybrid is enough.',
 				'Use `--hotfix` only when you are intentionally saving from `main` for an explicit production hotfix flow.',
