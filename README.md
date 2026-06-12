@@ -1,174 +1,147 @@
-# `@treeseed/cli`
+# @treeseed/cli
 
-Operator-facing Treeseed CLI package.
+`@treeseed/cli` publishes the `treeseed` and `trsd` command surfaces. Use it to configure Treeseed, run local development, save/stage/release work, reconcile hosting, operate capacity providers, manage package images, and inspect workflow state.
 
-This package publishes the `treeseed` binary. `@treeseed/sdk` owns the reusable workflow and runtime capabilities, `@treeseed/core` owns integrated local platform orchestration, and `@treeseed/cli` owns argv parsing, command help, terminal formatting, command handlers, and the installable executable surface.
+The CLI is the human and automation entrypoint over package-owned capabilities. It delegates platform logic to `@treeseed/sdk`, web runtime orchestration to `@treeseed/core`, backend behavior to API surfaces, capacity runtime to `@treeseed/agent`, and TreeDX image workflows to package manifests.
 
-## Requirements
+## What You Can Do With The CLI
 
-- Node `>=22`
-- npm as the canonical package manager for install, CI, and release flows
+- configure local, staging, and production environments
+- start and inspect local development instances
+- save, stage, close, resume, and release multi-repo work
+- plan/apply/verify hosted infrastructure through reconciliation
+- run operations-runner smoke checks
+- build and operate capacity providers
+- manage TreeDX package image workflows
+- inspect package drift, workflow locks, and interrupted runs
 
 ## Install
 
-Install the CLI with its runtime dependencies:
-
 ```bash
-npm install @treeseed/cli @treeseed/core @treeseed/sdk
+npm install @treeseed/cli
 ```
 
-`@treeseed/cli` is a thin installable wrapper over `@treeseed/sdk` workflow and operations interfaces plus the Treeseed runtime packages. `treeseed dev` resolves the tenant-installed or sibling-workspace `@treeseed/core` web runtime, while `treeseed agents ...` delegates to `@treeseed/agent`. In normal consumer installs, npm resolves the runtime dependencies automatically.
-
-Workflow guarantees:
-
-- `treeseed` is the only supported project-management surface for market and any checked-out `packages/sdk`, `packages/core`, and `packages/cli` repos.
-- `treeseed switch` requires clean worktrees, mirrors the task branch into checked-out package repos, and only pushes the market branch on branch creation.
-- `treeseed save` is the canonical recursive checkpoint command: it verifies, commits, and pushes dirty package repos in dependency order before saving the market repo.
-- `treeseed stage` squash-merges task branches into `staging` across package repos first, refreshes market submodule pointers to package `staging` heads, then stages the market repo.
-- `treeseed close` recursively archives and deletes matching task branches across market and checked-out package repos.
-- `treeseed release` only bumps, tags, and publishes changed packages plus internal dependents, then syncs market production to package `main` heads.
-- Every mutating workflow command supports `--plan`; `--dry-run` is only an alias where it still exists for compatibility.
-- Interrupted workflow runs are journaled under `.treeseed/workflow`; use `treeseed recover` to inspect them and `treeseed resume <run-id>` to continue a resumable run.
-
-After installation, the published binary is available as:
+After installation:
 
 ```bash
 treeseed --help
+trsd --help
 ```
 
-## Primary Workflow
+In this workspace, use `npx trsd ...` from the root.
 
-The main workflow commands exposed by the current CLI are:
-
-- `treeseed status [--json]`
-- `treeseed config`
-- `treeseed tasks [--json]`
-- `treeseed switch <branch-name> [--preview]`
-- `treeseed dev`
-- `treeseed dev start|status|logs|stop|restart`
-- `treeseed save [--preview] [--plan] "<commit message>"`
-- `treeseed stage "<resolution message>"`
-- `treeseed close "<close reason>"`
-- `treeseed release --major|--minor|--patch [--plan]`
-- `treeseed resume <run-id>`
-- `treeseed recover`
-- `treeseed destroy --environment <local|staging|prod> [--plan]`
-
-Support utilities such as `treeseed rollback`, `treeseed doctor`, `treeseed auth:*`, `treeseed template`, `treeseed sync`, `treeseed lint`, `treeseed test`, `treeseed build`, service helpers, and `treeseed agents ...` remain available.
-
-Use `treeseed help` for the full command list and `treeseed help <command>` for command-specific usage, options, and examples.
-
-## Common Commands
+## Primary Commands
 
 ```bash
-treeseed status
-treeseed config
-treeseed switch feature/search-improvements --plan
-treeseed switch feature/search-improvements --preview
-treeseed dev
-treeseed dev start --web-runtime local
-treeseed save --preview "feat: add search filters"
-treeseed stage "feat: add search filters"
-treeseed release --patch
-treeseed recover
 treeseed status --json
-```
-
-## Development Server Instances
-
-`treeseed dev` remains the foreground local runtime supervisor. It delegates to `@treeseed/core`, starts the Market web/API/control-plane development surface, streams output in the active terminal, and exits when the shell-owned process is stopped.
-
-Managed dev instances use subcommands:
-
-```bash
+treeseed config
+treeseed ready local --json
+treeseed switch feature/my-change --plan --json
 treeseed dev start --web-runtime local --json
-treeseed dev status --json
-treeseed dev status --all --json
-treeseed dev logs --follow
-treeseed dev stop --json
-treeseed dev restart --web-runtime local --json
+treeseed save --verify local --json "describe the checkpoint"
+treeseed stage --plan --json "describe the staging change"
+treeseed release --patch --verify-deployed-resources --plan --json
+treeseed recover --json
 ```
 
-Managed instances are scoped to the current physical worktree. The core runtime writes `.treeseed/dev/instances/<scope>.json`, `.treeseed/dev/pids/<scope>.pid`, and `.treeseed/logs/dev-<scope>.jsonl` in that worktree. A repository-family index under the git common dir makes sibling worktree instances discoverable to humans and AI agents.
-
-`--force` replaces only the current worktree instance. `--force-conflicts` is the explicit cross-worktree port-owner escape hatch. Additional worktrees receive stable alternate port blocks and worktree-specific local PostgreSQL/Mailpit names, so many agents can run development sessions in the same repository family.
-
-For the complete architecture, see the root workspace document `docs/local-dev-instances.md`.
-
-## Agent-Safe Workflow
-
-Use planning mode before any destructive or multi-repo mutation:
+Hosted diagnostics:
 
 ```bash
-treeseed switch feature/search-improvements --plan --json
-treeseed save --plan "feat: add search filters" --json
-treeseed stage --plan "feat: add search filters" --json
-treeseed release --patch --plan --json
+treeseed ready staging --json
+treeseed hosting plan --environment staging --service api --json
+treeseed hosting verify --environment staging --service operationsRunner --live --json
+treeseed operations smoke --environment staging --service operationsRunner --json
 ```
 
-If a workflow stops partway through, inspect the journaled state and resume from the recorded run:
+Capacity providers:
 
 ```bash
-treeseed recover
-treeseed resume <run-id>
+treeseed capacity build
+treeseed capacity up
+treeseed capacity status
+treeseed capacity logs
+treeseed capacity down
 ```
 
-In a full checked-out workspace, `treeseed tasks`, `treeseed status`, and `treeseed doctor` also report package-branch drift, dirty embedded repos, active workflow locks, and interrupted runs.
+TreeDX package image:
 
-## Maintainer Workflow
+```bash
+treeseed package image --package treedx --branch staging --plan --json
+treeseed package image --package treedx --branch staging --sync-config --json
+treeseed package image --package treedx --branch staging --execute --json
+```
 
-All package maintenance commands are npm-based and run from the `cli/` package root. This package verifies the published command surface, parser/help behavior, and packaged artifact shape.
+Use `treeseed help <command>` for command-specific usage and examples.
 
-Install dependencies:
+## Managed Package Set
+
+The CLI coordinates the root market repo plus checked-out package repositories:
+
+- `@treeseed/sdk`
+- `@treeseed/ui`
+- `@treeseed/core`
+- `@treeseed/admin`
+- `@treeseed/api`
+- `@treeseed/cli`
+- `@treeseed/agent`
+- `packages/treedx`
+
+Workflow commands save package repos in dependency order, update submodule pointers, verify package release gates, and avoid one-off provider mutation.
+
+## Save, Stage, And Release
+
+`treeseed save` is the default checkpoint command. It saves dirty package repositories first, restores workspace links, performs lightweight release-candidate validation, and then saves the root market repo.
+
+```bash
+treeseed save --json "describe the checkpoint"
+treeseed save --verify local --json "describe the checkpoint"
+treeseed save --lane promotion --json "describe the checkpoint"
+```
+
+`treeseed stage` and `treeseed release` are promotion-grade commands. Use `--plan` before risky operations:
+
+```bash
+treeseed stage --plan --json "describe the staging change"
+treeseed release --patch --verify-deployed-resources --plan --json
+```
+
+Interrupted workflow runs are journaled under `.treeseed/workflow`:
+
+```bash
+treeseed recover --json
+treeseed resume <run-id> --json
+```
+
+## How CLI Fits With Other Packages
+
+- `@treeseed/sdk` owns workflow, reconciliation, config, package discovery, and platform primitives.
+- `@treeseed/core` owns the local web runtime used by `treeseed dev`.
+- `@treeseed/admin` and `@treeseed/ui` are consumed by the web app; CLI does not own those routes or components.
+- `@treeseed/api` owns backend API and operations-runner implementation.
+- `@treeseed/agent` owns capacity-provider runtime artifacts that CLI starts or reconciles.
+- TreeDX owns its service/image; CLI exposes package-image workflow commands.
+
+## Package Development
+
+From this package root:
 
 ```bash
 npm install
-```
-
-Build the published package output:
-
-```bash
 npm run build
-```
-
-Run the package test suite:
-
-```bash
 npm test
-```
-
-Run full release verification:
-
-```bash
 npm run release:verify
 ```
 
-The release verification flow is intentionally stricter than a normal test run:
+Release verification checks the packaged command surface, parser/help behavior, build output, and publishable artifact shape.
 
-1. Build `dist`
-2. Validate publishable output for forbidden workspace references
-3. Assert the published artifact only contains the thin wrapper entrypoints
-4. Run the CLI wrapper test suite
-5. Pack the CLI tarball
-6. Smoke-test the packed install by running `treeseed --help` from the packed artifact
+## What CLI Does Not Own
 
-## CI And Publishing
+- SDK reconciliation internals
+- Core web runtime internals
+- Admin routes or UI components
+- backend API implementation
+- capacity-provider runtime implementation
+- TreeDX service internals
+- root market content or ecommerce
 
-The GitHub Actions workflows under `.github/workflows/` assume this package is the repository root for the standalone CLI repository.
-
-- `ci.yml` uses `npm ci`, `npm run build`, `npm test`, and `npm run release:verify`
-- `publish.yml` uses the same verification path before publishing to npm
-- `publish.yml` validates that the pushed tag matches the package version before `npm publish`
-
-Release tags must use this format:
-
-```text
-<version>
-```
-
-For example, package version `0.1.0` publishes from tag `0.1.0`.
-
-## Notes
-
-- `package-lock.json` should be committed and kept current so `npm ci` remains reproducible in CI and release jobs.
-- The README intentionally documents the command surface at a high level. The canonical source of operation identity and semantics is `@treeseed/sdk`, while `@treeseed/cli` owns argv parsing, help rendering, and terminal formatting.
+See the root [Package Ownership](../../docs/package-ownership.md) guide for cross-package boundaries.

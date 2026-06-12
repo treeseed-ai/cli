@@ -1,6 +1,6 @@
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
-import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from './workflow.js';
+import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
 
 export const handleStage: TreeseedCommandHandler = async (invocation, context) => {
 	try {
@@ -26,10 +26,12 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			finalBranch?: string;
 			ciMode?: string;
 			workflowGates?: Array<Record<string, unknown>>;
+			applicationSelection?: { selected?: string[]; skipped?: Array<{ appId?: string; reason?: string }> };
 			worktreeCleanup?: { removed?: boolean };
 			worktreePath?: string | null;
 		};
 		const mergedPackages = payload.repos.filter((repo) => repo.merged).length;
+		const hostingGraph = resolveWorkflowHostingGraph(context, 'staging', payload.applicationSelection);
 		return guidedResult({
 			command: invocation.commandName || 'stage',
 			summary: result.executionMode === 'plan' ? 'Treeseed stage plan ready.' : 'Treeseed stage completed successfully.',
@@ -42,14 +44,19 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Deprecated tag', value: payload.rootRepo.tagName ?? payload.deprecatedTag?.tagName ?? '(planned)' },
 				{ label: 'Package merges', value: String(mergedPackages) },
 				{ label: 'Staging wait', value: payload.stagingWait?.status ?? (result.executionMode === 'plan' ? 'planned' : 'unknown') },
+				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
 				{ label: 'Preview cleanup', value: payload.previewCleanup?.performed ? 'performed' : result.executionMode === 'plan' ? 'planned' : 'not needed' },
 				{ label: 'Worktree cleanup', value: payload.worktreeCleanup?.removed ? 'removed' : 'not needed' },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? payload.mergeTarget },
 			],
+			sections: result.executionMode === 'plan' ? hostingGraphSections(hostingGraph) : [],
 			nextSteps: renderWorkflowNextSteps(result),
-			report: result,
+			report: {
+				...result,
+				hostingGraph,
+			},
 		});
 	} catch (error) {
 		return workflowErrorResult(error);

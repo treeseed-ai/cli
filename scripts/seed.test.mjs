@@ -676,7 +676,7 @@ test('seed export emits a productized manifest from local state', async () => {
 	assert.doesNotMatch(payload.yaml, /encryptedPayload|BEGIN PRIVATE KEY|ghp_/);
 });
 
-test('seed staging apply uses the remote market API', async () => {
+test('seed staging apply uses the remote API', async () => {
 	const root = remoteSeedWorkspace();
 	const result = await withMockFetch(async (_url, init) => {
 		assert.equal(init?.method, 'POST');
@@ -720,7 +720,7 @@ test('seed prod apply returns blocked approval response', async () => {
 	assert.equal(payload.result.approvalRequest.id, 'approval-1');
 });
 
-test('seed prod apply passes approved approval request to remote market API', async () => {
+test('seed prod apply passes approved approval request to remote API', async () => {
 	const root = remoteSeedWorkspace();
 	let requestBody = null;
 	const result = await withMockFetch(async (_url, init) => {

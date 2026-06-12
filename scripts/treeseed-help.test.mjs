@@ -164,14 +164,14 @@ function marketControlPlaneLaunchRequirements() {
 		resources: [
 			{
 				kind: 'resource',
-				key: 'marketDatabase',
+				key: 'apiDatabase',
 				type: 'database',
 				required: true,
 				compatibleProviders: ['railway-postgres'],
 				displayName: 'Market database',
 				purpose: 'Store Market state.',
 				configWrites: [
-					{ target: 'treeseed.site.yaml', path: 'services.marketDatabase.provider', valueFrom: 'selectedResource.provider' },
+					{ target: 'treeseed.site.yaml', path: 'services.apiDatabase.provider', valueFrom: 'selectedResource.provider' },
 				],
 				environmentWrites: [
 					{ env: 'TREESEED_MARKET_DATABASE_URL', valueFrom: 'selectedResource.connectionUrl', targets: ['railway-secret'], scopes: ['staging', 'prod'], sensitivity: 'secret' },
@@ -183,17 +183,17 @@ function marketControlPlaneLaunchRequirements() {
 				type: 'service',
 				required: true,
 				compatibleProviders: ['railway'],
-				displayName: 'Market API',
-				purpose: 'Run the Market API service.',
+				displayName: 'API',
+				purpose: 'Run the API service.',
 				configWrites: [],
 			},
 			{
 				kind: 'resource',
-				key: 'marketOperationsRunner',
+				key: 'operationsRunner',
 				type: 'service',
 				required: true,
 				compatibleProviders: ['railway'],
-				displayName: 'Market operations runner',
+				displayName: 'Treeseed operations runner',
 				purpose: 'Run Market operations.',
 				configWrites: [],
 				environmentWrites: [
@@ -202,7 +202,7 @@ function marketControlPlaneLaunchRequirements() {
 			},
 		],
 		secrets: [
-			{ kind: 'secret', key: 'marketDatabaseUrl', env: 'TREESEED_MARKET_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
+			{ kind: 'secret', key: 'apiDatabaseUrl', env: 'TREESEED_MARKET_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
 			{ kind: 'secret', key: 'platformRunnerToken', env: 'TREESEED_PLATFORM_RUNNER_TOKEN', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'generated' },
 		],
 	};
@@ -449,7 +449,7 @@ test('dev help documents fixed Market web/API/runner runtime', async () => {
 	assert.match(result.output, /--force/);
 	assert.match(result.output, /web\/API\/runner/u);
 	assert.match(result.output, /managed local PostgreSQL/u);
-	assert.match(result.output, /Market operations runner/u);
+	assert.match(result.output, /Treeseed operations runner/u);
 	assert.match(result.output, /capacity/u);
 });
 
@@ -505,9 +505,9 @@ test('template show renders Market control-plane resource requirements', async (
 	assertSuccessWithDiagnostics(result, 'template show market-control-plane');
 	assert.match(result.stdout, /Status:\s+draft/u);
 	assert.match(result.stdout, /Resources/u);
-	assert.match(result.stdout, /marketDatabase: database required via railway-postgres/u);
+	assert.match(result.stdout, /apiDatabase: database required via railway-postgres/u);
 	assert.match(result.stdout, /api: service required via railway/u);
-	assert.match(result.stdout, /marketOperationsRunner: service required via railway/u);
+	assert.match(result.stdout, /operationsRunner: service required via railway/u);
 	assert.match(result.stdout, /TREESEED_MARKET_DATABASE_URL/u);
 	assert.match(result.stdout, /TREESEED_PLATFORM_RUNNER_TOKEN/u);
 });
@@ -646,6 +646,23 @@ test('railway wrapper selects the requested Railway environment before forwardin
 	assert.notEqual(result.spawns[1].options.cwd, workspaceRoot);
 	assert.equal(result.spawns[1].options.env.HOME, result.spawns[1].options.cwd);
 	assert.match(result.spawns[1].options.env.XDG_CONFIG_HOME, /treeseed-railway-prod-/);
+});
+
+test('railway wrapper forwards workspace project probes without preselecting project context', async () => {
+	const workspaceRoot = makeTenantWorkspace('staging');
+	const result = await runCli(['railway', '--environment', 'staging', '--', 'project', 'list', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			RAILWAY_API_TOKEN: 'railway-token',
+			TREESEED_RAILWAY_PROJECT_ID: 'f593a85c-38a2-4e76-a90b-2c20ecf81d6e',
+		},
+	});
+
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 1);
+	assert.deepEqual(result.spawns[0].args.slice(-3), ['project', 'list', '--json']);
+	assert.equal(result.spawns[0].options.cwd, workspaceRoot);
 });
 
 test('export help includes the directory argument', async () => {
@@ -1065,6 +1082,7 @@ test('config supports explicit non-interactive application without json output',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
 			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
 			CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
 			RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
@@ -1588,7 +1606,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
 	assert.deepEqual(
 		result.spawns[0].args.slice(-16),
-		['--surfaces', 'web,api', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
+		['--surfaces', 'web', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
 	);
 });
 
@@ -1624,7 +1642,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	assert.match(start.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
 	assert.deepEqual(
 		start.spawns[0].args.slice(-9),
-		['start', '--surfaces', 'web,api', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'],
+		['start', '--surfaces', 'web', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'],
 	);
 	assert.ok(!start.spawns[0].args.includes('--watch'));
 
@@ -1637,7 +1655,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	});
 	assert.equal(status.exitCode, 0);
 	assert.equal(status.spawns.length, 1);
-	assert.deepEqual(status.spawns[0].args.slice(-5), ['status', '--surfaces', 'web,api', '--all', '--json']);
+	assert.deepEqual(status.spawns[0].args.slice(-5), ['status', '--surfaces', 'web', '--all', '--json']);
 
 	const logs = await runCli(['dev', 'logs', '--follow'], {
 		cwd: workspaceRoot,
@@ -1647,7 +1665,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 		},
 	});
 	assert.equal(logs.exitCode, 0);
-	assert.deepEqual(logs.spawns[0].args.slice(-4), ['logs', '--surfaces', 'web,api', '--follow']);
+	assert.deepEqual(logs.spawns[0].args.slice(-4), ['logs', '--surfaces', 'web', '--follow']);
 });
 
 test('treeseed dev rejects removed surface and worker options', async () => {
@@ -1737,7 +1755,7 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 		assert.deepEqual(up.spawns[0].args.slice(0, 4), ['compose', '-f', resolve(agentRoot, 'compose.capacity-provider.yml'), '-p']);
 		assert.deepEqual(up.spawns[0].args.slice(-2), ['up', '-d']);
 		assert.notEqual(up.spawns[0].options.env.TREESEED_PROVIDER_STARTUP_MODE, 'diagnostic');
-		assert.equal(up.spawns[0].options.env.TREESEED_MARKET_ID, 'local');
+		assert.equal(up.spawns[0].options.env.TREESEED_MANAGER_ID, 'local');
 		assert.equal(up.spawns[0].options.env.TREESEED_CAPACITY_PROVIDER_API_KEY, secret);
 		assert.doesNotMatch(up.output, new RegExp(secret, 'u'));
 		const upPayload = JSON.parse(up.output);

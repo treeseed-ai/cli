@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, type SeedPlan } from '@treeseed/sdk/seeds';
 import { persistCapacityProviderConnectionToTreeseedConfig } from '@treeseed/sdk/capacity-provider';
-import { MarketApiError } from '@treeseed/sdk/market-client';
+import { MarketClientError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketAuthRoot, marketSelector } from './market-utils.js';
 import { MarketClient, resolveMarketProfile, resolveMarketSession, setMarketSession, type MarketSession } from '@treeseed/sdk/market-client';
 
@@ -215,7 +215,7 @@ function storeLocalCapacityProviderConnection(input: {
 }
 
 function remoteSeedError(error: unknown, command: string) {
-	if (error instanceof MarketApiError) {
+	if (error instanceof MarketClientError) {
 		const payload = error.payload && typeof error.payload === 'object' ? error.payload as Record<string, unknown> : { error: error.message };
 		const blocked = error.status === 409 || (payload.result as Record<string, unknown> | undefined)?.blocked === true;
 		const auth = error.status === 401 || error.status === 403;

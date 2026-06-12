@@ -1,4 +1,4 @@
-import { MarketApiError } from '@treeseed/sdk/market-client';
+import { MarketClientError } from '@treeseed/sdk/market-client';
 import { parseProjectLaunchHostBindingSpecs } from '@treeseed/sdk';
 import type { ProjectDeploymentEnvironment, ProjectWebDeploymentAction } from '@treeseed/sdk';
 import type { TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
@@ -56,7 +56,7 @@ function projectUsage(action: string) {
 }
 
 function authFailure(error: unknown) {
-	if (error instanceof MarketApiError && [401, 403].includes(error.status)) {
+	if (error instanceof MarketClientError && [401, 403].includes(error.status)) {
 		return fail(error.message, 2);
 	}
 	const message = error instanceof Error ? error.message : String(error);
@@ -67,7 +67,7 @@ function authFailure(error: unknown) {
 }
 
 function deploymentApiExitCode(error: unknown) {
-	if (error instanceof MarketApiError) {
+	if (error instanceof MarketClientError) {
 		if ([401, 403].includes(error.status)) return 2;
 		const payload = error.payload as any;
 		const code = payload?.error?.code ?? payload?.code;

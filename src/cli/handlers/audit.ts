@@ -1,4 +1,6 @@
 import {
+	collectTreeseedHostedServiceChecks,
+	collectTreeseedLiveHostedServiceChecks,
 	formatTreeseedHostingAuditReport,
 	runTreeseedHostingAudit,
 	type TreeseedHostingAuditEnvironment,
@@ -57,12 +59,27 @@ export const handleAudit: TreeseedCommandHandler = async (invocation, context) =
 			hostKinds: normalizeHostKinds(invocation.args.hostKinds ?? invocation.args.hosts),
 			write: context.write,
 		});
+		const hostedTarget = report.environment === 'prod' ? 'prod' : report.environment === 'local' ? 'local' : 'staging';
+		const hostedServices = invocation.args.live === true
+			? await collectTreeseedLiveHostedServiceChecks({
+				tenantRoot: context.cwd,
+				target: hostedTarget,
+				strict: false,
+				env: context.env,
+			})
+			: collectTreeseedHostedServiceChecks({
+				tenantRoot: context.cwd,
+				target: hostedTarget,
+			});
 		const counts = statusCounts(report.checks);
 		if (context.outputFormat === 'json') {
 			return {
 				exitCode: report.ok ? 0 : 1,
 				stdout: [],
-				report,
+				report: {
+					...report,
+					hostedServices,
+				},
 			};
 		}
 		return guidedResult({
@@ -75,9 +92,20 @@ export const handleAudit: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Passed', value: counts.passed ?? 0 },
 				{ label: 'Warnings', value: (counts.warning ?? 0) + report.warnings.length },
 				{ label: 'Failed', value: counts.failed ?? 0 },
+				{ label: 'Hosted checks', value: `${hostedServices.summary.passed} passed, ${hostedServices.summary.warning} warnings, ${hostedServices.summary.failed} failed, ${hostedServices.summary.skipped} skipped` },
+			],
+			sections: [
+				{
+					title: 'Hosted service checks',
+					lines: hostedServices.checks.map((check) =>
+						`${check.provider} ${check.serviceKey ?? check.serviceType} ${check.description}: ${check.status}${check.issues.length ? ` (${check.issues.join('; ')})` : ''}`),
+				},
 			],
 			nextSteps: report.nextActions,
-			report,
+			report: {
+				...report,
+				hostedServices,
+			},
 			exitCode: report.ok ? 0 : 1,
 		});
 	} catch (error) {

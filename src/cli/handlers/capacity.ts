@@ -418,7 +418,7 @@ function runLifecycleAction(action: string, invocation: TreeseedParsedInvocation
 		requireConnection: lifecycleActionRequiresConnection(action),
 		overrides: {
 			TREESEED_MARKET_URL: market.baseUrl,
-			TREESEED_MARKET_ID: market.id,
+			TREESEED_MANAGER_ID: market.id,
 			TREESEED_PROVIDER_HOST_DATA_DIR: resolvedHostDataDir,
 			TREESEED_PROVIDER_ENVIRONMENT: providerSelector(invocation),
 			...(diagnostic ? { TREESEED_PROVIDER_STARTUP_MODE: 'diagnostic' } : {}),
@@ -487,7 +487,7 @@ function invokeProviderEntrypoint(action: string, invocation: TreeseedParsedInvo
 		env: {
 			...context.env,
 			TREESEED_MARKET_URL: market.baseUrl,
-			TREESEED_MARKET_ID: market.id,
+			TREESEED_MANAGER_ID: market.id,
 			TREESEED_PROVIDER_ENVIRONMENT: providerSelector(invocation),
 		},
 		encoding: 'utf8',

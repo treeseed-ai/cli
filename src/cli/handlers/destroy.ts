@@ -31,14 +31,23 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 			dryRun: invocation.args.dryRun === true,
 			force: invocation.args.force === true,
 			deleteData: invocation.args.deleteData === true,
+			sweepTreeseed: invocation.args.sweepTreeseed === true,
 			removeBuildArtifacts: invocation.args.removeBuildArtifacts === true,
 		});
 		const payload = result.payload as {
 			scope: string;
 			dryRun: boolean;
 			deleteData?: boolean;
+			sweepTreeseed?: boolean;
 			removeBuildArtifacts: boolean;
+			remoteResult?: {
+				verification?: {
+					cloudflare?: { totalRemaining?: number; status?: string };
+					localDocker?: { totalRemaining?: number; status?: string };
+				} | null;
+			} | null;
 		};
+		const verification = payload.remoteResult?.verification ?? null;
 		return guidedResult({
 			command: invocation.commandName || 'destroy',
 			summary: result.executionMode === 'plan'
@@ -48,7 +57,14 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Environment', value: payload.scope },
 				{ label: 'Dry run', value: payload.dryRun ? 'yes' : 'no' },
 				{ label: 'Delete data', value: payload.deleteData ? 'yes' : 'no' },
+				{ label: 'Sweep TreeSeed resources', value: payload.sweepTreeseed ? 'yes' : 'no' },
 				{ label: 'Removed build artifacts', value: payload.removeBuildArtifacts ? 'yes' : 'no' },
+				...(verification?.cloudflare
+					? [{ label: 'Cloudflare remaining', value: String(verification.cloudflare.totalRemaining ?? 0) }]
+					: []),
+				...(verification?.localDocker
+					? [{ label: 'Local Docker remaining', value: String(verification.localDocker.totalRemaining ?? 0) }]
+					: []),
 			],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: result,
