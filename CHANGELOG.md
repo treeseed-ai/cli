@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.11.0] - 2026-06-12
+
+### Added
+
+- feat(cli): add release candidate mode to save command (ba737eee3749)
+- feat(cli): refine railway command context preselection (4846ea09e496)
+- feat(cli): add hosting command (ee6aaa9740ed)
+- feat(cli): add treedb command handlers and enhance status output (6a419b16d477)
+
+### Changed
+
+- Updates to the destroy command. (b71c82c9b39b)
+
+### Fixed
+
+- build(build): fix package deploy gate timeout and hybrid save validation (0cf2b779cc6b)
+- build(build): fix package deploy gate timeout and hybrid save validation (4023cfa093e5)
+- build(build): fix railway live deploy readiness retry (846d32240c13)
+- build(build): fix staging web monitor and ui edge theme runtime (62d64ac35188)
+- build(build): fix workspace deployment install readiness (962890e930a2)
+- build(build): fix ui pages staging reconciliation (ab0e45c637ef)
+- build(build): fix package app cloudflare auth (abcc76fb475f)
+- build(build): fix package hosted config sync and api deploy environment (6968af0206a3)
+- fix(cli): update sdk dependency and refresh lockfile (c42a059585e7)
+- build(build): fix manifest package save gates (1efae720d476)
+- build(build): complete Market API package migration hosted checker fix (c24404f73108)
+
+### Tests
+
+- build(build): stabilize github credential test for configured scoped (8a1f1cea4255)
+- build(build): Save reconciliation platform and live acceptance updates (8f76757ad6f6)
+- build(tests): Save reconciliation platform and live acceptance updates (22e8d1cd14df)
+- build(source): Save reconciliation platform and live acceptance updates (24e81a46f1dd)
+- build(source): document and harden staging release workflow (f1bbe45591ca)
+- test(cli): show API package Railway roots (0a9b39042576)
+- test(cli): expect package API Railway source root (a86c4baab1d0)
+- build(release): complete Market API package migration (b104efa989dd)
+- build(source): complete Market API package migration (d9fc6500f46d)
+- refactor(cli): rename TreeDB to TreeDX (32c82e45783d)
+
+### Dependencies
+
+- build(build): stage package submodule restructuring (cee3b0432afb)
+- build(build): document save lanes (7a9763aec8bb)
+- build(build): add fast and promotion save lanes (3b1baedaf5c8)
+- build(build): bound git dependency smoke checks (8b0c69edc3c2)
+- build(build): build ui artifacts for hosted deploy (7c3f01223ba6)
+- build(build): migrate reusable ui components to treeseed ui (7afa006293f5)
+- build(build): integrate treeseed ui (39d2a5669e9d)
+- build: update sdk package app dependency (ffc6eba169be)
+- build: update sdk pages build dependency (81a97c0b0393)
+- build: update sdk staging dependency (22977f754857)
+- build(deps): update sdk hosted checks (6bc84233a2fa)
+- build(deps): update sdk hosting dependency (7d318ecd3c01)
+- build(build): make cli json output robust under capture (3ec70bd0841c)
+- chore(cli): update version and @treeseed/sdk dependency (d4cd3302330c)
+- build(build): Push clean hosted project repositories during save (a0a08cc0bd88)
+- build(build): Install project dependencies before hosted project (cd7ee848b7fe)
+- build(build): Install project dependencies before hosted project (1a4aa8947ef1)
+- build(build): Install project dependencies before hosted project (7ee3c907730a)
+- build(build): Treat API as a hosted project with verification gates (e430b2bc2abe)
+- build(build): Move API deployment acceptance into API package (9a3566dfbeb0)
+- 14 additional changes omitted from this summary.
+
 ## [0.10.22] - 2026-06-05
 
 ### Tests
