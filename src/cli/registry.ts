@@ -32,6 +32,7 @@ import { handleReady } from './handlers/ready.js';
 import { handleOperations } from './handlers/operations.js';
 import { handlePacks } from './handlers/packs.js';
 import { handleToolWrapper } from './handlers/tool-wrapper.js';
+import { handleWorkflow } from './handlers/workflow-dispatch.js';
 import {
 	handleSecretsLock,
 	handleSecretsMigrateKey,
@@ -90,10 +91,12 @@ export const COMMAND_HANDLERS = {
 	reconcile: handleReconcile,
 	ready: handleReady,
 	operations: handleOperations,
+	workflow: handleWorkflow,
 	packs: handlePacks,
 	gh: handleToolWrapper,
 	railway: handleToolWrapper,
 	wrangler: handleToolWrapper,
+	docker: handleToolWrapper,
 	'secrets:status': handleSecretsStatus,
 	'secrets:unlock': handleSecretsUnlock,
 	'secrets:lock': handleSecretsLock,

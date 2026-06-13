@@ -8,13 +8,14 @@ import { loadTreeseedDeployConfigFromPath } from '@treeseed/sdk/platform/deploy-
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
 
-type WrappedToolName = 'gh' | 'railway' | 'wrangler';
+type WrappedToolName = 'gh' | 'railway' | 'wrangler' | 'docker';
 type TreeseedEnvironmentScope = 'local' | 'staging' | 'prod';
 
-const WRAPPED_TOOLS = new Set<string>(['gh', 'railway', 'wrangler']);
+const WRAPPED_TOOLS = new Set<string>(['gh', 'railway', 'wrangler', 'docker']);
 const ENVIRONMENT_SCOPES = new Set<string>(['local', 'staging', 'prod']);
 
 function wrappedToolName(value: string): WrappedToolName {
@@ -189,6 +190,7 @@ function railwayCommandNeedsProjectContext(args: string[]) {
 
 export const handleToolWrapper: TreeseedCommandHandler = async (invocation, context) => {
 	let isolatedRailwayCwd: string | null = null;
+	let isolatedDockerCwd: string | null = null;
 	try {
 		const toolName = wrappedToolName(invocation.commandName);
 		const scope = wrapperScope(invocation.args.environment);
@@ -221,6 +223,65 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 		}
 
 		const targetArgs = invocation.positionals;
+		if (toolName === 'docker') {
+			isolatedDockerCwd = mkdtempSync(join(tmpdir(), `treeseed-docker-${scope}-`));
+			const dockerEnv = {
+				...managedEnv,
+				DOCKER_CONFIG: join(isolatedDockerCwd, 'config'),
+			};
+			const username = managedEnv.DOCKERHUB_USERNAME?.trim() ?? '';
+			const token = managedEnv.DOCKERHUB_TOKEN?.trim() ?? '';
+			const command = targetArgs[0] ?? '';
+			if (username && token && !['login', 'logout'].includes(command)) {
+				const login = spawnSync(resolved.command, [
+					...resolved.argsPrefix,
+					'login',
+					'--username',
+					username,
+					'--password-stdin',
+				], {
+					cwd: context.cwd,
+					env: dockerEnv,
+					input: token,
+					encoding: 'utf8',
+					stdio: ['pipe', 'pipe', 'pipe'],
+				});
+				if ((login.status ?? 1) !== 0) {
+					return {
+						exitCode: login.status ?? 1,
+						stderr: ['Failed to authenticate Docker through Treeseed DockerHub credentials.'],
+						report: {
+							command: toolName,
+							ok: false,
+							scope,
+							executable: resolved.command,
+							binaryPath: resolved.binaryPath,
+							argsPrefix: resolved.argsPrefix,
+							args: targetArgs,
+						},
+					};
+				}
+			}
+			const result = context.spawn(resolved.command, [...resolved.argsPrefix, ...targetArgs], {
+				cwd: context.cwd,
+				env: dockerEnv,
+				stdio: 'inherit',
+			});
+			return {
+				exitCode: result.status ?? 1,
+				suppressJsonResult: true,
+				report: {
+					command: toolName,
+					ok: (result.status ?? 1) === 0,
+					scope,
+					executable: resolved.command,
+					binaryPath: resolved.binaryPath,
+					argsPrefix: resolved.argsPrefix,
+					args: targetArgs,
+					authenticated: Boolean(username && token),
+				},
+			};
+		}
 		if (toolName === 'railway' && scope !== 'local' && railwayCommandNeedsProjectContext(targetArgs)) {
 			const environmentName = railwayEnvironmentName(scope);
 			const projectId = await resolveLiveRailwayProjectId({
@@ -339,6 +400,13 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 				rmSync(isolatedRailwayCwd, { recursive: true, force: true });
 			} catch {
 				// Best-effort cleanup for an operator convenience wrapper.
+			}
+		}
+		if (isolatedDockerCwd) {
+			try {
+				rmSync(isolatedDockerCwd, { recursive: true, force: true });
+			} catch {
+				// Best effort cleanup for isolated Docker auth config.
 			}
 		}
 	}
