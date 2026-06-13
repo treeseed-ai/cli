@@ -50,12 +50,15 @@ function targetFor(environment: TreeseedHostingEnvironment): TreeseedReconcileTa
 }
 
 function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostingGraph>): TreeseedReconcileSelector {
+	const exactServiceIds = [...new Set(graph.units.flatMap((unit) => [
+		typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null,
+		!['api', 'operationsRunner', 'capacityProviderApi', 'capacityProviderManager', 'capacityProviderRunner'].includes(unit.id)
+			? unit.id
+			: null,
+	]).filter((value): value is string => Boolean(value)))];
 	return {
 		host: [...new Set(graph.units.map((unit) => unit.host.id).filter((hostId) => hostId !== 'smtp' && hostId !== 'local-process' && hostId !== 'local-docker'))],
-		serviceId: [...new Set(graph.units.flatMap((unit) => [
-			unit.id,
-			typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null,
-		]).filter((value): value is string => Boolean(value)))],
+		serviceId: exactServiceIds,
 		serviceType: [...new Set(graph.units.flatMap((unit) => {
 			if (unit.id === 'api') return ['api-runtime', 'railway-service:api'];
 			if (unit.id === 'operationsRunner') return ['operations-runner-runtime', 'railway-service:operations-runner'];
