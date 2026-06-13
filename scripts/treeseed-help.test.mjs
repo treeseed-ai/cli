@@ -1731,14 +1731,15 @@ test('treeseed dev:manager and dev:watch are no longer public aliases', async ()
 
 test('capacity lifecycle commands route through package-owned scripts and Compose with redacted env', async () => {
 	const agentRoot = makeFakeAgentPackageRoot();
+	const workspaceRoot = makeWorkspaceRoot();
 	const secret = 'tscp_capacity_cli_test_secret';
 	try {
-		const build = await runCli(['capacity', 'build', '--agent-package-root', agentRoot, '--plan', '--json'], { cwd: repoRoot });
+		const build = await runCli(['capacity', 'build', '--agent-package-root', agentRoot, '--plan', '--json'], { cwd: workspaceRoot });
 		assert.equal(build.exitCode, 0);
 		assert.equal(build.spawns.length, 0);
 
 		const up = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--plan', '--json'], {
-			cwd: repoRoot,
+			cwd: workspaceRoot,
 			env: {
 				TREESEED_CAPACITY_PROVIDER_API_KEY: secret,
 			},
@@ -1750,20 +1751,21 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 		assert.equal(upPayload.command, 'capacity up');
 		assert.equal(upPayload.ok, true);
 
-		const diagnostic = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--diagnostic', '--plan', '--json'], { cwd: repoRoot });
+		const diagnostic = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--diagnostic', '--plan', '--json'], { cwd: workspaceRoot });
 		assert.equal(diagnostic.exitCode, 0);
 		assert.equal(diagnostic.spawns.length, 0);
 		assert.equal(JSON.parse(diagnostic.output).command, 'capacity up');
 
-		const status = await runCli(['capacity', 'status', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], { cwd: repoRoot });
+		const status = await runCli(['capacity', 'status', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], { cwd: workspaceRoot });
 		assert.equal(status.spawns.length, 0);
 		assert.equal(JSON.parse(status.output).command, 'capacity status');
 
-		const providerPlan = await runCli(['capacity', 'plan', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], { cwd: repoRoot });
+		const providerPlan = await runCli(['capacity', 'plan', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], { cwd: workspaceRoot });
 		assert.equal(providerPlan.spawns.length, 0);
 		assert.equal(JSON.parse(providerPlan.output).command, 'capacity plan');
 	} finally {
 		rmSync(agentRoot, { recursive: true, force: true });
+		rmSync(workspaceRoot, { recursive: true, force: true });
 	}
 });
 
