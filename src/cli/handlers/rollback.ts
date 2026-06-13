@@ -11,7 +11,7 @@ import {
 	loadDeployState,
 } from '@treeseed/sdk/workflow-support';
 import { loadCliDeployConfig, packageScriptPath, resolveWranglerBin } from '@treeseed/sdk/workflow-support';
-import { run } from '@treeseed/sdk/workflow-support';
+import { classifyTreeseedGitMode, runTreeseedGitText } from '@treeseed/sdk/operations';
 import { repoRoot } from '@treeseed/sdk/workflow-support';
 import { guidedResult } from './utils.js';
 import { copyTreeseedOperationalState } from '../repair.js';
@@ -52,7 +52,8 @@ function isRollbackCompatible(state: Record<string, unknown>, candidate: Record<
 }
 
 function runGitWorktree(repoDir: string, args: string[]) {
-	return run('git', ['worktree', ...args], { cwd: repoDir, capture: true });
+	const gitArgs = ['worktree', ...args];
+	return runTreeseedGitText(gitArgs, { cwd: repoDir, mode: classifyTreeseedGitMode(gitArgs) });
 }
 
 export const handleRollback: TreeseedCommandHandler = (invocation, context) => {

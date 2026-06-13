@@ -13,14 +13,14 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			dryRun: invocation.args.dryRun === true,
 		});
 		const payload = result.payload as {
-			mode: 'root-only' | 'recursive-workspace';
-			branchName: string;
-			mergeTarget: string;
-			mergeStrategy: string;
+			mode: 'root-only' | 'recursive-workspace' | 'reconcile-release-gates';
+			branchName?: string;
+			mergeTarget?: string;
+			mergeStrategy?: string;
 			autoSaved?: boolean;
 			deprecatedTag?: { tagName: string };
-			repos: Array<{ merged: boolean; deletedLocal: boolean; deletedRemote: boolean; skippedReason: string | null }>;
-			rootRepo: { deletedLocal: boolean; deletedRemote: boolean; tagName: string | null };
+			repos?: Array<{ merged: boolean; deletedLocal: boolean; deletedRemote: boolean; skippedReason: string | null }>;
+			rootRepo?: { deletedLocal: boolean; deletedRemote: boolean; tagName: string | null };
 			stagingWait?: { status: string };
 			previewCleanup?: { performed: boolean };
 			finalBranch?: string;
@@ -29,8 +29,33 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			applicationSelection?: { selected?: string[]; skipped?: Array<{ appId?: string; reason?: string }> };
 			worktreeCleanup?: { removed?: boolean };
 			worktreePath?: string | null;
+			units?: Array<Record<string, unknown>>;
+			plannedSteps?: Array<Record<string, unknown>>;
+			reconcile?: unknown;
 		};
-		const mergedPackages = payload.repos.filter((repo) => repo.merged).length;
+		if (payload.mode === 'reconcile-release-gates') {
+			const hostingGraph = resolveWorkflowHostingGraph(context, 'staging', payload.applicationSelection);
+			return guidedResult({
+				command: invocation.commandName || 'stage',
+				summary: result.executionMode === 'plan' ? 'Treeseed stage release-gate plan ready.' : 'Treeseed stage release gates reconciled.',
+				facts: [
+					{ label: 'Mode', value: payload.mode },
+					{ label: 'Merge target', value: payload.mergeTarget ?? 'staging' },
+					{ label: 'Merge strategy', value: payload.mergeStrategy ?? 'squash' },
+					{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
+					{ label: 'Units', value: String(payload.units?.length ?? 0) },
+					{ label: 'Planned steps', value: String(payload.plannedSteps?.length ?? 0) },
+					{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
+				],
+				sections: result.executionMode === 'plan' ? hostingGraphSections(hostingGraph) : [],
+				nextSteps: renderWorkflowNextSteps(result),
+				report: {
+					...result,
+					hostingGraph,
+				},
+			});
+		}
+		const mergedPackages = (payload.repos ?? []).filter((repo) => repo.merged).length;
 		const hostingGraph = resolveWorkflowHostingGraph(context, 'staging', payload.applicationSelection);
 		return guidedResult({
 			command: invocation.commandName || 'stage',
@@ -41,7 +66,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Merge target', value: payload.mergeTarget },
 				{ label: 'Merge strategy', value: payload.mergeStrategy },
 				{ label: 'Auto-saved', value: payload.autoSaved ? 'yes' : 'no' },
-				{ label: 'Deprecated tag', value: payload.rootRepo.tagName ?? payload.deprecatedTag?.tagName ?? '(planned)' },
+				{ label: 'Deprecated tag', value: payload.rootRepo?.tagName ?? payload.deprecatedTag?.tagName ?? '(planned)' },
 				{ label: 'Package merges', value: String(mergedPackages) },
 				{ label: 'Staging wait', value: payload.stagingWait?.status ?? (result.executionMode === 'plan' ? 'planned' : 'unknown') },
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },

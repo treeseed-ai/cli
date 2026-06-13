@@ -1,0 +1,20 @@
+id: "@treeseed/cli"
+name: TreeSeed CLI
+kind: node-typescript
+type: node-cli
+repository: treeseed-ai/cli
+publishTarget: npm
+workflowTemplateVersion: "1"
+githubEnvironments:
+  - production
+requiredSecrets:
+  - NPM_TOKEN
+verify:
+  fast: npm run verify
+  local: npm run verify:local
+  release: npm run release:verify
+artifacts:
+  - provider: npm
+    name: "@treeseed/cli"
+releaseGate:
+  workflow: publish.yml

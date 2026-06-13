@@ -1,18 +1,20 @@
 import {
-	applyTreeseedHostingGraph,
 	compileTreeseedHostingGraph,
 	planTreeseedHostingGraph,
-	serializeHostingApplyResult,
 	serializeHostingPlan,
 	serializeHostingUnit,
 	type TreeseedHostingEnvironment,
 } from '@treeseed/sdk/hosting';
 import {
+	collectTreeseedReconcileStatus,
+	destroyTreeseedTargetUnits,
+	reconcileTreeseedTarget,
+	type TreeseedReconcileSelector,
+	type TreeseedReconcileTarget,
+} from '@treeseed/sdk/reconcile';
+import {
 	collectTreeseedConfigSeedValues,
 	collectTreeseedLiveHostedServiceChecks as collectLiveChecks,
-	deleteRailwayProject,
-	listRailwayProjects,
-	resolveRailwayWorkspaceContext,
 } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
@@ -41,6 +43,34 @@ function listArg(value: unknown) {
 
 function renderUnitLine(entry: { unit: ReturnType<typeof serializeHostingUnit>; plan?: { action?: string }; verification?: { verified?: boolean } }) {
 	return `${entry.unit.id}: ${entry.unit.serviceType} -> ${entry.unit.hostId} (${entry.unit.placement})${entry.plan?.action ? ` ${entry.plan.action}` : ''}${entry.verification ? ` verified=${entry.verification.verified ? 'yes' : 'no'}` : ''}`;
+}
+
+function targetFor(environment: TreeseedHostingEnvironment): TreeseedReconcileTarget {
+	return { kind: 'persistent', scope: environment };
+}
+
+function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostingGraph>): TreeseedReconcileSelector {
+	return {
+		host: [...new Set(graph.units.map((unit) => unit.host.id).filter((hostId) => hostId !== 'smtp' && hostId !== 'local-process' && hostId !== 'local-docker'))],
+		serviceId: [...new Set(graph.units.flatMap((unit) => [
+			unit.id,
+			typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null,
+		]).filter((value): value is string => Boolean(value)))],
+		serviceType: [...new Set(graph.units.flatMap((unit) => {
+			if (unit.id === 'api') return ['api-runtime', 'railway-service:api'];
+			if (unit.id === 'operationsRunner') return ['operations-runner-runtime', 'railway-service:operations-runner'];
+			if (unit.placement === 'runner-capacity') return ['api-runtime', 'operations-runner-runtime', 'railway-service:api', 'railway-service:operations-runner'];
+			if (unit.host.id === 'cloudflare') return ['web-ui', 'edge-worker', 'content-store', 'queue', 'database', 'kv-form-guard', 'turnstile-widget', 'pages-project', 'custom-domain:web', 'dns-record'];
+			return [];
+		}))],
+	};
+}
+
+function selectedSeedEnv(context: Parameters<TreeseedCommandHandler>[1], environment: TreeseedHostingEnvironment) {
+	return {
+		...context.env,
+		...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
+	};
 }
 
 export const handleHosting: TreeseedCommandHandler = async (invocation, context) => {
@@ -108,45 +138,16 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				throw new Error('hosting destroy requires --app so the teardown boundary is explicit.');
 			}
 			const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, ...filterInput });
-			const selectedProjectNames = graph.units
-				.filter((unit) => unit.host.id === 'railway')
-				.map((unit) => unit.projectGroup?.environments?.[environment]?.projectName)
-				.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
-			const railwayProjectNames = [...new Set(selectedProjectNames)];
-			const seedEnv = {
-				...context.env,
-				...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
-			};
-			const projects = railwayProjectNames.length === 0
-				? []
-				: await listRailwayProjects({
-					workspaceId: (await resolveRailwayWorkspaceContext({ env: seedEnv })).id,
-					env: seedEnv,
+			const selector = selectorFromHostingGraph(graph);
+			const result = dryRun
+				? { target: targetFor(environment), results: graph.units.map((unit) => ({ unit: serializeHostingUnit(unit), action: 'destroy', dryRun: true })) }
+				: await destroyTreeseedTargetUnits({
+					tenantRoot: context.cwd,
+					target: targetFor(environment),
+					env: selectedSeedEnv(context, environment),
+					selector,
+					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 				});
-			const results = [];
-			for (const projectName of railwayProjectNames) {
-				const matchingProjects = projects.filter((entry) => entry.name === projectName || entry.id === projectName);
-				if (matchingProjects.length === 0) {
-					results.push({
-						projectName,
-						projectId: null,
-						action: dryRun ? 'destroy' : 'noop',
-						result: { status: dryRun ? 'planned' : 'missing', projectName },
-					});
-					continue;
-				}
-				for (const project of matchingProjects) {
-					const result = dryRun
-						? { status: 'planned', projectName, projectId: project.id }
-						: await deleteRailwayProject({ projectId: project.id, env: seedEnv });
-					results.push({
-						projectName,
-						projectId: project.id,
-						action: dryRun ? 'destroy' : result.status === 'missing' ? 'noop' : 'destroy',
-						result,
-					});
-				}
-			}
 			return guidedResult({
 				command: 'hosting destroy',
 				summary: `${dryRun ? 'Planned' : 'Destroyed'} hosting resources for ${appId} in ${environment}`,
@@ -154,14 +155,14 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					{ label: 'Environment', value: environment },
 					{ label: 'Application', value: appId },
 					{ label: 'Dry run', value: dryRun ? 'yes' : 'no' },
-					{ label: 'Railway projects', value: railwayProjectNames.length ? railwayProjectNames.join(', ') : '(none)' },
+					{ label: 'Selected units', value: graph.units.length },
 				],
 				sections: [
 					{
-						title: 'Railway Projects',
-						lines: results.length
-							? results.map((entry) => `${entry.projectName}: ${entry.action}`)
-							: ['No Railway project groups selected.'],
+						title: 'Units',
+						lines: graph.units.length
+							? graph.units.map((unit) => `${unit.id}: destroy`)
+							: ['No hosting units selected.'],
 					},
 				],
 				report: {
@@ -169,7 +170,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					environment,
 					appId,
 					dryRun,
-					projects: results,
+					result,
 				},
 			});
 		}
@@ -224,8 +225,40 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			});
 		}
 
-		const result = await applyTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun, ...filterInput });
-		const report = serializeHostingApplyResult(result);
+		const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, ...filterInput });
+		const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, ...filterInput });
+		const planReport = serializeHostingPlan(plan);
+		const reconcileResult = dryRun
+			? null
+			: await reconcileTreeseedTarget({
+				tenantRoot: context.cwd,
+				target: targetFor(environment),
+				env: selectedSeedEnv(context, environment),
+				selector: selectorFromHostingGraph(graph),
+				dryRun: false,
+				write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
+			});
+		const status = dryRun
+			? null
+			: await collectTreeseedReconcileStatus({
+				tenantRoot: context.cwd,
+				target: targetFor(environment),
+				env: selectedSeedEnv(context, environment),
+				selector: selectorFromHostingGraph(graph),
+			});
+		const report = {
+			...planReport,
+			dryRun,
+			results: planReport.units.map((entry) => ({
+				unit: entry.unit,
+				plan: entry.plan,
+				verification: entry.verification,
+				reconcile: reconcileResult?.results.find((result) => result.unit.logicalName === entry.unit.id || result.unit.unitId.includes(entry.unit.id)) ?? null,
+			})),
+			reconcile: reconcileResult,
+			status,
+			ok: status ? status.ready : true,
+		};
 		const liveHostedServices = !dryRun && environment !== 'local'
 			? await collectLiveChecks({
 				tenantRoot: context.cwd,

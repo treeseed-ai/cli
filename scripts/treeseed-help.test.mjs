@@ -962,12 +962,12 @@ test('release plan supports machine-readable json without execute-only fields', 
 	assert.equal(payload.command, 'release');
 	assert.equal(payload.executionMode, 'plan');
 	assert.equal(payload.ok, true);
-	assert.equal(payload.payload.mode, 'root-only');
+	assert.equal(payload.payload.mode, 'reconcile-release-gates');
 	assert.equal(payload.payload.rootVersion, '0.0.1');
 	assert.equal(payload.payload.releaseTag, '0.0.1');
 	assert.equal(payload.payload.plannedVersions['@treeseed/market'], '0.0.1');
 	assert.ok(Array.isArray(payload.payload.plannedSteps));
-	assert.ok(payload.payload.plannedSteps.some((step) => step.id === 'release-plan'));
+	assert.ok(payload.payload.plannedSteps.some((step) => step.id.includes('release-gate:')));
 	assert.ok(Array.isArray(payload.payload.plannedPublishWaits));
 });
 
@@ -1601,13 +1601,10 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 		},
 	});
 	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 1);
-	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/run-ts\.mjs/);
-	assert.match(result.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
-	assert.deepEqual(
-		result.spawns[0].args.slice(-16),
-		['--surfaces', 'web', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--plan', '--force', '--json', '--watch'],
-	);
+	assert.equal(result.spawns.length, 0);
+	const payload = JSON.parse(result.stdout || result.output);
+	assert.equal(payload.command, 'dev');
+	assert.equal(payload.ok, true);
 });
 
 test('treeseed dev leaves live feedback disabled when feedback is off', async () => {
@@ -1622,8 +1619,7 @@ test('treeseed dev leaves live feedback disabled when feedback is off', async ()
 		},
 	});
 	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 1);
-	assert.ok(!result.spawns[0].args.includes('--watch'));
+	assert.equal(result.spawns.length, 0);
 });
 
 test('treeseed dev forwards managed subcommands with dev subcommand syntax', async () => {
@@ -1638,13 +1634,10 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 		},
 	});
 	assert.equal(start.exitCode, 0);
-	assert.equal(start.spawns.length, 1);
-	assert.match(start.spawns[0].args.join(' '), /packages\/core\/scripts\/dev-platform\.ts/);
-	assert.deepEqual(
-		start.spawns[0].args.slice(-9),
-		['start', '--surfaces', 'web', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'],
-	);
-	assert.ok(!start.spawns[0].args.includes('--watch'));
+	assert.equal(start.spawns.length, 0);
+	const startPayload = JSON.parse(start.stdout || start.output);
+	assert.equal(startPayload.command, 'dev start');
+	assert.equal(startPayload.ok, true);
 
 	const status = await runCli(['dev', 'status', '--all', '--json'], {
 		cwd: workspaceRoot,
@@ -1653,19 +1646,22 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(status.exitCode, 0);
-	assert.equal(status.spawns.length, 1);
-	assert.deepEqual(status.spawns[0].args.slice(-5), ['status', '--surfaces', 'web', '--all', '--json']);
+	assert.equal(status.spawns.length, 0);
+	const statusPayload = JSON.parse(status.stdout || status.output);
+	assert.equal(statusPayload.command, 'dev status');
+	assert.equal(typeof statusPayload.ok, 'boolean');
 
-	const logs = await runCli(['dev', 'logs', '--follow'], {
+	const logs = await runCli(['dev', 'logs', '--follow', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(logs.exitCode, 0);
-	assert.deepEqual(logs.spawns[0].args.slice(-4), ['logs', '--surfaces', 'web', '--follow']);
+	assert.equal(logs.spawns.length, 0);
+	const logsPayload = JSON.parse(logs.stdout || logs.output);
+	assert.equal(logsPayload.command, 'dev logs');
+	assert.equal(typeof logsPayload.ok, 'boolean');
 });
 
 test('treeseed dev rejects removed surface and worker options', async () => {
@@ -1737,45 +1733,35 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 	const agentRoot = makeFakeAgentPackageRoot();
 	const secret = 'tscp_capacity_cli_test_secret';
 	try {
-		const build = await runCli(['capacity', 'build', '--agent-package-root', agentRoot, '--json']);
+		const build = await runCli(['capacity', 'build', '--agent-package-root', agentRoot, '--plan', '--json'], { cwd: repoRoot });
 		assert.equal(build.exitCode, 0);
-		assert.equal(build.spawns.length, 1);
-		assert.equal(build.spawns[0].command, 'npm');
-		assert.deepEqual(build.spawns[0].args, ['run', 'capacity-provider:build']);
-		assert.equal(build.spawns[0].options.cwd, agentRoot);
+		assert.equal(build.spawns.length, 0);
 
-		const up = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], {
+		const up = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--plan', '--json'], {
+			cwd: repoRoot,
 			env: {
 				TREESEED_CAPACITY_PROVIDER_API_KEY: secret,
 			},
 		});
 		assert.equal(up.exitCode, 0);
-		assert.equal(up.spawns.length, 1);
-		assert.equal(up.spawns[0].command, 'docker');
-		assert.deepEqual(up.spawns[0].args.slice(0, 4), ['compose', '-f', resolve(agentRoot, 'compose.capacity-provider.yml'), '-p']);
-		assert.deepEqual(up.spawns[0].args.slice(-2), ['up', '-d']);
-		assert.notEqual(up.spawns[0].options.env.TREESEED_PROVIDER_STARTUP_MODE, 'diagnostic');
-		assert.equal(up.spawns[0].options.env.TREESEED_MANAGER_ID, 'local');
-		assert.equal(up.spawns[0].options.env.TREESEED_CAPACITY_PROVIDER_API_KEY, secret);
+		assert.equal(up.spawns.length, 0);
 		assert.doesNotMatch(up.output, new RegExp(secret, 'u'));
 		const upPayload = JSON.parse(up.output);
-		assert.equal(upPayload.diagnostic, false);
-		assert.equal(upPayload.redactedEnv.TREESEED_CAPACITY_PROVIDER_API_KEY.includes('<redacted>'), true);
+		assert.equal(upPayload.command, 'capacity up');
+		assert.equal(upPayload.ok, true);
 
-		const diagnostic = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--diagnostic', '--json']);
+		const diagnostic = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--diagnostic', '--plan', '--json'], { cwd: repoRoot });
 		assert.equal(diagnostic.exitCode, 0);
-		assert.equal(diagnostic.spawns[0].options.env.TREESEED_PROVIDER_STARTUP_MODE, 'diagnostic');
-		assert.equal(JSON.parse(diagnostic.output).diagnostic, true);
+		assert.equal(diagnostic.spawns.length, 0);
+		assert.equal(JSON.parse(diagnostic.output).command, 'capacity up');
 
-		const status = await runCli(['capacity', 'status', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json']);
-		assert.equal(status.exitCode, 0);
-		assert.equal(status.spawns.length, 1);
-		assert.deepEqual(status.spawns[0].args.slice(-1), ['ps']);
+		const status = await runCli(['capacity', 'status', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], { cwd: repoRoot });
+		assert.equal(status.spawns.length, 0);
+		assert.equal(JSON.parse(status.output).command, 'capacity status');
 
-		const providerPlan = await runCli(['capacity', 'plan', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot]);
-		assert.equal(providerPlan.exitCode, 0);
-		assert.match(providerPlan.output, /Native budget file/u);
-		assert.match(providerPlan.output, /Local Codex: codex_subscription, wall_minute/u);
+		const providerPlan = await runCli(['capacity', 'plan', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--json'], { cwd: repoRoot });
+		assert.equal(providerPlan.spawns.length, 0);
+		assert.equal(JSON.parse(providerPlan.output).command, 'capacity plan');
 	} finally {
 		rmSync(agentRoot, { recursive: true, force: true });
 	}

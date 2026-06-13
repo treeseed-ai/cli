@@ -1,9 +1,15 @@
 import {
+	collectTreeseedReconcileStatus,
+	destroyTreeseedTargetUnits,
+	planTreeseedReconciliation,
+	reconcileTreeseedTarget,
 	runTreeseedLiveReconcileTests,
 	type TreeseedLiveReconcileEnvironment,
 	type TreeseedLiveReconcileMode,
 	type TreeseedLiveReconcileProvider,
+	type TreeseedReconcileTarget,
 } from '@treeseed/sdk/reconcile';
+import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
 import { collectTreeseedConfigSeedValues } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
@@ -38,6 +44,14 @@ function providersFor(value: unknown): TreeseedLiveReconcileProvider[] {
 
 function yesRequested(value: unknown) {
 	return value === true || value === 'true' || value === 'yes' || value === '1';
+}
+
+function executeRequested(value: unknown) {
+	return value === true || value === 'true' || value === 'yes' || value === '1';
+}
+
+function targetFor(environment: TreeseedLiveReconcileEnvironment): TreeseedReconcileTarget {
+	return { kind: 'persistent', scope: environment };
 }
 
 function formatDuration(ms: unknown) {
@@ -120,10 +134,117 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 		const subcommand = typeof invocation.positionals[0] === 'string' && invocation.positionals[0].trim()
 			? invocation.positionals[0].trim()
 			: 'status';
-		if (subcommand !== 'test-live') {
-			throw new Error(`Unknown reconcile subcommand "${subcommand}". Use test-live.`);
-		}
 		const environment = environmentFor(invocation.args.environment);
+		const target = targetFor(environment);
+		if (subcommand === 'plan' || subcommand === 'status' || subcommand === 'verify' || subcommand === 'apply' || subcommand === 'destroy') {
+			const resolvedEnv = {
+				...context.env,
+				...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
+			};
+			const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+			const desiredUnits = compileTreeseedDesiredUnitsFromGraph(desiredGraph);
+			if (subcommand === 'plan') {
+				const planned = await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: resolvedEnv, units: desiredUnits });
+				const actions = planned.plans.map((plan) => ({
+					unitId: plan.unit.unitId,
+					unitType: plan.unit.unitType,
+					provider: plan.unit.provider,
+					logicalName: plan.unit.logicalName,
+					action: plan.diff.action,
+					reasons: plan.diff.reasons,
+				}));
+				return guidedResult({
+					command: 'reconcile plan',
+					summary: `Reconcile plan resolved ${actions.length} unit${actions.length === 1 ? '' : 's'} for ${environment}.`,
+					facts: [
+						{ label: 'Environment', value: environment },
+						{ label: 'Resources', value: desiredGraph.resources.length },
+						{ label: 'Packages', value: desiredGraph.packages.length },
+					],
+					sections: [{
+						title: 'Actions',
+						lines: actions.map((action) => `${action.provider}:${action.unitType} ${action.logicalName} -> ${action.action}`),
+					}],
+					report: { target, desiredGraph, actions },
+				});
+			}
+			if (subcommand === 'status' || subcommand === 'verify') {
+				const status = await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: resolvedEnv, units: desiredUnits });
+				return guidedResult({
+					command: `reconcile ${subcommand}`,
+					summary: status.ready
+						? `Reconcile ${subcommand} is ready for ${environment}.`
+						: `Reconcile ${subcommand} found ${status.blockers.length} blocker${status.blockers.length === 1 ? '' : 's'} for ${environment}.`,
+					facts: [
+						{ label: 'Environment', value: environment },
+						{ label: 'Ready', value: status.ready ? 'yes' : 'no' },
+						{ label: 'Units', value: status.units.length },
+						{ label: 'Resources', value: desiredGraph.resources.length },
+					],
+					sections: [{
+						title: 'Units',
+						lines: status.units.map((unit) => `${unit.provider}:${unit.unitType} ${unit.unitId} ${unit.verification?.verified ? 'verified' : 'unverified'}`),
+					}, {
+						title: 'Blockers',
+						lines: status.blockers,
+					}],
+					report: { target, desiredGraph, status },
+					exitCode: status.ready ? 0 : 1,
+				});
+			}
+			if (subcommand === 'apply') {
+				const execute = executeRequested(invocation.args.execute);
+				const result = await reconcileTreeseedTarget({
+					tenantRoot: context.cwd,
+					target,
+					env: resolvedEnv,
+					units: desiredUnits,
+					dryRun: !execute,
+					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
+				});
+				return guidedResult({
+					command: 'reconcile apply',
+					summary: execute
+						? `Reconciled ${result.results.length} unit${result.results.length === 1 ? '' : 's'} for ${environment}.`
+						: `Rendered non-mutating reconcile apply plan for ${environment}.`,
+					facts: [
+						{ label: 'Environment', value: environment },
+						{ label: 'Execute', value: execute ? 'yes' : 'no' },
+						{ label: 'Units', value: result.units.length },
+						{ label: 'Results', value: result.results.length },
+					],
+					sections: [{
+						title: 'Actions',
+						lines: result.plans.map((plan) => `${plan.unit.provider}:${plan.unit.unitType} ${plan.unit.logicalName} -> ${plan.diff.action}`),
+					}],
+					report: { target, desiredGraph, result },
+				});
+			}
+			if (subcommand === 'destroy') {
+				if (!executeRequested(invocation.args.execute)) {
+					throw new Error('Reconcile destroy mutates provider resources. Re-run with --execute to confirm.');
+				}
+				const result = await destroyTreeseedTargetUnits({
+					tenantRoot: context.cwd,
+					target,
+					env: resolvedEnv,
+					units: desiredUnits,
+					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
+				});
+				return guidedResult({
+					command: 'reconcile destroy',
+					summary: `Destroyed ${result.results.length} reconcile unit${result.results.length === 1 ? '' : 's'} for ${environment}.`,
+					facts: [
+						{ label: 'Environment', value: environment },
+						{ label: 'Results', value: result.results.length },
+					],
+					report: { target, desiredGraph, result },
+				});
+			}
+		}
+		if (subcommand !== 'test-live') {
+			throw new Error(`Unknown reconcile subcommand "${subcommand}". Use plan, status, verify, apply, destroy, or test-live.`);
+		}
 		const providers = providersFor(invocation.args.provider);
 		const mode = modeFor(invocation.args.mode);
 		if ((mode === 'acceptance' || mode === 'cleanup') && !yesRequested(invocation.args.yes)) {
