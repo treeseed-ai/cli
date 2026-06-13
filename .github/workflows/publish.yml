@@ -20,7 +20,7 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
       - run: npm ci || (echo "dependency install failed; retrying" && npm ci)
-      - run: bash -lc npm run verify:local
+      - run: bash -lc 'npm run verify:local'
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
