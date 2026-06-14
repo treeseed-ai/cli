@@ -501,6 +501,52 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		executionMode: 'handler',
 		handlerName: 'save',
 	})],
+	['update', command({
+		options: [
+			{ name: 'from', flags: '--from <branch>', description: 'Source branch to merge from.', kind: 'string' },
+			{ name: 'strategy', flags: '--strategy <mode>', description: 'Merge strategy.', kind: 'enum', values: ['merge', 'ff-only'] },
+			{ name: 'noPush', flags: '--no-push', description: 'Do not push branches after a successful update.', kind: 'boolean' },
+			{ name: 'worktreeMode', flags: '--worktree <mode>', description: 'Control managed workflow worktrees.', kind: 'enum', values: ['auto', 'on', 'off'] },
+			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
+			{ name: 'plan', flags: '--plan', description: 'Compute the update plan without mutating any repo.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed update --from staging', 'treeseed update --from staging --plan --json', 'treeseed update --from staging --strategy ff-only --plan'],
+		help: {
+			workflowPosition: 'sync task branch',
+			longSummary: [
+				'Update merges staging, or another selected source branch, down into the current task branch across market and checked-out package repositories.',
+				'It is the inverse of stage: update brings staging into the task branch, while stage promotes the task branch back into staging.',
+			],
+			whenToUse: [
+				'Use this from a task branch or managed worktree when staging has advanced and the task needs the latest integrated state.',
+				'Use --plan before a risky update to see which repositories need a merge.',
+			],
+			beforeYouRun: [
+				'Run from the task branch or managed worktree you want to update.',
+				'The root and package repositories must be clean. Run `treeseed save` first if there are local changes.',
+			],
+			outcomes: [
+				'Merges the selected source branch into checked-out package repos first, then the root market repo.',
+				'Commits updated root package pointers when package heads changed.',
+				'Pushes updated branches by default unless --no-push is supplied.',
+			],
+			examples: [
+				example('treeseed update --from staging --json', 'Update from staging', 'Merge origin/staging into the current task branch and push the result.'),
+				example('treeseed update --from staging --plan --json', 'Plan the update', 'Inspect package and root merge needs without changing any repository.'),
+				example('treeseed update --from staging --strategy ff-only --plan', 'Require fast-forward', 'Check whether the task branch can be updated without a merge commit.'),
+			],
+			relatedDetails: [
+				related('status', 'Use `status` before update when you need to confirm the current branch role and cleanliness.'),
+				related('save', 'Use `save` before update when local changes need to be checkpointed.'),
+				related('stage', 'Use `stage` after update when the task is ready to promote back into staging.'),
+				related('switch', 'Use `switch` to create or resume the task branch before updating it.'),
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'update',
+	})],
 	['close', command({
 		arguments: [{ name: 'message', description: 'Reason for closing the task without staging it.', required: true, kind: 'message_tail' }],
 		options: [

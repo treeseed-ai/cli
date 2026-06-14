@@ -113,6 +113,8 @@ export function renderWorkflowNextStep(step: TreeseedWorkflowNextStep) {
 			const message = String(input.message ?? '').trim();
 			return `treeseed save${message ? ` "${message}"` : ''}${input.hotfix ? ' --hotfix' : ''}`;
 		}
+		case 'update':
+			return `treeseed update --from ${String(input.from ?? 'staging')}`;
 		case 'close':
 			return `treeseed close "${String(input.message ?? 'reason')}"`;
 		case 'stage':

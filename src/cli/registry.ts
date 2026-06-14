@@ -8,6 +8,7 @@ import { handleInit } from './handlers/init.js';
 import { handleConfig } from './handlers/config.js';
 import { handleClose } from './handlers/close.js';
 import { handleSave } from './handlers/save.js';
+import { handleUpdate } from './handlers/update.js';
 import { handleRelease } from './handlers/release.js';
 import { handleDestroy } from './handlers/destroy.js';
 import { handleStatus } from './handlers/status.js';
@@ -59,6 +60,7 @@ export const COMMAND_HANDLERS = {
 	config: handleConfig,
 	close: handleClose,
 	save: handleSave,
+	update: handleUpdate,
 	release: handleRelease,
 	destroy: handleDestroy,
 	status: handleStatus,
