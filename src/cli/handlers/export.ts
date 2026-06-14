@@ -9,7 +9,6 @@ export const handleExport: TreeseedCommandHandler = async (invocation, context) 
 			: undefined;
 		const result = await createWorkflowSdk(context).export({
 			directory,
-			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 		});
 		const exported = result.payload as Record<string, any>;
 		return guidedResult({

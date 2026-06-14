@@ -8,7 +8,7 @@ export const handleSwitch: TreeseedCommandHandler = async (invocation, context) 
 		const result = await createWorkflowSdk(context).switchTask({
 			branch,
 			preview: invocation.args.preview === true,
-			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
+			worktreeMode: invocation.args.worktree === true ? 'on' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,

@@ -668,7 +668,7 @@ test('railway wrapper forwards workspace project probes without preselecting pro
 test('export help includes the directory argument', async () => {
 	const result = await runCli(['help', 'export']);
 	assert.equal(result.exitCode, 0);
-	assert.match(result.output, /treeseed export \[directory\] \[--worktree <mode>\] \[--json\]/);
+	assert.match(result.output, /treeseed export \[directory\] \[--json\]/);
 });
 
 test('recover help documents stale run pruning', async () => {

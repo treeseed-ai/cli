@@ -8,7 +8,6 @@ export const handleUpdate: TreeseedCommandHandler = async (invocation, context) 
 			from: typeof invocation.args.from === 'string' ? invocation.args.from : undefined,
 			strategy: typeof invocation.args.strategy === 'string' ? invocation.args.strategy as 'merge' | 'ff-only' : undefined,
 			push: invocation.args.noPush === true ? false : undefined,
-			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,

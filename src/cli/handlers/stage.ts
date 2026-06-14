@@ -6,7 +6,6 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 	try {
 		const result = await createWorkflowSdk(context).stage({
 			message: invocation.positionals.join(' ').trim(),
-			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
@@ -18,7 +17,6 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			mergeTarget?: string;
 			mergeStrategy?: string;
 			autoSaved?: boolean;
-			deprecatedTag?: { tagName: string };
 			repos?: Array<{ merged: boolean; deletedLocal: boolean; deletedRemote: boolean; skippedReason: string | null }>;
 			rootRepo?: { deletedLocal: boolean; deletedRemote: boolean; tagName: string | null };
 			stagingWait?: { status: string };
@@ -66,7 +64,6 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Merge target', value: payload.mergeTarget },
 				{ label: 'Merge strategy', value: payload.mergeStrategy },
 				{ label: 'Auto-saved', value: payload.autoSaved ? 'yes' : 'no' },
-				{ label: 'Deprecated tag', value: payload.rootRepo?.tagName ?? payload.deprecatedTag?.tagName ?? '(planned)' },
 				{ label: 'Package merges', value: String(mergedPackages) },
 				{ label: 'Staging wait', value: payload.stagingWait?.status ?? (result.executionMode === 'plan' ? 'planned' : 'unknown') },
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },

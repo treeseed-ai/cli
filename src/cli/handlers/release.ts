@@ -83,7 +83,6 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			bump,
 			repairVersionLine,
 			targetVersionLine: typeof invocation.args.targetVersionLine === 'string' ? invocation.args.targetVersionLine : undefined,
-			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			verifyDeployedResources: invocation.args.verifyDeployedResources === true,

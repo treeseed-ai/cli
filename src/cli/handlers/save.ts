@@ -128,7 +128,6 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			message: invocation.positionals.join(' ').trim(),
 			hotfix: invocation.args.hotfix === true,
 			preview: invocation.args.preview === true,
-			worktreeMode: typeof invocation.args.worktreeMode === 'string' ? invocation.args.worktreeMode as 'auto' | 'on' | 'off' : undefined,
 			lane: typeof invocation.args.lane === 'string' ? invocation.args.lane as 'fast' | 'promotion' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
 			verifyMode: typeof invocation.args.verifyMode === 'string' ? invocation.args.verifyMode as 'fast' | 'local' | 'hosted' | 'both' | 'skip' : undefined,
