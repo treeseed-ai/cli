@@ -642,16 +642,19 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(secondPayload.actions.find((action) => action.key === 'team:treeseed').action, 'unchanged');
 });
 
-test('seed local apply requires a saved market session', async () => {
+test('seed local apply can bootstrap without a saved market session', async () => {
 	const root = seedWorkspace();
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
 		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: tempD1Path() },
 	});
-	assert.equal(result.exitCode, 4);
-	const payload = JSON.parse(result.stderr);
-	assert.equal(payload.ok, false);
-	assert.match(payload.error, /Not logged in to market "local"/);
+	assert.equal(result.exitCode, 0, result.stderr);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.ok, true);
+	assert.equal(payload.result.message, 'Local seed apply completed.');
+	assert.equal(payload.summary.create, 8);
+	assert.equal(payload.result.actionCount, 8);
+	assert.equal(payload.result.capacityProviderKeys.created.length, 1);
 });
 
 test('seed export emits a productized manifest from local state', async () => {

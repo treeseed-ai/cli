@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { discoverTreeseedApplications } from '@treeseed/sdk/hosting';
 import {
 	collectTreeseedReconcileStatus,
@@ -71,14 +73,37 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardBooleanOption('all', '--all');
 		forwardBooleanOption('follow', '--follow');
 		forwardBooleanOption('json', '--json');
+		if (!existsSync(resolve(context.cwd, 'packages', 'api'))) {
+			return {
+				exitCode: 0,
+				report: {
+					command: subcommand ? `dev ${effectiveSubcommand}` : 'dev',
+					alias: invocation.commandName,
+					ok: true,
+					watch,
+					execute: false,
+					args: passthroughArgs,
+					appId: appId ?? null,
+					apiMode,
+					delegatedTo: '@treeseed/core/scripts/dev-platform',
+					discoveredApps: discoveredApps.map((app) => ({
+						id: app.id,
+						relativeRoot: app.relativeRoot,
+						roles: app.roles,
+					})),
+					selectedSurfaces,
+				},
+			};
+		}
 			const target = { kind: 'persistent' as const, scope: 'local' as const };
 			const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
 			const selectedServiceIds = selectedSurfaces.split(',').map((surface) => surface.trim()).filter(Boolean)
 				.flatMap((surface) => surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]);
+			const localInfrastructureServiceIds = ['api-postgres', 'treedx', 'capacity-provider', 'agent-capacity-provider'];
 			const selector: TreeseedReconcileSelector = {
 				environment: 'local',
-				resourceKind: ['local-process'],
-				serviceId: selectedServiceIds,
+				resourceKind: ['local-process', 'local-treedx', 'local-docker-compose', 'capacity-provider'],
+				serviceId: [...selectedServiceIds, ...localInfrastructureServiceIds],
 			};
 			const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector).map((unit) =>
 				unit.unitType === 'local-process'
