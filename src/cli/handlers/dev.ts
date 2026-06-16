@@ -28,6 +28,14 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		const apiMode = typeof invocation.args.api === 'string' && invocation.args.api.trim()
 			? invocation.args.api.trim()
 			: 'auto';
+		const target = { kind: 'persistent' as const, scope: 'local' as const };
+		const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+		const localProcessServiceIds = new Set(
+			compileTreeseedDesiredUnitsFromGraph(desiredGraph, {
+				environment: 'local',
+				resourceKind: ['local-process'],
+			}).map((unit) => typeof unit.metadata.serviceId === 'string' ? unit.metadata.serviceId : null),
+		);
 		const subcommand = typeof invocation.positionals[0] === 'string' ? invocation.positionals[0] : '';
 		const effectiveSubcommand = subcommand || 'start';
 		const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
@@ -35,12 +43,12 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			return fail(`Unknown dev subcommand "${subcommand}". Use start, status, logs, stop, or restart.`);
 		}
 		const discoveredApps = discoverTreeseedApplications(context.cwd);
-		const hasApiApp = discoveredApps.some((app) => app.id === 'api');
+		const hasLocalApi = localProcessServiceIds.has('api') || localProcessServiceIds.has('operations-runner');
 		const selectedSurfaces = appId === 'api'
 			? 'api'
 			: appId === 'web' || apiMode === 'remote'
 				? 'web'
-				: hasApiApp
+				: hasLocalApi
 					? 'web,api'
 					: 'web';
 		const passthroughArgs: string[] = ['--surfaces', selectedSurfaces];
@@ -71,26 +79,56 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardBooleanOption('all', '--all');
 		forwardBooleanOption('follow', '--follow');
 		forwardBooleanOption('json', '--json');
-			const target = { kind: 'persistent' as const, scope: 'local' as const };
-			const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
-			const selectedServiceIds = selectedSurfaces.split(',').map((surface) => surface.trim()).filter(Boolean)
-				.flatMap((surface) => surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]);
-			const selector: TreeseedReconcileSelector = {
-				environment: 'local',
-				resourceKind: ['local-process'],
-				serviceId: selectedServiceIds,
-			};
-			const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector).map((unit) =>
-				unit.unitType === 'local-process'
-					? { ...unit, spec: { ...unit.spec, action: effectiveSubcommand === 'restart' ? 'restart' : 'start' } }
-					: unit);
-			const planOnly = invocation.args.plan === true;
-			const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
-			const stopLike = effectiveSubcommand === 'stop';
-			const statusLike = effectiveSubcommand === 'status' || effectiveSubcommand === 'logs';
-			const result = statusLike
-				? await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector })
-				: stopLike
+		const numberOption = (name: string) => {
+			const value = invocation.args[name];
+			const parsed = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : Number.NaN;
+			return Number.isFinite(parsed) ? parsed : undefined;
+		};
+		const stringOption = (name: string) => {
+			const value = invocation.args[name];
+			return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+		};
+		const localProcessOptions = {
+			...(stringOption('host') ? { host: stringOption('host') } : {}),
+			...(numberOption('port') !== undefined ? { port: numberOption('port') } : {}),
+			...(stringOption('apiHost') ? { apiHost: stringOption('apiHost') } : {}),
+			...(numberOption('apiPort') !== undefined ? { apiPort: numberOption('apiPort') } : {}),
+			...(stringOption('webRuntime') ? { webRuntime: stringOption('webRuntime') } : {}),
+			...(invocation.args.reset === true ? { reset: true } : {}),
+			...(invocation.args.force === true ? { force: true } : {}),
+			...(invocation.args.forceConflicts === true ? { forceConflicts: true } : {}),
+			...(invocation.args.all === true ? { all: true } : {}),
+			...(invocation.args.follow === true ? { follow: true } : {}),
+		};
+		const selectedServiceIds = selectedSurfaces.split(',').map((surface) => surface.trim()).filter(Boolean)
+			.flatMap((surface) => surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]);
+		const selector: TreeseedReconcileSelector = {
+			environment: 'local',
+			resourceKind: ['local-process'],
+			serviceId: selectedServiceIds,
+		};
+		const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector).map((unit) =>
+			unit.unitType === 'local-process'
+				? {
+					...unit,
+					spec: {
+						...unit.spec,
+						action: effectiveSubcommand === 'restart' ? 'restart' : 'start',
+						options: {
+							...(unit.spec.options as Record<string, unknown> | undefined),
+							...localProcessOptions,
+							...(unit.metadata.serviceId === 'operations-runner' ? { reset: false } : {}),
+						},
+					},
+				}
+				: unit);
+		const planOnly = invocation.args.plan === true;
+		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
+		const stopLike = effectiveSubcommand === 'stop';
+		const statusLike = effectiveSubcommand === 'status' || effectiveSubcommand === 'logs';
+		const result = statusLike
+			? await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector })
+			: stopLike
 					? planOnly
 						? await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: context.env, units, selector })
 						: await destroyTreeseedTargetUnits({ tenantRoot: context.cwd, target, env: context.env, units, selector, write: (line) => context.write(`[dev] ${line}`, 'stderr') })
@@ -123,7 +161,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 					roles: app.roles,
 					})),
 					selectedSurfaces,
-					desiredGraph,
+					...(invocation.args.plan === true || invocation.args.verbose === true ? { desiredGraph } : {}),
 					reconcile: result,
 				},
 			};

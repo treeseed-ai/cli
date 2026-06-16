@@ -1611,7 +1611,7 @@ test('treeseed dev leaves live feedback disabled when feedback is off', async ()
 	const workspaceRoot = makeTenantWorkspace('feature/dev-feedback-off');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const result = await runCli(['dev', '--feedback', 'off', '--json'], {
+	const result = await runCli(['dev', '--feedback', 'off', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
@@ -1626,7 +1626,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	const workspaceRoot = makeTenantWorkspace('feature/dev-managed-subcommands');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const start = await runCli(['dev', 'start', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--json'], {
+	const start = await runCli(['dev', 'start', '--port', '4501', '--web-runtime', 'local', '--force-conflicts', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
