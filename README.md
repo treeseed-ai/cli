@@ -11,7 +11,8 @@ The CLI is the human and automation entrypoint over package-owned capabilities. 
 - save, stage, close, resume, and release multi-repo work
 - plan/apply/verify hosted infrastructure through reconciliation
 - run operations-runner smoke checks
-- build and operate capacity providers
+- build and operate capacity provider runtime lifecycle
+- inspect capacity plans, provider sessions, assignments, mode runs, and usage
 - manage TreeDX package image workflows
 - inspect package drift, workflow locks, and interrupted runs
 
@@ -61,7 +62,10 @@ treeseed capacity up
 treeseed capacity status
 treeseed capacity logs
 treeseed capacity down
+treeseed capacity test-local
 ```
+
+Capacity lifecycle commands reconcile or inspect provider runtime. Assignment policy, provider sessions, mode runs, and usage settlement are API control-plane records exposed through explicit inspection/diagnostic commands as they are implemented; CLI must not become a hidden scheduler.
 
 TreeDX package image:
 
@@ -118,6 +122,7 @@ treeseed resume <run-id> --json
 - `@treeseed/core` owns the local web runtime used by `treeseed dev`.
 - `@treeseed/admin` and `@treeseed/ui` are consumed by the web app; CLI does not own those routes or components.
 - `@treeseed/api` owns backend API and operations-runner implementation.
+- `@treeseed/api` owns durable capacity coordination records and assignment APIs.
 - `@treeseed/agent` owns capacity-provider runtime artifacts that CLI starts or reconciles.
 - TreeDX owns its service/image; CLI exposes package-image workflow commands.
 
