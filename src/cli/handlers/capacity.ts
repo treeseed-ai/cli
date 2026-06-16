@@ -15,6 +15,20 @@ import { fail, guidedResult } from './utils.js';
 const PROVIDER_LIFECYCLE_ACTIONS = new Set(['build', 'up', 'down', 'restart', 'logs', 'status', 'test-local']);
 const PROVIDER_ENTRYPOINT_ACTIONS = new Set(['doctor', 'register', 'plan']);
 const MARKET_CAPACITY_ACTIONS = new Set(['migrate']);
+const MARKET_INSPECTION_ACTIONS = new Set([
+	'allocation-sets',
+	'agent-classes',
+	'provider-sessions',
+	'assignments',
+	'mode-runs',
+	'decision-planning',
+	'execution-inputs',
+	'capacity-plans',
+	'capacity-plan',
+	'workday',
+	'workday-summary',
+	'assignment-explanation',
+]);
 
 function stringArg(invocation: TreeseedParsedInvocation, name: string) {
 	const value = invocation.args[name];
@@ -66,6 +80,11 @@ function resolveCapacityLaunchConfigPath(invocation: TreeseedParsedInvocation, c
 	return resolve(context.cwd, configPath);
 }
 
+function isNonGitWorkspaceError(error: unknown) {
+	const message = error instanceof Error ? error.message : String(error);
+	return /not a git repository/u.test(message);
+}
+
 function nativeBudgetSummaryLines(report: Record<string, unknown> | null) {
 	const budgets = recordValue(report, 'budgets');
 	const nativeCapacity = recordValue(budgets, 'nativeCapacity') ?? recordValue(budgets, 'native_capacity');
@@ -103,6 +122,130 @@ function derivedCapacityLines(plan: Record<string, unknown>) {
 		`derived ${formatNumber(recordValue(entry, 'derivedAvailableCredits'))} credits`,
 		`confidence ${recordValue(entry, 'confidence') ?? 'unknown'}`,
 	].join(' | '));
+}
+
+function summarizeRecord(record: unknown) {
+	if (!record || typeof record !== 'object') return String(record ?? '');
+	const item = record as Record<string, unknown>;
+	const id = String(item.id ?? item.assignmentId ?? item.sessionId ?? item.classId ?? 'record');
+	const state = item.status ?? item.state ?? item.leaseState ?? item.mode ?? item.kind ?? null;
+	const parts = [
+		id,
+		state ? String(state) : null,
+		item.projectId ? `project=${String(item.projectId)}` : null,
+		item.providerId ? `provider=${String(item.providerId)}` : null,
+		item.mode ? `mode=${String(item.mode)}` : null,
+		item.updatedAt ? `updated=${String(item.updatedAt)}` : item.createdAt ? `created=${String(item.createdAt)}` : null,
+	].filter(Boolean);
+	return parts.join(' | ');
+}
+
+function listLines(records: unknown[]) {
+	return records.length > 0 ? records.slice(0, 25).map(summarizeRecord) : ['No records returned.'];
+}
+
+function queryFromFilters(filters: Record<string, string | null>) {
+	const query = new URLSearchParams();
+	for (const [key, value] of Object.entries(filters)) {
+		if (value) query.set(key, value);
+	}
+	return query.toString() ? `?${query.toString()}` : '';
+}
+
+async function runMarketInspection(action: string, invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+	const teamId = stringArg(invocation, 'team');
+	const projectId = stringArg(invocation, 'project');
+	const providerId = stringArg(invocation, 'provider');
+	const status = stringArg(invocation, 'status');
+	const mode = stringArg(invocation, 'mode');
+	const assignmentId = stringArg(invocation, 'assignment');
+	const decisionId = stringArg(invocation, 'decision');
+	const capacityPlanId = stringArg(invocation, 'capacity-plan') ?? stringArg(invocation, 'plan');
+	const workdayId = stringArg(invocation, 'workday');
+	if ((action === 'allocation-sets' || action === 'provider-sessions' || action === 'assignments' || action === 'assignment-explanation') && !teamId) {
+		return fail(`Missing --team. Use \`trsd capacity ${action} --team <team-id> --json\`.`);
+	}
+	if ((action === 'agent-classes' || action === 'mode-runs') && !projectId) {
+		return fail(`Missing --project. Use \`trsd capacity ${action} --project <project-id> --json\`.`);
+	}
+	if ((action === 'decision-planning' || action === 'execution-inputs' || action === 'capacity-plans') && !decisionId) {
+		return fail(`Missing --decision. Use \`trsd capacity ${action} --decision <decision-id> --json\`.`);
+	}
+	if (action === 'capacity-plan' && !capacityPlanId) {
+		return fail('Missing --capacity-plan. Use `trsd capacity capacity-plan --capacity-plan <capacity-plan-id> --json`.');
+	}
+	if ((action === 'workday' || action === 'workday-summary') && !workdayId) {
+		return fail(`Missing --workday. Use \`trsd capacity ${action} --workday <workday-id> --json\`.`);
+	}
+	if (action === 'assignment-explanation' && !assignmentId) {
+		return fail('Missing --assignment. Use `trsd capacity assignment-explanation --assignment <assignment-id> --json`.');
+	}
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	let path = '';
+	let scopeLabel = '';
+	if (action === 'allocation-sets') {
+		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/allocation-sets`;
+		scopeLabel = `team ${teamId}`;
+	} else if (action === 'provider-sessions') {
+		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/provider-sessions${queryFromFilters({ providerId, status })}`;
+		scopeLabel = `team ${teamId}`;
+	} else if (action === 'assignments') {
+		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/assignments${queryFromFilters({ projectId, providerId, status })}`;
+		scopeLabel = `team ${teamId}`;
+	} else if (action === 'agent-classes') {
+		path = `/v1/projects/${encodeURIComponent(projectId!)}/agent-classes`;
+		scopeLabel = `project ${projectId}`;
+	} else if (action === 'mode-runs') {
+		path = `/v1/projects/${encodeURIComponent(projectId!)}/agent-mode-runs${queryFromFilters({ mode, assignmentId })}`;
+		scopeLabel = `project ${projectId}`;
+	} else if (action === 'decision-planning') {
+		path = `/v1/decisions/${encodeURIComponent(decisionId!)}/planning-status`;
+		scopeLabel = `decision ${decisionId}`;
+	} else if (action === 'execution-inputs') {
+		path = `/v1/decisions/${encodeURIComponent(decisionId!)}/execution-inputs${queryFromFilters({ status })}`;
+		scopeLabel = `decision ${decisionId}`;
+	} else if (action === 'capacity-plans') {
+		path = `/v1/decisions/${encodeURIComponent(decisionId!)}/capacity-plans${queryFromFilters({ status })}`;
+		scopeLabel = `decision ${decisionId}`;
+	} else if (action === 'capacity-plan') {
+		path = `/v1/capacity-plans/${encodeURIComponent(capacityPlanId!)}`;
+		scopeLabel = `capacity plan ${capacityPlanId}`;
+	} else if (action === 'workday') {
+		path = `/v1/workdays/${encodeURIComponent(workdayId!)}`;
+		scopeLabel = `workday ${workdayId}`;
+	} else if (action === 'workday-summary') {
+		path = `/v1/workdays/${encodeURIComponent(workdayId!)}/summary`;
+		scopeLabel = `workday ${workdayId}`;
+	} else if (action === 'assignment-explanation') {
+		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/assignments/${encodeURIComponent(assignmentId!)}/explanation`;
+		scopeLabel = `team ${teamId}`;
+	}
+	const response = await marketRequest<{ ok: true; payload: unknown[] | Record<string, unknown> }>(client, path, { requireAuth: true });
+	const records = Array.isArray(response.payload) ? response.payload : response.payload ? [response.payload] : [];
+	return guidedResult({
+		command: `capacity ${action}`,
+		summary: `Read ${records.length} ${action.replace(/-/gu, ' ')} record${records.length === 1 ? '' : 's'} for ${scopeLabel}.`,
+		facts: [
+			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
+			{ label: 'Scope', value: scopeLabel },
+			{ label: 'Records', value: records.length },
+			...(providerId ? [{ label: 'Provider filter', value: providerId }] : []),
+			...(status ? [{ label: 'Status filter', value: status }] : []),
+			...(mode ? [{ label: 'Mode filter', value: mode }] : []),
+			...(assignmentId ? [{ label: 'Assignment filter', value: assignmentId }] : []),
+		],
+		sections: [
+			{ title: 'Records', lines: listLines(records) },
+			{ title: 'Boundary', lines: ['Read-only inspection. Assignment creation, selection, and provider lifecycle remain owned by API coordination and reconciled provider runtime.'] },
+		],
+		report: {
+			action,
+			market: { id: profile.id, baseUrl: profile.baseUrl },
+			scope: { teamId, projectId },
+			filters: { providerId, status, mode, assignmentId, capacityPlanId },
+			records,
+		},
+	});
 }
 
 function grantAllocationLines(plan: Record<string, unknown>) {
@@ -285,7 +428,39 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 async function runLifecycleAction(action: string, invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
 	const environment = 'local' as const;
 	const target = { kind: 'persistent' as const, scope: environment };
-	const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+	const agentPackageRoot = stringArg(invocation, 'agentPackageRoot');
+	let desiredGraph: ReturnType<typeof compileTreeseedDesiredResourceGraph>;
+	try {
+		desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+	} catch (error) {
+		if (!agentPackageRoot || !isNonGitWorkspaceError(error)) throw error;
+		const execute = boolArg(invocation, 'execute');
+		const market = resolveMarket(invocation);
+		const capacityConfigPath = resolveCapacityLaunchConfigPath(invocation, context);
+		return guidedResult({
+			command: `capacity ${action}`,
+			summary: `Capacity provider ${action} package-root plan rendered outside a git-backed Treeseed workspace.`,
+			facts: [
+				{ label: 'Market', value: `${market.id} (${market.baseUrl})` },
+				{ label: 'Provider', value: providerSelector(invocation) },
+				{ label: 'Agent package root', value: agentPackageRoot },
+				{ label: 'Execute', value: execute ? 'yes' : 'no' },
+				...(capacityConfigPath ? [{ label: 'Config', value: capacityConfigPath }] : []),
+			],
+			sections: [
+				{ title: 'Boundary', lines: ['Package-root fallback is diagnostic-only. Git-backed Treeseed workspaces use canonical reconciliation for provider lifecycle.'] },
+			],
+			report: {
+				action,
+				market: { id: market.id, baseUrl: market.baseUrl },
+				provider: providerSelector(invocation),
+				agentPackageRoot,
+				...(capacityConfigPath ? { launchManifest: { path: capacityConfigPath } } : {}),
+				execute,
+				diagnosticOnly: true,
+			},
+		});
+	}
 	const selector: TreeseedReconcileSelector = action === 'build'
 		? { environment, packageId: ['@treeseed/agent'], resourceKind: ['docker-image-build'] }
 		: { environment, packageId: ['@treeseed/agent'], resourceKind: ['capacity-provider', 'local-docker-compose'] };
@@ -368,7 +543,34 @@ async function runLifecycleAction(action: string, invocation: TreeseedParsedInvo
 async function invokeProviderEntrypoint(action: string, invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
 	const market = resolveMarket(invocation);
 	const target = { kind: 'persistent' as const, scope: 'local' as const };
-	const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+	const agentPackageRoot = stringArg(invocation, 'agentPackageRoot');
+	let desiredGraph: ReturnType<typeof compileTreeseedDesiredResourceGraph>;
+	try {
+		desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+	} catch (error) {
+		if (!agentPackageRoot || !isNonGitWorkspaceError(error)) throw error;
+		return guidedResult({
+			command: `capacity ${action}`,
+			summary: `Capacity provider ${action} package-root diagnostic rendered outside a git-backed Treeseed workspace.`,
+			facts: [
+				{ label: 'Market', value: `${market.id} (${market.baseUrl})` },
+				{ label: 'Provider', value: providerSelector(invocation) },
+				{ label: 'Agent package root', value: agentPackageRoot },
+				{ label: 'Ready', value: 'diagnostic-only' },
+			],
+			sections: [
+				{ title: 'Boundary', lines: ['Package-root fallback is diagnostic-only. Git-backed Treeseed workspaces use canonical reconciliation for provider lifecycle.'] },
+			],
+			report: {
+				ok: true,
+				action,
+				market: { id: market.id, baseUrl: market.baseUrl },
+				provider: providerSelector(invocation),
+				agentPackageRoot,
+				diagnosticOnly: true,
+			},
+		});
+	}
 	const selector: TreeseedReconcileSelector = { environment: 'local', packageId: ['@treeseed/agent'], resourceKind: ['capacity-provider', 'local-docker-compose'] };
 	const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector);
 	const status = await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector });
@@ -412,6 +614,13 @@ export const handleCapacity: TreeseedCommandHandler = async (invocation, context
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
+	if (MARKET_INSPECTION_ACTIONS.has(action)) {
+		try {
+			return await runMarketInspection(action, invocation, context);
+		} catch (error) {
+			return fail(error instanceof Error ? error.message : String(error));
+		}
+	}
 	if (PROVIDER_LIFECYCLE_ACTIONS.has(action)) {
 		try {
 			return await runLifecycleAction(action, invocation, context);
@@ -426,5 +635,5 @@ export const handleCapacity: TreeseedCommandHandler = async (invocation, context
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
-	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, build, up, down, restart, logs, status, or test-local.`);
+	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, allocation-sets, agent-classes, provider-sessions, assignments, mode-runs, decision-planning, execution-inputs, capacity-plans, capacity-plan, workday, workday-summary, assignment-explanation, build, up, down, restart, logs, status, or test-local.`);
 };

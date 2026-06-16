@@ -65,7 +65,24 @@ treeseed capacity down
 treeseed capacity test-local
 ```
 
-Capacity lifecycle commands reconcile or inspect provider runtime. Assignment policy, provider sessions, mode runs, and usage settlement are API control-plane records exposed through explicit inspection/diagnostic commands as they are implemented; CLI must not become a hidden scheduler.
+Capacity lifecycle commands reconcile or inspect provider runtime. Assignment policy, provider sessions, assignments, mode runs, and usage settlement are API control-plane records exposed through explicit inspection/diagnostic commands; CLI must not become a hidden scheduler.
+
+Capacity coordination inspection:
+
+```bash
+treeseed capacity plan --market local --project project_123 --environment local --json
+treeseed capacity allocation-sets --market local --team team_123 --json
+treeseed capacity agent-classes --market local --project project_123 --json
+treeseed capacity provider-sessions --market local --team team_123 --provider provider_123 --json
+treeseed capacity assignments --market local --team team_123 --status leased --json
+treeseed capacity mode-runs --market local --project project_123 --mode planning --json
+treeseed capacity decision-planning --market local --decision decision_123 --json
+treeseed capacity execution-inputs --market local --decision decision_123 --json
+treeseed capacity capacity-plans --market local --decision decision_123 --json
+treeseed capacity capacity-plan --market local --capacity-plan capacity_plan_123 --json
+treeseed capacity workday-summary --market local --workday workday_123 --json
+treeseed capacity assignment-explanation --market local --team team_123 --assignment assignment_123 --json
+```
 
 TreeDX package image:
 
