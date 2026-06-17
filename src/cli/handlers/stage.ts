@@ -27,6 +27,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			applicationSelection?: { selected?: string[]; skipped?: Array<{ appId?: string; reason?: string }> };
 			worktreeCleanup?: { removed?: boolean };
 			worktreePath?: string | null;
+			blockers?: string[];
 			units?: Array<Record<string, unknown>>;
 			plannedSteps?: Array<Record<string, unknown>>;
 			reconcile?: unknown;
@@ -65,6 +66,9 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Merge strategy', value: payload.mergeStrategy },
 				{ label: 'Auto-saved', value: payload.autoSaved ? 'yes' : 'no' },
 				{ label: 'Package merges', value: String(mergedPackages) },
+				...(payload.blockers?.length
+					? [{ label: 'Blockers', value: payload.blockers.join('; ') }]
+					: []),
 				{ label: 'Staging wait', value: payload.stagingWait?.status ?? (result.executionMode === 'plan' ? 'planned' : 'unknown') },
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
@@ -74,7 +78,9 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Final branch', value: payload.finalBranch ?? payload.mergeTarget },
 			],
 			sections: result.executionMode === 'plan' ? hostingGraphSections(hostingGraph) : [],
-			nextSteps: renderWorkflowNextSteps(result),
+			nextSteps: payload.blockers?.length
+				? ['treeseed status --json  # Inspect current branch and workflow state before staging.']
+				: renderWorkflowNextSteps(result),
 			report: {
 				...result,
 				hostingGraph,
