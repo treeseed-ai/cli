@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.11.1-dev.staging.20260617T171530Z",
+  "version": "0.11.1-dev.staging.20260617T203043Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
