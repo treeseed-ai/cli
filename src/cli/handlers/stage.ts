@@ -55,8 +55,32 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			});
 		}
 		const mergedPackages = (payload.repos ?? []).filter((repo) => repo.merged).length;
-		const hostingGraph = resolveWorkflowHostingGraph(context, 'staging', payload.applicationSelection);
 		const blocked = (payload.blockers?.length ?? 0) > 0;
+		const hostingGraph = blocked ? null : resolveWorkflowHostingGraph(context, 'staging', payload.applicationSelection);
+		const report = blocked
+			? {
+				schemaVersion: result.schemaVersion,
+				kind: result.kind,
+				command: result.command,
+				executionMode: result.executionMode,
+				runId: result.runId,
+				ok: false,
+				operation: result.operation,
+				payload: {
+					mode: payload.mode,
+					branchName: payload.branchName,
+					mergeTarget: payload.mergeTarget,
+					mergeStrategy: payload.mergeStrategy,
+					autoSaved: payload.autoSaved ?? false,
+					blockers: payload.blockers ?? [],
+					worktreePath: payload.worktreePath ?? null,
+				},
+				errors: result.errors ?? [],
+			}
+			: {
+				...result,
+				hostingGraph,
+			};
 		return guidedResult({
 			command: invocation.commandName || 'stage',
 			summary: blocked
@@ -80,15 +104,12 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? payload.mergeTarget },
 			],
-			sections: result.executionMode === 'plan' ? hostingGraphSections(hostingGraph) : [],
+			sections: !blocked && result.executionMode === 'plan' && hostingGraph ? hostingGraphSections(hostingGraph) : [],
 			nextSteps: blocked
 				? ['treeseed status --json  # Inspect current branch and workflow state before staging.']
 				: renderWorkflowNextSteps(result),
 			exitCode: blocked ? 1 : 0,
-			report: {
-				...result,
-				hostingGraph,
-			},
+			report,
 		});
 	} catch (error) {
 		return workflowErrorResult(error);
