@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { findNearestTreeseedRoot, findNearestTreeseedWorkspaceRoot } from '@treeseed/sdk/workflow-support';
+import { findNearestTreeseedWorkspaceRoot, resolveTreeseedWorkflowPaths } from '@treeseed/sdk/workflow-support';
 import { TreeseedOperationsSdk as SdkOperationsRuntime } from '@treeseed/sdk/operations';
 import type {
 	TreeseedCommandContext,
@@ -468,7 +468,8 @@ export function resolveTreeseedCommandCwd(spec: TreeseedOperationSpec, cwd: stri
 		};
 	}
 
-	const resolvedProjectRoot = findNearestTreeseedRoot(cwd);
+	const workflowPaths = resolveTreeseedWorkflowPaths(cwd);
+	const resolvedProjectRoot = workflowPaths.tenantRoot;
 	const resolvedWorkspaceRoot = resolvedProjectRoot ? findNearestTreeseedWorkspaceRoot(resolvedProjectRoot) : null;
 
 	return {
