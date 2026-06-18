@@ -1,13 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { discoverTreeseedApplications } from '@treeseed/sdk/hosting';
-import {
-	collectTreeseedReconcileStatus,
-	destroyTreeseedTargetUnits,
-	planTreeseedReconciliation,
-	reconcileTreeseedTarget,
-	type TreeseedReconcileSelector,
-} from '@treeseed/sdk/reconcile';
+import { collectTreeseedReconcileStatus, destroyTreeseedTargetUnits, planTreeseedReconciliation, reconcileTreeseedTarget, type TreeseedReconcileSelector } from '@treeseed/sdk/reconcile';
 import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
@@ -24,12 +18,8 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		}
 		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
 		const watch = feedback !== 'off';
-		const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim()
-			? invocation.args.app.trim()
-			: undefined;
-		const apiMode = typeof invocation.args.api === 'string' && invocation.args.api.trim()
-			? invocation.args.api.trim()
-			: 'auto';
+		const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim() ? invocation.args.app.trim() : undefined;
+		const apiMode = typeof invocation.args.api === 'string' && invocation.args.api.trim() ? invocation.args.api.trim() : 'auto';
 		const subcommand = typeof invocation.positionals[0] === 'string' ? invocation.positionals[0] : '';
 		const effectiveSubcommand = subcommand || 'start';
 		const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
@@ -38,14 +28,8 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		}
 		const discoveredApps = discoverTreeseedApplications(context.cwd);
 		const hasApiApp = discoveredApps.some((app) => app.id === 'api');
-		const selectedSurfaces = appId === 'api'
-			? 'api'
-			: appId === 'web' || apiMode === 'remote'
-				? 'web'
-				: hasApiApp
-					? 'web,api'
-					: 'web';
-		const passthroughArgs: string[] = ['--surfaces', selectedSurfaces];
+		const selectedSurfaces = appId === 'api' ? 'api' : appId === 'web' || apiMode === 'remote' ? 'web' : hasApiApp ? 'web,api' : 'web';
+		const passthroughArgs: string[] = [];
 		const forwardStringOption = (name: string, flag: string) => {
 			const value = invocation.args[name];
 			if (typeof value === 'string' && value.trim().length > 0) {
@@ -95,33 +79,73 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 				},
 			};
 		}
-			const target = { kind: 'persistent' as const, scope: 'local' as const };
-			const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
-			const selectedServiceIds = selectedSurfaces.split(',').map((surface) => surface.trim()).filter(Boolean)
-				.flatMap((surface) => surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]);
-			const localInfrastructureServiceIds = ['api-postgres', 'treedx', 'capacity-provider', 'agent-capacity-provider'];
-			const selector: TreeseedReconcileSelector = {
-				environment: 'local',
-				resourceKind: ['local-process', 'local-treedx', 'local-docker-compose', 'capacity-provider'],
-				serviceId: [...selectedServiceIds, ...localInfrastructureServiceIds],
-			};
-			const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector).map((unit) =>
+		const target = { kind: 'persistent' as const, scope: 'local' as const };
+		const desiredGraph = compileTreeseedDesiredResourceGraph({
+			tenantRoot: context.cwd,
+			target,
+		});
+		const selectedServiceIds = selectedSurfaces
+			.split(',')
+			.map((surface) => surface.trim())
+			.filter(Boolean)
+			.flatMap((surface) => (surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]));
+		const selectedUnitIds = [...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`), 'local-docker-compose:api-postgres', 'local-treedx:team-primary', 'local-docker-compose:treedx'];
+		const selectedUnitIdSet = new Set(selectedUnitIds);
+		const selector: TreeseedReconcileSelector = {
+			environment: 'local',
+			unitId: selectedUnitIds,
+		};
+		const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector)
+			.filter((unit) => selectedUnitIdSet.has(unit.unitId))
+			.map((unit) =>
 				unit.unitType === 'local-process'
-					? { ...unit, spec: { ...unit.spec, action: effectiveSubcommand === 'restart' ? 'restart' : 'start' } }
-					: unit);
-			const planOnly = invocation.args.plan === true;
-			const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
-			const stopLike = effectiveSubcommand === 'stop';
-			const statusLike = effectiveSubcommand === 'status' || effectiveSubcommand === 'logs';
-			const result = statusLike
-				? await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector })
-				: stopLike
-					? planOnly
-						? await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: context.env, units, selector })
-						: await destroyTreeseedTargetUnits({ tenantRoot: context.cwd, target, env: context.env, units, selector, write: (line) => context.write(`[dev] ${line}`, 'stderr') })
-					: planOnly
-						? await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: context.env, units, selector })
-						: await reconcileTreeseedTarget({
+					? {
+							...unit,
+							spec: {
+								...unit.spec,
+								action: effectiveSubcommand === 'restart' ? 'restart' : 'start',
+							},
+						}
+					: unit,
+			);
+		const planOnly = invocation.args.plan === true;
+		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
+		const stopLike = effectiveSubcommand === 'stop';
+		const statusLike = effectiveSubcommand === 'status' || effectiveSubcommand === 'logs';
+		const result = statusLike
+			? await collectTreeseedReconcileStatus({
+					tenantRoot: context.cwd,
+					target,
+					env: context.env,
+					units,
+					selector,
+				})
+			: stopLike
+				? planOnly
+					? await planTreeseedReconciliation({
+							tenantRoot: context.cwd,
+							target,
+							env: context.env,
+							units,
+							selector,
+						})
+					: await destroyTreeseedTargetUnits({
+							tenantRoot: context.cwd,
+							target,
+							env: context.env,
+							units,
+							selector,
+							write: (line) => context.write(`[dev] ${line}`, 'stderr'),
+						})
+				: planOnly
+					? await planTreeseedReconciliation({
+							tenantRoot: context.cwd,
+							target,
+							env: context.env,
+							units,
+							selector,
+						})
+					: await reconcileTreeseedTarget({
 							tenantRoot: context.cwd,
 							target,
 							env: context.env,
@@ -130,28 +154,28 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 							dryRun: false,
 							write: (line) => context.write(`[dev] ${line}`, 'stderr'),
 						});
-			const ok = 'ready' in result ? result.ready : true;
-			return {
-				exitCode: ok ? 0 : 1,
-				report: {
-					command: subcommand ? `dev ${effectiveSubcommand}` : 'dev',
-					alias: invocation.commandName,
-					ok,
-					watch,
-					execute,
-					args: passthroughArgs,
-					appId: appId ?? null,
-					apiMode,
+		const ok = 'ready' in result ? result.ready : true;
+		return {
+			exitCode: ok ? 0 : 1,
+			report: {
+				command: subcommand ? `dev ${effectiveSubcommand}` : 'dev',
+				alias: invocation.commandName,
+				ok,
+				watch,
+				execute,
+				args: passthroughArgs,
+				appId: appId ?? null,
+				apiMode,
 				discoveredApps: discoveredApps.map((app) => ({
 					id: app.id,
 					relativeRoot: app.relativeRoot,
 					roles: app.roles,
-					})),
-					selectedSurfaces,
-					desiredGraph,
-					reconcile: result,
-				},
-			};
+				})),
+				selectedSurfaces,
+				desiredGraph,
+				reconcile: result,
+			},
+		};
 	} catch (error) {
 		return workflowErrorResult(error);
 	}

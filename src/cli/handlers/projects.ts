@@ -380,9 +380,11 @@ export const handleProjects: TreeseedCommandHandler = async (invocation, context
 				}
 			}
 			if (!requirementKey) return fail(`${subaction} requires --requirement <key>.`);
+			if (stringArg(invocation, 'sensitivePassphrase')) {
+				return fail('Project host operations no longer accept --sensitive-passphrase. Re-enter or migrate the host secret into an approved target, then retry the operation.');
+			}
 			const body = {
 				...(hostBinding ? { hostBinding } : {}),
-				...(stringArg(invocation, 'sensitivePassphrase') ? { sensitivePassphrase: stringArg(invocation, 'sensitivePassphrase') } : {}),
 				...(stringArg(invocation, 'idempotencyKey') ? { idempotencyKey: stringArg(invocation, 'idempotencyKey') } : {}),
 			};
 			const response = subaction === 'replace'

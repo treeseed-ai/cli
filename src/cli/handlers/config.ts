@@ -12,6 +12,7 @@ import type { TreeseedCommandHandler } from '../types.js';
 import { fail, guidedResult } from './utils.js';
 import { buildCliConfigPages, runCliConfigEditor } from './config-ui.js';
 import { promptForNewPassphrase, promptHidden } from './secret-prompts.js';
+import { summarizeCliSecretCapabilityState } from '../secrets-escrow.js';
 import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from './workflow.js';
 
 function normalizeConfigScopes(value: unknown) {
@@ -38,6 +39,7 @@ function normalizeBootstrapSystems(system: unknown, systems: unknown) {
 
 function formatPrintEnvReports(payload: Record<string, any>) {
 	const lines: string[] = [];
+	const secretCapability = buildConfigSecretCapabilityReport(payload);
 	for (const report of payload.reports ?? []) {
 		lines.push(`Resolved environment values for ${report.scope}`);
 		lines.push(payload.secretsRevealed ? 'Secrets are shown.' : 'Secret values are masked.');
@@ -54,6 +56,16 @@ function formatPrintEnvReports(payload: Record<string, any>) {
 			lines.push(`${check.provider}: ${status} - ${check.detail}`);
 		}
 		lines.push('');
+	}
+	lines.push('Secret capability boundary');
+	lines.push(`Escrowed: ${secretCapability.counts.escrowed}`);
+	lines.push(`GitHub-backed: ${secretCapability.counts.githubBacked}`);
+	lines.push(`Host-injected: ${secretCapability.counts.hostInjected}`);
+	lines.push(`Bootstrap: ${secretCapability.counts.bootstrap}`);
+	lines.push(`Provider-owned: ${secretCapability.counts.providerOwned}`);
+	lines.push(`Re-entry required: ${secretCapability.counts.reentryRequired}`);
+	for (const warning of secretCapability.warnings) {
+		lines.push(`warning: ${warning}`);
 	}
 	return lines.filter((line, index, all) => !(line === '' && all[index - 1] === ''));
 }
@@ -138,6 +150,61 @@ function describeSharedStorageMigrations(migrations: Array<Record<string, any>> 
 	}).join('; ');
 }
 
+function candidateSecretCapabilityRecords(payload: Record<string, any>) {
+	const explicit = payload.secretCapability?.records ?? payload.result?.secretCapability?.records;
+	if (Array.isArray(explicit)) return explicit;
+	const records: Array<Record<string, any>> = [];
+	const context = payload.context as Record<string, any> | undefined;
+	const readinessByScope = context?.configReadinessByScope ?? {};
+	for (const [scope, readiness] of Object.entries(readinessByScope as Record<string, any>)) {
+		for (const provider of ['github', 'cloudflare', 'railway'] as const) {
+			const configured = Boolean((readiness as Record<string, any>)?.[provider]?.configured);
+			records.push({
+				id: `${scope}:${provider}`,
+				custodyMode: provider === 'github' ? 'github_actions_secret_enclave' : 'host_env_injection',
+				hostInjected: provider !== 'github',
+				githubSecretTarget: provider === 'github' && configured ? { scope: 'repository' } : null,
+				status: configured ? 'active' : 'metadata_only_reentry',
+				metadataOnly: !configured,
+			});
+		}
+	}
+	if (payload.secretSession?.status) {
+		records.push({
+			id: 'local-machine-key',
+			custodyMode: 'bootstrap_service_secret',
+			bootstrap: true,
+			status: payload.secretSession.status.unlocked ? 'active' : 'metadata_only_reentry',
+		});
+	}
+	return records;
+}
+
+function buildConfigSecretCapabilityReport(payload: Record<string, any>) {
+	const records = candidateSecretCapabilityRecords(payload).map((record) => ({
+		...record,
+		summary: summarizeCliSecretCapabilityState(record),
+	}));
+	const counts = {
+		metadataOnly: records.filter((record) => record.summary.metadataOnly).length,
+		escrowed: records.filter((record) => record.summary.escrowed).length,
+		githubBacked: records.filter((record) => record.summary.githubBacked).length,
+		hostInjected: records.filter((record) => record.summary.hostInjected).length,
+		bootstrap: records.filter((record) => record.summary.bootstrap).length,
+		providerOwned: records.filter((record) => record.summary.providerOwned).length,
+		migrated: records.filter((record) => record.summary.migrated).length,
+		expired: records.filter((record) => record.summary.expired).length,
+		tombstoned: records.filter((record) => record.summary.tombstoned).length,
+		reentryRequired: records.filter((record) => record.summary.reentryRequired || record.summary.metadataOnly).length,
+	};
+	const warnings = [
+		...records.flatMap((record) => record.summary.warnings),
+		'Admin browser encryption depends on the integrity of the hosted Admin JavaScript.',
+		'Secret-bearing workflows must use allowlisted GitHub Actions operations with protected refs and environments.',
+	].filter((warning, index, all) => all.indexOf(warning) === index);
+	return { records, counts, warnings };
+}
+
 function renderConfigResult(commandName: string, result: any) {
 	const payload = result.payload as Record<string, any>;
 	const toolHealth = payload.toolHealth as Record<string, any> | undefined;
@@ -158,6 +225,7 @@ function renderConfigResult(commandName: string, result: any) {
 	const resourceInventoryByScope = payload.result?.resourceInventoryByScope ?? payload.resourceInventoryByScope ?? {};
 	const secretSession = payload.secretSession as Record<string, any> | undefined;
 	const sharedStorageMigrations = payload.result?.sharedStorageMigrations as Array<Record<string, any>> | undefined;
+	const secretCapability = buildConfigSecretCapabilityReport(payload);
 	const summary = payload.mode === 'print-env-only'
 		? 'Treeseed config environment report completed.'
 		: payload.mode === 'rotate-machine-key'
@@ -196,6 +264,7 @@ function renderConfigResult(commandName: string, result: any) {
 			{ label: 'GitHub token/config', value: providerConfigStatus('github') },
 			{ label: 'Cloudflare token/config', value: providerConfigStatus('cloudflare') },
 			{ label: 'Railway token/config', value: providerConfigStatus('railway') },
+			{ label: 'Secret capability', value: `escrowed ${secretCapability.counts.escrowed}, GitHub ${secretCapability.counts.githubBacked}, host ${secretCapability.counts.hostInjected}, re-entry ${secretCapability.counts.reentryRequired}` },
 			{ label: 'GitHub CLI', value: toolHealth?.githubCli?.available ? 'ready' : 'missing' },
 			{ label: 'Wrangler CLI', value: toolHealth?.wranglerCli?.available ? 'ready' : 'missing' },
 			{ label: 'Railway CLI', value: toolHealth?.railwayCli?.available ? 'ready' : 'missing' },
@@ -213,9 +282,13 @@ function renderConfigResult(commandName: string, result: any) {
 		],
 		nextSteps: [
 			...(payload.passphraseEnv?.configured ? [] : [payload.passphraseEnv?.recommendedLaunch].filter(Boolean)),
+			...secretCapability.warnings,
 			...renderWorkflowNextSteps(result),
 		],
-		report: payload,
+		report: {
+			...payload,
+			secretCapability,
+		},
 	});
 }
 

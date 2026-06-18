@@ -729,9 +729,9 @@ export async function runCliConfigEditor(
 			const detailWidth = viewMode === 'full' ? layout.contentWidth : layout.columns;
 			const detailPanel = detailViewportLines(detailSourceLines, detailWidth, layout.detailHeight, detailOffset);
 			const configReadiness = {
-				github: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'GH_TOKEN', readinessScope)) },
-				cloudflare: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'CLOUDFLARE_API_TOKEN', readinessScope)) },
-				railway: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'RAILWAY_API_TOKEN', readinessScope)) },
+				github: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'TREESEED_GITHUB_TOKEN', readinessScope)) },
+				cloudflare: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'TREESEED_CLOUDFLARE_API_TOKEN', readinessScope)) },
+				railway: { configured: hasUsableValue(resolveCurrentConfigValue(currentContext, overrides, 'TREESEED_RAILWAY_API_TOKEN', readinessScope)) },
 				localDevelopment: currentContext.configReadinessByScope[readinessScope]?.localDevelopment ?? { configured: true },
 			};
 			const sidebarHeight = Math.max(4, layout.bodyHeight - sidebarFilterHeight);

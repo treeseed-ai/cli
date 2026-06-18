@@ -9,6 +9,10 @@ import { setMarketSession } from '@treeseed/sdk/market-client';
 import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
 
 const { runTreeseedCli } = await import('../dist/cli/main.js');
+const {
+	buildCliClientEncryptedEscrowBody,
+	summarizeCliClientEncryptedEscrow,
+} = await import('../dist/cli/secrets-escrow.js');
 
 function prepareMarketWorkspace({ withSession = true } = {}) {
 	const root = makeWorkspaceRoot();
@@ -496,5 +500,47 @@ test('projects deployment commands report missing auth with exit code 2', async 
 		const result = await runCli(['projects', 'deployments', 'project-1', '--market', 'local'], { cwd: root, env: { HOME: root } });
 		assert.equal(result.exitCode, 2);
 		assert.match(result.stderr, /auth:login --market local/u);
+	});
+});
+
+test('client-encrypted escrow helpers produce ciphertext-only bodies and safe status labels', () => {
+	const body = buildCliClientEncryptedEscrowBody({
+		id: 'escrow-1',
+		secretId: 'secret-1',
+		name: 'TREESEED_PROJECT_SECRET',
+		secretClass: 'customer_project_secret',
+		ciphertext: 'base64-ciphertext',
+		ciphertextRef: 'api://projects/project-1/secrets/escrow/escrow-1',
+		algorithm: 'xchacha20-poly1305',
+		nonce: 'base64-nonce',
+		salt: 'base64-salt',
+		kdf: 'argon2id',
+		kdfParams: { memoryKiB: 65536, iterations: 3, parallelism: 1 },
+		wrappingKeyId: 'client-key-1',
+		encryptionVersion: 'v1',
+		deploymentIntent: { targetMode: 'github_actions_secret_enclave' },
+	});
+
+	assert.equal(body.recoveryPolicy, 'reentry_required');
+	assert.equal(body.ciphertext, 'base64-ciphertext');
+	assert.equal(JSON.stringify(body).includes('passphrase'), false);
+	assert.throws(() => buildCliClientEncryptedEscrowBody({
+		...body,
+		passphrase: 'do-not-send',
+	}));
+	assert.deepEqual(summarizeCliClientEncryptedEscrow({
+		...body,
+		status: 'active',
+		expiresAt: '2026-01-01T00:00:00.000Z',
+	}, new Date('2026-06-17T00:00:00.000Z')), {
+		status: 'reentry_required',
+		escrowed: true,
+		migrated: false,
+		expired: true,
+		tombstoned: false,
+		reentryRequired: true,
+		migrationTarget: null,
+		expiresAt: '2026-01-01T00:00:00.000Z',
+		label: 're-entry required',
 	});
 });

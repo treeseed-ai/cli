@@ -62,7 +62,7 @@ test('reconcile cleanup requires explicit yes before deleting providers', async 
 
 test('reconcile live railway provider reports credential drift instead of unimplemented scenarios', async () => {
 	const result = await runCli(['reconcile', 'test-live', '--provider', 'railway', '--environment', 'staging', '--json'], makeWorkspaceRoot(), {
-		RAILWAY_API_TOKEN: '',
+		TREESEED_RAILWAY_API_TOKEN: '',
 	});
 	assert.equal(result.exitCode, 1);
 	const payload = parseJsonOutput(result.output);
@@ -70,6 +70,6 @@ test('reconcile live railway provider reports credential drift instead of unimpl
 
 	assert.equal(payload.ok, false);
 	assert.equal(payload.providers[0].provider, 'railway');
-	assert.match(serialized, /Missing RAILWAY_API_TOKEN/u);
+	assert.match(serialized, /Missing TREESEED_RAILWAY_API_TOKEN/u);
 	assert.doesNotMatch(serialized, /declared but not implemented|not implemented in the canonical live-test harness/iu);
 });

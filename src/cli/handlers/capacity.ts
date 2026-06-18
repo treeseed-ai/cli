@@ -1,12 +1,6 @@
 import { resolve } from 'node:path';
 import { resolveMarketProfile } from '@treeseed/sdk/market-client';
-import {
-	collectTreeseedReconcileStatus,
-	destroyTreeseedTargetUnits,
-	planTreeseedReconciliation,
-	reconcileTreeseedTarget,
-	type TreeseedReconcileSelector,
-} from '@treeseed/sdk/reconcile';
+import { collectTreeseedReconcileStatus, destroyTreeseedTargetUnits, planTreeseedReconciliation, reconcileTreeseedTarget, type TreeseedReconcileSelector } from '@treeseed/sdk/reconcile';
 import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
 import type { TreeseedCommandContext, TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
 import { createMarketClientForInvocation } from './market-utils.js';
@@ -15,20 +9,9 @@ import { fail, guidedResult } from './utils.js';
 const PROVIDER_LIFECYCLE_ACTIONS = new Set(['build', 'up', 'down', 'restart', 'logs', 'status', 'test-local']);
 const PROVIDER_ENTRYPOINT_ACTIONS = new Set(['doctor', 'register', 'plan']);
 const MARKET_CAPACITY_ACTIONS = new Set(['migrate']);
-const MARKET_INSPECTION_ACTIONS = new Set([
-	'allocation-sets',
-	'agent-classes',
-	'provider-sessions',
-	'assignments',
-	'mode-runs',
-	'decision-planning',
-	'execution-inputs',
-	'capacity-plans',
-	'capacity-plan',
-	'workday',
-	'workday-summary',
-	'assignment-explanation',
-]);
+const MARKET_INSPECTION_ACTIONS = new Set(['allocation-sets', 'agent-classes', 'provider-sessions', 'assignments', 'mode-runs', 'decision-planning', 'execution-inputs', 'capacity-plans', 'capacity-plan', 'workday', 'workday-summary', 'assignment-explanation', 'fallback-outputs', 'treedx-proxy-audit']);
+const CAPACITY_PROVIDER_UNIT_IDS = ['capacity-provider:local', 'local-docker-compose:agent-capacity-provider'];
+const CAPACITY_PROVIDER_UNIT_ID_SET = new Set(CAPACITY_PROVIDER_UNIT_IDS);
 
 function stringArg(invocation: TreeseedParsedInvocation, name: string) {
 	const value = invocation.args[name];
@@ -58,8 +41,11 @@ function recordValue(record: unknown, key: string) {
 }
 
 function marketRequest<T>(client: unknown, path: string, options: { method?: string; body?: unknown; requireAuth?: boolean } = {}) {
-	return (client as { request<TResponse>(path: string, options?: { method?: string; body?: unknown; requireAuth?: boolean }): Promise<TResponse> })
-		.request<T>(path, options);
+	return (
+		client as {
+			request<TResponse>(path: string, options?: { method?: string; body?: unknown; requireAuth?: boolean }): Promise<TResponse>;
+		}
+	).request<T>(path, options);
 }
 
 function providerSelector(invocation: TreeseedParsedInvocation) {
@@ -68,6 +54,15 @@ function providerSelector(invocation: TreeseedParsedInvocation) {
 
 function environmentSelector(invocation: TreeseedParsedInvocation) {
 	return stringArg(invocation, 'environment') ?? 'local';
+}
+
+function capacityProviderUnits<T extends { unitId?: unknown; dependencies?: string[] }>(units: T[]) {
+	return units
+		.filter((unit) => CAPACITY_PROVIDER_UNIT_ID_SET.has(String(unit.unitId ?? '')))
+		.map((unit) => ({
+			...unit,
+			dependencies: (unit.dependencies ?? []).filter((dependencyId) => CAPACITY_PROVIDER_UNIT_ID_SET.has(dependencyId)),
+		}));
 }
 
 function resolveMarket(invocation: TreeseedParsedInvocation) {
@@ -112,16 +107,7 @@ function derivedCapacityLines(plan: Record<string, unknown>) {
 	if (!Array.isArray(entries) || entries.length === 0) {
 		return ['No derived native capacity entries are available yet.'];
 	}
-	return entries.map((entry) => [
-		`${recordValue(entry, 'executionProviderKind') ?? 'provider'}:${recordValue(entry, 'nativeUnit') ?? 'native'}`,
-		`limit ${formatNumber(recordValue(entry, 'configuredNativeLimit'))}`,
-		`observed ${formatNumber(recordValue(entry, 'observedNativeRemaining'))}`,
-		`reserved ${formatNumber(recordValue(entry, 'activeReservedNativeAmount'))}`,
-		`reserve ${formatNumber(recordValue(entry, 'reserveBufferPercent'))}%`,
-		`conversion ${formatNumber(recordValue(entry, 'nativeUnitsPerCredit'))} native/credit`,
-		`derived ${formatNumber(recordValue(entry, 'derivedAvailableCredits'))} credits`,
-		`confidence ${recordValue(entry, 'confidence') ?? 'unknown'}`,
-	].join(' | '));
+	return entries.map((entry) => [`${recordValue(entry, 'executionProviderKind') ?? 'provider'}:${recordValue(entry, 'nativeUnit') ?? 'native'}`, `limit ${formatNumber(recordValue(entry, 'configuredNativeLimit'))}`, `observed ${formatNumber(recordValue(entry, 'observedNativeRemaining'))}`, `reserved ${formatNumber(recordValue(entry, 'activeReservedNativeAmount'))}`, `reserve ${formatNumber(recordValue(entry, 'reserveBufferPercent'))}%`, `conversion ${formatNumber(recordValue(entry, 'nativeUnitsPerCredit'))} native/credit`, `derived ${formatNumber(recordValue(entry, 'derivedAvailableCredits'))} credits`, `confidence ${recordValue(entry, 'confidence') ?? 'unknown'}`].join(' | '));
 }
 
 function summarizeRecord(record: unknown) {
@@ -129,14 +115,7 @@ function summarizeRecord(record: unknown) {
 	const item = record as Record<string, unknown>;
 	const id = String(item.id ?? item.assignmentId ?? item.sessionId ?? item.classId ?? 'record');
 	const state = item.status ?? item.state ?? item.leaseState ?? item.mode ?? item.kind ?? null;
-	const parts = [
-		id,
-		state ? String(state) : null,
-		item.projectId ? `project=${String(item.projectId)}` : null,
-		item.providerId ? `provider=${String(item.providerId)}` : null,
-		item.mode ? `mode=${String(item.mode)}` : null,
-		item.updatedAt ? `updated=${String(item.updatedAt)}` : item.createdAt ? `created=${String(item.createdAt)}` : null,
-	].filter(Boolean);
+	const parts = [id, state ? String(state) : null, item.projectId ? `project=${String(item.projectId)}` : null, item.providerId ? `provider=${String(item.providerId)}` : null, item.mode ? `mode=${String(item.mode)}` : null, item.updatedAt ? `updated=${String(item.updatedAt)}` : item.createdAt ? `created=${String(item.createdAt)}` : null].filter(Boolean);
 	return parts.join(' | ');
 }
 
@@ -165,7 +144,7 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 	if ((action === 'allocation-sets' || action === 'provider-sessions' || action === 'assignments' || action === 'assignment-explanation') && !teamId) {
 		return fail(`Missing --team. Use \`trsd capacity ${action} --team <team-id> --json\`.`);
 	}
-	if ((action === 'agent-classes' || action === 'mode-runs') && !projectId) {
+	if ((action === 'agent-classes' || action === 'mode-runs' || action === 'fallback-outputs' || action === 'treedx-proxy-audit') && !projectId) {
 		return fail(`Missing --project. Use \`trsd capacity ${action} --project <project-id> --json\`.`);
 	}
 	if ((action === 'decision-planning' || action === 'execution-inputs' || action === 'capacity-plans') && !decisionId) {
@@ -198,6 +177,12 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 	} else if (action === 'mode-runs') {
 		path = `/v1/projects/${encodeURIComponent(projectId!)}/agent-mode-runs${queryFromFilters({ mode, assignmentId })}`;
 		scopeLabel = `project ${projectId}`;
+	} else if (action === 'fallback-outputs') {
+		path = `/v1/projects/${encodeURIComponent(projectId!)}/agent-fallback-outputs${queryFromFilters({ mode, status, assignmentId })}`;
+		scopeLabel = `project ${projectId}`;
+	} else if (action === 'treedx-proxy-audit') {
+		path = `/v1/projects/${encodeURIComponent(projectId!)}/treedx-proxy-audit${queryFromFilters({ assignmentId })}`;
+		scopeLabel = `project ${projectId}`;
 	} else if (action === 'decision-planning') {
 		path = `/v1/decisions/${encodeURIComponent(decisionId!)}/planning-status`;
 		scopeLabel = `decision ${decisionId}`;
@@ -220,23 +205,21 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/assignments/${encodeURIComponent(assignmentId!)}/explanation`;
 		scopeLabel = `team ${teamId}`;
 	}
-	const response = await marketRequest<{ ok: true; payload: unknown[] | Record<string, unknown> }>(client, path, { requireAuth: true });
+	const response = await marketRequest<{
+		ok: true;
+		payload: unknown[] | Record<string, unknown>;
+	}>(client, path, { requireAuth: true });
 	const records = Array.isArray(response.payload) ? response.payload : response.payload ? [response.payload] : [];
 	return guidedResult({
 		command: `capacity ${action}`,
 		summary: `Read ${records.length} ${action.replace(/-/gu, ' ')} record${records.length === 1 ? '' : 's'} for ${scopeLabel}.`,
-		facts: [
-			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
-			{ label: 'Scope', value: scopeLabel },
-			{ label: 'Records', value: records.length },
-			...(providerId ? [{ label: 'Provider filter', value: providerId }] : []),
-			...(status ? [{ label: 'Status filter', value: status }] : []),
-			...(mode ? [{ label: 'Mode filter', value: mode }] : []),
-			...(assignmentId ? [{ label: 'Assignment filter', value: assignmentId }] : []),
-		],
+		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Scope', value: scopeLabel }, { label: 'Records', value: records.length }, ...(providerId ? [{ label: 'Provider filter', value: providerId }] : []), ...(status ? [{ label: 'Status filter', value: status }] : []), ...(mode ? [{ label: 'Mode filter', value: mode }] : []), ...(assignmentId ? [{ label: 'Assignment filter', value: assignmentId }] : [])],
 		sections: [
 			{ title: 'Records', lines: listLines(records) },
-			{ title: 'Boundary', lines: ['Read-only inspection. Assignment creation, selection, and provider lifecycle remain owned by API coordination and reconciled provider runtime.'] },
+			{
+				title: 'Boundary',
+				lines: ['Read-only inspection. Assignment creation, selection, and provider lifecycle remain owned by API coordination and reconciled provider runtime.'],
+			},
 		],
 		report: {
 			action,
@@ -251,14 +234,7 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 function grantAllocationLines(plan: Record<string, unknown>) {
 	const grants = recordValue(plan, 'grants');
 	if (!Array.isArray(grants) || grants.length === 0) return [];
-	return grants.map((grant) => [
-		`${recordValue(grant, 'grantScope') ?? 'grant'} ${recordValue(grant, 'environment') ?? 'all'}`,
-		`allocation ${formatNumber(recordValue(grant, 'portfolioAllocationPercent'))}%`,
-		`reserve pool ${formatNumber(recordValue(grant, 'reservePoolPercent'))}%`,
-		`max daily project credits ${formatNumber(recordValue(grant, 'maxDailyProjectCredits'))}`,
-		`overflow ${recordValue(grant, 'overflowPolicy') ?? 'soft_grant'}`,
-		`emergency ${recordValue(grant, 'emergencyOverride') === true ? 'on' : 'off'}`,
-	].join(' | '));
+	return grants.map((grant) => [`${recordValue(grant, 'grantScope') ?? 'grant'} ${recordValue(grant, 'environment') ?? 'all'}`, `allocation ${formatNumber(recordValue(grant, 'portfolioAllocationPercent'))}%`, `reserve pool ${formatNumber(recordValue(grant, 'reservePoolPercent'))}%`, `max daily project credits ${formatNumber(recordValue(grant, 'maxDailyProjectCredits'))}`, `overflow ${recordValue(grant, 'overflowPolicy') ?? 'soft_grant'}`, `emergency ${recordValue(grant, 'emergencyOverride') === true ? 'on' : 'off'}`].join(' | '));
 }
 
 async function runProjectCapacityPlan(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
@@ -266,11 +242,10 @@ async function runProjectCapacityPlan(invocation: TreeseedParsedInvocation, cont
 	if (!projectId) return fail('Missing --project. Use `trsd capacity plan --project <project-id> --environment local`.');
 	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
 	const environment = environmentSelector(invocation);
-	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
-		client,
-		`/v1/projects/${encodeURIComponent(projectId)}/capacity-plan?environment=${encodeURIComponent(environment)}`,
-		{ requireAuth: true },
-	);
+	const response = await marketRequest<{
+		ok: true;
+		payload: Record<string, unknown>;
+	}>(client, `/v1/projects/${encodeURIComponent(projectId)}/capacity-plan?environment=${encodeURIComponent(environment)}`, { requireAuth: true });
 	const plan = response.payload;
 	return guidedResult({
 		command: 'capacity plan',
@@ -279,13 +254,22 @@ async function runProjectCapacityPlan(invocation: TreeseedParsedInvocation, cont
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Project', value: projectId },
 			{ label: 'Environment', value: environment },
-			{ label: 'Derived credits', value: formatNumber(recordValue(recordValue(plan, 'derivedCapacity'), 'totalDerivedAvailableCredits')) },
+			{
+				label: 'Derived credits',
+				value: formatNumber(recordValue(recordValue(plan, 'derivedCapacity'), 'totalDerivedAvailableCredits')),
+			},
 		],
 		sections: [
 			{ title: 'Native projection', lines: derivedCapacityLines(plan) },
 			{ title: 'Allocation grants', lines: grantAllocationLines(plan) },
 		],
-		report: { action: 'plan', projectId, environment, market: { id: profile.id, baseUrl: profile.baseUrl }, plan },
+		report: {
+			action: 'plan',
+			projectId,
+			environment,
+			market: { id: profile.id, baseUrl: profile.baseUrl },
+			plan,
+		},
 	});
 }
 
@@ -331,13 +315,7 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 	const allocationPercent = numberArg(invocation, 'portfolioAllocationPercent');
 	const dryRun = boolArg(invocation, 'dryRun');
 	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: !dryRun });
-	const providerList = dryRun
-		? { payload: [{ id: providerSelectorValue, name: providerSelectorValue }] }
-		: await marketRequest<{ ok: true; payload: unknown[] }>(
-			client,
-			`/v1/teams/${encodeURIComponent(teamId)}/capacity-providers`,
-			{ requireAuth: true },
-		);
+	const providerList = dryRun ? { payload: [{ id: providerSelectorValue, name: providerSelectorValue }] } : await marketRequest<{ ok: true; payload: unknown[] }>(client, `/v1/teams/${encodeURIComponent(teamId)}/capacity-providers`, { requireAuth: true });
 	const provider = (providerList.payload as unknown[]).find(providerMatcher(providerSelectorValue));
 	if (!provider) return fail(`Capacity provider "${providerSelectorValue}" was not found in team ${teamId}.`);
 	const providerId = String(recordValue(provider, 'id'));
@@ -348,32 +326,37 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 		quotaVisibility,
 		maxConcurrentWorkers,
 		resetCadence,
-		nativeLimits: [{
-			scope,
-			nativeUnit,
-			limitAmount,
-			reserveBufferPercent,
-			resetCadence,
-			confidence: 'estimated',
-			source: 'operator_migration',
-		}],
+		nativeLimits: [
+			{
+				scope,
+				nativeUnit,
+				limitAmount,
+				reserveBufferPercent,
+				resetCadence,
+				confidence: 'estimated',
+				source: 'operator_migration',
+			},
+		],
 		metadata: {
 			source: 'trsd capacity migrate --to-derived',
 			staticCreditBudgetsPreservedAs: 'hybrid_fallback_cap',
 		},
 	};
-	const grant = allocationPercent === null ? null : {
-		capacityProviderId: providerId,
-		teamId,
-		projectId,
-		environment,
-		grantScope: projectId ? 'project' : 'team',
-		portfolioAllocationPercent: allocationPercent,
-		overflowPolicy: 'soft_grant',
-		metadata: {
-			source: 'trsd capacity migrate --to-derived',
-		},
-	};
+	const grant =
+		allocationPercent === null
+			? null
+			: {
+					capacityProviderId: providerId,
+					teamId,
+					projectId,
+					environment,
+					grantScope: projectId ? 'project' : 'team',
+					portfolioAllocationPercent: allocationPercent,
+					overflowPolicy: 'soft_grant',
+					metadata: {
+						source: 'trsd capacity migrate --to-derived',
+					},
+				};
 	if (!dryRun) {
 		await marketRequest(client, `/v1/teams/${encodeURIComponent(teamId)}/capacity-providers/${encodeURIComponent(providerId)}`, {
 			method: 'PATCH',
@@ -398,21 +381,38 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 	}
 	return guidedResult({
 		command: 'capacity migrate',
-		summary: dryRun
-			? 'Dry run: derived native capacity migration plan.'
-			: 'Derived native capacity migration applied.',
+		summary: dryRun ? 'Dry run: derived native capacity migration plan.' : 'Derived native capacity migration applied.',
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: teamId },
 			{ label: 'Provider', value: providerId },
-			{ label: 'Native limit', value: `${formatNumber(limitAmount)} ${nativeUnit} / ${scope}` },
-			{ label: 'Reserve buffer', value: `${formatNumber(reserveBufferPercent)}%` },
-			{ label: 'Allocation percent', value: allocationPercent === null ? null : `${formatNumber(allocationPercent)}%` },
+			{
+				label: 'Native limit',
+				value: `${formatNumber(limitAmount)} ${nativeUnit} / ${scope}`,
+			},
+			{
+				label: 'Reserve buffer',
+				value: `${formatNumber(reserveBufferPercent)}%`,
+			},
+			{
+				label: 'Allocation percent',
+				value: allocationPercent === null ? null : `${formatNumber(allocationPercent)}%`,
+			},
 			{ label: 'Dry run', value: dryRun },
 		],
 		sections: [
-			{ title: 'Execution provider', lines: [`${executionProvider.name}: ${kind}, ${nativeUnit}, ${maxConcurrentWorkers} workers, ${quotaVisibility} quota visibility`] },
-			...(grant ? [{ title: 'Allocation grant', lines: [`${grant.grantScope} ${projectId ?? teamId} in ${environment}: ${formatNumber(allocationPercent)}%`] }] : []),
+			{
+				title: 'Execution provider',
+				lines: [`${executionProvider.name}: ${kind}, ${nativeUnit}, ${maxConcurrentWorkers} workers, ${quotaVisibility} quota visibility`],
+			},
+			...(grant
+				? [
+						{
+							title: 'Allocation grant',
+							lines: [`${grant.grantScope} ${projectId ?? teamId} in ${environment}: ${formatNumber(allocationPercent)}%`],
+						},
+					]
+				: []),
 		],
 		report: {
 			action: 'migrate',
@@ -431,7 +431,10 @@ async function runLifecycleAction(action: string, invocation: TreeseedParsedInvo
 	const agentPackageRoot = stringArg(invocation, 'agentPackageRoot');
 	let desiredGraph: ReturnType<typeof compileTreeseedDesiredResourceGraph>;
 	try {
-		desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+		desiredGraph = compileTreeseedDesiredResourceGraph({
+			tenantRoot: context.cwd,
+			target,
+		});
 	} catch (error) {
 		if (!agentPackageRoot || !isNonGitWorkspaceError(error)) throw error;
 		const execute = boolArg(invocation, 'execute');
@@ -440,15 +443,12 @@ async function runLifecycleAction(action: string, invocation: TreeseedParsedInvo
 		return guidedResult({
 			command: `capacity ${action}`,
 			summary: `Capacity provider ${action} package-root plan rendered outside a git-backed Treeseed workspace.`,
-			facts: [
-				{ label: 'Market', value: `${market.id} (${market.baseUrl})` },
-				{ label: 'Provider', value: providerSelector(invocation) },
-				{ label: 'Agent package root', value: agentPackageRoot },
-				{ label: 'Execute', value: execute ? 'yes' : 'no' },
-				...(capacityConfigPath ? [{ label: 'Config', value: capacityConfigPath }] : []),
-			],
+			facts: [{ label: 'Market', value: `${market.id} (${market.baseUrl})` }, { label: 'Provider', value: providerSelector(invocation) }, { label: 'Agent package root', value: agentPackageRoot }, { label: 'Execute', value: execute ? 'yes' : 'no' }, ...(capacityConfigPath ? [{ label: 'Config', value: capacityConfigPath }] : [])],
 			sections: [
-				{ title: 'Boundary', lines: ['Package-root fallback is diagnostic-only. Git-backed Treeseed workspaces use canonical reconciliation for provider lifecycle.'] },
+				{
+					title: 'Boundary',
+					lines: ['Package-root fallback is diagnostic-only. Git-backed Treeseed workspaces use canonical reconciliation for provider lifecycle.'],
+				},
 			],
 			report: {
 				action,
@@ -461,13 +461,27 @@ async function runLifecycleAction(action: string, invocation: TreeseedParsedInvo
 			},
 		});
 	}
-	const selector: TreeseedReconcileSelector = action === 'build'
-		? { environment, packageId: ['@treeseed/agent'], resourceKind: ['docker-image-build'] }
-		: { environment, packageId: ['@treeseed/agent'], resourceKind: ['capacity-provider', 'local-docker-compose'] };
-	const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector);
+	const selector: TreeseedReconcileSelector =
+		action === 'build'
+			? {
+					environment,
+					packageId: ['@treeseed/agent'],
+					resourceKind: ['docker-image-build'],
+				}
+			: {
+					environment,
+					unitId: CAPACITY_PROVIDER_UNIT_IDS,
+				};
+	const units = action === 'build' ? compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector) : capacityProviderUnits(compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector));
 	const execute = boolArg(invocation, 'execute');
 	if (action === 'status' || action === 'logs') {
-		const status = await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector });
+		const status = await collectTreeseedReconcileStatus({
+			tenantRoot: context.cwd,
+			target,
+			env: context.env,
+			units,
+			selector,
+		});
 		return guidedResult({
 			command: `capacity ${action}`,
 			summary: `Capacity provider ${action} resolved through canonical reconcile status.`,
@@ -477,7 +491,10 @@ async function runLifecycleAction(action: string, invocation: TreeseedParsedInvo
 				{ label: 'Ready', value: status.ready ? 'yes' : 'no' },
 			],
 			sections: [
-				{ title: action === 'logs' ? 'Log Observations' : 'Units', lines: status.units.map((unit) => `${unit.provider}:${unit.unitType} ${unit.unitId}`) },
+				{
+					title: action === 'logs' ? 'Log Observations' : 'Units',
+					lines: status.units.map((unit) => `${unit.provider}:${unit.unitType} ${unit.unitId}`),
+				},
 				{ title: 'Blockers', lines: status.blockers },
 			],
 			exitCode: status.ready ? 0 : 1,
@@ -491,42 +508,57 @@ async function runLifecycleAction(action: string, invocation: TreeseedParsedInvo
 	const market = resolveMarket(invocation);
 	const capacityConfigPath = resolveCapacityLaunchConfigPath(invocation, context);
 	const planOnly = boolArg(invocation, 'plan') || !execute;
-	const result = action === 'down'
-		? (execute
-			? await destroyTreeseedTargetUnits({ tenantRoot: context.cwd, target, env: context.env, units, selector, write: (line) => context.write(`[capacity] ${line}`, 'stderr') })
-			: await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: context.env, units, selector }))
-		: planOnly
-			? await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: context.env, units, selector })
-			: await reconcileTreeseedTarget({
-			tenantRoot: context.cwd,
-			target,
-			env: {
-				...context.env,
-				TREESEED_MARKET_URL: market.baseUrl,
-				TREESEED_MARKET_ID: market.id,
-				TREESEED_MANAGER_ID: market.id,
-				TREESEED_PROVIDER_ENVIRONMENT: providerSelector(invocation),
-				...(capacityConfigPath ? { TREESEED_CAPACITY_CONFIG_PATH: capacityConfigPath } : {}),
-			},
-			units,
-			selector,
-			dryRun: planOnly,
-			write: (line) => context.write(`[capacity] ${line}`, 'stderr'),
-		});
+	const result =
+		action === 'down'
+			? execute
+				? await destroyTreeseedTargetUnits({
+						tenantRoot: context.cwd,
+						target,
+						env: context.env,
+						units,
+						selector,
+						write: (line) => context.write(`[capacity] ${line}`, 'stderr'),
+					})
+				: await planTreeseedReconciliation({
+						tenantRoot: context.cwd,
+						target,
+						env: context.env,
+						units,
+						selector,
+					})
+			: planOnly
+				? await planTreeseedReconciliation({
+						tenantRoot: context.cwd,
+						target,
+						env: context.env,
+						units,
+						selector,
+					})
+				: await reconcileTreeseedTarget({
+						tenantRoot: context.cwd,
+						target,
+						env: {
+							...context.env,
+							TREESEED_MARKET_URL: market.baseUrl,
+							TREESEED_MARKET_ID: market.id,
+							TREESEED_MANAGER_ID: market.id,
+							TREESEED_PROVIDER_ENVIRONMENT: providerSelector(invocation),
+							...(capacityConfigPath ? { TREESEED_CAPACITY_CONFIG_PATH: capacityConfigPath } : {}),
+						},
+						units,
+						selector,
+						dryRun: planOnly,
+						write: (line) => context.write(`[capacity] ${line}`, 'stderr'),
+					});
 	return guidedResult({
 		command: `capacity ${action}`,
-		summary: planOnly
-			? `Capacity provider ${action} reconcile plan rendered.`
-			: `Capacity provider ${action} reconciled through canonical adapters.`,
-		facts: [
-			{ label: 'Market', value: `${market.id} (${market.baseUrl})` },
-			{ label: 'Provider', value: providerSelector(invocation) },
-			{ label: 'Execute', value: execute ? 'yes' : 'no' },
-			...(capacityConfigPath ? [{ label: 'Config', value: capacityConfigPath }] : []),
-			{ label: 'Units', value: units.length },
-		],
+		summary: planOnly ? `Capacity provider ${action} reconcile plan rendered.` : `Capacity provider ${action} reconciled through canonical adapters.`,
+		facts: [{ label: 'Market', value: `${market.id} (${market.baseUrl})` }, { label: 'Provider', value: providerSelector(invocation) }, { label: 'Execute', value: execute ? 'yes' : 'no' }, ...(capacityConfigPath ? [{ label: 'Config', value: capacityConfigPath }] : []), { label: 'Units', value: units.length }],
 		sections: [
-			{ title: 'Units', lines: units.map((unit) => `${unit.provider}:${unit.unitType} ${unit.logicalName}`) },
+			{
+				title: 'Units',
+				lines: units.map((unit) => `${unit.provider}:${unit.unitType} ${unit.logicalName}`),
+			},
 		],
 		report: {
 			action,
@@ -546,7 +578,10 @@ async function invokeProviderEntrypoint(action: string, invocation: TreeseedPars
 	const agentPackageRoot = stringArg(invocation, 'agentPackageRoot');
 	let desiredGraph: ReturnType<typeof compileTreeseedDesiredResourceGraph>;
 	try {
-		desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
+		desiredGraph = compileTreeseedDesiredResourceGraph({
+			tenantRoot: context.cwd,
+			target,
+		});
 	} catch (error) {
 		if (!agentPackageRoot || !isNonGitWorkspaceError(error)) throw error;
 		return guidedResult({
@@ -559,7 +594,10 @@ async function invokeProviderEntrypoint(action: string, invocation: TreeseedPars
 				{ label: 'Ready', value: 'diagnostic-only' },
 			],
 			sections: [
-				{ title: 'Boundary', lines: ['Package-root fallback is diagnostic-only. Git-backed Treeseed workspaces use canonical reconciliation for provider lifecycle.'] },
+				{
+					title: 'Boundary',
+					lines: ['Package-root fallback is diagnostic-only. Git-backed Treeseed workspaces use canonical reconciliation for provider lifecycle.'],
+				},
 			],
 			report: {
 				ok: true,
@@ -571,9 +609,18 @@ async function invokeProviderEntrypoint(action: string, invocation: TreeseedPars
 			},
 		});
 	}
-	const selector: TreeseedReconcileSelector = { environment: 'local', packageId: ['@treeseed/agent'], resourceKind: ['capacity-provider', 'local-docker-compose'] };
-	const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector);
-	const status = await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector });
+	const selector: TreeseedReconcileSelector = {
+		environment: 'local',
+		unitId: CAPACITY_PROVIDER_UNIT_IDS,
+	};
+	const units = capacityProviderUnits(compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector));
+	const status = await collectTreeseedReconcileStatus({
+		tenantRoot: context.cwd,
+		target,
+		env: context.env,
+		units,
+		selector,
+	});
 	return guidedResult({
 		command: `capacity ${action}`,
 		summary: `Capacity provider ${action} is reported through reconcile status; direct provider entrypoint execution has been removed.`,
@@ -583,7 +630,10 @@ async function invokeProviderEntrypoint(action: string, invocation: TreeseedPars
 			{ label: 'Ready', value: status.ready ? 'yes' : 'no' },
 		],
 		sections: [
-			{ title: 'Units', lines: status.units.map((unit) => `${unit.provider}:${unit.unitType} ${unit.unitId}`) },
+			{
+				title: 'Units',
+				lines: status.units.map((unit) => `${unit.provider}:${unit.unitType} ${unit.unitId}`),
+			},
 			{ title: 'Native budget file', lines: nativeBudgetSummaryLines(null) },
 			{ title: 'Blockers', lines: status.blockers },
 		],
@@ -635,5 +685,5 @@ export const handleCapacity: TreeseedCommandHandler = async (invocation, context
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
-	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, allocation-sets, agent-classes, provider-sessions, assignments, mode-runs, decision-planning, execution-inputs, capacity-plans, capacity-plan, workday, workday-summary, assignment-explanation, build, up, down, restart, logs, status, or test-local.`);
+	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, allocation-sets, agent-classes, provider-sessions, assignments, mode-runs, decision-planning, execution-inputs, capacity-plans, capacity-plan, workday, workday-summary, assignment-explanation, fallback-outputs, treedx-proxy-audit, build, up, down, restart, logs, status, or test-local.`);
 };

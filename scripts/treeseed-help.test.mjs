@@ -634,7 +634,7 @@ test('railway wrapper selects the requested Railway environment before forwardin
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
-			RAILWAY_API_TOKEN: 'railway-token',
+			TREESEED_RAILWAY_API_TOKEN: 'railway-token',
 			TREESEED_RAILWAY_PROJECT_ID: 'f593a85c-38a2-4e76-a90b-2c20ecf81d6e',
 		},
 	});
@@ -654,7 +654,7 @@ test('railway wrapper forwards workspace project probes without preselecting pro
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
-			RAILWAY_API_TOKEN: 'railway-token',
+			TREESEED_RAILWAY_API_TOKEN: 'railway-token',
 			TREESEED_RAILWAY_PROJECT_ID: 'f593a85c-38a2-4e76-a90b-2c20ecf81d6e',
 		},
 	});
@@ -989,12 +989,12 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 		env: {
 			...npmInstallTestEnv(),
 			HOME: workspaceRoot,
-			GH_TOKEN: 'gh_test_token',
+			TREESEED_GITHUB_TOKEN: 'gh_test_token',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
 			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
-			CLOUDFLARE_API_TOKEN: 'cf_test_token',
-			CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
-			RAILWAY_API_TOKEN: 'rw_test_token',
+			TREESEED_CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			TREESEED_CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
+			TREESEED_RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
@@ -1006,13 +1006,13 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	assert.ok(Array.isArray(payload.scopes));
 	assert.ok(payload.scopes.includes('local'));
 	const localEntryIds = new Set(payload.context.entriesByScope.local.map((entry) => entry.id));
-	assert.equal(localEntryIds.has('GH_TOKEN'), true);
+	assert.equal(localEntryIds.has('TREESEED_GITHUB_TOKEN'), true);
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_OWNER'), true);
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_NAME'), true);
 	assert.equal(localEntryIds.has('TREESEED_GITHUB_REPOSITORY_VISIBILITY'), true);
-	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
-	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
-	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
+	assert.equal(localEntryIds.has('TREESEED_CLOUDFLARE_API_TOKEN'), true);
+	assert.equal(localEntryIds.has('TREESEED_RAILWAY_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('TREESEED_CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(localEntryIds.has('TREESEED_RAILWAY_WORKSPACE'), false);
 	assert.equal(payload.toolHealth.ghActExtension.attemptedInstall, false);
 });
@@ -1033,12 +1033,12 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.deepEqual(JSON.parse(explicitResult.stdout).scopes, ['local', 'staging', 'prod']);
 	const localEntryIds = new Set(defaultPayload.context.entriesByScope.local.map((entry) => entry.id));
 	const stagingEntryIds = new Set(defaultPayload.context.entriesByScope.staging.map((entry) => entry.id));
-	assert.equal(localEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
-	assert.equal(localEntryIds.has('RAILWAY_API_TOKEN'), false);
-	assert.equal(localEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
-	assert.equal(stagingEntryIds.has('CLOUDFLARE_API_TOKEN'), true);
-	assert.equal(stagingEntryIds.has('RAILWAY_API_TOKEN'), false);
-	assert.equal(stagingEntryIds.has('CLOUDFLARE_ACCOUNT_ID'), true);
+	assert.equal(localEntryIds.has('TREESEED_CLOUDFLARE_API_TOKEN'), true);
+	assert.equal(localEntryIds.has('TREESEED_RAILWAY_API_TOKEN'), false);
+	assert.equal(localEntryIds.has('TREESEED_CLOUDFLARE_ACCOUNT_ID'), true);
+	assert.equal(stagingEntryIds.has('TREESEED_CLOUDFLARE_API_TOKEN'), true);
+	assert.equal(stagingEntryIds.has('TREESEED_RAILWAY_API_TOKEN'), false);
+	assert.equal(stagingEntryIds.has('TREESEED_CLOUDFLARE_ACCOUNT_ID'), true);
 });
 
 test('config rejects non-tty execution without explicit automation mode', async () => {
@@ -1078,12 +1078,12 @@ test('config supports explicit non-interactive application without json output',
 		env: {
 			...npmInstallTestEnv(),
 			HOME: workspaceRoot,
-			GH_TOKEN: 'gh_test_token',
+			TREESEED_GITHUB_TOKEN: 'gh_test_token',
 			TREESEED_GITHUB_OWNER: 'knowledge-coop',
 			TREESEED_GITHUB_REPOSITORY_NAME: 'market',
-			CLOUDFLARE_API_TOKEN: 'cf_test_token',
-			CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
-			RAILWAY_API_TOKEN: 'rw_test_token',
+			TREESEED_CLOUDFLARE_API_TOKEN: 'cf_test_token',
+			TREESEED_CLOUDFLARE_ACCOUNT_ID: 'cf_account_test',
+			TREESEED_RAILWAY_API_TOKEN: 'rw_test_token',
 			TREESEED_FORM_TOKEN_SECRET: 'form_token_secret_test_value',
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
@@ -1247,12 +1247,12 @@ test('config ui helpers tolerate environment-limited config contexts', () => {
 		entriesByScope: {
 			staging: [
 				{ id: 'TREESEED_HOSTED_HUBS_GITHUB_OWNER', label: 'Hosted owner', group: 'github', cluster: 'github:hosted', startupProfile: 'advanced', requirement: 'conditional', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'GH_TOKEN', label: 'GitHub token', group: 'github', cluster: 'github:token', startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: 'gh-token', suggestedValue: '', effectiveValue: 'gh-token' },
+				{ id: 'TREESEED_GITHUB_TOKEN', label: 'GitHub token', group: 'github', cluster: 'github:token', startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'staging', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: 'gh-token', suggestedValue: '', effectiveValue: 'gh-token' },
 			],
 		},
 	};
 
-	assert.equal(resolveCurrentConfigValue(context, {}, 'GH_TOKEN', 'local'), 'gh-token');
+	assert.equal(resolveCurrentConfigValue(context, {}, 'TREESEED_GITHUB_TOKEN', 'local'), 'gh-token');
 	assert.deepEqual(
 		buildCliConfigPages(context, 'local', {}, 'startup').map((page) => page.entry.id),
 		['TREESEED_HOSTED_HUBS_GITHUB_OWNER'],
@@ -1421,8 +1421,8 @@ test('config ui orders provider workflow groups before cluster names', () => {
 		entriesByScope: {
 			local: [
 				{ id: 'TREESEED_FORM_TOKEN_SECRET', label: 'Forms token', group: 'forms', cluster: 'z-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'CLOUDFLARE_API_TOKEN', label: 'Cloudflare token', group: 'cloudflare', cluster: 'a-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'RAILWAY_API_TOKEN', label: 'Railway token', group: 'railway', cluster: 'm-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_CLOUDFLARE_API_TOKEN', label: 'Cloudflare token', group: 'cloudflare', cluster: 'a-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_RAILWAY_API_TOKEN', label: 'Railway token', group: 'railway', cluster: 'm-cluster', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'scoped', scope: 'local', sharedScopes: ['local'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 			staging: [],
 			prod: [],
@@ -1431,7 +1431,7 @@ test('config ui orders provider workflow groups before cluster names', () => {
 	const pages = buildCliConfigPages(context, 'local', {}, 'full');
 	assert.deepEqual(
 		pages.map((page) => page.entry.id),
-		['CLOUDFLARE_API_TOKEN', 'RAILWAY_API_TOKEN', 'TREESEED_FORM_TOKEN_SECRET'],
+		['TREESEED_CLOUDFLARE_API_TOKEN', 'TREESEED_RAILWAY_API_TOKEN', 'TREESEED_FORM_TOKEN_SECRET'],
 	);
 });
 
@@ -1446,9 +1446,9 @@ test('config ui keeps mixed-group Cloudflare account settings adjacent', () => {
 		},
 		entriesByScope: {
 			local: [
-				{ id: 'CLOUDFLARE_API_TOKEN', label: 'Cloudflare token', group: 'auth', cluster: 'auth:a', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'CLOUDFLARE_ACCOUNT_ID', label: 'Cloudflare account ID', group: 'cloudflare', cluster: 'cloudflare:z', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
-				{ id: 'RAILWAY_API_TOKEN', label: 'Railway token', group: 'railway', cluster: 'railway:a', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_CLOUDFLARE_API_TOKEN', label: 'Cloudflare token', group: 'auth', cluster: 'auth:a', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_CLOUDFLARE_ACCOUNT_ID', label: 'Cloudflare account ID', group: 'cloudflare', cluster: 'cloudflare:z', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'plain', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
+				{ id: 'TREESEED_RAILWAY_API_TOKEN', label: 'Railway token', group: 'railway', cluster: 'railway:a', onboardingFeature: null, startupProfile: 'core', requirement: 'required', description: '', howToGet: '', sensitivity: 'secret', targets: [], purposes: ['config'], storage: 'shared', scope: 'local', sharedScopes: ['local', 'staging', 'prod'], required: true, currentValue: '', suggestedValue: '', effectiveValue: '' },
 			],
 			staging: [],
 			prod: [],
@@ -1456,10 +1456,10 @@ test('config ui keeps mixed-group Cloudflare account settings adjacent', () => {
 	};
 	const pages = buildCliConfigPages(context, 'local', {}, 'full');
 	const orderedIds = pages.map((page) => page.entry.id);
-	const tokenIndex = orderedIds.indexOf('CLOUDFLARE_API_TOKEN');
-	const accountIndex = orderedIds.indexOf('CLOUDFLARE_ACCOUNT_ID');
+	const tokenIndex = orderedIds.indexOf('TREESEED_CLOUDFLARE_API_TOKEN');
+	const accountIndex = orderedIds.indexOf('TREESEED_CLOUDFLARE_ACCOUNT_ID');
 	assert.equal(Math.abs(tokenIndex - accountIndex), 1);
-	assert.equal(orderedIds.at(-1), 'RAILWAY_API_TOKEN');
+	assert.equal(orderedIds.at(-1), 'TREESEED_RAILWAY_API_TOKEN');
 });
 
 test('config ui keeps short required secret values in the startup wizard', () => {
@@ -1472,7 +1472,7 @@ test('config ui keeps short required secret values in the startup wizard', () =>
 		entriesByScope: {
 			local: [
 				{
-					id: 'RAILWAY_API_TOKEN',
+					id: 'TREESEED_RAILWAY_API_TOKEN',
 					label: 'Railway token',
 					group: 'auth',
 					cluster: 'auth:railway',
@@ -1498,7 +1498,7 @@ test('config ui keeps short required secret values in the startup wizard', () =>
 	};
 	const pages = buildCliConfigPages(context, 'local', {}, 'startup');
 	assert.equal(pages.length, 1);
-	assert.equal(pages[0].entry.id, 'RAILWAY_API_TOKEN');
+	assert.equal(pages[0].entry.id, 'TREESEED_RAILWAY_API_TOKEN');
 	assert.equal(pages[0].wizardRequiredMissing, true);
 });
 

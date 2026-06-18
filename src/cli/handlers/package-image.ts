@@ -42,8 +42,8 @@ function packageImageReconcileUnits(input: {
 	const target = { kind: 'persistent' as const, scope: 'staging' as const };
 	const units: TreeseedDesiredUnit[] = [];
 	const githubEnvironmentId = `github-environment:${input.packageId}:staging`;
-	const secretId = `github-secret-binding:${input.packageId}:staging:DOCKERHUB_TOKEN`;
-	const variableId = `github-variable-binding:${input.packageId}:staging:DOCKERHUB_USERNAME`;
+	const secretId = `github-secret-binding:${input.packageId}:staging:TREESEED_DOCKERHUB_TOKEN`;
+	const variableId = `github-variable-binding:${input.packageId}:staging:TREESEED_DOCKERHUB_USERNAME`;
 	if (input.syncConfig) {
 		units.push({
 			unitId: githubEnvironmentId,
@@ -62,9 +62,9 @@ function packageImageReconcileUnits(input: {
 			provider: 'github',
 			identity,
 			target,
-			logicalName: `${input.packageId} staging DOCKERHUB_TOKEN`,
+			logicalName: `${input.packageId} staging TREESEED_DOCKERHUB_TOKEN`,
 			dependencies: [githubEnvironmentId],
-			spec: { packageId: input.packageId, packageRoot: input.packageRoot, repository: input.repository, environment: 'staging', secretName: 'DOCKERHUB_TOKEN', envName: 'DOCKERHUB_TOKEN' },
+			spec: { packageId: input.packageId, packageRoot: input.packageRoot, repository: input.repository, environment: 'staging', secretName: 'TREESEED_DOCKERHUB_TOKEN', envName: 'TREESEED_DOCKERHUB_TOKEN' },
 			secrets: {},
 			metadata: { packageId: input.packageId, resourceKind: 'github-secret-binding' },
 		}, {
@@ -73,9 +73,9 @@ function packageImageReconcileUnits(input: {
 			provider: 'github',
 			identity,
 			target,
-			logicalName: `${input.packageId} staging DOCKERHUB_USERNAME`,
+			logicalName: `${input.packageId} staging TREESEED_DOCKERHUB_USERNAME`,
 			dependencies: [githubEnvironmentId],
-			spec: { packageId: input.packageId, packageRoot: input.packageRoot, repository: input.repository, environment: 'staging', variableName: 'DOCKERHUB_USERNAME', envName: 'DOCKERHUB_USERNAME' },
+			spec: { packageId: input.packageId, packageRoot: input.packageRoot, repository: input.repository, environment: 'staging', variableName: 'TREESEED_DOCKERHUB_USERNAME', envName: 'TREESEED_DOCKERHUB_USERNAME' },
 			secrets: {},
 			metadata: { packageId: input.packageId, resourceKind: 'github-variable-binding' },
 		});
@@ -90,7 +90,7 @@ function packageImageReconcileUnits(input: {
 			target,
 			logicalName: imageName,
 			dependencies: input.syncConfig ? [secretId, variableId] : [],
-			spec: { packageId: input.packageId, packageRoot: input.packageRoot, repository: input.repository, image: imageName, requiredSecrets: ['DOCKERHUB_TOKEN'], requiredVariables: ['DOCKERHUB_USERNAME'] },
+			spec: { packageId: input.packageId, packageRoot: input.packageRoot, repository: input.repository, image: imageName, requiredSecrets: ['TREESEED_DOCKERHUB_TOKEN'], requiredVariables: ['TREESEED_DOCKERHUB_USERNAME'] },
 			secrets: {},
 			metadata: { packageId: input.packageId, resourceKind: 'package-image' },
 		});

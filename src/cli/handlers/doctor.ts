@@ -58,10 +58,10 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 		}
 	}
 
-	if (!state.auth.gh) optional.push('Configure GitHub token/config (`GH_TOKEN`) for GitHub CLI automation and Copilot-backed workflows.');
-	if (!state.auth.wrangler) optional.push('Configure Cloudflare token/config (`CLOUDFLARE_API_TOKEN`) before staging, preview, or production deployment work.');
+	if (!state.auth.gh) optional.push('Configure GitHub token/config (`TREESEED_GITHUB_TOKEN`) for GitHub CLI automation and Copilot-backed workflows.');
+	if (!state.auth.wrangler) optional.push('Configure Cloudflare token/config (`TREESEED_CLOUDFLARE_API_TOKEN`) before staging, preview, or production deployment work.');
 	if (!state.auth.railway && railwayManagedServicesEnabled) {
-		optional.push('Configure Railway token/config (`RAILWAY_API_TOKEN`) before deploying the managed Railway services.');
+		optional.push('Configure Railway token/config (`TREESEED_RAILWAY_API_TOKEN`) before deploying the managed Railway services.');
 	}
 	if (!state.auth.remoteApi && state.managedServices.api.enabled) {
 		optional.push('Run `treeseed auth:login` so the CLI can use the configured remote API.');
@@ -72,7 +72,7 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 	if (!state.secrets.keyAgentRunning) {
 		optional.push('The Treeseed key-agent is not running yet. It will start automatically when you unlock the secret session.');
 	}
-	if (!state.auth.copilot) optional.push('Configure `GH_TOKEN` if you rely on local Copilot-assisted workflows.');
+	if (!state.auth.copilot) optional.push('Configure `TREESEED_GITHUB_TOKEN` if you rely on local Copilot-assisted workflows.');
 
 	return guidedResult({
 		command: 'doctor',
