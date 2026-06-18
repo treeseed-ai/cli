@@ -7,6 +7,7 @@ import {
 	type TreeseedLiveReconcileEnvironment,
 	type TreeseedLiveReconcileMode,
 	type TreeseedLiveReconcileProvider,
+	type TreeseedReconcileSelector,
 	type TreeseedReconcileTarget,
 } from '@treeseed/sdk/reconcile';
 import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
@@ -52,6 +53,32 @@ function executeRequested(value: unknown) {
 
 function targetFor(environment: TreeseedLiveReconcileEnvironment): TreeseedReconcileTarget {
 	return { kind: 'persistent', scope: environment };
+}
+
+function stringList(value: unknown) {
+	if (Array.isArray(value)) {
+		return value.flatMap((entry) => stringList(entry));
+	}
+	if (typeof value !== 'string') return [];
+	return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function selectorFor(args: Record<string, unknown>, environment: TreeseedLiveReconcileEnvironment): TreeseedReconcileSelector | undefined {
+	const selector: TreeseedReconcileSelector = { environment };
+	const assign = <Key extends keyof TreeseedReconcileSelector>(key: Key, value: unknown) => {
+		const values = stringList(value);
+		if (values.length > 0) {
+			selector[key] = values as TreeseedReconcileSelector[Key];
+		}
+	};
+	assign('unitId', args.unitId ?? args['unit-id']);
+	assign('unitType', args.unitType ?? args['unit-type']);
+	assign('resourceKind', args.resourceKind ?? args['resource-kind']);
+	assign('provider', args.provider);
+	assign('packageId', args.packageId ?? args['package-id']);
+	assign('serviceId', args.serviceId ?? args['service-id']);
+	assign('serviceType', args.serviceType ?? args['service-type']);
+	return Object.keys(selector).length > 1 ? selector : undefined;
 }
 
 function formatDuration(ms: unknown) {
@@ -129,6 +156,54 @@ function renderScenarioRows(result: Awaited<ReturnType<typeof runTreeseedLiveRec
 	];
 }
 
+function graphSummary(desiredGraph: ReturnType<typeof compileTreeseedDesiredResourceGraph>) {
+	const byKind = new Map<string, number>();
+	const byProvider = new Map<string, number>();
+	for (const resource of desiredGraph.resources) {
+		byKind.set(resource.kind, (byKind.get(resource.kind) ?? 0) + 1);
+		byProvider.set(resource.provider, (byProvider.get(resource.provider) ?? 0) + 1);
+	}
+	return {
+		workspaceId: desiredGraph.workspaceId,
+		environment: desiredGraph.environment,
+		packageCount: desiredGraph.packages.length,
+		resourceCount: desiredGraph.resources.length,
+		resourceKinds: Object.fromEntries([...byKind.entries()].sort(([left], [right]) => left.localeCompare(right))),
+		providers: Object.fromEntries([...byProvider.entries()].sort(([left], [right]) => left.localeCompare(right))),
+	};
+}
+
+function resultSummary(result: Awaited<ReturnType<typeof reconcileTreeseedTarget>>) {
+	return {
+		unitCount: result.units.length,
+		resultCount: result.results.length,
+		plans: result.plans.map((plan) => ({
+			unitId: plan.unit.unitId,
+			unitType: plan.unit.unitType,
+			provider: plan.unit.provider,
+			logicalName: plan.unit.logicalName,
+			action: plan.diff.action,
+			reasons: plan.diff.reasons,
+		})),
+		results: result.results.map((entry) => ({
+			unitId: entry.unit.unitId,
+			unitType: entry.unit.unitType,
+			provider: entry.unit.provider,
+			logicalName: entry.unit.logicalName,
+			action: entry.result.action,
+			status: entry.result.status,
+			warnings: entry.result.warnings,
+			error: entry.result.error,
+		})),
+		timings: result.timings.map((timing) => ({
+			name: timing.name,
+			durationMs: timing.durationMs,
+			status: timing.status,
+			metadata: timing.metadata,
+		})),
+	};
+}
+
 export const handleReconcile: TreeseedCommandHandler = async (invocation, context) => {
 	try {
 		const subcommand = typeof invocation.positionals[0] === 'string' && invocation.positionals[0].trim()
@@ -142,7 +217,8 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 				...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
 			};
 			const desiredGraph = compileTreeseedDesiredResourceGraph({ tenantRoot: context.cwd, target });
-			const desiredUnits = compileTreeseedDesiredUnitsFromGraph(desiredGraph);
+			const selector = selectorFor(invocation.args, environment);
+			const desiredUnits = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector);
 			if (subcommand === 'plan') {
 				const planned = await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: resolvedEnv, units: desiredUnits });
 				const actions = planned.plans.map((plan) => ({
@@ -165,7 +241,7 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 						title: 'Actions',
 						lines: actions.map((action) => `${action.provider}:${action.unitType} ${action.logicalName} -> ${action.action}`),
 					}],
-					report: { target, desiredGraph, actions },
+					report: { target, desiredGraph: graphSummary(desiredGraph), actions },
 				});
 			}
 			if (subcommand === 'status' || subcommand === 'verify') {
@@ -188,7 +264,7 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 						title: 'Blockers',
 						lines: status.blockers,
 					}],
-					report: { target, desiredGraph, status },
+					report: { target, desiredGraph: graphSummary(desiredGraph), status },
 					exitCode: status.ready ? 0 : 1,
 				});
 			}
@@ -217,7 +293,7 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 						title: 'Actions',
 						lines: result.plans.map((plan) => `${plan.unit.provider}:${plan.unit.unitType} ${plan.unit.logicalName} -> ${plan.diff.action}`),
 					}],
-					report: { target, desiredGraph, result },
+					report: { target, desiredGraph: graphSummary(desiredGraph), result: resultSummary(result) },
 				});
 			}
 			if (subcommand === 'destroy') {
@@ -238,7 +314,7 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 						{ label: 'Environment', value: environment },
 						{ label: 'Results', value: result.results.length },
 					],
-					report: { target, desiredGraph, result },
+					report: { target, desiredGraph: graphSummary(desiredGraph), result: resultSummary(result as Awaited<ReturnType<typeof reconcileTreeseedTarget>>) },
 				});
 			}
 		}
