@@ -623,6 +623,42 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		executionMode: 'handler',
 		handlerName: 'stage',
 	})],
+	['release-candidate', command({
+		usage: 'treeseed release-candidate [--strict] [--verify-driver auto|local|action] [--package <id>]... [--json]',
+		options: [
+			{ name: 'mode', flags: '--mode <mode>', description: 'Release-candidate mode to run.', kind: 'enum', values: ['hybrid', 'strict', 'skip'] },
+			{ name: 'strict', flags: '--strict', description: 'Run strict local release graph rehearsal.', kind: 'boolean' },
+			{ name: 'verifyDriver', flags: '--verify-driver <driver>', description: 'Choose local verification driver.', kind: 'enum', values: ['auto', 'local', 'action'] },
+			{ name: 'skipAction', flags: '--skip-action', description: 'Force local verify scripts instead of gh act.', kind: 'boolean' },
+			{ name: 'package', flags: '--package <id>', description: 'Limit rehearsal to one package id or name. Repeatable.', kind: 'string', multiple: true },
+			{ name: 'keepWorkspace', flags: '--keep-workspace', description: 'Keep the temporary rehearsal workspace for debugging.', kind: 'boolean' },
+			{ name: 'plan', flags: '--plan', description: 'Show the rehearsal plan without running it.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: [
+			'treeseed release-candidate --strict --json',
+			'treeseed release-candidate --verify-driver local --json',
+			'treeseed release-candidate --verify-driver action --package @treeseed/sdk --json',
+		],
+		help: {
+			workflowPosition: 'local proof before hosted gates',
+			longSummary: [
+				'Release-candidate runs the local package graph rehearsal that stage and release rely on before they touch hosted GitHub Actions.',
+			],
+			whenToUse: [
+				'Use this before stage when package dependencies, manifests, TreeDX, or publish packaging changed.',
+				'Use --verify-driver action when you need package workflow parity through managed gh act.',
+			],
+			outcomes: [
+				'Builds internal npm packages in dependency order as local tarballs.',
+				'Runs manifest-owned verification for image-service packages such as TreeDX.',
+				'Fails locally before hosted GitHub Actions cost is incurred.',
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'release-candidate',
+	})],
 	['tags:cleanup', command({
 		usage: 'treeseed tags:cleanup [--plan|--dry-run] [--include-packages <names>] [--branch-scope <staging|preview|all>] [--json]',
 		options: [

@@ -10,6 +10,7 @@ import { handleClose } from './handlers/close.js';
 import { handleSave } from './handlers/save.js';
 import { handleUpdate } from './handlers/update.js';
 import { handleRelease } from './handlers/release.js';
+import { handleReleaseCandidate } from './handlers/release-candidate.js';
 import { handleDestroy } from './handlers/destroy.js';
 import { handleStatus } from './handlers/status.js';
 import { handleCi } from './handlers/ci.js';
@@ -73,6 +74,7 @@ export const COMMAND_HANDLERS = {
 	tasks: handleTasks,
 	switch: handleSwitch,
 	stage: handleStage,
+	'release-candidate': handleReleaseCandidate,
 	'tags:cleanup': handleTagsCleanup,
 	resume: handleResume,
 	recover: handleRecover,
