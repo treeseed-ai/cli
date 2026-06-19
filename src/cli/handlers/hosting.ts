@@ -51,6 +51,7 @@ function targetFor(environment: TreeseedHostingEnvironment): TreeseedReconcileTa
 
 function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostingGraph>): TreeseedReconcileSelector {
 	const exactServiceIds = [...new Set(graph.units.flatMap((unit) => [
+		unit.id,
 		typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null,
 		!['api', 'operationsRunner', 'capacityProviderApi', 'capacityProviderManager', 'capacityProviderRunner'].includes(unit.id)
 			? unit.id
@@ -60,7 +61,7 @@ function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostin
 		host: [...new Set(graph.units.map((unit) => unit.host.id).filter((hostId) => hostId !== 'smtp' && hostId !== 'local-process' && hostId !== 'local-docker'))],
 		serviceId: exactServiceIds,
 		serviceType: [...new Set(graph.units.flatMap((unit) => {
-			if (unit.id === 'api') return ['api-runtime', 'railway-service:api'];
+			if (unit.id === 'api') return ['api-runtime', 'railway-service:api', 'custom-domain:api', 'dns-record'];
 			if (unit.id === 'operationsRunner') return ['operations-runner-runtime', 'railway-service:operations-runner'];
 			if (unit.placement === 'runner-capacity') return ['api-runtime', 'operations-runner-runtime', 'railway-service:api', 'railway-service:operations-runner'];
 			if (unit.host.id === 'cloudflare') return ['web-ui', 'edge-worker', 'content-store', 'queue', 'database', 'kv-form-guard', 'turnstile-widget', 'pages-project', 'custom-domain:web', 'dns-record'];
@@ -232,13 +233,14 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 		const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, ...filterInput });
 		const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, ...filterInput });
 		const planReport = serializeHostingPlan(plan);
+		const selector = selectorFromHostingGraph(graph);
 		const reconcileResult = dryRun
 			? null
 			: await reconcileTreeseedTarget({
 				tenantRoot: context.cwd,
 				target: targetFor(environment),
 				env: selectedSeedEnv(context, environment),
-				selector: selectorFromHostingGraph(graph),
+				selector,
 				dryRun: false,
 				write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 			});
@@ -248,11 +250,12 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				tenantRoot: context.cwd,
 				target: targetFor(environment),
 				env: selectedSeedEnv(context, environment),
-				selector: selectorFromHostingGraph(graph),
+				selector,
 			});
 		const report = {
 			...planReport,
 			dryRun,
+			selector,
 			results: planReport.units.map((entry) => ({
 				unit: entry.unit,
 				plan: entry.plan,

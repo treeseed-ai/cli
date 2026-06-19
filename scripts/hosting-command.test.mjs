@@ -215,3 +215,15 @@ test('hosting plan can target split web and api applications', async () => {
 	assert.ok(apiPayload.units.some((entry) => entry.unit.id === 'api' && entry.unit.config.rootDir === '.'));
 	assert.ok(apiPayload.units.some((entry) => entry.unit.id === 'public-treedx-node-01'));
 });
+
+test('hosting apply selects API custom domain and DNS reconcile units', async () => {
+	const cwd = makeSplitMarketWorkspace();
+	const result = await runCli(['hosting', 'apply', '--environment', 'staging', '--app', 'api', '--json'], cwd);
+	assert.equal(result.exitCode, 0);
+	const payload = parseJsonOutput(result.stdout);
+
+	assert.equal(payload.dryRun, true);
+	assert.ok(payload.selector.serviceId.includes('api'));
+	assert.ok(payload.selector.serviceType.includes('custom-domain:api'));
+	assert.ok(payload.selector.serviceType.includes('dns-record'));
+});
