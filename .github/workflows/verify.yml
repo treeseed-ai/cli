@@ -25,6 +25,11 @@ jobs:
 
       - name: Install dependencies
         run: |
+          cp package.json package.json.verify-action.bak
+          restore_package_json() {
+            mv package.json.verify-action.bak package.json
+          }
+          trap restore_package_json EXIT
           node -e "const fs = require('fs'); const p = JSON.parse(fs.readFileSync('package.json', 'utf8')); if (p.scripts) delete p.scripts.prepare; fs.writeFileSync('package.json', JSON.stringify(p, null, '\t') + '\n');"
           install_with_retry() {
             for attempt in 1 2 3; do
@@ -41,7 +46,6 @@ jobs:
           else
             install_with_retry npm install --no-audit --no-fund
           fi
-          git checkout -- package.json
 
       - name: Verify package
         run: npm run verify:direct

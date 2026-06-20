@@ -456,6 +456,7 @@ function commandNeedsProjectRoot(spec: TreeseedOperationSpec) {
 		'capacity',
 		'packs',
 		'template',
+		'scene',
 	]).has(spec.name);
 }
 

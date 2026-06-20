@@ -79,9 +79,9 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardBooleanOption('all', '--all');
 		forwardBooleanOption('follow', '--follow');
 		forwardBooleanOption('json', '--json');
-		const numberOption = (name: string) => {
-			const value = invocation.args[name];
-			const parsed = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : Number.NaN;
+			const numberOption = (name: string) => {
+				const value = invocation.args[name];
+				const parsed = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : Number.NaN;
 			return Number.isFinite(parsed) ? parsed : undefined;
 		};
 		const stringOption = (name: string) => {
@@ -126,9 +126,9 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
 		const stopLike = effectiveSubcommand === 'stop';
 		const statusLike = effectiveSubcommand === 'status' || effectiveSubcommand === 'logs';
-		const result = statusLike
-			? await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector })
-			: stopLike
+			const result = statusLike
+				? await collectTreeseedReconcileStatus({ tenantRoot: context.cwd, target, env: context.env, units, selector })
+				: stopLike
 					? planOnly
 						? await planTreeseedReconciliation({ tenantRoot: context.cwd, target, env: context.env, units, selector })
 						: await destroyTreeseedTargetUnits({ tenantRoot: context.cwd, target, env: context.env, units, selector, write: (line) => context.write(`[dev] ${line}`, 'stderr') })
