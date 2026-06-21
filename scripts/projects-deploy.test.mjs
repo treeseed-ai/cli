@@ -262,6 +262,66 @@ test('projects deploy, publish, and monitor post canonical deployment bodies', a
 	});
 });
 
+test('projects import plans and applies safe canonical repository import payloads', async () => {
+	const root = prepareMarketWorkspace();
+	await withFetch((call) => {
+		if (call.path === '/repos/treeseed-ai/sdk') {
+			return json({
+				default_branch: 'main',
+				private: false,
+				html_url: 'https://github.com/treeseed-ai/sdk',
+				clone_url: 'https://github.com/treeseed-ai/sdk.git',
+			});
+		}
+		if (call.path === '/repos/treeseed-ai/sdk/git/trees/main?recursive=1') {
+			return json({
+				tree: [
+					{ type: 'blob', path: 'package.json' },
+					{ type: 'blob', path: 'treeseed.package.yaml' },
+					{ type: 'blob', path: 'docs/index.md' },
+					{ type: 'blob', path: 'docs/src/content/intro.md' },
+					{ type: 'tree', path: 'docs' },
+					{ type: 'tree', path: 'docs/src' },
+					{ type: 'tree', path: 'docs/src/content' },
+				],
+			});
+		}
+		if (call.path === '/v1/teams/treeseed/projects/import') {
+			return json({
+				ok: true,
+				payload: {
+					project: { id: 'project-sdk', slug: 'sdk' },
+					architecture: call.body.plan.architecture,
+					hubRepository: { metadata: { credentialRef: call.body.plan.credentialRef } },
+				},
+			}, 201);
+		}
+		return json({ ok: false, error: `Unexpected path ${call.path}` }, 404);
+	}, async (calls) => {
+		const plan = await runCli(['projects', 'import', 'treeseed-ai/sdk', '--team', 'treeseed', '--plan', '--json'], {
+			cwd: root,
+			env: { HOME: root, TREESEED_GITHUB_TOKEN_TREESEED_AI_SDK: 'ghp_not-rendered' },
+		});
+		assert.equal(plan.exitCode, 0);
+		const planned = JSON.parse(plan.stdout);
+		assert.equal(planned.projectImport.architecture.sitePath, 'docs');
+		assert.equal(planned.projectImport.architecture.contentPath, 'docs/src/content');
+		assert.equal(planned.projectImport.credentialRef, 'env:TREESEED_GITHUB_TOKEN_TREESEED_AI_SDK');
+		assert.doesNotMatch(plan.output, /ghp_not-rendered/u);
+
+		const applied = await runCli(['projects', 'import', 'treeseed-ai/sdk', '--team', 'treeseed', '--market', 'local', '--execute', '--json'], {
+			cwd: root,
+			env: { HOME: root, TREESEED_GITHUB_TOKEN_TREESEED_AI_SDK: 'ghp_not-rendered' },
+		});
+		assert.equal(applied.exitCode, 0, applied.stderr || applied.output);
+		const importCall = calls.find((call) => call.path === '/v1/teams/treeseed/projects/import');
+		assert.equal(importCall.body.plan.architecture.sitePath, 'docs');
+		assert.equal(importCall.body.plan.architecture.contentPath, 'docs/src/content');
+		assert.equal(JSON.stringify(importCall.body).includes('ghp_not-rendered'), false);
+		assert.doesNotMatch(applied.output, /ghp_not-rendered/u);
+	});
+});
+
 test('projects hosts lists, audits, and queues replacement through canonical host binding API', async () => {
 	const root = prepareMarketWorkspace();
 	await withFetch((call) => {

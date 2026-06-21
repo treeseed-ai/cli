@@ -107,7 +107,7 @@ The CLI coordinates the root market repo plus checked-out package repositories:
 - `@treeseed/agent`
 - `packages/treedx`
 
-Workflow commands save package repos in dependency order, update submodule pointers, verify package release gates, and avoid one-off provider mutation.
+Workflow commands save package repos in dependency order, update workspace submodule pointers when this checkout uses them, verify package release gates, and avoid one-off provider mutation. Those submodule pointer updates are package-workspace mechanics; project architecture and imported content are modeled separately through repository identity, `rootPath`, `sitePath`, `contentPath`, and local materialization policy.
 
 ## Save, Stage, And Release
 

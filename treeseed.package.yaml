@@ -18,3 +18,13 @@ artifacts:
     name: "@treeseed/cli"
 releaseGate:
   workflow: release-gate.yml
+projectArchitecture:
+  topology: single_repository_site
+  rootPath: .
+  sitePath: docs
+  contentPath: docs
+  contentRuntimeSource: r2_published_manifest
+  localContentMaterialization: none
+  contentPublishTarget:
+    kind: cloudflare_r2
+    prefix: packages/cli

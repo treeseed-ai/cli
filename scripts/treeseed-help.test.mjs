@@ -174,7 +174,7 @@ function marketControlPlaneLaunchRequirements() {
 					{ target: 'treeseed.site.yaml', path: 'services.apiDatabase.provider', valueFrom: 'selectedResource.provider' },
 				],
 				environmentWrites: [
-					{ env: 'TREESEED_MARKET_DATABASE_URL', valueFrom: 'selectedResource.connectionUrl', targets: ['railway-secret'], scopes: ['staging', 'prod'], sensitivity: 'secret' },
+					{ env: 'TREESEED_DATABASE_URL', valueFrom: 'selectedResource.connectionUrl', targets: ['railway-secret'], scopes: ['staging', 'prod'], sensitivity: 'secret' },
 				],
 			},
 			{
@@ -202,7 +202,7 @@ function marketControlPlaneLaunchRequirements() {
 			},
 		],
 		secrets: [
-			{ kind: 'secret', key: 'apiDatabaseUrl', env: 'TREESEED_MARKET_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
+			{ kind: 'secret', key: 'apiDatabaseUrl', env: 'TREESEED_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
 			{ kind: 'secret', key: 'platformRunnerToken', env: 'TREESEED_PLATFORM_RUNNER_TOKEN', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'generated' },
 		],
 	};
@@ -446,6 +446,7 @@ test('dev help documents fixed Market web/API/runner runtime', async () => {
 	assert.doesNotMatch(result.output, /--surfaces <surfaces>/);
 	assert.doesNotMatch(result.output, /--surface <surface>/);
 	assert.match(result.output, /--web-runtime <mode>/);
+	assert.match(result.output, /--local-content <mode>/);
 	assert.match(result.output, /--force/);
 	assert.match(result.output, /web\/API\/runner/u);
 	assert.match(result.output, /managed local PostgreSQL/u);
@@ -469,6 +470,7 @@ test('dev managed subcommands render focused help pages', async () => {
 	assert.equal(start.exitCode, 0);
 	assert.match(start.output, /dev start  Start a detached worktree-scoped dev instance\./);
 	assert.match(start.output, /--web-runtime <mode>/);
+	assert.match(start.output, /--local-content <mode>/);
 	assert.match(start.output, /--force-conflicts/);
 });
 
@@ -508,7 +510,7 @@ test('template show renders Market control-plane resource requirements', async (
 	assert.match(result.stdout, /apiDatabase: database required via railway-postgres/u);
 	assert.match(result.stdout, /api: service required via railway/u);
 	assert.match(result.stdout, /operationsRunner: service required via railway/u);
-	assert.match(result.stdout, /TREESEED_MARKET_DATABASE_URL/u);
+	assert.match(result.stdout, /TREESEED_DATABASE_URL/u);
 	assert.match(result.stdout, /TREESEED_PLATFORM_RUNNER_TOKEN/u);
 });
 
@@ -1593,7 +1595,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	const workspaceRoot = makeTenantWorkspace('feature/dev-workspace');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 
-	const result = await runCli(['dev', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--force', '--plan', '--json'], {
+	const result = await runCli(['dev', '--port', '4499', '--web-runtime', 'local', '--setup', 'check', '--feedback', 'restart', '--open', 'off', '--local-content', 'preview', '--force', '--plan', '--json'], {
 		cwd: workspaceRoot,
 		env: {
 			HOME: workspaceRoot,
@@ -1605,6 +1607,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	const payload = JSON.parse(result.stdout || result.output);
 	assert.equal(payload.command, 'dev');
 	assert.equal(payload.ok, true);
+	assert.deepEqual(payload.args.slice(payload.args.indexOf('--local-content'), payload.args.indexOf('--local-content') + 2), ['--local-content', 'preview']);
 });
 
 test('treeseed dev leaves live feedback disabled when feedback is off', async () => {
@@ -1883,6 +1886,19 @@ test('capacity removes old helper-capacity actions', async () => {
 	} finally {
 		rmSync(agentRoot, { recursive: true, force: true });
 	}
+});
+
+test('capacity inspection exposes read-only execution visibility summaries', () => {
+	const capacityHandler = readFileSync(resolve(cliPackageRoot, 'src/cli/handlers/capacity.ts'), 'utf8');
+	const operationsRegistry = readFileSync(resolve(cliPackageRoot, 'src/cli/operations-registry.ts'), 'utf8');
+
+	assert.match(capacityHandler, /decorateExecutionProviderVisibility/u);
+	assert.match(capacityHandler, /summarizeExecutionProviderVisibility/u);
+	assert.match(capacityHandler, /executionCapabilityMatch/u);
+	assert.match(capacityHandler, /execution=/u);
+	assert.match(capacityHandler, /adapter=/u);
+	assert.match(capacityHandler, /external=/u);
+	assert.match(operationsRegistry, /execution visibility and capability match summaries/u);
 });
 
 test('command metadata stays aligned with help coverage', () => {

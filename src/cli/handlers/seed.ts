@@ -171,7 +171,7 @@ function remoteSeedResult(payload: Record<string, unknown>, command: string, exi
 		exitCode,
 		stdout: exitCode === 0
 			? [
-				...formatSeedPlan(plan),
+				...formatSeedPlanWithProjectArchitecture(plan),
 				...(result
 					? [
 						'',
@@ -207,6 +207,33 @@ function formatCapacityProviderKeyNotes(result: Record<string, unknown>) {
 		...created.map((entry) =>
 			`  ${String(entry.providerName ?? entry.providerKey ?? entry.providerId)} (${String(entry.keyPrefix ?? 'new key')}): stored in encrypted Treeseed config`),
 		'  Use `treeseed capacity up --market local --provider local` to launch the provider.',
+	];
+}
+
+function projectArchitectureLines(plan: SeedPlan) {
+	const lines = plan.actions
+		.filter((action) => action.kind === 'project' && action.action !== 'skip')
+		.map((action) => {
+			const architecture = action.payload?.architecture && typeof action.payload.architecture === 'object'
+				? action.payload.architecture as Record<string, unknown>
+				: null;
+			if (!architecture) return null;
+			return `  ${action.label}: ${String(architecture.topology ?? 'unknown')} site=${String(architecture.sitePath ?? '.')} content=${String(architecture.contentPath ?? '(none)')} runtime=${String(architecture.contentRuntimeSource ?? 'unknown')} local=${String(architecture.localContentMaterialization ?? 'none')}`;
+		})
+		.filter((line): line is string => Boolean(line));
+	return lines.length > 0 ? ['', 'Project architecture:', ...lines] : [];
+}
+
+function formatSeedPlanWithProjectArchitecture(plan: SeedPlan) {
+	const lines = formatSeedPlan(plan);
+	const architecture = projectArchitectureLines(plan);
+	if (architecture.length === 0) return lines;
+	const summaryIndex = lines.findIndex((line) => line === 'Summary:');
+	if (summaryIndex < 0) return [...lines, ...architecture];
+	return [
+		...lines.slice(0, summaryIndex),
+		...architecture,
+		...lines.slice(summaryIndex),
 	];
 }
 
@@ -477,7 +504,7 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 			stdout: context.outputFormat === 'json'
 				? []
 				: [
-					...formatSeedPlan(applied.plan),
+					...formatSeedPlanWithProjectArchitecture(applied.plan),
 					'',
 					'Apply:',
 					`  created: ${applied.plan.summary.create}`,
@@ -529,7 +556,7 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 
 	return {
 		exitCode: 0,
-		stdout: formatSeedPlan(planned.plan),
+		stdout: formatSeedPlanWithProjectArchitecture(planned.plan),
 		report: {
 			...planned.plan,
 			command: 'seed',

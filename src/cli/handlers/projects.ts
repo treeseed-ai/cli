@@ -1,7 +1,11 @@
 import { MarketClientError } from '@treeseed/sdk/market-client';
-import { parseProjectLaunchHostBindingSpecs } from '@treeseed/sdk';
+import {
+	githubRepositoryCredentialEnvName,
+	parseProjectLaunchHostBindingSpecs,
+	planTreeseedRepositoryImport,
+} from '@treeseed/sdk';
 import type { ProjectDeploymentEnvironment, ProjectWebDeploymentAction } from '@treeseed/sdk';
-import type { TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
+import type { TreeseedCommandContext, TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
 import { fail, guidedResult } from './utils.js';
 import { createMarketClientForInvocation } from './market-utils.js';
 
@@ -50,8 +54,10 @@ function projectUsage(action: string) {
 			return 'Usage: treeseed projects deployment <project-id> <deployment-id>';
 		case 'hosts':
 			return 'Usage: treeseed projects hosts [audit|replace|resync|rotate] <project-id> [--host <requirement=provider:host-id|managed>]';
+		case 'import':
+			return 'Usage: treeseed projects import <owner/repo> --team <team-slug-or-id> [--plan|--execute]';
 		default:
-			return 'Usage: treeseed projects [list|access|hosts|deploy|publish|monitor|deployments|deployment]';
+			return 'Usage: treeseed projects [list|access|hosts|import|deploy|publish|monitor|deployments|deployment]';
 	}
 }
 
@@ -125,6 +131,22 @@ function deploymentLine(deployment: any) {
 		workflowUrl(deployment),
 		deploymentUrl(deployment),
 	].filter(Boolean).join('  ');
+}
+
+function architectureSummary(project: any) {
+	const architecture = project?.architecture && typeof project.architecture === 'object'
+		? project.architecture
+		: project?.metadata?.architecture && typeof project.metadata.architecture === 'object'
+			? project.metadata.architecture
+			: null;
+	if (!architecture) return 'architecture=(not recorded)';
+	return [
+		`topology=${architecture.topology ?? 'unknown'}`,
+		`site=${architecture.sitePath ?? '.'}`,
+		`content=${architecture.contentPath ?? '(none)'}`,
+		`runtime=${architecture.contentRuntimeSource ?? 'unknown'}`,
+		`local=${architecture.localContentMaterialization ?? 'none'}`,
+	].join(' ');
 }
 
 function normalizeRepeatable(value: unknown) {
@@ -235,6 +257,112 @@ function pollIntervalMs(invocation: TreeseedParsedInvocation) {
 	return Number.isFinite(value) && value > 0 ? value : 1000;
 }
 
+function normalizeGitHubRepositorySlug(repository: string) {
+	return repository.trim()
+		.replace(/^https?:\/\/github\.com\//iu, '')
+		.replace(/^git@github\.com:/iu, '')
+		.replace(/^ssh:\/\/git@github\.com\//iu, '')
+		.replace(/\.git$/iu, '')
+		.replace(/^\/+|\/+$/gu, '');
+}
+
+async function observeGitHubRepository(repository: string, env: Record<string, string | undefined>) {
+	const slug = normalizeGitHubRepositorySlug(repository);
+	const [owner, name] = slug.split('/');
+	if (!owner || !name) return null;
+	const scopedEnvName = githubRepositoryCredentialEnvName(slug);
+	const token = env[scopedEnvName] || env.TREESEED_GITHUB_TOKEN || '';
+	const headers: Record<string, string> = {
+		accept: 'application/vnd.github+json',
+		'user-agent': 'treeseed-project-import',
+	};
+	if (token) headers.authorization = `Bearer ${token}`;
+	try {
+		const repoResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`, { headers });
+		if (!repoResponse.ok) return null;
+		const repo = await repoResponse.json() as any;
+		const defaultBranch = typeof repo.default_branch === 'string' ? repo.default_branch : 'main';
+		const treeResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`, { headers });
+		const tree = treeResponse.ok ? await treeResponse.json() as any : null;
+		const entries = Array.isArray(tree?.tree) ? tree.tree : [];
+		return {
+			provider: 'github',
+			owner,
+			name,
+			defaultBranch,
+			visibility: repo.private === true ? 'private' : 'public',
+			htmlUrl: typeof repo.html_url === 'string' ? repo.html_url : `https://github.com/${slug}`,
+			cloneUrl: typeof repo.clone_url === 'string' ? repo.clone_url : `https://github.com/${slug}.git`,
+			files: entries.filter((entry: any) => entry?.type === 'blob').map((entry: any) => String(entry.path)),
+			directories: entries.filter((entry: any) => entry?.type === 'tree').map((entry: any) => String(entry.path)),
+		};
+	} catch {
+		return null;
+	}
+}
+
+async function handleProjectImport(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+	const repository = invocation.positionals[1];
+	const team = stringArg(invocation, 'team');
+	if (!repository || !team) return fail(projectUsage('import'));
+	const observation = await observeGitHubRepository(repository, process.env);
+	const plan = planTreeseedRepositoryImport({
+		team,
+		repository,
+		observation: observation ?? undefined,
+		rootPath: stringArg(invocation, 'rootPath') ?? undefined,
+		sitePath: stringArg(invocation, 'sitePath') ?? undefined,
+		contentPath: stringArg(invocation, 'contentPath') ?? undefined,
+		visibility: stringArg(invocation, 'visibility') ?? undefined,
+		credentialRef: stringArg(invocation, 'credentialRef') ?? undefined,
+		env: process.env,
+	});
+	if (!observation) {
+		plan.diagnostics.push({
+			severity: 'warning',
+			code: 'github_observation_unavailable',
+			message: 'GitHub repository observation was unavailable; the plan uses explicit overrides and safe defaults.',
+		});
+	}
+	if (!boolArg(invocation, 'execute')) {
+		return guidedResult({
+			command: 'projects import',
+			summary: 'Treeseed project import plan',
+			facts: [
+				{ label: 'Repository', value: plan.repository.slug },
+				{ label: 'Team', value: plan.team },
+				{ label: 'Site path', value: plan.architecture.sitePath },
+				{ label: 'Content path', value: plan.architecture.contentPath ?? '(none)' },
+				{ label: 'Credential', value: plan.credentialRef },
+			],
+			sections: [{
+				title: 'Diagnostics',
+				lines: plan.diagnostics.map((entry) => `${entry.severity}  ${entry.code}  ${entry.message}`),
+			}],
+			report: { projectImport: redact(plan) },
+		});
+	}
+	let market;
+	try {
+		market = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	} catch (error) {
+		return authFailure(error) ?? fail(error instanceof Error ? error.message : String(error), 1);
+	}
+	const response = await market.client.importProjectRepository(team, plan);
+	return guidedResult({
+		command: 'projects import',
+		summary: 'Treeseed project import applied',
+		facts: [
+			{ label: 'Repository', value: plan.repository.slug },
+			{ label: 'Team', value: plan.team },
+			{ label: 'Project', value: (response.payload as any).project?.id ?? (response.payload as any).project?.slug ?? null },
+			{ label: 'Site path', value: plan.architecture.sitePath },
+			{ label: 'Content path', value: plan.architecture.contentPath ?? '(none)' },
+		],
+		report: { marketId: market.profile.id, response: redact(response.payload) },
+	});
+}
+
 function deploymentRequestBody(invocation: TreeseedParsedInvocation, action: ProjectWebDeploymentAction, environment: ProjectDeploymentEnvironment) {
 	const body: Record<string, unknown> = {
 		environment,
@@ -276,6 +404,20 @@ function monitorSection(deployment: any) {
 
 export const handleProjects: TreeseedCommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'list';
+	if (action === 'import') {
+		try {
+			return await handleProjectImport(invocation, context);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			return guidedResult({
+				command: 'projects import',
+				summary: message,
+				exitCode: 1,
+				stderr: [message],
+				report: { ok: false, error: message },
+			});
+		}
+	}
 	let market;
 	try {
 		market = createMarketClientForInvocation(invocation, context, { requireAuth: true });
@@ -293,7 +435,7 @@ export const handleProjects: TreeseedCommandHandler = async (invocation, context
 				summary: 'Treeseed market projects',
 				sections: [{
 					title: 'Projects',
-					lines: response.payload.map((project: any) => `${project.id}  ${project.name ?? project.slug}  team=${project.teamId}`),
+					lines: response.payload.map((project: any) => `${project.id}  ${project.name ?? project.slug}  team=${project.teamId}  ${architectureSummary(project)}`),
 				}],
 				report: { marketId: profile.id, teamId, projects: redact(response.payload) },
 			});

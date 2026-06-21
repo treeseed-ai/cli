@@ -1,4 +1,9 @@
 import { resolve } from 'node:path';
+import {
+	decorateExecutionProviderVisibility,
+	summarizeExecutionProviderVisibility,
+	type ExecutionProviderVisibilitySummary,
+} from '@treeseed/sdk/agent-capacity';
 import { resolveMarketProfile } from '@treeseed/sdk/market-client';
 import { collectTreeseedReconcileStatus, destroyTreeseedTargetUnits, planTreeseedReconciliation, reconcileTreeseedTarget, type TreeseedReconcileSelector } from '@treeseed/sdk/reconcile';
 import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
@@ -119,8 +124,101 @@ function summarizeRecord(record: unknown) {
 	return parts.join(' | ');
 }
 
-function listLines(records: unknown[]) {
-	return records.length > 0 ? records.slice(0, 25).map(summarizeRecord) : ['No records returned.'];
+function executionLabel(visibility: ExecutionProviderVisibilitySummary) {
+	return visibility.executionProviderKind ?? visibility.executionProviderId ?? 'none';
+}
+
+function externalLabel(visibility: ExecutionProviderVisibilitySummary) {
+	return visibility.externalRef ?? 'none';
+}
+
+function summarizeAssignmentRecord(record: unknown) {
+	if (!record || typeof record !== 'object') return String(record ?? '');
+	const item = record as Record<string, unknown>;
+	const visibility = summarizeExecutionProviderVisibility({
+		assignment: item,
+		explanation: recordValue(item, 'explanation') as Record<string, unknown> | null,
+	});
+	return [
+		String(item.id ?? item.assignmentId ?? 'assignment'),
+		String(item.status ?? item.state ?? item.leaseState ?? 'n/a'),
+		`project=${String(item.projectId ?? 'n/a')}`,
+		`provider=${String(item.capacityProviderId ?? item.providerId ?? 'n/a')}`,
+		`execution=${executionLabel(visibility)}`,
+		`adapter=${visibility.adapterStatus ?? 'n/a'}`,
+		`external=${externalLabel(visibility)}`,
+	].join(' | ');
+}
+
+function summarizeModeRunRecord(record: unknown) {
+	if (!record || typeof record !== 'object') return String(record ?? '');
+	const item = record as Record<string, unknown>;
+	const visibility = summarizeExecutionProviderVisibility({ modeRun: item });
+	return [
+		String(item.id ?? 'mode-run'),
+		String(item.status ?? item.state ?? 'n/a'),
+		`assignment=${String(item.assignmentId ?? 'n/a')}`,
+		`execution=${executionLabel(visibility)}`,
+		`adapter=${visibility.adapterStatus ?? 'n/a'}`,
+		`external=${externalLabel(visibility)}`,
+		`artifacts=${visibility.artifacts.length}`,
+		`usage=${visibility.usage.length}`,
+	].join(' | ');
+}
+
+function listLines(records: unknown[], action?: string) {
+	if (records.length === 0) return ['No records returned.'];
+	if (action === 'assignments') return records.slice(0, 25).map(summarizeAssignmentRecord);
+	if (action === 'mode-runs') return records.slice(0, 25).map(summarizeModeRunRecord);
+	return records.slice(0, 25).map(summarizeRecord);
+}
+
+function decorateInspectionRecords(action: string, records: unknown[]) {
+	if (action === 'assignments') {
+		return records.map((record) => isRecord(record)
+			? decorateExecutionProviderVisibility(record, { explanation: record.explanation as Record<string, unknown> | null })
+			: record);
+	}
+	if (action === 'mode-runs') {
+		return records.map((record) => isRecord(record)
+			? decorateExecutionProviderVisibility(record, { modeRun: record })
+			: record);
+	}
+	return records;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function executionCapabilityMatch(visibility: ExecutionProviderVisibilitySummary) {
+	return {
+		requiredCapabilities: visibility.requiredCapabilities,
+		preferredCapabilities: visibility.preferredCapabilities,
+		availableCapabilities: visibility.availableCapabilities,
+		aliasCapabilities: visibility.aliasCapabilities,
+		missingCapabilities: visibility.missingCapabilities,
+		selectedProvider: visibility.selectedProvider,
+		selectedExecutionProvider: visibility.selectedExecutionProvider,
+		executionProviderKind: visibility.executionProviderKind,
+		eligible: visibility.capabilityEligible,
+		reasonCodes: visibility.reasonCodes,
+	};
+}
+
+function capabilityMatchLines(visibility: ExecutionProviderVisibilitySummary) {
+	const match = executionCapabilityMatch(visibility);
+	return [
+		`required: ${match.requiredCapabilities.join(', ') || 'none'}`,
+		`available: ${match.availableCapabilities.join(', ') || 'none'}`,
+		`aliases: ${match.aliasCapabilities.join(', ') || 'none'}`,
+		`missing: ${match.missingCapabilities.join(', ') || 'none'}`,
+		`selected provider: ${match.selectedProvider ?? 'none'}`,
+		`selected execution provider: ${match.selectedExecutionProvider ?? 'none'}`,
+		`execution provider kind: ${match.executionProviderKind ?? 'none'}`,
+		`eligible: ${match.eligible === null ? 'unknown' : String(match.eligible)}`,
+		`reasons: ${match.reasonCodes.join(', ') || 'none'}`,
+	];
 }
 
 function queryFromFilters(filters: Record<string, string | null>) {
@@ -210,12 +308,17 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 		payload: unknown[] | Record<string, unknown>;
 	}>(client, path, { requireAuth: true });
 	const records = Array.isArray(response.payload) ? response.payload : response.payload ? [response.payload] : [];
+	const decoratedRecords = decorateInspectionRecords(action, records);
+	const explanationVisibility = action === 'assignment-explanation'
+		? summarizeExecutionProviderVisibility({ explanation: records[0] as Record<string, unknown> | null })
+		: null;
 	return guidedResult({
 		command: `capacity ${action}`,
 		summary: `Read ${records.length} ${action.replace(/-/gu, ' ')} record${records.length === 1 ? '' : 's'} for ${scopeLabel}.`,
 		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Scope', value: scopeLabel }, { label: 'Records', value: records.length }, ...(providerId ? [{ label: 'Provider filter', value: providerId }] : []), ...(status ? [{ label: 'Status filter', value: status }] : []), ...(mode ? [{ label: 'Mode filter', value: mode }] : []), ...(assignmentId ? [{ label: 'Assignment filter', value: assignmentId }] : [])],
 		sections: [
-			{ title: 'Records', lines: listLines(records) },
+			{ title: 'Records', lines: listLines(decoratedRecords, action) },
+			...(explanationVisibility ? [{ title: 'Execution capability match', lines: capabilityMatchLines(explanationVisibility) }] : []),
 			{
 				title: 'Boundary',
 				lines: ['Read-only inspection. Assignment creation, selection, and provider lifecycle remain owned by API coordination and reconciled provider runtime.'],
@@ -226,7 +329,8 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 			market: { id: profile.id, baseUrl: profile.baseUrl },
 			scope: { teamId, projectId },
 			filters: { providerId, status, mode, assignmentId, capacityPlanId },
-			records,
+			records: decoratedRecords,
+			...(explanationVisibility ? { executionCapabilityMatch: executionCapabilityMatch(explanationVisibility) } : {}),
 		},
 	});
 }

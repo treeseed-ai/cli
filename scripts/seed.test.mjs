@@ -353,6 +353,18 @@ resources:
         gitUrl: https://github.com/knowledge-coop/market.git
         defaultBranch: main
         checkoutPath: .
+      architecture:
+        topology: single_repository_site
+        rootPath: .
+        sitePath: .
+        contentPath: src/content
+        contentRuntimeSource: r2_published_manifest
+        localContentMaterialization: existing_path
+        contentPublishTarget:
+          kind: cloudflare_r2
+          bucket: treeseed-content-local
+          prefix: treeseed/market
+          manifestPath: manifests/treeseed/market/latest.json
   capacityProviders:
     - key: capacity-provider:treeseed/local-dev
       environments: [local]
@@ -510,6 +522,15 @@ resources:
         name: market
         gitUrl: https://github.com/knowledge-coop/market.git
         defaultBranch: main
+      architecture:
+        topology: single_repository_site
+        rootPath: .
+        sitePath: .
+        contentPath: src/content
+        contentRuntimeSource: local_directory
+        localContentMaterialization: existing_path
+        contentPublishTarget:
+          kind: none
   capacityProviders: []
   capacityGrants: []
   workPolicies: []

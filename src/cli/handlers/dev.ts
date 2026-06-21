@@ -50,6 +50,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardStringOption('setup', '--setup');
 		forwardStringOption('feedback', '--feedback');
 		forwardStringOption('open', '--open');
+		forwardStringOption('localContent', '--local-content');
 		forwardBooleanOption('plan', '--plan');
 		forwardBooleanOption('reset', '--reset');
 		forwardBooleanOption('force', '--force');
@@ -80,16 +81,31 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			};
 		}
 		const target = { kind: 'persistent' as const, scope: 'local' as const };
+		const localContent = typeof invocation.args.localContent === 'string' && invocation.args.localContent.trim()
+			? invocation.args.localContent.trim() as 'auto' | 'none' | 'preview' | 'edit'
+			: 'auto';
 		const desiredGraph = compileTreeseedDesiredResourceGraph({
 			tenantRoot: context.cwd,
 			target,
+			localContent,
 		});
 		const selectedServiceIds = selectedSurfaces
 			.split(',')
 			.map((surface) => surface.trim())
 			.filter(Boolean)
 			.flatMap((surface) => (surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]));
-		const selectedUnitIds = [...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`), 'local-docker-compose:api-postgres', 'local-treedx:team-primary', 'local-docker-compose:treedx'];
+		const localContentUnitIds = localContent === 'preview' || localContent === 'edit'
+			? desiredGraph.resources
+					.filter((resource) => resource.kind === 'local-content-materialization' && resource.spec.executeRequested === true)
+					.map((resource) => resource.id)
+			: [];
+		const selectedUnitIds = [
+			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
+			'local-docker-compose:api-postgres',
+			'local-treedx:team-primary',
+			'local-docker-compose:treedx',
+			...localContentUnitIds,
+		];
 		const selectedUnitIdSet = new Set(selectedUnitIds);
 		const selector: TreeseedReconcileSelector = {
 			environment: 'local',
@@ -172,6 +188,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 					roles: app.roles,
 				})),
 				selectedSurfaces,
+				localContent,
 				desiredGraph,
 				reconcile: result,
 			},
