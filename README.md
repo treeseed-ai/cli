@@ -45,9 +45,10 @@ treeseed release --patch --verify-deployed-resources --plan --json
 treeseed recover --json
 ```
 
-Hosted diagnostics:
+Runtime diagnostics:
 
 ```bash
+treeseed operations smoke --environment local --service operationsRunner --json
 treeseed ready staging --json
 treeseed hosting plan --environment staging --service api --json
 treeseed hosting verify --environment staging --service operationsRunner --live --json

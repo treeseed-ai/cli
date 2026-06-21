@@ -3,9 +3,22 @@ import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
 import { workflowErrorResult } from './workflow.js';
 
-function environmentFor(value: unknown): 'staging' | 'prod' {
+function environmentFor(value: unknown): 'local' | 'staging' | 'prod' {
 	const raw = typeof value === 'string' && value.trim() ? value.trim() : 'staging';
+	if (raw === 'local') return 'local';
 	return raw === 'prod' || raw === 'production' ? 'prod' : 'staging';
+}
+
+function failureNextSteps(environment: 'local' | 'staging' | 'prod') {
+	if (environment === 'local') {
+		return [
+			'npx trsd dev start --web-runtime local --json',
+			'npx trsd dev status --json',
+		];
+	}
+	return [
+		`npx trsd hosting verify --environment ${environment} --service operationsRunner --live --json`,
+	];
 }
 
 export const handleOperations: TreeseedCommandHandler = async (invocation, context) => {
@@ -35,7 +48,7 @@ export const handleOperations: TreeseedCommandHandler = async (invocation, conte
 				{ label: 'Runner', value: report.runnerId ?? '(none)' },
 			],
 			nextSteps: report.ok ? [] : [
-				`npx trsd hosting verify --environment ${environment} --service operationsRunner --live --json`,
+				...failureNextSteps(environment),
 			],
 			report,
 			exitCode: report.ok ? 0 : 1,

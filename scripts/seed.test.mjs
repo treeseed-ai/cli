@@ -387,7 +387,7 @@ resources:
           nativeLimits:
             - scope: daily
               nativeUnit: wall_minute
-              limitAmount: 480
+              limitAmount: 600
               reserveBufferPercent: 20
               resetCadence: daily
               confidence: estimated
@@ -415,7 +415,6 @@ resources:
       grantScope: project
       portfolioAllocationPercent: 100
       reservePoolPercent: 10
-      maxDailyProjectCredits: 5000
       priorityWeight: 1
       overflowPolicy: soft_grant
   workPolicies:
