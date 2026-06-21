@@ -154,7 +154,7 @@ export async function runPackageImageCommand(
 	if ((syncConfig || execute) && credential.fallbackUsed) {
 		const scopedTokenMessage = [
 			`Package image ${syncConfig ? 'config sync' : 'workflow dispatch'} for ${imagePlan.repository} requires repository-scoped GitHub token ${credential.envName}.`,
-			'GH_TOKEN is only a fallback for root/top-level workflows and is not accepted for package repository mutation.',
+			'TREESEED_GITHUB_TOKEN is only a fallback for root/top-level workflows and is not accepted for package repository mutation.',
 			`Store an Agent/package repo token through trsd config, then retry: npx trsd package image --package ${packageId} --branch ${branch} ${syncConfig ? '--sync-config' : '--execute'} --json`,
 		].join(' ');
 		report.ok = false;
