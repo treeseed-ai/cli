@@ -455,16 +455,16 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			longSummary: [
 				'Save is the main task-branch checkpoint command. It verifies, commits, syncs, pushes, and can refresh the task preview so the branch remains in a clean, reviewable state.',
 				'Use it instead of ad hoc manual git-and-preview sequences when you want the standard Treeseed task-save behavior.',
-				'Save has two lanes. The default fast lane is for routine integrated checkpoints. The explicit promotion lane is for checkpoints that should wait for hosted gates and strict release-candidate proof.',
+				'Save has two lanes. The default fast lane is for routine integrated checkpoints and does not run release-candidate. The explicit promotion lane is for checkpoints that should wait for hosted gates and strict release-candidate proof.',
 			],
 			whenToUse: [
 				'Use this after a meaningful unit of work on a task branch.',
-				'Use the default fast lane for routine code, docs, and low-risk package checkpoints where local lockfile validation and lightweight release-candidate checks are enough.',
+				'Use the default fast lane for routine code, docs, and low-risk package checkpoints where package pointers and lockfile validation are enough.',
 				'Use `--verify local` when a fast-lane checkpoint should also run package-local verification before pushing.',
 				'Use `--preview` when the branch preview should be refreshed as part of the save operation.',
 				'Use `--lane promotion` when a save should wait for hosted gates and strict release-candidate checks like a promotion rehearsal.',
 				'Use `--verify-deployed-resources` on staging or production branches when the checkpoint should wait for deployed provider resources to be verified.',
-				'Use `--release-candidate strict` on staging when dependency topology changed and you want a full clean-install rehearsal even if the cache says hybrid is enough.',
+				'Use `--release-candidate strict` on staging when dependency topology changed and you want a full clean-install rehearsal before saving.',
 				'Use `--hotfix` only when you are intentionally saving from `main` for an explicit production hotfix flow.',
 			],
 			beforeYouRun: [
@@ -487,7 +487,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				example('treeseed save --hotfix "fix production form submit"', 'Explicit hotfix save', 'Allow a save from main when the work is a deliberate hotfix path.', { why: 'Use sparingly and only when the workflow intentionally bypasses the usual task-branch rule.' }),
 			],
 			warnings: [
-				'Fast lane is intentionally optimized for iteration. Use `stage`, `release`, or `save --lane promotion` when hosted proof is required.',
+				'Fast lane is intentionally optimized for iteration. Use `release-candidate --strict`, `release`, or `save --lane promotion` when full proof is required.',
 				'`--verify local` can still be expensive because package-local verify scripts may run builds, unit tests, and smoke tests even though hosted gates remain off.',
 				'`--hotfix` deliberately loosens the normal task-branch safety model. Keep it exceptional.',
 			],
@@ -589,17 +589,19 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Compute the recursive staging plan without mutating any repo.', kind: 'boolean' },
 			{ name: 'ciMode', flags: '--ci <mode>', description: 'Control hosted GitHub Actions waits.', kind: 'enum', values: ['auto', 'hosted', 'off'] },
+			{ name: 'releaseCandidate', flags: '--release-candidate <mode>', description: 'Opt into release-candidate proof for staging.', kind: 'enum', values: ['hybrid', 'strict', 'skip'] },
 			{ name: 'verifyDeployedResources', flags: '--verify-deployed-resources', description: 'Force staging deployment checks to verify provider resources before stage returns.', kind: 'boolean' },
 			{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
 			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
-		examples: ['treeseed stage "feat: add search filters"', 'treeseed stage --plan "feat: add search filters"'],
-		notes: ['Auto-saves meaningful uncommitted task-branch changes before merging into staging.'],
+		examples: ['treeseed stage "feat: add search filters"', 'treeseed stage --plan "feat: add search filters"', 'treeseed stage --release-candidate strict "feat: add search filters"'],
+		notes: ['Auto-saves meaningful uncommitted task-branch changes before merging into staging.', 'Release-candidate proof is skipped by default; use --release-candidate strict when staging should rehearse the full package graph.'],
 		help: {
 			workflowPosition: 'merge to staging',
 			longSummary: [
-				'Stage is the task completion command for the normal promotion path. It merges the current task into staging and then cleans up the task branch.',
+				'Stage is the task completion command for the normal promotion path. It merges the current task into staging, waits hosted staging gates by default, and then cleans up the task branch.',
+				'It is optimized for development speed: release-candidate proof is not run unless --release-candidate is provided.',
 			],
 			whenToUse: [
 				'Use this when a task branch is ready for the staging environment.',
@@ -607,11 +609,13 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			outcomes: [
 				'Merges the task branch into staging.',
+				'Pushes exact staging SHAs before waiting on hosted gates.',
 				'Performs task cleanup after the merge succeeds.',
 				'Auto-saves meaningful uncommitted changes before the merge when necessary.',
 			],
 			examples: [
 				example('treeseed stage "feat: add search filters"', 'Promote a completed task', 'Merge the current task branch into staging with a resolution message.'),
+				example('treeseed stage --release-candidate strict "feat: package topology"', 'Stage with strict proof', 'Run full release-candidate proof only when this staging merge needs production-style rehearsal.'),
 				example('treeseed stage "fix: stabilize staging deploy"', 'Stage a fix branch', 'Advance a staging-targeted fix into the shared staging branch.'),
 				example('treeseed stage --json "feat: add search filters"', 'Automate staging promotion', 'Emit structured workflow output during task promotion.'),
 			],
@@ -644,10 +648,12 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		help: {
 			workflowPosition: 'local proof before hosted gates',
 			longSummary: [
-				'Release-candidate runs the local package graph rehearsal that stage and release rely on before they touch hosted GitHub Actions.',
+				'Release-candidate runs the explicit local package graph rehearsal and optional package GitHub Actions simulation.',
+				'It is available at any time, is no longer part of default save/update/stage, and is required as strict proof before production release.',
 			],
 			whenToUse: [
-				'Use this before stage when package dependencies, manifests, TreeDX, or publish packaging changed.',
+				'Use this before stage when package dependencies, manifests, TreeDX, workflow files, or publish packaging changed.',
+				'Use this before production release, or let release run a fresh strict proof when no valid proof exists.',
 				'Use --verify-driver action when you need package workflow parity through managed gh act.',
 			],
 			outcomes: [
@@ -1301,6 +1307,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			beforeYouRun: [
 				'Confirm staging is in the state you want to promote.',
+				'Run `treeseed release-candidate --strict` first if you want to inspect the full proof before release; release will require strict proof for the exact staging state.',
 				'Choose one of `--major`, `--minor`, `--patch`, or `--repair-version-line` before running the command.',
 			],
 			outcomes: [

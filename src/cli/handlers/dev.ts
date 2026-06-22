@@ -1,4 +1,5 @@
 import { discoverTreeseedApplications } from '@treeseed/sdk/hosting';
+import { runTreeseedManagedDev } from '@treeseed/sdk';
 import {
 	collectTreeseedReconcileStatus,
 	destroyTreeseedTargetUnits,
@@ -100,6 +101,35 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			...(invocation.args.all === true ? { all: true } : {}),
 			...(invocation.args.follow === true ? { follow: true } : {}),
 		};
+		const planOnly = invocation.args.plan === true;
+		if (effectiveSubcommand === 'stop' && invocation.args.all === true && !planOnly) {
+			const result = await runTreeseedManagedDev({
+				action: 'stop',
+				cwd: context.cwd,
+				surfaces: selectedSurfaces,
+				...localProcessOptions,
+				all: true,
+				env: context.env,
+			});
+			return {
+				exitCode: result.ok ? 0 : 1,
+				report: {
+					command: 'dev stop',
+					ok: result.ok,
+					action: result.action,
+					instances: result.instances.map((instance) => ({
+						id: instance.id,
+						surface: instance.surface,
+						pid: instance.pid,
+						running: instance.running,
+						logPath: instance.logPath,
+					})),
+				},
+				message: result.ok
+					? `Treeseed dev stopped ${result.instances.length} managed instance record${result.instances.length === 1 ? '' : 's'} across worktrees.`
+					: 'Treeseed dev stop found managed instances that could not be stopped.',
+			};
+		}
 		const selectedServiceIds = selectedSurfaces.split(',').map((surface) => surface.trim()).filter(Boolean)
 			.flatMap((surface) => surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]);
 		const selector: TreeseedReconcileSelector = {
@@ -122,7 +152,6 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 					},
 				}
 				: unit);
-		const planOnly = invocation.args.plan === true;
 		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
 		const stopLike = effectiveSubcommand === 'stop';
 		const statusLike = effectiveSubcommand === 'status' || effectiveSubcommand === 'logs';

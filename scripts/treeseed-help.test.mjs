@@ -1662,6 +1662,20 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	const logsPayload = JSON.parse(logs.stdout || logs.output);
 	assert.equal(logsPayload.command, 'dev logs');
 	assert.equal(typeof logsPayload.ok, 'boolean');
+
+	const stopAll = await runCli(['dev', 'stop', '--all', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(stopAll.spawns.length, 0);
+	const stopAllPayload = JSON.parse(stopAll.stdout || stopAll.output);
+	assert.equal(stopAllPayload.command, 'dev stop');
+	assert.equal(stopAllPayload.ok, true);
+	assert.equal(stopAllPayload.reconcile, undefined);
+	assert.doesNotMatch(stopAll.output, /"reconcile"/u);
 });
 
 test('treeseed dev rejects removed surface and worker options', async () => {

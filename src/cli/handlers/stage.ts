@@ -7,6 +7,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 		const result = await createWorkflowSdk(context).stage({
 			message: invocation.positionals.join(' ').trim(),
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
+			releaseCandidate: typeof invocation.args.releaseCandidate === 'string' ? invocation.args.releaseCandidate as 'hybrid' | 'strict' | 'skip' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
@@ -20,6 +21,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			repos?: Array<{ merged: boolean; deletedLocal: boolean; deletedRemote: boolean; skippedReason: string | null }>;
 			rootRepo?: { deletedLocal: boolean; deletedRemote: boolean; tagName: string | null };
 			stagingWait?: { status: string };
+			releaseCandidateMode?: string;
 			previewCleanup?: { performed: boolean };
 			finalBranch?: string;
 			ciMode?: string;
@@ -97,6 +99,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 					? [{ label: 'Blockers', value: payload.blockers.join('; ') }]
 					: []),
 				{ label: 'Staging wait', value: payload.stagingWait?.status ?? (result.executionMode === 'plan' ? 'planned' : 'unknown') },
+				{ label: 'Release candidate', value: payload.releaseCandidateMode ?? 'skip' },
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
 				{ label: 'Preview cleanup', value: payload.previewCleanup?.performed ? 'performed' : result.executionMode === 'plan' ? 'planned' : 'not needed' },
