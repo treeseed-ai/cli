@@ -5,8 +5,7 @@ import {
 	resolveTreeseedToolCommand,
 } from '@treeseed/sdk/workflow-support';
 import { loadTreeseedDeployConfigFromPath } from '@treeseed/sdk/platform/deploy-config';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { TreeseedCommandHandler } from '../types.js';
@@ -134,6 +133,12 @@ function railwayProjectNameFromManifest(cwd: string) {
 	return null;
 }
 
+function wrapperTempRoot(cwd: string) {
+	const root = join(cwd, '.treeseed', 'tmp', 'tool-wrapper');
+	mkdirSync(root, { recursive: true });
+	return root;
+}
+
 async function resolveLiveRailwayProjectId({
 	cwd,
 	env,
@@ -224,10 +229,13 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 
 		const targetArgs = invocation.positionals;
 		if (toolName === 'docker') {
-			isolatedDockerCwd = mkdtempSync(join(tmpdir(), `treeseed-docker-${scope}-`));
+			isolatedDockerCwd = mkdtempSync(join(wrapperTempRoot(context.cwd), `docker-${scope}-`));
 			const dockerEnv = {
 				...managedEnv,
 				DOCKER_CONFIG: join(isolatedDockerCwd, 'config'),
+				TMPDIR: managedEnv.TMPDIR ?? join(context.cwd, '.treeseed', 'tmp'),
+				TMP: managedEnv.TMP ?? join(context.cwd, '.treeseed', 'tmp'),
+				TEMP: managedEnv.TEMP ?? join(context.cwd, '.treeseed', 'tmp'),
 			};
 			const username = managedEnv.DOCKERHUB_USERNAME?.trim() ?? '';
 			const token = managedEnv.DOCKERHUB_TOKEN?.trim() ?? '';
@@ -291,7 +299,7 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 			});
 			const railwayCwd = railwayCommandUsesProjectFiles(targetArgs)
 				? context.cwd
-				: (isolatedRailwayCwd = mkdtempSync(join(tmpdir(), `treeseed-railway-${scope}-`)));
+				: (isolatedRailwayCwd = mkdtempSync(join(wrapperTempRoot(context.cwd), `railway-${scope}-`)));
 			const railwayEnv = isolatedRailwayCwd
 				? {
 					...managedEnv,

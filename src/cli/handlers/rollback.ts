@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import type { TreeseedCommandHandler } from '../types.js';
 import { applyTreeseedEnvironmentToProcess } from '@treeseed/sdk/workflow-support';
@@ -104,7 +103,9 @@ export const handleRollback: TreeseedCommandHandler = (invocation, context) => {
 
 	const gitRoot = repoRoot(tenantRoot);
 	const tenantRelativePath = relative(gitRoot, tenantRoot);
-	const tempRoot = mkdtempSync(join(tmpdir(), 'treeseed-rollback-'));
+	const tempBase = resolve(tenantRoot, '.treeseed', 'tmp', 'rollback');
+	mkdirSync(tempBase, { recursive: true });
+	const tempRoot = mkdtempSync(join(tempBase, 'treeseed-rollback-'));
 	const tempTenantRoot = resolve(tempRoot, tenantRelativePath);
 	const currentNodeModules = resolve(tenantRoot, 'node_modules');
 	let finalizedState: Record<string, unknown> | null = null;
