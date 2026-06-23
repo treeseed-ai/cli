@@ -1,0 +1,80 @@
+site:
+  logo:
+    src: https://treeseed.ai/logo.svg
+    alt: TreeSeed cli Knowledge Hub logo
+  name: TreeSeed CLI Knowledge Hub
+  statement: TreeSeed CLI package knowledge, agents, and workday memory
+  siteUrl: https://cli.treeseed.ai
+  githubRepository: https://github.com/treeseed-ai/cli
+  discordLink: https://discord.gg/example
+  headerMenu:
+    - label: Knowledge
+      items:
+        - label: Handbook
+          href: /knowledge/
+        - label: Objectives
+          href: /objectives/
+        - label: Agents
+          href: /agents/
+  footerMenu:
+    - label: Project
+      items:
+        - label: Repository
+          href: https://github.com/treeseed-ai/cli
+        - label: Core Objective
+          href: /objectives/core/
+  summary: TreeSeed CLI is the operator command surface project in the TreeSeed first-party portfolio.
+  projectStage: Package knowledge hub
+  projectStageDetail: A minimal standalone Knowledge Hub for package-local objectives, agents, workdays, and generated knowledge.
+  forms:
+    apiBaseUrl: /api/form/submit
+  emailNotifications:
+    contactRouting:
+      default:
+        - hello@treeseed.ai
+      issue:
+        - hello@treeseed.ai
+      collaboration:
+        - hello@treeseed.ai
+    subscribeRecipients:
+      - hello@treeseed.ai
+models:
+  pages:
+    defaults:
+      pageLayout: article
+      stage: package
+      audience: []
+  notes:
+    defaults:
+      author: TreeSeed CLI Team
+      draft: false
+      tags: []
+  questions:
+    defaults:
+      draft: false
+      tags: []
+  objectives:
+    defaults:
+      draft: false
+      tags: []
+  proposals:
+    defaults:
+      draft: false
+      tags: []
+  decisions:
+    defaults:
+      draft: false
+      tags: []
+  people:
+    defaults:
+      status: live
+      tags: []
+  agents:
+    defaults:
+      tags: []
+  books:
+    defaults:
+      tags: []
+  docs:
+    defaults:
+      tags: []

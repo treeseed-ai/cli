@@ -1,10 +1,12 @@
 import { resolve } from 'node:path';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import {
 	decorateExecutionProviderVisibility,
 	summarizeExecutionProviderVisibility,
 	type ExecutionProviderVisibilitySummary,
 } from '@treeseed/sdk/agent-capacity';
-import { resolveMarketProfile } from '@treeseed/sdk/market-client';
+import { MarketClient, resolveMarketProfile } from '@treeseed/sdk/market-client';
 import { collectTreeseedReconcileStatus, destroyTreeseedTargetUnits, planTreeseedReconciliation, reconcileTreeseedTarget, type TreeseedReconcileSelector } from '@treeseed/sdk/reconcile';
 import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
 import type { TreeseedCommandContext, TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
@@ -14,9 +16,29 @@ import { fail, guidedResult } from './utils.js';
 const PROVIDER_LIFECYCLE_ACTIONS = new Set(['build', 'up', 'down', 'restart', 'logs', 'status', 'test-local']);
 const PROVIDER_ENTRYPOINT_ACTIONS = new Set(['doctor', 'register', 'plan']);
 const MARKET_CAPACITY_ACTIONS = new Set(['migrate']);
-const MARKET_INSPECTION_ACTIONS = new Set(['allocation-sets', 'agent-classes', 'provider-sessions', 'assignments', 'mode-runs', 'decision-planning', 'execution-inputs', 'capacity-plans', 'capacity-plan', 'workday', 'workday-summary', 'assignment-explanation', 'fallback-outputs', 'treedx-proxy-audit']);
+const MARKET_INSPECTION_ACTIONS = new Set(['allocation-sets', 'agent-classes', 'provider-sessions', 'assignments', 'mode-runs', 'execution-runs', 'decision-planning', 'execution-inputs', 'capacity-plans', 'capacity-plan', 'workday', 'workday-summary', 'workday-test', 'assignment-explanation', 'fallback-outputs', 'treedx-proxy-audit']);
 const CAPACITY_PROVIDER_UNIT_IDS = ['capacity-provider:local', 'local-docker-compose:agent-capacity-provider'];
 const CAPACITY_PROVIDER_UNIT_ID_SET = new Set(CAPACITY_PROVIDER_UNIT_IDS);
+const WORKDAY_TEST_PROJECT_SLUGS = ['market', 'admin', 'agent', 'api', 'cli', 'core', 'sdk', 'ui', 'treedx'];
+const WORKDAY_TEST_AGENT_COUNT = 9;
+
+function safeWorkdayIdPart(value: string) {
+	return value.replace(/[^a-zA-Z0-9_.-]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 96) || randomUUID();
+}
+
+function treeDxRepositoryIdForProjectSlug(slug: string) {
+	return `treeseed-${slug}`.toLowerCase().replace(/[^a-z0-9_.-]+/gu, '-').replace(/^-+|-+$/gu, '') || 'treeseed-project';
+}
+
+type WorkdayTestAgentSpec = {
+	id: string;
+	slug: string;
+	name: string;
+	handler: string | null;
+	projectAgentClassId: string;
+	projectAgentClassSlug: string;
+	contentPath: string;
+};
 
 function stringArg(invocation: TreeseedParsedInvocation, name: string) {
 	const value = invocation.args[name];
@@ -32,6 +54,24 @@ function numberArg(invocation: TreeseedParsedInvocation, name: string) {
 	if (typeof value === 'number' && Number.isFinite(value)) return value;
 	if (typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value))) return Number(value);
 	return null;
+}
+
+function csvArg(invocation: TreeseedParsedInvocation, name: string, fallback: string[]) {
+	const value = stringArg(invocation, name);
+	if (!value || value === 'all') return fallback;
+	const entries = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+	return entries.length ? [...new Set(entries)] : fallback;
+}
+
+function positiveNumberArg(invocation: TreeseedParsedInvocation, name: string, fallback: number) {
+	const value = numberArg(invocation, name);
+	return value && value > 0 ? Math.floor(value) : fallback;
+}
+
+function sleep(ms: number) {
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 }
 
 function formatNumber(value: unknown, digits = 2) {
@@ -72,6 +112,35 @@ function capacityProviderUnits<T extends { unitId?: unknown; dependencies?: stri
 
 function resolveMarket(invocation: TreeseedParsedInvocation) {
 	return resolveMarketProfile(stringArg(invocation, 'market') ?? 'local');
+}
+
+function localAcceptanceAdminToken(env: NodeJS.ProcessEnv) {
+	const configured = env.TREESEED_CAPACITY_ACCEPTANCE_ADMIN_TOKEN?.trim();
+	return configured || 'tsk_local_treeseed_acceptance_admin';
+}
+
+function createWorkdayTestMarketClient(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+	const profile = resolveMarket(invocation);
+	if (profile.id === 'local') {
+		return {
+			profile,
+			authMode: 'local_acceptance_admin',
+			client: new MarketClient({
+				profile,
+				accessToken: localAcceptanceAdminToken(context.env),
+				fetchImpl: fetch,
+				userAgent: 'treeseed-cli',
+			}),
+		};
+	}
+	try {
+		return {
+			...createMarketClientForInvocation(invocation, context, { requireAuth: true }),
+			authMode: 'session',
+		};
+	} catch (error) {
+		throw error;
+	}
 }
 
 function resolveCapacityLaunchConfigPath(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
@@ -221,15 +290,1143 @@ function capabilityMatchLines(visibility: ExecutionProviderVisibilitySummary) {
 	];
 }
 
-function queryFromFilters(filters: Record<string, string | null>) {
+function queryFromFilters(filters: Record<string, string | number | null>) {
 	const query = new URLSearchParams();
 	for (const [key, value] of Object.entries(filters)) {
-		if (value) query.set(key, value);
+		if (value) query.set(key, String(value));
 	}
 	return query.toString() ? `?${query.toString()}` : '';
 }
 
+function modeRunContentArtifacts(modeRun: unknown) {
+	if (!modeRun || typeof modeRun !== 'object') return [];
+	const directRefs = recordValue(modeRun, 'contentArtifactRefs');
+	if (Array.isArray(directRefs)) return uniqueContentArtifacts(directRefs);
+	const outputs = recordValue(recordValue(modeRun, 'output'), 'outputs') ?? recordValue(modeRun, 'outputs');
+	const outputRefs = recordValue(recordValue(outputs, 'metadata'), 'contentArtifactRefs');
+	if (Array.isArray(outputRefs)) return uniqueContentArtifacts(outputRefs);
+	const lifecycleOutput = recordValue(recordValue(modeRun, 'output'), 'lifecycleOutput') ?? recordValue(modeRun, 'lifecycleOutput');
+	const lifecycleRefs = recordValue(recordValue(lifecycleOutput, 'metadata'), 'contentArtifactRefs');
+	return Array.isArray(lifecycleRefs) ? uniqueContentArtifacts(lifecycleRefs) : [];
+}
+
+function assignmentContentArtifacts(assignment: unknown) {
+	const output = recordValue(assignment, 'lifecycleOutput');
+	const refs = recordValue(recordValue(output, 'metadata'), 'contentArtifactRefs');
+	return Array.isArray(refs) ? uniqueContentArtifacts(refs) : [];
+}
+
+function contentArtifactKey(artifact: unknown) {
+	const record = artifact && typeof artifact === 'object' && !Array.isArray(artifact) ? artifact as Record<string, unknown> : {};
+	return [
+		record.contentPath ?? record.path ?? record.uri ?? '',
+		record.artifactKind ?? record.kind ?? '',
+		record.sourceAssignmentId ?? '',
+		record.producedByAgent ?? '',
+		record.executionProviderRunId ?? '',
+	].map((part) => String(part ?? '')).join('\u0000');
+}
+
+function uniqueContentArtifacts(artifacts: unknown[]) {
+	const seen = new Set<string>();
+	const result: unknown[] = [];
+	for (const artifact of artifacts) {
+		const key = contentArtifactKey(artifact);
+		if (!key.trim() || seen.has(key)) continue;
+		seen.add(key);
+		result.push(artifact);
+	}
+	return result;
+}
+
+function normalizeExecutionRunRecord(row: Record<string, unknown>) {
+	const contentArtifactRefs = recordValue(row, 'contentArtifactRefs');
+	return {
+		...row,
+		...(Array.isArray(contentArtifactRefs) ? { contentArtifactRefs: uniqueContentArtifacts(contentArtifactRefs) } : {}),
+	};
+}
+
+async function executionRunsForAssignments(client: unknown, teamId: string, assignmentIds: string[]) {
+	const rows = await Promise.all(assignmentIds.map(async (assignmentId) => {
+		const response = await marketRequest<{ ok: true; payload: unknown[] }>(
+			client,
+			`/v1/teams/${encodeURIComponent(teamId)}/capacity/execution-runs${queryFromFilters({ assignmentId, limit: 50 })}`,
+			{ requireAuth: true },
+		).catch(() => ({ ok: false, payload: [] as unknown[] }));
+		return Array.isArray(response.payload) ? response.payload.filter(isRecord) : [];
+	}));
+	return rows.flat().map((row) => normalizeExecutionRunRecord(redactAuditValue(row) as Record<string, unknown>));
+}
+
+function isTerminalAssignment(assignment: unknown) {
+	const status = String(recordValue(assignment, 'status') ?? '').toLowerCase();
+	const leaseState = String(recordValue(assignment, 'leaseState') ?? '').toLowerCase();
+	if (['completed', 'failed', 'returned', 'expired', 'cancelled'].includes(status)) return true;
+	return status === 'completed' && leaseState === 'released';
+}
+
+function isUnfinishedAssignment(assignment: unknown) {
+	return !isTerminalAssignment(assignment);
+}
+
+async function fetchWorkdayTestAssignments(
+	client: unknown,
+	teamId: string,
+	projectStates: Array<{ projectId: string; assignmentIds: string[] }>,
+	providerId: string,
+) {
+	const entries = await Promise.all(projectStates.map(async (projectState) => {
+		const response = await (
+			client as {
+				providerAssignments(teamId: string, options?: { projectId?: string | null; providerId?: string | null }): Promise<{ payload?: unknown[] }>;
+			}
+		).providerAssignments(teamId, { projectId: projectState.projectId, providerId }).catch(() => ({ payload: [] as unknown[] }));
+		const assignments = (Array.isArray(response.payload) ? response.payload : [])
+			.filter(isRecord)
+			.filter((assignment) => projectState.assignmentIds.length === 0 || projectState.assignmentIds.includes(String(assignment.id ?? '')));
+		return [projectState.projectId, assignments] as const;
+	}));
+	return new Map(entries);
+}
+
+async function waitForWorkdayTestAssignments(
+	client: unknown,
+	teamId: string,
+	projectStates: Array<{ projectId: string; assignmentIds: string[] }>,
+	providerId: string,
+	waitSeconds: number,
+) {
+	const deadline = Date.now() + waitSeconds * 1000;
+	let snapshots = await fetchWorkdayTestAssignments(client, teamId, projectStates, providerId);
+	while (Date.now() < deadline) {
+		const unfinished = [...snapshots.values()].flat().filter(isUnfinishedAssignment);
+		if (unfinished.length === 0) {
+			return { completed: true, snapshots, unfinished };
+		}
+		await sleep(Math.min(5000, Math.max(500, deadline - Date.now())));
+		snapshots = await fetchWorkdayTestAssignments(client, teamId, projectStates, providerId);
+	}
+	const unfinished = [...snapshots.values()].flat().filter(isUnfinishedAssignment);
+	return { completed: unfinished.length === 0, snapshots, unfinished };
+}
+
+function redactAuditValue(value: unknown, key = ''): unknown {
+	if (/(api[_-]?key|authorization|bearer|credential|lease[_-]?token|password|secret|token)$/iu.test(key)) {
+		return '<redacted>';
+	}
+	if (Array.isArray(value)) return value.map((entry) => redactAuditValue(entry));
+	if (!value || typeof value !== 'object') return value;
+	return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
+		entryKey,
+		redactAuditValue(entryValue, entryKey),
+	]));
+}
+
+function yamlScalar(value: unknown) {
+	if (value === null || value === undefined) return 'null';
+	if (typeof value === 'boolean' || typeof value === 'number') return JSON.stringify(value);
+	if (typeof value !== 'string') return JSON.stringify(value);
+	if (value.length === 0) return "''";
+	if (/^[A-Za-z0-9_.:/@-]+$/u.test(value) && !['true', 'false', 'null'].includes(value.toLowerCase())) return value;
+	return JSON.stringify(value);
+}
+
+function toYaml(value: unknown, indent = 0): string {
+	const pad = ' '.repeat(indent);
+	if (Array.isArray(value)) {
+		if (value.length === 0) return '[]';
+		return value.map((entry) => {
+			if (entry && typeof entry === 'object') {
+				const nested = toYaml(entry, indent + 2);
+				return `${pad}-${nested.startsWith('\n') ? nested : `\n${nested}`}`;
+			}
+			return `${pad}- ${yamlScalar(entry)}`;
+		}).join('\n');
+	}
+	if (value && typeof value === 'object') {
+		const entries = Object.entries(value as Record<string, unknown>);
+		if (entries.length === 0) return '{}';
+		return entries.map(([key, entryValue]) => {
+			if (entryValue && typeof entryValue === 'object') {
+				const nested = toYaml(entryValue, indent + 2);
+				return `${pad}${key}:${nested === '[]' || nested === '{}' ? ` ${nested}` : `\n${nested}`}`;
+			}
+			return `${pad}${key}: ${yamlScalar(entryValue)}`;
+		}).join('\n');
+	}
+	return `${pad}${yamlScalar(value)}`;
+}
+
+function timestampMs(value: unknown) {
+	if (typeof value !== 'string' || !value) return null;
+	const parsed = Date.parse(value);
+	return Number.isFinite(parsed) ? parsed : null;
+}
+
+function durationMs(start: unknown, end: unknown) {
+	const started = timestampMs(start);
+	const ended = timestampMs(end);
+	if (started === null || ended === null || ended < started) return null;
+	return ended - started;
+}
+
+function nestedNumber(value: unknown, keys: string[]): number | null {
+	if (!value || typeof value !== 'object') return null;
+	const record = value as Record<string, unknown>;
+	for (const key of keys) {
+		const direct = record[key];
+		if (typeof direct === 'number' && Number.isFinite(direct)) return direct;
+		if (typeof direct === 'string' && Number.isFinite(Number(direct))) return Number(direct);
+	}
+	for (const entry of Object.values(record)) {
+		const nested = nestedNumber(entry, keys);
+		if (nested !== null) return nested;
+	}
+	return null;
+}
+
+function tokenDiagnostics(...sources: unknown[]) {
+	const source = sources.find((entry) => entry && typeof entry === 'object') ?? {};
+	return {
+		promptTokens: nestedNumber(source, ['promptTokens', 'prompt_tokens', 'inputTokens', 'input_tokens']),
+		completionTokens: nestedNumber(source, ['completionTokens', 'completion_tokens', 'outputTokens', 'output_tokens']),
+		totalTokens: nestedNumber(source, ['totalTokens', 'total_tokens', 'tokens']),
+		cachedTokens: nestedNumber(source, ['cachedTokens', 'cached_tokens', 'cachedInputTokens', 'cached_input_tokens']),
+		reasoningTokens: nestedNumber(source, ['reasoningTokens', 'reasoning_tokens']),
+	};
+}
+
+async function resolveWorkdayTestTeam(client: unknown, teamSelector: string) {
+	const profile = await marketRequest<{ ok: boolean; payload?: Record<string, unknown> }>(
+		client,
+		`/v1/teams/by-name/${encodeURIComponent(teamSelector)}/profile`,
+		{ requireAuth: true },
+	).catch(() => null);
+	const payload = profile?.payload && typeof profile.payload === 'object' ? profile.payload : {};
+	const team = recordValue(payload, 'team');
+	if (team && typeof team === 'object') {
+		const teamRecord = team as Record<string, unknown>;
+		const activity = recordValue(payload, 'activity');
+		const projects = activity && typeof activity === 'object' && Array.isArray((activity as Record<string, unknown>).projects)
+			? (activity as Record<string, unknown>).projects as Array<Record<string, unknown>>
+			: [];
+		return {
+			teamId: String(teamRecord.id ?? teamSelector),
+			teamSelector,
+			team,
+			projects,
+		};
+	}
+	return {
+		teamId: teamSelector,
+		teamSelector,
+		team: null,
+		projects: [] as Array<Record<string, unknown>>,
+	};
+}
+
+async function runExecutionRunsInspection(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+	const teamSelector = stringArg(invocation, 'team');
+	if (!teamSelector) {
+		return fail('Missing --team. Use `trsd capacity execution-runs --team <team-id-or-slug> --format yaml`.');
+	}
+	const projectId = stringArg(invocation, 'project');
+	const providerId = stringArg(invocation, 'provider');
+	const status = stringArg(invocation, 'status');
+	const mode = stringArg(invocation, 'mode');
+	const assignmentId = stringArg(invocation, 'assignment');
+	const workdayId = stringArg(invocation, 'workday');
+	const executionProviderId = stringArg(invocation, 'execution-provider');
+	const kindFilter = stringArg(invocation, 'kind');
+	const outputFormat = stringArg(invocation, 'format');
+	const maxRuns = positiveNumberArg(invocation, 'limit', 200);
+	const { profile, client, authMode } = createWorkdayTestMarketClient(invocation, context);
+	const team = await resolveWorkdayTestTeam(client, teamSelector);
+	const teamId = team.teamId;
+	const response = await marketRequest<{ ok: true; payload: unknown[] }>(
+		client,
+		`/v1/teams/${encodeURIComponent(teamId)}/capacity/execution-runs${queryFromFilters({
+			projectId,
+			providerId,
+			status,
+			mode,
+			assignmentId,
+			workdayId,
+			executionProviderId,
+			limit: maxRuns,
+		})}`,
+		{ requireAuth: true },
+	);
+	const rows = (Array.isArray(response.payload) ? response.payload : [])
+		.filter(isRecord)
+		.filter((row) => !kindFilter || String(recordValue(recordValue(row, 'executionProvider'), 'id') ?? '').toLowerCase().includes(kindFilter.toLowerCase()))
+		.slice(0, maxRuns)
+		.map((row) => normalizeExecutionRunRecord(redactAuditValue(row) as Record<string, unknown>));
+	const yaml = toYaml(rows);
+	if (outputFormat === 'yaml') {
+		return {
+			exitCode: 0,
+			stdout: [yaml],
+			report: {
+				action: 'execution-runs',
+				ok: true,
+				market: { id: profile.id, baseUrl: profile.baseUrl },
+				authMode,
+				scope: { teamId, projectId },
+				filters: { providerId, status, mode, assignmentId, workdayId, executionProviderId, kind: kindFilter },
+				records: rows,
+				yaml,
+			},
+		};
+	}
+	if (outputFormat === 'json') {
+		return {
+			exitCode: 0,
+			stdout: [JSON.stringify(rows, null, 2)],
+			report: { action: 'execution-runs', ok: true, records: rows },
+		};
+	}
+	const timelineLines = rows.map((row) => {
+		const agent = recordValue(row, 'agent') as Record<string, unknown> | undefined;
+		const assignment = recordValue(row, 'assignment') as Record<string, unknown> | undefined;
+		const timing = recordValue(row, 'timing') as Record<string, unknown> | undefined;
+		const artifacts = Array.isArray(recordValue(row, 'contentArtifactRefs')) ? recordValue(row, 'contentArtifactRefs') as unknown[] : [];
+		return `${String(timing?.startedAt ?? timing?.createdAt ?? 'time?')} | ${String(row.status ?? 'unknown')} | ${String(agent?.projectSlug ?? agent?.projectId ?? 'project?')} | ${String(agent?.agentId ?? 'agent?')} | assignment=${String(assignment?.id ?? 'n/a')} | artifacts=${uniqueContentArtifacts(artifacts).length}`;
+	});
+	const treeLines: string[] = [];
+	const byProject = new Map<string, Record<string, unknown>[]>();
+	for (const row of rows) {
+		const agent = recordValue(row, 'agent') as Record<string, unknown> | undefined;
+		const key = String(agent?.projectSlug ?? agent?.projectId ?? 'unknown-project');
+		byProject.set(key, [...(byProject.get(key) ?? []), row]);
+	}
+	for (const [project, projectRows] of byProject) {
+		treeLines.push(project);
+		for (const row of projectRows) {
+			const agent = recordValue(row, 'agent') as Record<string, unknown> | undefined;
+			const assignment = recordValue(row, 'assignment') as Record<string, unknown> | undefined;
+			const artifacts = uniqueContentArtifacts(Array.isArray(recordValue(row, 'contentArtifactRefs')) ? recordValue(row, 'contentArtifactRefs') as Array<Record<string, unknown>> : []) as Array<Record<string, unknown>>;
+			treeLines.push(`  ${String(assignment?.workdayId ?? 'workday?')}`);
+			treeLines.push(`    ${String(assignment?.id ?? 'assignment?')} -> ${String(row.id ?? 'run?')} ${String(row.status ?? 'unknown')} ${String(agent?.agentId ?? 'agent?')}`);
+			for (const artifact of artifacts) {
+				treeLines.push(`      content: ${String(artifact.contentPath ?? artifact.uri ?? 'artifact')}`);
+			}
+		}
+	}
+	if (outputFormat === 'timeline' || outputFormat === 'tree') {
+		return {
+			exitCode: 0,
+			stdout: [outputFormat === 'tree' ? treeLines.join('\n') : timelineLines.join('\n')],
+			report: { action: 'execution-runs', ok: true, records: rows },
+		};
+	}
+	return guidedResult({
+		command: 'capacity execution-runs',
+		summary: `Read ${rows.length} execution run audit record${rows.length === 1 ? '' : 's'} for team ${teamId}.`,
+		facts: [
+			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
+			{ label: 'Team', value: teamId },
+			{ label: 'Records', value: rows.length },
+			...(providerId ? [{ label: 'Provider filter', value: providerId }] : []),
+			...(workdayId ? [{ label: 'Workday filter', value: workdayId }] : []),
+			...(kindFilter ? [{ label: 'Kind filter', value: kindFilter }] : []),
+		],
+		sections: [
+			{ title: 'Timeline', lines: timelineLines.slice(0, 25) },
+			{ title: 'YAML', lines: ['Use `--format yaml` to print the full redacted YAML list.'] },
+		],
+		report: {
+			action: 'execution-runs',
+			market: { id: profile.id, baseUrl: profile.baseUrl },
+			authMode,
+			scope: { teamId, projectId },
+			filters: { providerId, status, mode, assignmentId, workdayId, executionProviderId, kind: kindFilter },
+			records: rows,
+		},
+	});
+}
+
+function workdayTestScore(input: {
+	expectedProjects: string[];
+	actualProjects: Array<Record<string, unknown>>;
+	providerReady: boolean;
+	auditEvents: number;
+	planningOnly: boolean;
+}) {
+	const bySlug = new Map(input.actualProjects.map((project) => [String(project.slug ?? project.projectId), project]));
+	const expected = input.expectedProjects;
+	const projectCoverage = expected.filter((slug) => bySlug.has(slug)).length;
+	const agentCoverage = expected.filter((slug) => Number(bySlug.get(slug)?.agentCount ?? 0) >= WORKDAY_TEST_AGENT_COUNT).length;
+	const planningCoverage = expected.filter((slug) => Number(bySlug.get(slug)?.planningRuns ?? 0) > 0).length;
+	const contentCoverage = expected.filter((slug) => Number(bySlug.get(slug)?.contentArtifacts ?? 0) > 0).length;
+	const actingCoverage = input.planningOnly
+		? expected.length
+		: expected.filter((slug) => Number(bySlug.get(slug)?.actingRuns ?? 0) > 0 || Number(bySlug.get(slug)?.outputs ?? 0) > 0).length;
+	const checks = [
+		{ name: 'projectCoverage', actual: projectCoverage, expected: expected.length },
+		{ name: 'agentCoverage', actual: agentCoverage, expected: expected.length },
+		{ name: 'planningCoverage', actual: planningCoverage, expected: expected.length },
+		{ name: 'contentArtifactCoverage', actual: contentCoverage, expected: expected.length },
+		{ name: 'actingCoverage', actual: actingCoverage, expected: expected.length },
+		{ name: 'auditCompleteness', actual: input.auditEvents > 0 ? 1 : 0, expected: 1 },
+		{ name: 'providerHealth', actual: input.providerReady ? 1 : 0, expected: 1 },
+	].map((check) => ({
+		...check,
+		score: Math.round(Math.max(0, Math.min(1, check.actual / Math.max(1, check.expected))) * 100),
+	}));
+	const blockers = [
+		...(input.providerReady ? [] : ['local provider readiness was not proven']),
+		...(input.auditEvents > 0 ? [] : ['audit event trail is empty']),
+		...input.actualProjects.flatMap((project) => Array.isArray(project.blockers) ? (project.blockers as unknown[]).map((blocker) => `${project.slug}: ${String(blocker)}`) : []),
+	];
+	const score = Math.round(checks.reduce((sum, check) => sum + check.score, 0) / checks.length);
+	return {
+		score,
+		status: blockers.length === 0 && score >= 90 ? 'completed' : score >= 60 ? 'degraded' : 'failed',
+		checks,
+		blockers,
+	};
+}
+
+async function writeWorkdayTestReportFiles(context: TreeseedCommandContext, input: {
+	runId: string;
+	reportDir: string;
+	parameters: Record<string, unknown>;
+	expected: Record<string, unknown>;
+	actual: Record<string, unknown>;
+	metrics: Record<string, unknown>;
+}) {
+	const reportDir = resolve(context.cwd, input.reportDir);
+	await mkdir(reportDir, { recursive: true });
+	const jsonPath = resolve(reportDir, `workday-test-${input.runId}.json`);
+	const markdownPath = resolve(reportDir, `workday-test-${input.runId}.md`);
+	await writeFile(jsonPath, `${JSON.stringify(input, null, 2)}\n`, 'utf8');
+	const checks = Array.isArray(input.metrics.checks) ? input.metrics.checks as Array<Record<string, unknown>> : [];
+	const blockers = Array.isArray(input.metrics.blockers) ? input.metrics.blockers as unknown[] : [];
+	const actualProjects = Array.isArray(input.actual.projects) ? input.actual.projects as Array<Record<string, unknown>> : [];
+	const diagnosticLines = actualProjects.flatMap((project) => {
+		const diagnostics = Array.isArray(project.leaseDiagnostics) ? project.leaseDiagnostics as Array<Record<string, unknown>> : [];
+		return diagnostics.map((diagnostic) => {
+			const reasons = Array.isArray(diagnostic.reasons) ? diagnostic.reasons.join(', ') : String(diagnostic.reasons ?? 'unknown');
+			return `- ${String(project.slug ?? project.projectId)} / ${String(diagnostic.assignmentId ?? 'assignment')}: ${reasons || 'no recorded reasons'}`;
+		});
+	});
+	await writeFile(markdownPath, `${[
+		`# Workday Test ${input.runId}`,
+		'',
+		`Status: ${String(input.metrics.status ?? 'unknown')}`,
+		`Score: ${String(input.metrics.score ?? 'n/a')}`,
+		`Scenario: ${String(input.parameters.scenarioId ?? 'portfolio-local')}`,
+		`Provider: ${String(input.parameters.providerId ?? 'local')}`,
+		'',
+		'## Coverage',
+		'',
+		...checks.map((check) => `- ${String(check.name)}: ${String(check.actual)}/${String(check.expected)} (${String(check.score)})`),
+		'',
+		'## Projects',
+		'',
+		...actualProjects.map((project) => `- ${String(project.slug ?? project.projectId)}: ${String(project.status ?? 'unknown')}; agents=${String(project.agentCount ?? 0)}; planning=${String(project.planningRuns ?? 0)}; acting=${String(project.actingRuns ?? 0)}; assignments=${String(project.assignments ?? 0)}`),
+		'',
+		'## Blockers',
+		'',
+		...(blockers.length ? blockers.map((blocker) => `- ${String(blocker)}`) : ['- none']),
+		'',
+		'## Lease Diagnostics',
+		'',
+		...(diagnosticLines.length ? diagnosticLines : ['- none']),
+	].join('\n')}\n`, 'utf8');
+	return { jsonPath, markdownPath };
+}
+
+function frontmatterBlock(source: string) {
+	const match = /^---\n([\s\S]*?)\n---/u.exec(source);
+	return match?.[1] ?? '';
+}
+
+function frontmatterScalar(frontmatter: string, key: string) {
+	const match = new RegExp(`^${key}:\\s*(.+)$`, 'mu').exec(frontmatter);
+	return match?.[1]?.trim().replace(/^['"]|['"]$/gu, '') ?? null;
+}
+
+async function readWorkdayTestAgentSpecs(context: TreeseedCommandContext, projectSlug: string): Promise<WorkdayTestAgentSpec[]> {
+	const agentDir = projectSlug === 'market'
+		? resolve(context.cwd, 'src/content/agents')
+		: resolve(context.cwd, 'packages', projectSlug, 'docs/src/content/agents');
+	const entries = await readdir(agentDir, { withFileTypes: true }).catch(() => []);
+	const specs: WorkdayTestAgentSpec[] = [];
+	for (const entry of entries) {
+		if (!entry.isFile() || !entry.name.endsWith('.mdx')) continue;
+		const contentPath = resolve(agentDir, entry.name);
+		const source = await readFile(contentPath, 'utf8').catch(() => '');
+		const frontmatter = frontmatterBlock(source);
+		const slug = frontmatterScalar(frontmatter, 'slug') ?? entry.name.replace(/\.mdx$/u, '');
+		specs.push({
+			id: frontmatterScalar(frontmatter, 'id') ?? `agent:${slug}`,
+			slug,
+			name: frontmatterScalar(frontmatter, 'name') ?? slug,
+			handler: frontmatterScalar(frontmatter, 'handler'),
+			projectAgentClassId: frontmatterScalar(frontmatter, 'projectAgentClassId') ?? frontmatterScalar(frontmatter, 'agentClassId') ?? 'planning',
+			projectAgentClassSlug: frontmatterScalar(frontmatter, 'projectAgentClassSlug') ?? frontmatterScalar(frontmatter, 'agentClassSlug') ?? frontmatterScalar(frontmatter, 'projectAgentClassId') ?? 'planning',
+			contentPath,
+		});
+	}
+	return specs.sort((left, right) => left.slug.localeCompare(right.slug));
+}
+
+function providerMatchesSelector(provider: Record<string, unknown>, selector: string) {
+	const metadata = provider.metadata && typeof provider.metadata === 'object' ? provider.metadata as Record<string, unknown> : {};
+	return [provider.id, provider.name, provider.provider, provider.kind, metadata.provider, metadata.localProviderId]
+		.some((value) => String(value ?? '').toLowerCase() === selector.toLowerCase());
+}
+
+async function resolveWorkdayTestProviderId(client: ReturnType<typeof createMarketClientForInvocation>['client'], teamId: string, selector: string) {
+	const providersResponse = await client.teamCapacityProviders(teamId).catch(() => ({ payload: [] as unknown[] }));
+	const providers = providersResponse.payload as Array<Record<string, unknown>>;
+	const matched = providers.find((provider) => providerMatchesSelector(provider, selector));
+	return {
+		providerId: String(matched?.id ?? selector),
+		providers,
+	};
+}
+
+async function ensureWorkdayTestAgentClasses(
+	client: ReturnType<typeof createMarketClientForInvocation>['client'],
+	context: TreeseedCommandContext,
+	projectId: string,
+	projectSlug: string,
+	existingClasses: Array<Record<string, unknown>>,
+) {
+	const existingByKey = new Map(existingClasses.flatMap((agentClass) => [
+		[String(agentClass.id ?? ''), agentClass] as const,
+		[String(agentClass.slug ?? ''), agentClass] as const,
+	]).filter(([key]) => key.length > 0));
+	const created: Array<Record<string, unknown>> = [];
+	const specs = await readWorkdayTestAgentSpecs(context, projectSlug);
+	for (const classId of [...new Set(specs.map((spec) => spec.projectAgentClassId))]) {
+		const classSpecs = specs.filter((spec) => spec.projectAgentClassId === classId);
+		const first = classSpecs[0];
+		if (!first || existingByKey.has(classId) || existingByKey.has(first.projectAgentClassSlug)) continue;
+		const response = await client.createProjectAgentClass(projectId, {
+			id: classId,
+			slug: first.projectAgentClassSlug,
+			name: `${first.projectAgentClassSlug.replace(/[-_]+/gu, ' ')} agents`,
+			status: 'active',
+			allowedModes: ['planning', 'acting'],
+			requiredCapabilities: ['repo_read', 'agent_mode_run'],
+			handlerRefs: { agents: classSpecs.map((spec) => ({ slug: spec.slug, handler: spec.handler })) },
+			metadata: {
+				source: 'workday_test_agent_content',
+				agentCount: classSpecs.length,
+				agentSlugs: classSpecs.map((spec) => spec.slug),
+				contentPaths: classSpecs.map((spec) => spec.contentPath.replace(`${context.cwd}/`, '')),
+			},
+		}).catch(() => null);
+		if (response?.payload) {
+			created.push(response.payload);
+			existingByKey.set(classId, response.payload);
+			existingByKey.set(first.projectAgentClassSlug, response.payload);
+		}
+	}
+	return {
+		agentClasses: [...new Map([...existingByKey.values()].map((agentClass) => [String(agentClass.id ?? agentClass.slug), agentClass])).values()],
+		created,
+		contentAgents: specs,
+		contentAgentCount: specs.length,
+	};
+}
+
+async function prepareWorkdayTestAllocation(
+	client: ReturnType<typeof createMarketClientForInvocation>['client'],
+	teamId: string,
+	providerId: string,
+	runId: string,
+	projects: Array<Record<string, unknown>>,
+) {
+	const percent = projects.length > 0 ? Math.round((100 / projects.length) * 100) / 100 : 100;
+	const allocationSetId = `workday-test-${runId}-allocation`.replace(/[^a-zA-Z0-9_.-]+/gu, '-').slice(0, 96);
+	const allocationSet = await client.createCapacityAllocationSet(teamId, {
+		id: allocationSetId,
+		version: runId,
+		status: 'draft',
+		policy: {
+			source: 'workday_test',
+			capacityProviderId: providerId,
+			environment: 'local',
+			totalPercent: 100,
+		},
+		slices: projects.map((project) => ({
+			projectId: project.id,
+			capacityProviderId: providerId,
+			environment: 'local',
+			percent,
+			metadata: { source: 'workday_test', runId, slug: project.slug },
+		})),
+		metadata: { source: 'workday_test', runId },
+	}).catch(() => null);
+	if (allocationSet?.payload?.id) {
+		await client.activateCapacityAllocationSet(teamId, String(allocationSet.payload.id)).catch(() => null);
+	}
+	for (const project of projects) {
+		await client.createCapacityGrant(teamId, {
+			id: `${providerId}:${project.id}:workday-test:${runId}`,
+			capacityProviderId: providerId,
+			laneId: `${providerId}:agent-capacity`,
+			grantScope: 'project',
+			teamId,
+			projectId: project.id,
+			environment: 'local',
+			state: 'active',
+			priorityWeight: 100,
+			overflowPolicy: 'approval_required',
+			portfolioAllocationPercent: percent,
+			metadata: {
+				source: 'workday_test',
+				runId,
+				allocationSetId: allocationSet?.payload?.id ?? null,
+			},
+		}).catch(() => null);
+	}
+	return allocationSet?.payload ?? null;
+}
+
+async function ensureLocalTreeDxForWorkdayTest(context: TreeseedCommandContext, projectSlugs: string[]) {
+	const target = { kind: 'persistent' as const, scope: 'local' as const };
+	const desiredGraph = compileTreeseedDesiredResourceGraph({
+		tenantRoot: context.cwd,
+		target,
+		localContent: 'edit',
+	});
+	const unitIds = ['local-docker-compose:treedx', 'local-treedx:team-primary'];
+	const selector: TreeseedReconcileSelector = {
+		environment: 'local',
+		unitId: unitIds,
+	};
+	const selected = new Set(unitIds);
+	const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector)
+		.filter((unit) => selected.has(unit.unitId))
+		.map((unit) => {
+			if (unit.unitId !== 'local-treedx:team-primary') return unit;
+			const projects = Array.isArray(unit.spec.projects)
+				? unit.spec.projects.filter((project) => projectSlugs.includes(String((project as Record<string, unknown>).slug ?? '')))
+				: [];
+			return {
+				...unit,
+				spec: {
+					...unit.spec,
+					projects,
+				},
+			};
+		});
+	if (units.length !== unitIds.length) {
+		throw new Error(`Local TreeDX readiness expected ${unitIds.length} units but resolved ${units.length}.`);
+	}
+	const result = await reconcileTreeseedTarget({
+		tenantRoot: context.cwd,
+		target,
+		env: context.env,
+		units,
+		selector,
+		write: (line) => context.write(`[workday-test] ${line}`, 'stderr'),
+	});
+	const failed = result.results?.filter((entry) => entry.error || entry.verification?.verified === false) ?? [];
+	if (failed.length > 0) {
+		throw new Error(`Local TreeDX readiness failed for ${failed.map((entry) => entry.unit?.unitId ?? 'unknown').join(', ')}.`);
+	}
+	const repositoryIdsBySlug: Record<string, string> = {};
+	for (const entry of result.results ?? []) {
+		const syncedProjects = recordValue(recordValue(entry, 'state'), 'syncedProjects');
+		if (!Array.isArray(syncedProjects)) continue;
+		for (const project of syncedProjects) {
+			const slug = String(recordValue(project, 'project') ?? '');
+			const repositoryId = String(recordValue(project, 'repositoryId') ?? '');
+			if (slug && repositoryId) repositoryIdsBySlug[slug] = repositoryId;
+		}
+	}
+	return {
+		unitIds,
+		projectSlugs,
+		repositoryIdsBySlug,
+		results: result.results?.map((entry) => ({
+			unitId: entry.unit?.unitId ?? null,
+			action: entry.action,
+			verified: entry.verification?.verified ?? null,
+			issues: entry.verification?.issues ?? [],
+			error: entry.error ?? null,
+		})) ?? [],
+	};
+}
+
+async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+	const { profile, client, authMode } = createWorkdayTestMarketClient(invocation, context);
+	const teamSelector = stringArg(invocation, 'team');
+	if (!teamSelector) return fail('Missing --team. Use `trsd capacity workday-test --team <team-id> --provider local --execute --json`.');
+	const teamResolution = await resolveWorkdayTestTeam(client, teamSelector);
+	const teamId = teamResolution.teamId;
+	const providerSelectorValue = providerSelector(invocation);
+	const projectSlugs = csvArg(invocation, 'projects', WORKDAY_TEST_PROJECT_SLUGS);
+	const providerResolution = await resolveWorkdayTestProviderId(client, teamId, providerSelectorValue);
+	const providerId = providerResolution.providerId;
+	const parameters = {
+		scenarioId: stringArg(invocation, 'scenario') ?? 'portfolio-local',
+		providerId,
+		providerSelector: providerSelectorValue,
+		projects: projectSlugs,
+		workdays: positiveNumberArg(invocation, 'workdays', 1),
+		maxAssignments: positiveNumberArg(invocation, 'maxAssignments', projectSlugs.length),
+		waitSeconds: positiveNumberArg(invocation, 'waitSeconds', boolArg(invocation, 'execute') ? 90 : 0),
+		planningOnly: boolArg(invocation, 'planningOnly') || !boolArg(invocation, 'acting'),
+		dryRun: boolArg(invocation, 'dryRun') || !boolArg(invocation, 'execute'),
+		reportDir: stringArg(invocation, 'reportDir') ?? '.treeseed/test-reports',
+	};
+	const runResponse = await client.createWorkdayTestRun(teamId, {
+		capacityProviderId: providerId,
+		scenarioId: parameters.scenarioId,
+		status: parameters.dryRun ? 'planned' : 'running',
+		environment: 'local',
+		startedAt: parameters.dryRun ? null : new Date().toISOString(),
+		parameters,
+		expected: {
+			projects: projectSlugs,
+			agentCountPerProject: WORKDAY_TEST_AGENT_COUNT,
+			planningModeRequired: true,
+			actingModeRequired: !parameters.planningOnly,
+		},
+	});
+	const run = runResponse.payload as Record<string, unknown>;
+	const runId = String(run.id);
+	let eventCount = 0;
+	const event = async (body: Record<string, unknown>) => {
+		eventCount += 1;
+		await client.createWorkdayTestEvent(teamId, runId, body).catch(() => null);
+	};
+	await event({
+		eventType: 'command.started',
+		status: 'recorded',
+		title: 'Workday test command started',
+		parameters,
+		context: {
+			cwd: context.cwd,
+			market: profile.id,
+			teamSelector,
+			teamId,
+			authMode,
+			...(authMode === 'local_acceptance_admin' ? { auth: { mode: authMode, bearerToken: '[redacted]' } } : {}),
+		},
+	});
+	const localTreeDxRepositoryIds = new Map<string, string>();
+	if (!parameters.dryRun && profile.id === 'local') {
+		try {
+			const localTreeDx = await ensureLocalTreeDxForWorkdayTest(context, projectSlugs);
+			for (const [slug, repositoryId] of Object.entries(localTreeDx.repositoryIdsBySlug)) {
+				localTreeDxRepositoryIds.set(slug, repositoryId);
+			}
+			await event({
+				eventType: 'treedx.local_reconciled',
+				status: 'recorded',
+				title: 'Local TreeDX repositories reconciled for workday test',
+				context: localTreeDx,
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await event({
+				eventType: 'treedx.local_reconcile_failed',
+				status: 'error',
+				title: 'Local TreeDX reconciliation failed before assignment creation',
+				context: { error: message },
+			});
+			await client.updateWorkdayTestRun(teamId, runId, {
+				status: 'failed',
+				completedAt: new Date().toISOString(),
+				summaryMetrics: {
+					score: 0,
+					status: 'failed',
+					blockers: [message],
+				},
+			}).catch(() => null);
+			return fail(`Local TreeDX readiness failed: ${message}`);
+		}
+	}
+	const projectsResponse = teamResolution.projects.length > 0
+		? { payload: teamResolution.projects }
+		: await client.projects(teamId);
+	const projects = (projectsResponse.payload as Array<Record<string, unknown>>)
+		.filter((project) => projectSlugs.includes(String(project.slug ?? project.id)));
+	const unexpectedSeedProjects = (projectsResponse.payload as Array<Record<string, unknown>>)
+		.filter((project) => String(project.slug ?? project.id) === 'karyon');
+	if (unexpectedSeedProjects.length > 0) {
+		await event({
+			eventType: 'seed.boundary.warning',
+			status: 'warning',
+			title: 'Unexpected Karyon project found in Treeseed team local state',
+			context: { projectIds: unexpectedSeedProjects.map((project) => project.id) },
+		});
+	}
+	if (!parameters.dryRun) {
+		const allocationSet = await prepareWorkdayTestAllocation(client, teamId, providerId, runId, projects);
+		await event({
+			eventType: 'allocation.prepared',
+			status: allocationSet ? 'recorded' : 'warning',
+			title: allocationSet ? 'Prepared workday test allocation set and project grants' : 'Workday test allocation set was not created',
+			context: { providerId, allocationSetId: allocationSet && typeof allocationSet === 'object' ? (allocationSet as Record<string, unknown>).id : null },
+		});
+	}
+	const providerSessions = await client.providerAvailabilitySessions(teamId, { providerId }).catch(() => ({ payload: [] as unknown[] }));
+	const providerReady = (providerSessions.payload as Array<Record<string, unknown>>).some((session) => ['open', 'active', 'available'].includes(String(session.status ?? session.state ?? '').toLowerCase()));
+	const projectStates: Array<{
+		projectId: string;
+		slug: string;
+		workdayId: string | null;
+		agentClasses: Array<Record<string, unknown>>;
+		contentAgents: WorkdayTestAgentSpec[];
+		contentAgentCount: number;
+		assignmentIds: string[];
+		assignmentCount: number;
+		blockers: string[];
+	}> = [];
+	let assignmentBudget = parameters.maxAssignments;
+	const perProjectAssignmentLimit = Math.max(1, Math.ceil(parameters.maxAssignments / Math.max(1, projects.length)));
+	for (const project of projects) {
+		const projectId = String(project.id);
+		const slug = String(project.slug ?? project.id);
+		const blockers: string[] = [];
+		const agentClassesResponse = await client.projectAgentClasses(projectId).catch(() => ({ payload: [] as unknown[] }));
+		const preparedAgents = await ensureWorkdayTestAgentClasses(client, context, projectId, slug, agentClassesResponse.payload as Array<Record<string, unknown>>);
+		const agentClasses = preparedAgents.agentClasses;
+		if (preparedAgents.created.length > 0) {
+			await event({
+				eventType: 'agent_classes.materialized',
+				projectId,
+				status: 'recorded',
+				title: `Materialized ${preparedAgents.created.length} agent classes for ${slug}`,
+				context: {
+					contentAgentCount: preparedAgents.contentAgentCount,
+					createdAgentClassIds: preparedAgents.created.map((agentClass) => agentClass.id),
+				},
+			});
+		}
+		let workdayId: string | null = null;
+		let assignmentCount = 0;
+		const assignmentIds: string[] = [];
+		if (!parameters.dryRun) {
+			const created = await client.createWorkday({
+				id: safeWorkdayIdPart(`workday-test-${runId}-${slug}`),
+				projectId,
+				environment: 'local',
+				status: 'draft',
+				availableCredits: 10,
+				metadata: { source: 'workday_test', runId, slug },
+			}).catch((error) => {
+				blockers.push(error instanceof Error ? error.message : String(error));
+				return null;
+			});
+			workdayId = created?.payload?.id ? String(created.payload.id) : null;
+			if (workdayId) {
+				await client.startWorkday(workdayId).catch((error) => blockers.push(error instanceof Error ? error.message : String(error)));
+				await event({ eventType: 'workday.started', projectId, workdayId, title: `Started test workday for ${slug}` });
+			}
+			const projectAssignmentLimit = Math.max(0, Math.min(WORKDAY_TEST_AGENT_COUNT, assignmentBudget, perProjectAssignmentLimit));
+			const preferredAgents = [
+				...preparedAgents.contentAgents.filter((agent) => agent.handler === 'plan'),
+				...preparedAgents.contentAgents.filter((agent) => agent.handler !== 'plan'),
+			].slice(0, projectAssignmentLimit);
+			const classById = new Map(agentClasses.map((agentClass) => [String(agentClass.id ?? agentClass.slug), agentClass]));
+			for (const agent of preferredAgents) {
+				const agentClass = classById.get(agent.projectAgentClassId);
+				if (!agentClass) {
+					blockers.push(`agent ${agent.slug} references missing project agent class ${agent.projectAgentClassId}`);
+					continue;
+				}
+				const contentRoot = slug === 'market' ? 'src/content' : 'docs/src/content';
+				const assignmentId = safeWorkdayIdPart(`workday-test-${runId}-${slug}-${agent.slug}`);
+				const treeDxRepositoryId = localTreeDxRepositoryIds.get(slug) ?? treeDxRepositoryIdForProjectSlug(slug);
+				const treedxProxyHandle = {
+					id: `tdx_${assignmentId}`,
+					teamId,
+					projectId,
+					assignmentId,
+					repositoryId: treeDxRepositoryId,
+					allowedOperations: ['files:read', 'files:search'],
+					allowedPaths: [`${contentRoot}/**`],
+					expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+					metadata: {
+						source: 'workday_test',
+						scenarioId: parameters.scenarioId,
+						runId,
+						repositoryId: treeDxRepositoryId,
+					},
+				};
+				const assignment = await client.createProviderAssignment(teamId, {
+					id: assignmentId,
+					projectId,
+					capacityProviderId: providerId,
+					projectAgentClassId: agentClass.id,
+					workDayId: workdayId,
+					mode: 'planning',
+					status: 'pending',
+					agentId: agent.slug,
+					handlerId: agent.handler,
+					capacityEnvelope: {
+						workDayId: workdayId,
+						projectId,
+						capacityProviderId: providerId,
+						environment: 'local',
+						reservedCredits: 1,
+					},
+					decisionInput: {
+						kind: 'workday_test_planning',
+						projectId,
+						agentId: agent.slug,
+						handlerId: agent.handler,
+						input: {
+							objective: 'Verify package knowledge hub readiness and planning behavior.',
+							agentSlug: agent.slug,
+							artifactKind: 'planning_note',
+							subjectModel: 'objective',
+							subjectId: 'core',
+							contentRoot,
+							dryRun: false,
+						},
+					},
+					allowedOutputs: { paths: [`${contentRoot}/**`], types: ['content_artifact_refs', 'planning_note'] },
+					workspaceContext: {
+						workspaceAccessMode: 'context_only',
+						treedxProxyHandle,
+					},
+					treedxProxyHandle,
+					explanation: { source: 'workday_test', scenarioId: parameters.scenarioId, runId, agentSlug: agent.slug },
+					synthesizedFrom: 'workday_test',
+					synthesisKey: `${runId}:${projectId}:${agent.slug}`,
+					metadata: { workdayTestRunId: runId, agentSlug: agent.slug, contentRoot, treeDxRepositoryId },
+				}).catch((error) => {
+					blockers.push(error instanceof Error ? error.message : String(error));
+					return null;
+				});
+				if (assignment?.payload?.id) {
+					assignmentBudget -= 1;
+					assignmentCount += 1;
+					assignmentIds.push(String(assignment.payload.id));
+					await event({ eventType: 'assignment.created', projectId, workdayId, assignmentId: String(assignment.payload.id), title: `Created planning assignment for ${slug}` });
+				}
+			}
+		}
+		projectStates.push({
+			projectId,
+			slug,
+			workdayId,
+			agentClasses,
+			contentAgents: preparedAgents.contentAgents,
+			contentAgentCount: preparedAgents.contentAgentCount,
+			assignmentIds,
+			assignmentCount,
+			blockers,
+		});
+	}
+	let waitedAssignmentSnapshots: Map<string, Record<string, unknown>[]> | null = null;
+	let waitTimedOutAssignmentIds = new Set<string>();
+	if (!parameters.dryRun && parameters.waitSeconds > 0) {
+		await event({
+			eventType: 'provider.wait.started',
+			status: 'recorded',
+			title: `Waiting up to ${parameters.waitSeconds}s for provider manager and runner lease consumption`,
+			context: { waitSeconds: parameters.waitSeconds },
+		});
+		const waitResult = await waitForWorkdayTestAssignments(client, teamId, projectStates, providerId, parameters.waitSeconds);
+		waitedAssignmentSnapshots = waitResult.snapshots;
+		waitTimedOutAssignmentIds = new Set(waitResult.unfinished.map((assignment) => String(assignment.id ?? '')).filter(Boolean));
+		await event({
+			eventType: 'provider.wait.completed',
+			status: waitResult.completed ? 'recorded' : 'warning',
+			title: waitResult.completed ? 'Provider lease-consumption wait completed' : 'Provider lease-consumption wait timed out before all assignments reached terminal state',
+			context: {
+				waitSeconds: parameters.waitSeconds,
+				completed: waitResult.completed,
+				unfinishedAssignments: waitResult.unfinished.map((assignment) => ({
+					id: assignment.id ?? null,
+					projectId: assignment.projectId ?? null,
+					status: assignment.status ?? null,
+					leaseState: assignment.leaseState ?? null,
+				})),
+			},
+		});
+	}
+	const actualProjects: Array<Record<string, unknown>> = [];
+	for (const projectState of projectStates) {
+		const projectAssignments = waitedAssignmentSnapshots?.get(projectState.projectId)
+			?? (await fetchWorkdayTestAssignments(client, teamId, [projectState], providerId)).get(projectState.projectId)
+			?? [];
+		const projectAssignmentIds = projectAssignments.map((assignment) => String(assignment.id ?? '')).filter(Boolean);
+		const modeRunResponses = await Promise.all(projectAssignmentIds.map((assignmentId) => (
+			client.projectAgentModeRuns(projectState.projectId, { assignmentId }).catch(() => ({ payload: [] as unknown[] }))
+		)));
+		const projectModeRuns = modeRunResponses.flatMap((response) => Array.isArray(response.payload) ? response.payload : []);
+		const planningRuns = projectModeRuns.filter((run) => String(recordValue(run, 'mode') ?? '').toLowerCase() === 'planning');
+		const actingRuns = projectModeRuns.filter((run) => String(recordValue(run, 'mode') ?? '').toLowerCase() === 'acting');
+		const executionRuns = await executionRunsForAssignments(client, teamId, projectAssignmentIds);
+		const pendingAssignments = projectAssignments.filter((assignment) => {
+			return isUnfinishedAssignment(assignment);
+		});
+		const failedAssignments = projectAssignments.filter((assignment) => {
+			const status = String(recordValue(assignment, 'status') ?? '').toLowerCase();
+			const lifecycleCode = String(recordValue(assignment, 'lifecycleCode') ?? '').trim();
+			if (['failed', 'returned', 'expired', 'cancelled'].includes(status)) return true;
+			return Boolean(lifecycleCode) && !['completed', 'succeeded', 'success'].includes(status);
+		});
+		const leaseDiagnostics = (await Promise.all(pendingAssignments.map(async (assignment) => {
+			const assignmentId = String(assignment.id ?? '');
+			if (!assignmentId) return null;
+			const explanation = await client.providerAssignmentExplanation(teamId, assignmentId).catch(() => null);
+			const payload = explanation && typeof explanation === 'object' && 'payload' in explanation
+				? (explanation as { payload?: unknown }).payload
+				: explanation;
+			return payload && typeof payload === 'object'
+				? {
+					assignmentId,
+					status: assignment.status ?? null,
+					leaseState: assignment.leaseState ?? null,
+					reasons: recordValue(payload, 'reasons') ?? [],
+					gates: recordValue(payload, 'gates') ?? {},
+					metadata: recordValue(payload, 'metadata') ?? {},
+				}
+				: {
+					assignmentId,
+					status: assignment.status ?? null,
+					leaseState: assignment.leaseState ?? null,
+					reasons: ['lease_diagnostics_missing'],
+					gates: {},
+					metadata: {},
+				};
+		}))).filter(Boolean);
+		if (pendingAssignments.length > 0 && leaseDiagnostics.length === 0) {
+			projectState.blockers.push(`${pendingAssignments.length} assignment(s) remained unfinished without lease diagnostics`);
+		} else if (pendingAssignments.length > 0) {
+			const reasons = leaseDiagnostics.flatMap((diagnostic) => Array.isArray((diagnostic as Record<string, unknown>).reasons)
+				? ((diagnostic as Record<string, unknown>).reasons as unknown[]).map(String)
+				: []);
+			const timedOutCount = pendingAssignments.filter((assignment) => waitTimedOutAssignmentIds.has(String(assignment.id ?? ''))).length;
+			projectState.blockers.push(`${pendingAssignments.length} assignment(s) remained unfinished${timedOutCount > 0 ? ` after ${parameters.waitSeconds}s` : ''}${reasons.length ? `: ${[...new Set(reasons)].join(', ')}` : ''}`);
+		}
+		const contentArtifacts = uniqueContentArtifacts([
+			...projectAssignments.flatMap(assignmentContentArtifacts),
+			...projectModeRuns.flatMap(modeRunContentArtifacts),
+			...executionRuns.flatMap(modeRunContentArtifacts),
+		]);
+		if (projectState.contentAgentCount < WORKDAY_TEST_AGENT_COUNT) projectState.blockers.push(`expected ${WORKDAY_TEST_AGENT_COUNT} content agents, found ${projectState.contentAgentCount}`);
+		if (!parameters.dryRun && projectAssignmentIds.length > 0 && projectModeRuns.length === 0) {
+			projectState.blockers.push('created assignments did not produce assignment-scoped mode-run telemetry');
+		}
+		if (!parameters.dryRun && projectModeRuns.length > 0 && executionRuns.length === 0) {
+			projectState.blockers.push('mode runs did not appear in the execution-run audit projection');
+		}
+		if (!parameters.dryRun && failedAssignments.length > 0) {
+			const reasons = failedAssignments.map((assignment) => {
+				const id = String(recordValue(assignment, 'id') ?? 'assignment');
+				const status = String(recordValue(assignment, 'status') ?? 'failed');
+				const code = String(recordValue(assignment, 'lifecycleCode') ?? '').trim();
+				const reason = String(recordValue(assignment, 'lifecycleReason') ?? '').trim();
+				return [id, status, code || null, reason || null].filter(Boolean).join(' | ');
+			});
+			projectState.blockers.push(`terminal assignment failure: ${reasons.join('; ')}`);
+		}
+		if (!parameters.dryRun && projectAssignmentIds.length > 0 && contentArtifacts.length === 0) {
+			projectState.blockers.push('completed workday did not produce durable content artifact refs');
+		}
+		actualProjects.push({
+			projectId: projectState.projectId,
+			slug: projectState.slug,
+			workdayId: projectState.workdayId,
+			agentCount: projectState.contentAgentCount,
+			agentClassCount: projectState.agentClasses.length,
+			assignments: Math.max(projectState.assignmentCount, projectAssignments.length),
+			pendingAssignments: pendingAssignments.length,
+			leaseDiagnostics,
+			planningRuns: planningRuns.length,
+			actingRuns: actingRuns.length,
+			executionRuns: executionRuns.length,
+			executionRunRefs: executionRuns.map((run) => ({
+				id: recordValue(run, 'id') ?? null,
+				status: recordValue(run, 'status') ?? null,
+				timing: recordValue(run, 'timing') ?? {},
+				agent: recordValue(run, 'agent') ?? {},
+				assignment: recordValue(run, 'assignment') ?? {},
+				executionProvider: recordValue(run, 'executionProvider') ?? {},
+				contentArtifactRefs: uniqueContentArtifacts(Array.isArray(recordValue(run, 'contentArtifactRefs')) ? recordValue(run, 'contentArtifactRefs') as unknown[] : []),
+			})),
+			contentArtifacts: contentArtifacts.length,
+			contentArtifactRefs: contentArtifacts,
+			status: projectState.blockers.length ? 'degraded' : 'ready',
+			blockers: projectState.blockers,
+		});
+		if (projectState.workdayId && !parameters.dryRun) {
+			await client.completeWorkday(projectState.workdayId).catch(() => null);
+			await event({
+				eventType: 'workday.completed',
+				projectId: projectState.projectId,
+				workdayId: projectState.workdayId,
+				title: `Completed test workday for ${projectState.slug}`,
+			});
+		}
+	}
+	const metrics = workdayTestScore({
+		expectedProjects: projectSlugs,
+		actualProjects,
+		providerReady,
+		auditEvents: eventCount,
+		planningOnly: parameters.planningOnly,
+	});
+	const reportRefs = await writeWorkdayTestReportFiles(context, {
+		runId,
+		reportDir: parameters.reportDir,
+		parameters,
+		expected: { projects: projectSlugs, agentCountPerProject: WORKDAY_TEST_AGENT_COUNT },
+		actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
+		metrics,
+	});
+	await client.updateWorkdayTestRun(teamId, runId, {
+		status: metrics.status,
+		completedAt: new Date().toISOString(),
+		summary: {
+			score: metrics.score,
+			status: metrics.status,
+			projectCount: actualProjects.length,
+			blockerCount: metrics.blockers.length,
+		},
+		metrics,
+		actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
+		reportRefs,
+		error: metrics.status === 'failed' ? { blockers: metrics.blockers } : {},
+	});
+	await event({ eventType: 'command.completed', status: metrics.status, title: 'Workday test command completed', refs: reportRefs });
+	return guidedResult({
+		command: 'capacity workday-test',
+		summary: `Workday test ${runId} finished with status ${metrics.status} and score ${metrics.score}.`,
+		facts: [
+			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
+			{ label: 'Team', value: teamId },
+			{ label: 'Provider', value: providerId },
+			{ label: 'Projects', value: actualProjects.length },
+			{ label: 'Score', value: metrics.score },
+			{ label: 'JSON report', value: reportRefs.jsonPath },
+			{ label: 'Markdown report', value: reportRefs.markdownPath },
+		],
+		sections: [
+			{ title: 'Checks', lines: metrics.checks.map((check) => `${check.name}: ${check.actual}/${check.expected} (${check.score})`) },
+			{ title: 'Blockers', lines: metrics.blockers.length ? metrics.blockers : ['none'] },
+		],
+		exitCode: metrics.status === 'failed' ? 1 : 0,
+		report: {
+			runId,
+			parameters,
+			metrics,
+			actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
+			reportRefs,
+		},
+	});
+}
+
 async function runMarketInspection(action: string, invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+	if (action === 'workday-test') return runWorkdayTest(invocation, context);
+	if (action === 'execution-runs') return runExecutionRunsInspection(invocation, context);
 	const teamId = stringArg(invocation, 'team');
 	const projectId = stringArg(invocation, 'project');
 	const providerId = stringArg(invocation, 'provider');
@@ -789,5 +1986,5 @@ export const handleCapacity: TreeseedCommandHandler = async (invocation, context
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
-	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, allocation-sets, agent-classes, provider-sessions, assignments, mode-runs, decision-planning, execution-inputs, capacity-plans, capacity-plan, workday, workday-summary, assignment-explanation, fallback-outputs, treedx-proxy-audit, build, up, down, restart, logs, status, or test-local.`);
+	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, allocation-sets, agent-classes, provider-sessions, assignments, mode-runs, execution-runs, decision-planning, execution-inputs, capacity-plans, capacity-plan, workday, workday-summary, workday-test, assignment-explanation, fallback-outputs, treedx-proxy-audit, build, up, down, restart, logs, status, or test-local.`);
 };

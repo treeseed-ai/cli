@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+import { makeWorkspaceRoot } from './cli-test-fixtures.ts';
 
 const { runTreeseedCli } = await import('../dist/cli/main.js');
 

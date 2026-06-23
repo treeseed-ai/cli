@@ -6,7 +6,7 @@ import {
 	writeTreeseedMachineConfig,
 } from '@treeseed/sdk/workflow-support';
 import { setMarketSession } from '@treeseed/sdk/market-client';
-import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+import { makeWorkspaceRoot } from './cli-test-fixtures.ts';
 
 const { runTreeseedCli } = await import('../dist/cli/main.js');
 const {

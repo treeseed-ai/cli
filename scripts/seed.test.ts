@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+import { makeWorkspaceRoot } from './cli-test-fixtures.ts';
 import { setMarketSession } from '@treeseed/sdk/market-client';
 import {
 	createDefaultTreeseedMachineConfig,

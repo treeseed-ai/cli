@@ -11,7 +11,7 @@ import {
 	unlockTreeseedSecretSessionFromEnv,
 } from '@treeseed/sdk/workflow-support';
 import { setMarketSession } from '@treeseed/sdk/market-client';
-import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.mjs';
+import { makeTenantWorkspace, makeWorkspaceRoot } from './cli-test-fixtures.ts';
 
 for (const key of ['CI', 'ACT', 'GITHUB_ACTIONS', 'TREESEED_VERIFY_DRIVER']) {
 	delete process.env[key];
@@ -1574,7 +1574,6 @@ function installCoreDevFixture(root, { workspace = false } = {}) {
 				'./scripts/dev-platform': './dist/scripts/dev-platform.js',
 			},
 		}, null, 2));
-		writeFileSync(resolve(coreRoot, 'scripts', 'run-ts.mjs'), 'export {};\n');
 		writeFileSync(resolve(coreRoot, 'scripts', 'dev-platform.ts'), 'export {};\n');
 		return;
 	}
