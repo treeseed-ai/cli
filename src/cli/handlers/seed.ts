@@ -35,6 +35,10 @@ type LocalSeedExportRunner = (input: {
 	env?: NodeJS.ProcessEnv;
 }) => Promise<Record<string, unknown>>;
 
+function localAcceptanceAdminToken(env: NodeJS.ProcessEnv) {
+	return env.TREESEED_CAPACITY_ACCEPTANCE_ADMIN_TOKEN?.trim() || 'tsk_local_treeseed_acceptance_admin';
+}
+
 async function loadLocalSeedModule(projectRoot: string): Promise<{
 	applyLocalSeedFromCli?: LocalSeedApplyRunner;
 	applyLocalSeedViaApiFromCli?: LocalSeedApplyRunner;
@@ -45,16 +49,29 @@ async function loadLocalSeedModule(projectRoot: string): Promise<{
 }> {
 	const rootApiModulePath = resolve(projectRoot, 'src', 'lib', 'market', 'seeds', 'local-api.js');
 	const rootApplyModulePath = resolve(projectRoot, 'src', 'lib', 'market', 'seeds', 'apply.js');
-	const packageApiModulePath = resolve(projectRoot, 'packages', 'api', 'src', 'market', 'seeds', 'local-api.js');
-	const packageApplyModulePath = resolve(projectRoot, 'packages', 'api', 'src', 'market', 'seeds', 'apply.js');
-	const apiModulePath = existsSync(rootApiModulePath) ? rootApiModulePath : packageApiModulePath;
-	const applyModulePath = existsSync(rootApplyModulePath) ? rootApplyModulePath : packageApplyModulePath;
+	const packageApiDistModulePath = resolve(projectRoot, 'packages', 'api', 'dist', 'market', 'seeds', 'local-api.js');
+	const packageApplyDistModulePath = resolve(projectRoot, 'packages', 'api', 'dist', 'market', 'seeds', 'apply.js');
+	const packageApiSourceModulePath = resolve(projectRoot, 'packages', 'api', 'src', 'market', 'seeds', 'local-api.ts');
+	const packageApplySourceModulePath = resolve(projectRoot, 'packages', 'api', 'src', 'market', 'seeds', 'apply.ts');
+	const apiModulePath = [
+		rootApiModulePath,
+		packageApiDistModulePath,
+		packageApiSourceModulePath,
+	].find((candidate) => existsSync(candidate));
+	const applyModulePath = [
+		rootApplyModulePath,
+		packageApplyDistModulePath,
+		packageApplySourceModulePath,
+	].find((candidate) => existsSync(candidate));
+	if (!applyModulePath) {
+		throw new Error('Local seed apply service is not available in this market project.');
+	}
 	const applyModule = await import(pathToFileURL(applyModulePath).href) as {
 		applyLocalSeedFromCli?: LocalSeedApplyRunner;
 		planLocalSeedFromCli?: LocalSeedPlanRunner;
 		exportSeedFromCli?: LocalSeedExportRunner;
 	};
-	if (!existsSync(apiModulePath)) {
+	if (!apiModulePath) {
 		return applyModule;
 	}
 	const apiModule = await import(pathToFileURL(apiModulePath).href) as {
@@ -85,10 +102,14 @@ async function requireLocalSeedSession(invocation: Parameters<TreeseedCommandHan
 				profile,
 				session: {
 					marketId: profile.id,
-					accessToken: '',
+					accessToken: localAcceptanceAdminToken(context.env),
 					refreshToken: null,
 					expiresAt: null,
-					principal: null,
+					principal: {
+						id: 'local-acceptance-admin',
+						type: 'local_acceptance_admin',
+						permissions: ['teams:manage:team'],
+					},
 				},
 			};
 		}
@@ -114,10 +135,14 @@ async function requireLocalSeedSession(invocation: Parameters<TreeseedCommandHan
 					profile,
 					session: {
 						marketId: profile.id,
-						accessToken: '',
+						accessToken: localAcceptanceAdminToken(context.env),
 						refreshToken: null,
 						expiresAt: null,
-						principal: null,
+						principal: {
+							id: 'local-acceptance-admin',
+							type: 'local_acceptance_admin',
+							permissions: ['teams:manage:team'],
+						},
 					},
 				};
 			}
@@ -130,14 +155,32 @@ async function requireLocalSeedSession(invocation: Parameters<TreeseedCommandHan
 				profile,
 				session: {
 					marketId: profile.id,
-					accessToken: '',
+					accessToken: localAcceptanceAdminToken(context.env),
 					refreshToken: null,
 					expiresAt: null,
-					principal: null,
+					principal: {
+						id: 'local-acceptance-admin',
+						type: 'local_acceptance_admin',
+						permissions: ['teams:manage:team'],
+					},
 				},
 			};
 		}
 		throw new Error(`Login for market "${profile.id}" expired. Run treeseed auth:login --market ${profile.id}.`);
+	}
+	if (profile.id === 'local') {
+		return {
+			profile,
+			session: {
+				...session,
+				accessToken: localAcceptanceAdminToken(context.env),
+				principal: {
+					id: 'local-acceptance-admin',
+					type: 'local_acceptance_admin',
+					permissions: ['teams:manage:team'],
+				},
+			},
+		};
 	}
 	return { profile, session };
 }

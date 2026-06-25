@@ -12,11 +12,12 @@ import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGra
 import type { TreeseedCommandContext, TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
 import { createMarketClientForInvocation } from './market-utils.js';
 import { fail, guidedResult } from './utils.js';
+import { renderWorkdayLogInk } from '../workday-log-ui.js';
 
 const PROVIDER_LIFECYCLE_ACTIONS = new Set(['build', 'up', 'down', 'restart', 'logs', 'status', 'test-local']);
 const PROVIDER_ENTRYPOINT_ACTIONS = new Set(['doctor', 'register', 'plan']);
 const MARKET_CAPACITY_ACTIONS = new Set(['migrate']);
-const MARKET_INSPECTION_ACTIONS = new Set(['allocation-sets', 'agent-classes', 'provider-sessions', 'assignments', 'mode-runs', 'execution-runs', 'decision-planning', 'execution-inputs', 'capacity-plans', 'capacity-plan', 'workday', 'workday-summary', 'workday-test', 'assignment-explanation', 'fallback-outputs', 'treedx-proxy-audit']);
+const MARKET_INSPECTION_ACTIONS = new Set(['allocation-sets', 'agent-classes', 'provider-sessions', 'assignments', 'mode-runs', 'execution-runs', 'workday-log', 'decision-planning', 'execution-inputs', 'capacity-plans', 'capacity-plan', 'workday', 'workday-summary', 'workday-run', 'assignment-explanation', 'fallback-outputs', 'treedx-proxy-audit']);
 const CAPACITY_PROVIDER_UNIT_IDS = ['capacity-provider:local', 'local-docker-compose:agent-capacity-provider'];
 const CAPACITY_PROVIDER_UNIT_ID_SET = new Set(CAPACITY_PROVIDER_UNIT_IDS);
 const WORKDAY_TEST_PROJECT_SLUGS = ['market', 'admin', 'agent', 'api', 'cli', 'core', 'sdk', 'ui', 'treedx'];
@@ -47,6 +48,18 @@ function stringArg(invocation: TreeseedParsedInvocation, name: string) {
 
 function boolArg(invocation: TreeseedParsedInvocation, name: string) {
 	return invocation.args[name] === true;
+}
+
+function booleanArg(invocation: TreeseedParsedInvocation, name: string, fallback = false) {
+	const value = invocation.args[name];
+	if (value === true) return true;
+	if (value === false) return false;
+	if (typeof value === 'string') {
+		const normalized = value.trim().toLowerCase();
+		if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+		if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+	}
+	return fallback;
 }
 
 function numberArg(invocation: TreeseedParsedInvocation, name: string) {
@@ -347,6 +360,331 @@ function normalizeExecutionRunRecord(row: Record<string, unknown>) {
 	};
 }
 
+function executionRunProjectionKey(row: Record<string, unknown>) {
+	const assignment = recordValue(row, 'assignment');
+	const assignmentId = String(recordValue(assignment, 'id') ?? '').trim();
+	const artifacts = Array.isArray(recordValue(row, 'contentArtifactRefs')) ? recordValue(row, 'contentArtifactRefs') as unknown[] : [];
+	const artifactRunId = artifacts
+		.map((artifact) => String(recordValue(artifact, 'executionProviderRunId') ?? '').trim())
+		.find(Boolean);
+	const executionProvider = recordValue(row, 'executionProvider');
+	const providerRunId = String(recordValue(executionProvider, 'id') ?? '').trim();
+	const runId = artifactRunId ?? providerRunId ?? String(recordValue(row, 'id') ?? '').trim();
+	return `${assignmentId || 'assignment'}:${runId || String(recordValue(row, 'id') ?? 'run')}`;
+}
+
+function executionRunProjectionRank(row: Record<string, unknown>) {
+	const status = String(recordValue(row, 'status') ?? '').toLowerCase();
+	const timing = recordValue(row, 'timing');
+	const executionProvider = recordValue(row, 'executionProvider');
+	const hasTokenCounts = recordValue(executionProvider, 'hasTokenCounts') === true;
+	const completed = Boolean(recordValue(timing, 'completedAt'));
+	const failed = Boolean(recordValue(timing, 'failedAt'));
+	const terminal = ['succeeded', 'completed', 'failed', 'cancelled'].includes(status) || completed || failed;
+	return [
+		terminal ? 100 : 0,
+		hasTokenCounts ? 50 : 0,
+		status === 'succeeded' || status === 'completed' ? 20 : 0,
+		Number(new Date(String(recordValue(timing, 'createdAt') ?? 0)).getTime()) / 1_000_000_000,
+	].reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+}
+
+function dedupeExecutionRunRecords(rows: Record<string, unknown>[]) {
+	const byKey = new Map<string, Record<string, unknown>>();
+	for (const row of rows) {
+		const key = executionRunProjectionKey(row);
+		const current = byKey.get(key);
+		if (!current || executionRunProjectionRank(row) >= executionRunProjectionRank(current)) {
+			byKey.set(key, row);
+		}
+	}
+	return [...byKey.values()].sort((a, b) => {
+		const aTiming = recordValue(a, 'timing');
+		const bTiming = recordValue(b, 'timing');
+		const aTime = Number(new Date(String(recordValue(aTiming, 'createdAt') ?? 0)).getTime());
+		const bTime = Number(new Date(String(recordValue(bTiming, 'createdAt') ?? 0)).getTime());
+		return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+	});
+}
+
+function workdayExecutionKey(row: Record<string, unknown>) {
+	const assignment = recordValue(row, 'assignment');
+	const assignmentId = String(recordValue(assignment, 'id') ?? '').trim();
+	if (assignmentId) return assignmentId;
+	const agent = recordValue(row, 'agent');
+	return [
+		recordValue(agent, 'projectId') ?? 'project',
+		recordValue(agent, 'agentId') ?? 'agent',
+		recordValue(row, 'mode') ?? 'mode',
+		recordValue(row, 'id') ?? 'run',
+	].map((part) => String(part ?? '')).join(':');
+}
+
+function groupWorkdayExecutionRecords(rows: Record<string, unknown>[]) {
+	const byAssignment = new Map<string, Record<string, unknown>>();
+	for (const row of rows) {
+		const key = workdayExecutionKey(row);
+		const current = byAssignment.get(key);
+		if (!current || executionRunProjectionRank(row) >= executionRunProjectionRank(current)) {
+			byAssignment.set(key, row);
+		}
+	}
+	return [...byAssignment.values()].sort((a, b) => {
+		const aTiming = recordValue(a, 'timing');
+		const bTiming = recordValue(b, 'timing');
+		const aTime = timestampMs(recordValue(aTiming, 'startedAt') ?? recordValue(aTiming, 'createdAt')) ?? 0;
+		const bTime = timestampMs(recordValue(bTiming, 'startedAt') ?? recordValue(bTiming, 'createdAt')) ?? 0;
+		return aTime - bTime;
+	});
+}
+
+function modeRunProjectionKey(row: Record<string, unknown>) {
+	const assignmentId = String(recordValue(row, 'providerAssignmentId') ?? recordValue(recordValue(row, 'selectedInput'), 'assignmentId') ?? '').trim();
+	const mode = String(recordValue(row, 'mode') ?? '').trim();
+	const agentId = String(recordValue(row, 'agentId') ?? '').trim();
+	const handlerId = String(recordValue(row, 'handlerId') ?? '').trim();
+	return [assignmentId || String(recordValue(row, 'id') ?? 'assignment'), mode || 'mode', agentId || 'agent', handlerId || 'handler'].join(':');
+}
+
+function modeRunProjectionRank(row: Record<string, unknown>) {
+	const status = String(recordValue(row, 'status') ?? '').toLowerCase();
+	const outputs = recordValue(row, 'outputs');
+	const metadata = recordValue(outputs, 'metadata');
+	const hasArtifacts = Array.isArray(recordValue(metadata, 'contentArtifactRefs'))
+		&& (recordValue(metadata, 'contentArtifactRefs') as unknown[]).length > 0;
+	const timing = recordValue(row, 'timing');
+	return [
+		['succeeded', 'completed', 'failed', 'cancelled'].includes(status) ? 100 : 0,
+		hasArtifacts ? 50 : 0,
+		status === 'succeeded' || status === 'completed' ? 20 : 0,
+		Number(new Date(String(recordValue(timing, 'createdAt') ?? recordValue(row, 'createdAt') ?? 0)).getTime()) / 1_000_000_000,
+	].reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+}
+
+function dedupeModeRunRecords(rows: unknown[]) {
+	const byKey = new Map<string, Record<string, unknown>>();
+	for (const row of rows.filter(isRecord)) {
+		const key = modeRunProjectionKey(row);
+		const current = byKey.get(key);
+		if (!current || modeRunProjectionRank(row) >= modeRunProjectionRank(current)) {
+			byKey.set(key, row);
+		}
+	}
+	return [...byKey.values()];
+}
+
+function workdayRowRecord(row: Record<string, unknown>, key: string) {
+	const value = recordValue(row, key);
+	return isRecord(value) ? value : {};
+}
+
+function modeRunOutputs(modeRun: Record<string, unknown>) {
+	const outputs = recordValue(modeRun, 'outputs');
+	return isRecord(outputs) ? outputs : {};
+}
+
+function modeRunMetadata(modeRun: Record<string, unknown>) {
+	const metadata = recordValue(modeRunOutputs(modeRun), 'metadata');
+	return isRecord(metadata) ? metadata : {};
+}
+
+function modeRunSource(modeRun: Record<string, unknown>) {
+	return String(recordValue(modeRun, 'source') ?? recordValue(modeRunMetadata(modeRun), 'source') ?? '').trim();
+}
+
+function firstModeRunBySource(modeRuns: Record<string, unknown>[], source: string) {
+	return modeRuns.find((modeRun) => modeRunSource(modeRun) === source);
+}
+
+function lastModeRunBySource(modeRuns: Record<string, unknown>[], source: string) {
+	return [...modeRuns].reverse().find((modeRun) => modeRunSource(modeRun) === source);
+}
+
+function codexSnapshotFromModeRuns(modeRuns: Record<string, unknown>[]) {
+	for (const modeRun of [...modeRuns].reverse()) {
+		const metadata = modeRunMetadata(modeRun);
+		const codex = recordValue(metadata, 'codex');
+		if (isRecord(codex)) return codex;
+		const result = recordValue(metadata, 'result');
+		const snapshot = recordValue(recordValue(result, 'snapshot'), 'metadata');
+		const snapshotCodex = recordValue(snapshot, 'codex');
+		if (isRecord(snapshotCodex)) return snapshotCodex;
+		const directSnapshot = recordValue(recordValue(metadata, 'snapshot'), 'metadata');
+		const directSnapshotCodex = recordValue(directSnapshot, 'codex');
+		if (isRecord(directSnapshotCodex)) return directSnapshotCodex;
+	}
+	return {};
+}
+
+function workPackageFromModeRuns(modeRuns: Record<string, unknown>[]) {
+	const scored = modeRuns
+		.map((modeRun) => {
+			const metadata = modeRunMetadata(modeRun);
+			const workPackage = recordValue(metadata, 'workPackage');
+			const resolved = recordValue(metadata, 'resolvedInputs');
+			const packageFromResolved = recordValue(resolved, 'workPackage');
+			const candidate = isRecord(workPackage) ? workPackage : isRecord(packageFromResolved) ? packageFromResolved : {};
+			const context = recordValue(candidate, 'context');
+			const evidence = Array.isArray(recordValue(context, 'treeDxEvidence')) ? recordValue(context, 'treeDxEvidence') as unknown[] : [];
+			const score = evidence.length * 10
+				+ (recordValue(context, 'coreObjective') ? 5 : 0)
+				+ (recordValue(candidate, 'instructions') ? 3 : 0)
+				+ (recordValue(candidate, 'expectedOutputs') ? 1 : 0);
+			return { candidate, score };
+		})
+		.filter((entry) => Object.keys(entry.candidate).length > 0)
+		.sort((a, b) => b.score - a.score);
+	return scored[0]?.candidate ?? {};
+}
+
+function contextFromWorkPackage(workPackage: Record<string, unknown>) {
+	const context = recordValue(workPackage, 'context');
+	return isRecord(context) ? context : {};
+}
+
+function contextDiagnosticsFromWorkPackage(workPackage: Record<string, unknown>) {
+	const context = contextFromWorkPackage(workPackage);
+	const diagnostics = recordValue(context, 'contextDiagnostics') ?? recordValue(workPackage, 'contextDiagnostics');
+	return isRecord(diagnostics) ? diagnostics : {};
+}
+
+function contextPackSummaries(workPackage: Record<string, unknown>) {
+	const context = contextFromWorkPackage(workPackage);
+	const packs = Array.isArray(recordValue(context, 'contextPacks')) ? recordValue(context, 'contextPacks') as unknown[] : [];
+	return packs.filter(isRecord).map((pack) => {
+		const packValue = recordValue(pack, 'pack');
+		const diagnostics = isRecord(packValue) ? recordValue(packValue, 'diagnostics') : undefined;
+		const budget = recordValue(diagnostics, 'budget');
+		return {
+			id: String(recordValue(pack, 'id') ?? 'context'),
+			source: String(recordValue(pack, 'source') ?? 'n/a'),
+			purpose: String(recordValue(pack, 'purpose') ?? 'n/a'),
+			paths: recordValue(recordValue(pack, 'sourceRef'), 'paths') ?? recordValue(recordValue(pack, 'sourceRef'), 'path'),
+			tokens: recordValue(packValue, 'totalTokenEstimate') ?? recordValue(budget, 'estimatedTokens'),
+			truncated: recordValue(budget, 'truncated'),
+			provenancePaths: recordValue(diagnostics, 'provenancePaths'),
+		};
+	});
+}
+
+function treeDxProxyCallSummaries(modeRuns: Record<string, unknown>[]) {
+	const completed = modeRuns.filter((modeRun) => {
+		const metadata = modeRunMetadata(modeRun);
+		return modeRunSource(modeRun) === 'provider_runner_treedx_proxy_request'
+			&& String(recordValue(metadata, 'phase') ?? '') !== 'started';
+	});
+	return completed.map((modeRun) => {
+		const metadata = modeRunMetadata(modeRun);
+		const preview = recordValue(metadata, 'bodyPreview');
+		return {
+			operation: String(recordValue(metadata, 'operation') ?? 'request'),
+			path: String(recordValue(metadata, 'path') ?? 'n/a'),
+			status: recordValue(metadata, 'httpStatus'),
+			durationMs: recordValue(metadata, 'durationMs'),
+			resultCount: recordValue(metadata, 'resultCount'),
+			target: recordValue(preview, 'path') ?? recordValue(preview, 'query') ?? recordValue(preview, 'paths'),
+		};
+	});
+}
+
+function telemetrySpanMs(modeRuns: Record<string, unknown>[]) {
+	const times = modeRuns
+		.flatMap((modeRun) => [
+			timestampMs(recordValue(modeRun, 'startedAt')),
+			timestampMs(recordValue(modeRun, 'createdAt')),
+			timestampMs(recordValue(modeRun, 'completedAt')),
+			timestampMs(recordValue(modeRun, 'updatedAt')),
+			timestampMs(recordValue(modeRun, 'failedAt')),
+		])
+		.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+	if (times.length < 2) return null;
+	return Math.max(...times) - Math.min(...times);
+}
+
+function workdaySummaryFacts(row: Record<string, unknown>) {
+	const timing = workdayRowRecord(row, 'timing');
+	const agent = workdayRowRecord(row, 'agent');
+	const assignment = workdayRowRecord(row, 'assignment');
+	const executionProvider = workdayRowRecord(row, 'executionProvider');
+	const modeRuns = Array.isArray(recordValue(row, 'modeRuns')) ? recordValue(row, 'modeRuns') as Record<string, unknown>[] : [];
+	const workPackage = workPackageFromModeRuns(modeRuns);
+	const contextDiagnostics = contextDiagnosticsFromWorkPackage(workPackage);
+	const codex = codexSnapshotFromModeRuns(modeRuns);
+	const codexMetadata = recordValue(codex, 'metadata');
+	const request = recordValue(codexMetadata, 'request');
+	const usage = recordValue(codex, 'usage');
+	const tokenCounts = recordValue(executionProvider, 'tokenCounts');
+	const artifacts = uniqueContentArtifacts(Array.isArray(recordValue(row, 'contentArtifactRefs')) ? recordValue(row, 'contentArtifactRefs') as unknown[] : []);
+	const treeDxCalls = treeDxProxyCallSummaries(modeRuns);
+	const directDuration = Number(recordValue(timing, 'durationMs'));
+	const usageDuration = Number(recordValue(isRecord(usage) ? usage : {}, 'wallMs'));
+	const durationMsValue = Number.isFinite(directDuration) && directDuration > 0
+		? directDuration
+		: telemetrySpanMs(modeRuns) ?? (Number.isFinite(usageDuration) && usageDuration > 0 ? usageDuration : null);
+	return {
+		timing,
+		agent,
+		assignment,
+		executionProvider,
+		modeRuns,
+		workPackage,
+		contextDiagnostics,
+		codex,
+		request: isRecord(request) ? request : {},
+		usage: isRecord(usage) ? usage : {},
+		tokenCounts: isRecord(tokenCounts) ? tokenCounts : {},
+		artifacts,
+		treeDxCalls,
+		durationMs: durationMsValue,
+	};
+}
+
+function compactDuration(value: unknown) {
+	const numeric = Number(value);
+	if (!Number.isFinite(numeric)) return 'n/a';
+	if (numeric >= 60_000) return `${formatNumber(numeric / 60_000, 2)}m`;
+	if (numeric >= 1000) return `${formatNumber(numeric / 1000, 2)}s`;
+	return `${formatNumber(numeric, 0)}ms`;
+}
+
+function compactList(value: unknown, limit = 4) {
+	if (!Array.isArray(value) || value.length === 0) return 'none';
+	const entries = value.map((entry) => String(entry)).filter(Boolean);
+	const shown = entries.slice(0, limit).join(', ');
+	return entries.length > limit ? `${shown}, +${entries.length - limit} more` : shown;
+}
+
+function workdayHumanAssignmentLabel(row: Record<string, unknown>) {
+	const facts = workdaySummaryFacts(row);
+	const selectedInput = recordValue(workdayRowRecord(row, 'input'), 'selectedInput');
+	const cycle = recordValue(selectedInput, 'cycle');
+	return [
+		String(recordValue(facts.agent, 'agentId') ?? 'agent'),
+		cycle ? `cycle ${String(cycle)}` : null,
+		String(recordValue(row, 'mode') ?? 'mode'),
+	].filter(Boolean).join(' / ');
+}
+
+function workdayTimelineBlock(row: Record<string, unknown>) {
+	const facts = workdaySummaryFacts(row);
+	const startedAt = String(recordValue(facts.timing, 'startedAt') ?? recordValue(facts.timing, 'createdAt') ?? 'time?');
+	const duration = recordValue(facts.timing, 'durationMs');
+	const inputTokens = recordValue(facts.tokenCounts, 'inputTokens') ?? recordValue(facts.usage, 'inputTokens');
+	const outputTokens = recordValue(facts.tokenCounts, 'outputTokens') ?? recordValue(facts.usage, 'outputTokens');
+	const cachedTokens = recordValue(facts.tokenCounts, 'cachedInputTokens') ?? recordValue(facts.usage, 'cachedInputTokens');
+	const coreObjectiveIncluded = recordValue(facts.contextDiagnostics, 'coreObjectiveIncluded');
+	const treeDxEvidenceCount = recordValue(facts.contextDiagnostics, 'treeDxEvidenceCount');
+	const contextPacks = contextPackSummaries(facts.workPackage);
+	const treeDxCallCount = facts.treeDxCalls.length;
+	return [
+		`${startedAt} | ${String(recordValue(row, 'status') ?? 'unknown')} | ${String(recordValue(row, 'mode') ?? 'mode?')} | ${String(recordValue(facts.agent, 'projectSlug') ?? recordValue(facts.agent, 'projectId') ?? 'project?')} | ${String(recordValue(facts.agent, 'agentId') ?? 'agent?')}`,
+		`  execution: ${workdayHumanAssignmentLabel(row)} runner=${String(recordValue(facts.assignment, 'runnerId') ?? 'n/a')} duration=${compactDuration(facts.durationMs ?? duration)} telemetry=${facts.modeRuns.length}`,
+		`  ai: provider=${String(recordValue(facts.codex, 'provider') ?? recordValue(facts.executionProvider, 'id') ?? 'codex')} model=${String(recordValue(facts.request, 'model') ?? 'n/a')} input=${String(inputTokens ?? 'n/a')} output=${String(outputTokens ?? 'n/a')} cached=${String(cachedTokens ?? 'n/a')} wall=${compactDuration(recordValue(facts.usage, 'wallMs'))}`,
+		`  context: coreObjective=${String(coreObjectiveIncluded ?? 'n/a')} evidence=${String(treeDxEvidenceCount ?? contextPacks.length)} packs=${contextPacks.length} treedxCalls=${treeDxCallCount}`,
+		`  artifacts: ${facts.artifacts.map((artifact) => `${String(recordValue(artifact, 'artifactKind') ?? 'artifact')} -> ${String(recordValue(artifact, 'contentPath') ?? recordValue(artifact, 'uri') ?? 'path?')}`).join('; ') || 'none'}`,
+	];
+}
+
 async function executionRunsForAssignments(client: unknown, teamId: string, assignmentIds: string[]) {
 	const rows = await Promise.all(assignmentIds.map(async (assignmentId) => {
 		const response = await marketRequest<{ ok: true; payload: unknown[] }>(
@@ -356,7 +694,178 @@ async function executionRunsForAssignments(client: unknown, teamId: string, assi
 		).catch(() => ({ ok: false, payload: [] as unknown[] }));
 		return Array.isArray(response.payload) ? response.payload.filter(isRecord) : [];
 	}));
-	return rows.flat().map((row) => normalizeExecutionRunRecord(redactAuditValue(row) as Record<string, unknown>));
+	return dedupeExecutionRunRecords(rows.flat().map((row) => normalizeExecutionRunRecord(redactAuditValue(row) as Record<string, unknown>)));
+}
+
+async function workdayAssignmentIdsForLog(client: unknown, teamId: string, workdayId: string, providerId: string | null) {
+	const response = await marketRequest<{ ok: true; payload: unknown[] }>(
+		client,
+		`/v1/teams/${encodeURIComponent(teamId)}/capacity/assignments${queryFromFilters({ providerId })}`,
+		{ requireAuth: true },
+	).catch(() => ({ ok: false, payload: [] as unknown[] }));
+	return (Array.isArray(response.payload) ? response.payload : [])
+		.filter(isRecord)
+		.filter((assignment) => String(recordValue(assignment, 'workDayId') ?? recordValue(assignment, 'workdayId') ?? '') === workdayId)
+		.sort((a, b) => {
+			const aTime = timestampMs(recordValue(a, 'assignedAt') ?? recordValue(a, 'createdAt')) ?? 0;
+			const bTime = timestampMs(recordValue(b, 'assignedAt') ?? recordValue(b, 'createdAt')) ?? 0;
+			return aTime - bTime;
+		})
+		.map((assignment) => String(recordValue(assignment, 'id') ?? '').trim())
+		.filter(Boolean);
+}
+
+async function enrichWorkdayLogRecordsWithModeRuns(client: unknown, rows: Record<string, unknown>[]) {
+	return Promise.all(rows.map(async (row) => {
+		const agent = recordValue(row, 'agent');
+		const assignment = recordValue(row, 'assignment');
+		const projectId = String(recordValue(agent, 'projectId') ?? '').trim();
+		const assignmentId = String(recordValue(assignment, 'id') ?? '').trim();
+		if (!projectId || !assignmentId) {
+			return { ...row, modeRuns: [] };
+		}
+		const response = await (
+			client as {
+				projectAgentModeRuns(projectId: string, options?: { mode?: string | null; assignmentId?: string | null }): Promise<{ payload?: unknown[] }>;
+			}
+		).projectAgentModeRuns(projectId, { assignmentId }).catch(() => ({ payload: [] as unknown[] }));
+		const modeRuns = Array.isArray(response.payload)
+			? response.payload
+				.map((entry) => redactAuditValue(entry) as Record<string, unknown>)
+				.filter(isRecord)
+				.sort((a, b) => {
+					const aTime = timestampMs(recordValue(a, 'createdAt') ?? recordValue(recordValue(a, 'timing'), 'createdAt')) ?? 0;
+					const bTime = timestampMs(recordValue(b, 'createdAt') ?? recordValue(recordValue(b, 'timing'), 'createdAt')) ?? 0;
+					return aTime - bTime;
+				})
+			: [];
+		const modeRunHasContextDiagnostics = (modeRun: Record<string, unknown>) => {
+			const outputs = recordValue(modeRun, 'outputs');
+			const metadata = recordValue(outputs, 'metadata');
+			const workPackage = recordValue(metadata, 'workPackage');
+			const workPackageContext = recordValue(workPackage, 'context');
+			return Boolean(
+				recordValue(workPackageContext, 'contextDiagnostics')
+				?? recordValue(workPackage, 'contextDiagnostics')
+				?? recordValue(metadata, 'contextDiagnostics'),
+			);
+		};
+		const modeRunHasCoreObjective = (modeRun: Record<string, unknown>) => {
+			const outputs = recordValue(modeRun, 'outputs');
+			const metadata = recordValue(outputs, 'metadata');
+			const workPackage = recordValue(metadata, 'workPackage');
+			const workPackageContext = recordValue(workPackage, 'context');
+			const diagnostics = recordValue(workPackageContext, 'contextDiagnostics')
+				?? recordValue(workPackage, 'contextDiagnostics')
+				?? recordValue(metadata, 'contextDiagnostics');
+			return recordValue(diagnostics, 'coreObjectiveIncluded') === true || Boolean(recordValue(workPackageContext, 'coreObjective'));
+			};
+		const contentArtifactRefs = uniqueContentArtifacts([
+			...(Array.isArray(recordValue(row, 'contentArtifactRefs')) ? recordValue(row, 'contentArtifactRefs') as unknown[] : []),
+			...modeRuns.flatMap((modeRun) => modeRunContentArtifacts(modeRun)),
+		]);
+		return {
+			...row,
+			contentArtifactRefs,
+			modeRuns,
+			forensicCompleteness: {
+				modeRuns: modeRuns.length,
+				hasExecutionInputSnapshot: modeRuns.some((modeRun) => {
+					const outputs = recordValue(modeRun, 'outputs');
+					const metadata = recordValue(outputs, 'metadata');
+					return Boolean(recordValue(metadata, 'workPackage') ?? recordValue(metadata, 'executionInput') ?? recordValue(modeRun, 'selectedInput'));
+				}),
+				hasContentArtifactRefs: contentArtifactRefs.length > 0,
+				hasContextDiagnostics: modeRuns.some(modeRunHasContextDiagnostics),
+				hasCoreObjectiveContext: modeRuns.some(modeRunHasCoreObjective),
+			},
+		};
+	}));
+}
+
+function workdayLogDetailLines(rows: Record<string, unknown>[], maxRecords = 6) {
+	const lines: string[] = [];
+	for (const row of rows.slice(0, maxRecords)) {
+		const facts = workdaySummaryFacts(row);
+		const artifacts = facts.artifacts;
+		const modeRuns = facts.modeRuns;
+		const inputTokens = recordValue(facts.tokenCounts, 'inputTokens') ?? recordValue(facts.usage, 'inputTokens');
+		const outputTokens = recordValue(facts.tokenCounts, 'outputTokens') ?? recordValue(facts.usage, 'outputTokens');
+		const cachedTokens = recordValue(facts.tokenCounts, 'cachedInputTokens') ?? recordValue(facts.usage, 'cachedInputTokens');
+		const contextPacks = contextPackSummaries(facts.workPackage);
+		const starting = firstModeRunBySource(modeRuns, 'execution_provider_starting');
+		const startMetadata = starting ? modeRunMetadata(starting) : {};
+		const startProvider = recordValue(startMetadata, 'provider');
+		const startAgent = recordValue(startMetadata, 'agent');
+		const workPackageContext = contextFromWorkPackage(facts.workPackage);
+		const coreObjective = recordValue(workPackageContext, 'coreObjective');
+		const selectedInput = recordValue(row, 'input');
+		const selectedInputPayload = recordValue(selectedInput, 'selectedInput');
+		const finalResponse = recordValue(facts.codex, 'finalResponse');
+		const messages = modeRuns.filter((modeRun) => {
+			const metadata = modeRunMetadata(modeRun);
+			return modeRunSource(modeRun) === 'agent_kernel_message_emitted' || recordValue(metadata, 'message');
+		});
+		lines.push(`${String(recordValue(facts.timing, 'startedAt') ?? recordValue(facts.timing, 'createdAt') ?? 'time?')} ${String(recordValue(row, 'status') ?? 'unknown')} ${String(recordValue(row, 'mode') ?? 'mode?')} ${String(recordValue(facts.agent, 'projectSlug') ?? recordValue(facts.agent, 'projectId') ?? 'project?')} ${String(recordValue(facts.agent, 'agentId') ?? 'agent?')}`);
+		lines.push(`  Assignment: ${String(recordValue(facts.assignment, 'id') ?? 'n/a')}`);
+		lines.push(`    status=${String(recordValue(facts.assignment, 'status') ?? 'n/a')} lease=${String(recordValue(facts.assignment, 'leaseState') ?? 'n/a')} runner=${String(recordValue(facts.assignment, 'runnerId') ?? 'n/a')} workday=${String(recordValue(facts.assignment, 'workdayId') ?? 'n/a')}`);
+		lines.push(`    lifecycle=${String(recordValue(facts.assignment, 'lifecycleCode') ?? 'n/a')} duration=${compactDuration(facts.durationMs ?? recordValue(facts.timing, 'durationMs'))}`);
+		lines.push(`  Agent: class=${String(recordValue(facts.agent, 'projectAgentClassId') ?? recordValue(facts.agent, 'classSlug') ?? 'n/a')} handler=${String(recordValue(facts.agent, 'handlerId') ?? 'n/a')} configuredProvider=${String(recordValue(startProvider, 'id') ?? recordValue(facts.codex, 'provider') ?? 'codex')}`);
+		lines.push(`  AI Model Run: model=${String(recordValue(facts.request, 'model') ?? 'n/a')} reasoning=${String(recordValue(facts.request, 'reasoningEffort') ?? 'n/a')} sandbox=${String(recordValue(facts.request, 'sandboxMode') ?? 'n/a')} approval=${String(recordValue(facts.request, 'approvalPolicy') ?? 'n/a')}`);
+		lines.push(`    tokens input=${String(inputTokens ?? 'n/a')} output=${String(outputTokens ?? 'n/a')} cached=${String(cachedTokens ?? 'n/a')} wall=${compactDuration(recordValue(facts.usage, 'wallMs'))} promptChars=${String(recordValue(facts.request, 'promptCharacters') ?? 'n/a')}`);
+		lines.push(`  Context: coreObjective=${String(recordValue(facts.contextDiagnostics, 'coreObjectiveIncluded') ?? 'n/a')} path=${String(recordValue(facts.contextDiagnostics, 'coreObjectivePath') ?? recordValue(coreObjective, 'path') ?? 'n/a')} TreeDX=${String(recordValue(facts.contextDiagnostics, 'treeDxAvailable') ?? 'n/a')} evidence=${String(recordValue(facts.contextDiagnostics, 'treeDxEvidenceCount') ?? contextPacks.length)}`);
+		for (const pack of contextPacks.slice(0, 8)) {
+			lines.push(`    context pack: ${pack.id} source=${pack.source} tokens=${String(pack.tokens ?? 'n/a')} truncated=${String(pack.truncated ?? 'n/a')} paths=${compactList(pack.paths)}`);
+		}
+		if (facts.treeDxCalls.length === 0) {
+			lines.push('    TreeDX proxy calls: none recorded');
+		} else {
+			lines.push(`    TreeDX proxy calls: ${facts.treeDxCalls.length}`);
+			for (const call of facts.treeDxCalls.slice(0, 10)) {
+				lines.push(`      ${call.operation} ${call.path} status=${String(call.status ?? 'n/a')} duration=${compactDuration(call.durationMs)} target=${Array.isArray(call.target) ? compactList(call.target) : String(call.target ?? 'n/a')}`);
+			}
+		}
+		if (isRecord(selectedInputPayload)) {
+			lines.push(`  Input: objective=${String(recordValue(selectedInputPayload, 'objective') ?? 'n/a')}`);
+			lines.push(`    artifactKind=${String(recordValue(selectedInputPayload, 'artifactKind') ?? 'n/a')} subject=${String(recordValue(selectedInputPayload, 'subjectModel') ?? 'n/a')}:${String(recordValue(selectedInputPayload, 'subjectId') ?? 'n/a')} subjectPath=${String(recordValue(selectedInputPayload, 'subjectPath') ?? 'n/a')}`);
+		}
+		if (isRecord(startAgent)) {
+			lines.push(`  Agent Config Snapshot: capabilities=${compactList(recordValue(startAgent, 'capabilities'))} outputTypes=${compactList(recordValue(startAgent, 'outputTypes'))}`);
+		}
+		if (artifacts.length === 0) {
+			lines.push('  artifacts: none');
+		} else {
+			lines.push('  Artifacts Written:');
+			for (const artifact of artifacts.slice(0, 8)) {
+				lines.push(`    ${String(recordValue(artifact, 'artifactKind') ?? 'artifact')} ${String(recordValue(artifact, 'model') ?? 'model?')} -> ${String(recordValue(artifact, 'contentPath') ?? recordValue(artifact, 'uri') ?? 'path?')}`);
+			}
+		}
+		if (messages.length === 0) {
+			lines.push('  Messages/Signals: none recorded');
+		} else {
+			lines.push(`  Messages/Signals: ${messages.length}`);
+			for (const messageRun of messages.slice(0, 8)) {
+				const message = recordValue(modeRunMetadata(messageRun), 'message');
+				const messageType = String((recordValue(message, 'type') ?? modeRunSource(messageRun)) || 'message');
+				lines.push(`    ${String(recordValue(messageRun, 'createdAt') ?? 'time?')} ${messageType} ${String(recordValue(message, 'status') ?? '')}`.trimEnd());
+			}
+		}
+		lines.push(`  Execution Timeline: ${modeRuns.length} telemetry event(s)`);
+		for (const modeRun of modeRuns.slice(0, 18)) {
+			const outputs = modeRunOutputs(modeRun);
+			lines.push(`    ${String(recordValue(modeRun, 'createdAt') ?? 'time?')} ${String(recordValue(modeRun, 'status') ?? 'n/a')} ${modeRunSource(modeRun) || 'mode-run'}: ${String(recordValue(outputs, 'summary') ?? '').replace(/\s+/gu, ' ').slice(0, 220)}`);
+		}
+		const adapter = lastModeRunBySource(modeRuns, 'execution_provider_adapter_lifecycle');
+		if (adapter) {
+			const outputs = modeRunOutputs(adapter);
+			lines.push(`  Final AI Response: ${String(finalResponse ?? recordValue(outputs, 'summary') ?? 'n/a').replace(/\s+/gu, ' ').slice(0, 500)}`);
+		}
+		lines.push('');
+	}
+	if (rows.length > maxRecords) {
+		lines.push(`... ${rows.length - maxRecords} more execution records omitted from text detail. Use --mouse, --json, or --format yaml for the complete forensic record.`);
+	}
+	return lines.length > 0 ? lines : ['No execution records returned.'];
 }
 
 function isTerminalAssignment(assignment: unknown) {
@@ -375,6 +884,7 @@ async function fetchWorkdayTestAssignments(
 	teamId: string,
 	projectStates: Array<{ projectId: string; assignmentIds: string[] }>,
 	providerId: string,
+	runId: string,
 ) {
 	const entries = await Promise.all(projectStates.map(async (projectState) => {
 		const response = await (
@@ -384,7 +894,16 @@ async function fetchWorkdayTestAssignments(
 		).providerAssignments(teamId, { projectId: projectState.projectId, providerId }).catch(() => ({ payload: [] as unknown[] }));
 		const assignments = (Array.isArray(response.payload) ? response.payload : [])
 			.filter(isRecord)
-			.filter((assignment) => projectState.assignmentIds.length === 0 || projectState.assignmentIds.includes(String(assignment.id ?? '')));
+			.filter((assignment) => {
+				const assignmentId = String(assignment.id ?? '');
+				const metadata = recordValue(assignment, 'metadata');
+				const explanation = recordValue(assignment, 'explanation');
+				const synthesisKey = String(recordValue(assignment, 'synthesisKey') ?? '');
+				return projectState.assignmentIds.includes(assignmentId)
+					|| metadata.workdayTestRunId === runId
+					|| explanation.runId === runId
+					|| synthesisKey.startsWith(`${runId}:`);
+			});
 		return [projectState.projectId, assignments] as const;
 	}));
 	return new Map(entries);
@@ -396,19 +915,48 @@ async function waitForWorkdayTestAssignments(
 	projectStates: Array<{ projectId: string; assignmentIds: string[] }>,
 	providerId: string,
 	waitSeconds: number,
+	runId: string,
 ) {
 	const deadline = Date.now() + waitSeconds * 1000;
-	let snapshots = await fetchWorkdayTestAssignments(client, teamId, projectStates, providerId);
+	let snapshots = await fetchWorkdayTestAssignments(client, teamId, projectStates, providerId, runId);
 	while (Date.now() < deadline) {
 		const unfinished = [...snapshots.values()].flat().filter(isUnfinishedAssignment);
 		if (unfinished.length === 0) {
 			return { completed: true, snapshots, unfinished };
 		}
 		await sleep(Math.min(5000, Math.max(500, deadline - Date.now())));
-		snapshots = await fetchWorkdayTestAssignments(client, teamId, projectStates, providerId);
+		snapshots = await fetchWorkdayTestAssignments(client, teamId, projectStates, providerId, runId);
 	}
 	const unfinished = [...snapshots.values()].flat().filter(isUnfinishedAssignment);
 	return { completed: unfinished.length === 0, snapshots, unfinished };
+}
+
+async function holdWorkdayOpen(input: {
+	runId: string;
+	durationSeconds: number;
+	event(body: Record<string, unknown>): Promise<void>;
+}) {
+	const durationMs = Math.max(0, Math.floor(input.durationSeconds * 1000));
+	const startedAt = new Date().toISOString();
+	const deadline = Date.now() + durationMs;
+	const deadlineAt = new Date(deadline).toISOString();
+	await input.event({
+		eventType: 'workday.duration.started',
+		status: 'recorded',
+		title: `Timed workday observation started for ${input.durationSeconds}s`,
+		context: { durationSeconds: input.durationSeconds, startedAt, deadlineAt },
+	});
+	while (Date.now() < deadline) {
+		await sleep(Math.min(15_000, Math.max(250, deadline - Date.now())));
+	}
+	const completedAt = new Date().toISOString();
+	await input.event({
+		eventType: 'workday.duration.completed',
+		status: 'recorded',
+		title: 'Timed workday observation completed',
+		context: { durationSeconds: input.durationSeconds, startedAt, deadlineAt, completedAt },
+	});
+	return { startedAt, deadlineAt, completedAt };
 }
 
 function redactAuditValue(value: unknown, key = ''): unknown {
@@ -526,10 +1074,11 @@ async function resolveWorkdayTestTeam(client: unknown, teamSelector: string) {
 	};
 }
 
-async function runExecutionRunsInspection(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+async function runExecutionRunsInspection(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext, options: { action?: 'execution-runs' | 'workday-log' } = {}) {
+	const action = options.action ?? 'execution-runs';
 	const teamSelector = stringArg(invocation, 'team');
 	if (!teamSelector) {
-		return fail('Missing --team. Use `trsd capacity execution-runs --team <team-id-or-slug> --format yaml`.');
+		return fail(`Missing --team. Use \`trsd capacity ${action} --team <team-id-or-slug>${action === 'workday-log' ? ' --workday <workday-id>' : ''} --format yaml\`.`);
 	}
 	const projectId = stringArg(invocation, 'project');
 	const providerId = stringArg(invocation, 'provider');
@@ -537,66 +1086,79 @@ async function runExecutionRunsInspection(invocation: TreeseedParsedInvocation, 
 	const mode = stringArg(invocation, 'mode');
 	const assignmentId = stringArg(invocation, 'assignment');
 	const workdayId = stringArg(invocation, 'workday');
+	if (action === 'workday-log' && !workdayId) {
+		return fail('Missing --workday. Use `trsd capacity workday-log --team <team-id-or-slug> --workday <workday-id> --json`.');
+	}
 	const executionProviderId = stringArg(invocation, 'execution-provider');
 	const kindFilter = stringArg(invocation, 'kind');
 	const outputFormat = stringArg(invocation, 'format');
 	const maxRuns = positiveNumberArg(invocation, 'limit', 200);
+	const rawLimit = action === 'workday-log' ? Math.max(maxRuns * 100, maxRuns) : maxRuns;
 	const { profile, client, authMode } = createWorkdayTestMarketClient(invocation, context);
 	const team = await resolveWorkdayTestTeam(client, teamSelector);
 	const teamId = team.teamId;
-	const response = await marketRequest<{ ok: true; payload: unknown[] }>(
-		client,
-		`/v1/teams/${encodeURIComponent(teamId)}/capacity/execution-runs${queryFromFilters({
-			projectId,
-			providerId,
-			status,
-			mode,
-			assignmentId,
-			workdayId,
-			executionProviderId,
-			limit: maxRuns,
-		})}`,
-		{ requireAuth: true },
-	);
+	const assignmentScopedRows = action === 'workday-log' && workdayId && !assignmentId
+		? await executionRunsForAssignments(
+			client,
+			teamId,
+			(await workdayAssignmentIdsForLog(client, teamId, workdayId, providerId ?? null)).slice(0, maxRuns),
+		)
+		: null;
+	const response = assignmentScopedRows
+		? { payload: assignmentScopedRows }
+		: await marketRequest<{ ok: true; payload: unknown[] }>(
+			client,
+			`/v1/teams/${encodeURIComponent(teamId)}/capacity/execution-runs${queryFromFilters({
+				projectId,
+				providerId,
+				status,
+				mode,
+				assignmentId,
+				workdayId,
+				executionProviderId,
+				limit: rawLimit,
+			})}`,
+			{ requireAuth: true },
+		);
 	const rows = (Array.isArray(response.payload) ? response.payload : [])
 		.filter(isRecord)
 		.filter((row) => !kindFilter || String(recordValue(recordValue(row, 'executionProvider'), 'id') ?? '').toLowerCase().includes(kindFilter.toLowerCase()))
-		.slice(0, maxRuns)
 		.map((row) => normalizeExecutionRunRecord(redactAuditValue(row) as Record<string, unknown>));
-	const yaml = toYaml(rows);
-	if (outputFormat === 'yaml') {
+	const projectedRows = action === 'workday-log'
+		? dedupeExecutionRunRecords(rows)
+		: dedupeExecutionRunRecords(rows).slice(0, maxRuns);
+	const forensicRows = action === 'workday-log'
+		? await enrichWorkdayLogRecordsWithModeRuns(client, groupWorkdayExecutionRecords(projectedRows).slice(0, maxRuns))
+		: projectedRows;
+	const effectiveFormat = outputFormat ?? (context.outputFormat === 'json' ? 'json' : null);
+	if (effectiveFormat === 'yaml') {
 		return {
 			exitCode: 0,
-			stdout: [yaml],
+			stdout: [toYaml(forensicRows)],
 			report: {
-				action: 'execution-runs',
+				action,
 				ok: true,
 				market: { id: profile.id, baseUrl: profile.baseUrl },
 				authMode,
 				scope: { teamId, projectId },
 				filters: { providerId, status, mode, assignmentId, workdayId, executionProviderId, kind: kindFilter },
-				records: rows,
-				yaml,
+				records: forensicRows,
+				yaml: toYaml(forensicRows),
 			},
 		};
 	}
-	if (outputFormat === 'json') {
+	if (effectiveFormat === 'json') {
 		return {
 			exitCode: 0,
-			stdout: [JSON.stringify(rows, null, 2)],
-			report: { action: 'execution-runs', ok: true, records: rows },
+			stdout: [JSON.stringify(forensicRows, null, 2)],
+			report: { action, ok: true, records: forensicRows },
 		};
 	}
-	const timelineLines = rows.map((row) => {
-		const agent = recordValue(row, 'agent') as Record<string, unknown> | undefined;
-		const assignment = recordValue(row, 'assignment') as Record<string, unknown> | undefined;
-		const timing = recordValue(row, 'timing') as Record<string, unknown> | undefined;
-		const artifacts = Array.isArray(recordValue(row, 'contentArtifactRefs')) ? recordValue(row, 'contentArtifactRefs') as unknown[] : [];
-		return `${String(timing?.startedAt ?? timing?.createdAt ?? 'time?')} | ${String(row.status ?? 'unknown')} | ${String(agent?.projectSlug ?? agent?.projectId ?? 'project?')} | ${String(agent?.agentId ?? 'agent?')} | assignment=${String(assignment?.id ?? 'n/a')} | artifacts=${uniqueContentArtifacts(artifacts).length}`;
-	});
+	const timelineBlocks = forensicRows.map(workdayTimelineBlock);
+	const timelineLines = timelineBlocks.flatMap((block, index) => index === 0 ? block : ['', ...block]);
 	const treeLines: string[] = [];
 	const byProject = new Map<string, Record<string, unknown>[]>();
-	for (const row of rows) {
+	for (const row of forensicRows) {
 		const agent = recordValue(row, 'agent') as Record<string, unknown> | undefined;
 		const key = String(agent?.projectSlug ?? agent?.projectId ?? 'unknown-project');
 		byProject.set(key, [...(byProject.get(key) ?? []), row]);
@@ -604,13 +1166,19 @@ async function runExecutionRunsInspection(invocation: TreeseedParsedInvocation, 
 	for (const [project, projectRows] of byProject) {
 		treeLines.push(project);
 		for (const row of projectRows) {
-			const agent = recordValue(row, 'agent') as Record<string, unknown> | undefined;
-			const assignment = recordValue(row, 'assignment') as Record<string, unknown> | undefined;
-			const artifacts = uniqueContentArtifacts(Array.isArray(recordValue(row, 'contentArtifactRefs')) ? recordValue(row, 'contentArtifactRefs') as Array<Record<string, unknown>> : []) as Array<Record<string, unknown>>;
-			treeLines.push(`  ${String(assignment?.workdayId ?? 'workday?')}`);
-			treeLines.push(`    ${String(assignment?.id ?? 'assignment?')} -> ${String(row.id ?? 'run?')} ${String(row.status ?? 'unknown')} ${String(agent?.agentId ?? 'agent?')}`);
-			for (const artifact of artifacts) {
-				treeLines.push(`      content: ${String(artifact.contentPath ?? artifact.uri ?? 'artifact')}`);
+			const facts = workdaySummaryFacts(row);
+			const assignment = facts.assignment;
+			const inputTokens = recordValue(facts.tokenCounts, 'inputTokens') ?? recordValue(facts.usage, 'inputTokens');
+			const outputTokens = recordValue(facts.tokenCounts, 'outputTokens') ?? recordValue(facts.usage, 'outputTokens');
+			const contextPacks = contextPackSummaries(facts.workPackage);
+			treeLines.push(`  ${String(recordValue(assignment, 'workdayId') ?? 'workday?')}`);
+			treeLines.push(`    ${workdayHumanAssignmentLabel(row)}`);
+			treeLines.push(`      agent: ${String(recordValue(facts.agent, 'agentId') ?? 'agent?')} (${String(recordValue(facts.agent, 'projectAgentClassId') ?? recordValue(facts.agent, 'classSlug') ?? 'class?')}, handler=${String(recordValue(facts.agent, 'handlerId') ?? 'n/a')})`);
+			treeLines.push(`      status: ${String(recordValue(row, 'status') ?? 'unknown')} duration=${compactDuration(facts.durationMs ?? recordValue(facts.timing, 'durationMs'))} telemetry=${facts.modeRuns.length}`);
+			treeLines.push(`      ai: provider=${String(recordValue(facts.codex, 'provider') ?? recordValue(facts.executionProvider, 'id') ?? 'codex')} model=${String(recordValue(facts.request, 'model') ?? 'n/a')} tokens=${String(inputTokens ?? 'n/a')}/${String(outputTokens ?? 'n/a')} wall=${compactDuration(recordValue(facts.usage, 'wallMs'))}`);
+			treeLines.push(`      context: coreObjective=${String(recordValue(facts.contextDiagnostics, 'coreObjectiveIncluded') ?? 'n/a')} packs=${contextPacks.length} treedxCalls=${facts.treeDxCalls.length}`);
+			for (const artifact of facts.artifacts) {
+				treeLines.push(`      content: ${String(recordValue(artifact, 'artifactKind') ?? 'artifact')} ${String(recordValue(artifact, 'model') ?? '')} -> ${String(recordValue(artifact, 'contentPath') ?? recordValue(artifact, 'uri') ?? 'artifact')}`);
 			}
 		}
 	}
@@ -618,31 +1186,59 @@ async function runExecutionRunsInspection(invocation: TreeseedParsedInvocation, 
 		return {
 			exitCode: 0,
 			stdout: [outputFormat === 'tree' ? treeLines.join('\n') : timelineLines.join('\n')],
-			report: { action: 'execution-runs', ok: true, records: rows },
+			report: { action, ok: true, records: forensicRows },
 		};
 	}
+	if (action === 'workday-log' && !outputFormat) {
+		const uiExit = await renderWorkdayLogInk({
+			title: 'Treeseed Workday Forensics',
+			subtitle: `${profile.id} ${teamId} ${workdayId ?? ''}`.trim(),
+			records: forensicRows,
+			mouseEnabled: boolArg(invocation, 'mouse'),
+		});
+		if (uiExit !== null) {
+			return {
+				exitCode: uiExit,
+				stdout: [],
+				report: {
+					action,
+					ok: uiExit === 0,
+					market: { id: profile.id, baseUrl: profile.baseUrl },
+					authMode,
+					scope: { teamId, projectId },
+					filters: { providerId, status, mode, assignmentId, workdayId, executionProviderId, kind: kindFilter },
+					records: forensicRows,
+				},
+			};
+		}
+	}
 	return guidedResult({
-		command: 'capacity execution-runs',
-		summary: `Read ${rows.length} execution run audit record${rows.length === 1 ? '' : 's'} for team ${teamId}.`,
+		command: `capacity ${action}`,
+		summary: action === 'workday-log'
+			? `Read ${forensicRows.length} forensic workday execution record${forensicRows.length === 1 ? '' : 's'} for ${workdayId}.`
+			: `Read ${forensicRows.length} execution run audit record${forensicRows.length === 1 ? '' : 's'} for team ${teamId}.`,
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: teamId },
-			{ label: 'Records', value: rows.length },
+			{ label: 'Records', value: forensicRows.length },
 			...(providerId ? [{ label: 'Provider filter', value: providerId }] : []),
 			...(workdayId ? [{ label: 'Workday filter', value: workdayId }] : []),
 			...(kindFilter ? [{ label: 'Kind filter', value: kindFilter }] : []),
 		],
 		sections: [
+			{ title: 'Planning Mode', lines: timelineLines.filter((line) => line.includes(' | planning ') || line.includes('| planning |')).slice(0, 50) },
+			{ title: 'Acting Mode', lines: timelineLines.filter((line) => line.includes(' | acting ') || line.includes('| acting |')).slice(0, 50) },
 			{ title: 'Timeline', lines: timelineLines.slice(0, 25) },
-			{ title: 'YAML', lines: ['Use `--format yaml` to print the full redacted YAML list.'] },
+			...(action === 'workday-log' && !outputFormat ? [{ title: 'Interactive UI', lines: ['This terminal is not interactive, so the sidebar TUI could not open here. Re-run from a TTY for the sidebar view; use --mouse only when you also want click and wheel capture.'] }] : []),
+			{ title: 'Execution Details', lines: workdayLogDetailLines(forensicRows) },
 		],
 		report: {
-			action: 'execution-runs',
+			action,
 			market: { id: profile.id, baseUrl: profile.baseUrl },
 			authMode,
 			scope: { teamId, projectId },
 			filters: { providerId, status, mode, assignmentId, workdayId, executionProviderId, kind: kindFilter },
-			records: rows,
+			records: forensicRows,
 		},
 	});
 }
@@ -658,22 +1254,32 @@ function workdayTestScore(input: {
 	const expected = input.expectedProjects;
 	const projectCoverage = expected.filter((slug) => bySlug.has(slug)).length;
 	const agentCoverage = expected.filter((slug) => Number(bySlug.get(slug)?.agentCount ?? 0) >= WORKDAY_TEST_AGENT_COUNT).length;
-	const planningCoverage = expected.filter((slug) => Number(bySlug.get(slug)?.planningRuns ?? 0) > 0).length;
+	const expectedPlanningRunsForProject = (project: Record<string, unknown> | undefined) => Math.min(
+		WORKDAY_TEST_AGENT_COUNT,
+		Number(project?.agentCount ?? WORKDAY_TEST_AGENT_COUNT),
+	);
+	const planningCoverage = expected.filter((slug) => {
+		const project = bySlug.get(slug);
+		return Number(project?.planningRuns ?? 0) >= expectedPlanningRunsForProject(project);
+	}).length;
 	const contentCoverage = expected.filter((slug) => Number(bySlug.get(slug)?.contentArtifacts ?? 0) > 0).length;
-	const actingCoverage = input.planningOnly
-		? expected.length
+	const actingExpected = input.planningOnly
+		? 0
+		: expected.filter((slug) => Number(bySlug.get(slug)?.actingAssignments ?? 0) > 0).length;
+	const actingCoverage = actingExpected === 0
+		? 0
 		: expected.filter((slug) => Number(bySlug.get(slug)?.actingRuns ?? 0) > 0 || Number(bySlug.get(slug)?.outputs ?? 0) > 0).length;
 	const checks = [
 		{ name: 'projectCoverage', actual: projectCoverage, expected: expected.length },
 		{ name: 'agentCoverage', actual: agentCoverage, expected: expected.length },
 		{ name: 'planningCoverage', actual: planningCoverage, expected: expected.length },
 		{ name: 'contentArtifactCoverage', actual: contentCoverage, expected: expected.length },
-		{ name: 'actingCoverage', actual: actingCoverage, expected: expected.length },
+		{ name: 'actingCoverage', actual: actingCoverage, expected: actingExpected },
 		{ name: 'auditCompleteness', actual: input.auditEvents > 0 ? 1 : 0, expected: 1 },
 		{ name: 'providerHealth', actual: input.providerReady ? 1 : 0, expected: 1 },
 	].map((check) => ({
 		...check,
-		score: Math.round(Math.max(0, Math.min(1, check.actual / Math.max(1, check.expected))) * 100),
+		score: check.expected === 0 ? 100 : Math.round(Math.max(0, Math.min(1, check.actual / check.expected)) * 100),
 	}));
 	const blockers = [
 		...(input.providerReady ? [] : ['local provider readiness was not proven']),
@@ -689,7 +1295,7 @@ function workdayTestScore(input: {
 	};
 }
 
-async function writeWorkdayTestReportFiles(context: TreeseedCommandContext, input: {
+async function writeWorkdayRunReportFiles(context: TreeseedCommandContext, input: {
 	runId: string;
 	reportDir: string;
 	parameters: Record<string, unknown>;
@@ -699,8 +1305,8 @@ async function writeWorkdayTestReportFiles(context: TreeseedCommandContext, inpu
 }) {
 	const reportDir = resolve(context.cwd, input.reportDir);
 	await mkdir(reportDir, { recursive: true });
-	const jsonPath = resolve(reportDir, `workday-test-${input.runId}.json`);
-	const markdownPath = resolve(reportDir, `workday-test-${input.runId}.md`);
+	const jsonPath = resolve(reportDir, `workday-${input.runId}.json`);
+	const markdownPath = resolve(reportDir, `workday-${input.runId}.md`);
 	await writeFile(jsonPath, `${JSON.stringify(input, null, 2)}\n`, 'utf8');
 	const checks = Array.isArray(input.metrics.checks) ? input.metrics.checks as Array<Record<string, unknown>> : [];
 	const blockers = Array.isArray(input.metrics.blockers) ? input.metrics.blockers as unknown[] : [];
@@ -713,11 +1319,11 @@ async function writeWorkdayTestReportFiles(context: TreeseedCommandContext, inpu
 		});
 	});
 	await writeFile(markdownPath, `${[
-		`# Workday Test ${input.runId}`,
+		`# Workday ${input.runId}`,
 		'',
 		`Status: ${String(input.metrics.status ?? 'unknown')}`,
 		`Score: ${String(input.metrics.score ?? 'n/a')}`,
-		`Scenario: ${String(input.parameters.scenarioId ?? 'portfolio-local')}`,
+		`Purpose: ${String(input.parameters.purpose ?? 'portfolio planning')}`,
 		`Provider: ${String(input.parameters.providerId ?? 'local')}`,
 		'',
 		'## Coverage',
@@ -816,7 +1422,7 @@ async function ensureWorkdayTestAgentClasses(
 			requiredCapabilities: ['repo_read', 'agent_mode_run'],
 			handlerRefs: { agents: classSpecs.map((spec) => ({ slug: spec.slug, handler: spec.handler })) },
 			metadata: {
-				source: 'workday_test_agent_content',
+				source: 'live_workday_agent_content',
 				agentCount: classSpecs.length,
 				agentSlugs: classSpecs.map((spec) => spec.slug),
 				contentPaths: classSpecs.map((spec) => spec.contentPath.replace(`${context.cwd}/`, '')),
@@ -834,60 +1440,6 @@ async function ensureWorkdayTestAgentClasses(
 		contentAgents: specs,
 		contentAgentCount: specs.length,
 	};
-}
-
-async function prepareWorkdayTestAllocation(
-	client: ReturnType<typeof createMarketClientForInvocation>['client'],
-	teamId: string,
-	providerId: string,
-	runId: string,
-	projects: Array<Record<string, unknown>>,
-) {
-	const percent = projects.length > 0 ? Math.round((100 / projects.length) * 100) / 100 : 100;
-	const allocationSetId = `workday-test-${runId}-allocation`.replace(/[^a-zA-Z0-9_.-]+/gu, '-').slice(0, 96);
-	const allocationSet = await client.createCapacityAllocationSet(teamId, {
-		id: allocationSetId,
-		version: runId,
-		status: 'draft',
-		policy: {
-			source: 'workday_test',
-			capacityProviderId: providerId,
-			environment: 'local',
-			totalPercent: 100,
-		},
-		slices: projects.map((project) => ({
-			projectId: project.id,
-			capacityProviderId: providerId,
-			environment: 'local',
-			percent,
-			metadata: { source: 'workday_test', runId, slug: project.slug },
-		})),
-		metadata: { source: 'workday_test', runId },
-	}).catch(() => null);
-	if (allocationSet?.payload?.id) {
-		await client.activateCapacityAllocationSet(teamId, String(allocationSet.payload.id)).catch(() => null);
-	}
-	for (const project of projects) {
-		await client.createCapacityGrant(teamId, {
-			id: `${providerId}:${project.id}:workday-test:${runId}`,
-			capacityProviderId: providerId,
-			laneId: `${providerId}:agent-capacity`,
-			grantScope: 'project',
-			teamId,
-			projectId: project.id,
-			environment: 'local',
-			state: 'active',
-			priorityWeight: 100,
-			overflowPolicy: 'approval_required',
-			portfolioAllocationPercent: percent,
-			metadata: {
-				source: 'workday_test',
-				runId,
-				allocationSetId: allocationSet?.payload?.id ?? null,
-			},
-		}).catch(() => null);
-	}
-	return allocationSet?.payload ?? null;
 }
 
 async function ensureLocalTreeDxForWorkdayTest(context: TreeseedCommandContext, projectSlugs: string[]) {
@@ -927,7 +1479,7 @@ async function ensureLocalTreeDxForWorkdayTest(context: TreeseedCommandContext, 
 		env: context.env,
 		units,
 		selector,
-		write: (line) => context.write(`[workday-test] ${line}`, 'stderr'),
+		write: (line) => context.write(`[workday-run] ${line}`, 'stderr'),
 	});
 	const failed = result.results?.filter((entry) => entry.error || entry.verification?.verified === false) ?? [];
 	if (failed.length > 0) {
@@ -957,35 +1509,131 @@ async function ensureLocalTreeDxForWorkdayTest(context: TreeseedCommandContext, 
 	};
 }
 
-async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
+async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
 	const { profile, client, authMode } = createWorkdayTestMarketClient(invocation, context);
 	const teamSelector = stringArg(invocation, 'team');
-	if (!teamSelector) return fail('Missing --team. Use `trsd capacity workday-test --team <team-id> --provider local --execute --json`.');
+	if (!teamSelector) return fail('Missing --team. Use `trsd capacity workday-run --team <team-id> --provider local --execute --json`.');
 	const teamResolution = await resolveWorkdayTestTeam(client, teamSelector);
 	const teamId = teamResolution.teamId;
 	const providerSelectorValue = providerSelector(invocation);
 	const projectSlugs = csvArg(invocation, 'projects', WORKDAY_TEST_PROJECT_SLUGS);
 	const providerResolution = await resolveWorkdayTestProviderId(client, teamId, providerSelectorValue);
 	const providerId = providerResolution.providerId;
+	const execute = boolArg(invocation, 'execute');
+	const durationSeconds = positiveNumberArg(invocation, 'durationSeconds', execute ? 900 : 0);
+	const settleSeconds = positiveNumberArg(invocation, 'waitSeconds', execute ? 30 : 0);
+	const actingEnabled = booleanArg(invocation, 'acting', false);
+	const abortOnDegradation = boolArg(invocation, 'abort');
 	const parameters = {
-		scenarioId: stringArg(invocation, 'scenario') ?? 'portfolio-local',
+		purpose: stringArg(invocation, 'purpose') ?? stringArg(invocation, 'scenario') ?? 'portfolio planning',
+		seed: stringArg(invocation, 'seed') ?? 'treeseed',
 		providerId,
 		providerSelector: providerSelectorValue,
 		projects: projectSlugs,
 		workdays: positiveNumberArg(invocation, 'workdays', 1),
-		maxAssignments: positiveNumberArg(invocation, 'maxAssignments', projectSlugs.length),
-		waitSeconds: positiveNumberArg(invocation, 'waitSeconds', boolArg(invocation, 'execute') ? 90 : 0),
-		planningOnly: boolArg(invocation, 'planningOnly') || !boolArg(invocation, 'acting'),
-		dryRun: boolArg(invocation, 'dryRun') || !boolArg(invocation, 'execute'),
-		reportDir: stringArg(invocation, 'reportDir') ?? '.treeseed/test-reports',
+		durationSeconds,
+		waitSeconds: settleSeconds,
+		maxAssignments: positiveNumberArg(invocation, 'maxAssignments', projectSlugs.length * WORKDAY_TEST_AGENT_COUNT * 6),
+		maxActiveAssignments: positiveNumberArg(invocation, 'maxActiveAssignments', Math.max(1, Math.min(projectSlugs.length * WORKDAY_TEST_AGENT_COUNT, 9))),
+		planningOnly: boolArg(invocation, 'planningOnly') || !actingEnabled,
+		abortOnDegradation,
+		dryRun: boolArg(invocation, 'dryRun') || !execute,
+		reportDir: stringArg(invocation, 'reportDir') ?? '.treeseed/workday-reports',
 	};
-	const runResponse = await client.createWorkdayTestRun(teamId, {
+	const projectsResponse = teamResolution.projects.length > 0
+		? { payload: teamResolution.projects }
+		: await client.projects(teamId);
+	const projects = (projectsResponse.payload as Array<Record<string, unknown>>)
+		.filter((project) => projectSlugs.includes(String(project.slug ?? project.id)));
+	const unexpectedSeedProjects = (projectsResponse.payload as Array<Record<string, unknown>>)
+		.filter((project) => String(project.slug ?? project.id) === 'karyon');
+	const localTreeDxRepositoryIds = new Map<string, string>();
+	let localTreeDxSetup: Record<string, unknown> | null = null;
+	if (!parameters.dryRun && profile.id === 'local') {
+		try {
+			await Promise.all(projects.map(async (project) => {
+				const slug = String(project.slug ?? project.id);
+				const library = await client.projectTreeDxLibrary(String(project.id)).catch(() => null);
+				const repositoryId = String(recordValue(recordValue(library, 'payload'), 'repositoryId') ?? '').trim();
+				if (repositoryId) localTreeDxRepositoryIds.set(slug, repositoryId);
+			}));
+			if (localTreeDxRepositoryIds.size < projects.length) {
+				const missingSlugs = projects
+					.map((project) => String(project.slug ?? project.id))
+					.filter((slug) => !localTreeDxRepositoryIds.has(slug));
+				const localTreeDx = await ensureLocalTreeDxForWorkdayTest(context, missingSlugs);
+				for (const [slug, repositoryId] of Object.entries(localTreeDx.repositoryIdsBySlug)) {
+					localTreeDxRepositoryIds.set(slug, repositoryId);
+				}
+				localTreeDxSetup = {
+					mode: 'reconciled_missing_bindings',
+					missingSlugs,
+					...localTreeDx,
+				};
+			} else {
+				localTreeDxSetup = {
+					mode: 'reused_existing_project_libraries',
+					projectSlugs,
+					repositoryIdsBySlug: Object.fromEntries(localTreeDxRepositoryIds),
+				};
+			}
+			await client.updateTeamTreeDx(teamId, {
+				id: 'local-primary',
+				kind: 'self_hosted',
+				provider: 'local',
+				name: 'Local TreeDX',
+				baseUrl: 'http://127.0.0.1:4000',
+				registryUrl: 'http://127.0.0.1:4000',
+				status: 'active',
+				primary: true,
+				metadata: {
+					source: 'live_workday',
+					environment: 'local',
+				},
+			}).catch((error) => {
+				throw new Error(`Local TreeDX team binding failed: ${error instanceof Error ? error.message : String(error)}`);
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			return fail(`Local TreeDX readiness failed: ${message}`);
+		}
+	}
+	const projectStates: Array<{
+		projectId: string;
+		slug: string;
+		workdayId: string | null;
+		agentClasses: Array<Record<string, unknown>>;
+		contentAgents: WorkdayTestAgentSpec[];
+		contentAgentCount: number;
+		assignmentIds: string[];
+		assignmentCount: number;
+		blockers: string[];
+	}> = [];
+	for (const project of projects) {
+		const projectId = String(project.id);
+		const slug = String(project.slug ?? project.id);
+		const agentClassesResponse = await client.projectAgentClasses(projectId).catch(() => ({ payload: [] as unknown[] }));
+		const preparedAgents = await ensureWorkdayTestAgentClasses(client, context, projectId, slug, agentClassesResponse.payload as Array<Record<string, unknown>>);
+		projectStates.push({
+			projectId,
+			slug,
+			workdayId: safeWorkdayIdPart(`workday-pending-${slug}`),
+			agentClasses: preparedAgents.agentClasses,
+			contentAgents: preparedAgents.contentAgents,
+			contentAgentCount: preparedAgents.contentAgentCount,
+			assignmentIds: [],
+			assignmentCount: 0,
+			blockers: preparedAgents.contentAgentCount < WORKDAY_TEST_AGENT_COUNT ? [`expected ${WORKDAY_TEST_AGENT_COUNT} content agents, found ${preparedAgents.contentAgentCount}`] : [],
+		});
+	}
+	const repositoryIdsBySlug = Object.fromEntries(localTreeDxRepositoryIds);
+	const runResponse = await client.createWorkdayRun(teamId, {
 		capacityProviderId: providerId,
-		scenarioId: parameters.scenarioId,
+		scenarioId: parameters.purpose,
 		status: parameters.dryRun ? 'planned' : 'running',
 		environment: 'local',
 		startedAt: parameters.dryRun ? null : new Date().toISOString(),
-		parameters,
+		parameters: { ...parameters, repositoryIdsBySlug },
 		expected: {
 			projects: projectSlugs,
 			agentCountPerProject: WORKDAY_TEST_AGENT_COUNT,
@@ -998,12 +1646,12 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 	let eventCount = 0;
 	const event = async (body: Record<string, unknown>) => {
 		eventCount += 1;
-		await client.createWorkdayTestEvent(teamId, runId, body).catch(() => null);
+		await client.createWorkdayEvent(teamId, runId, body).catch(() => null);
 	};
 	await event({
 		eventType: 'command.started',
 		status: 'recorded',
-		title: 'Workday test command started',
+		title: 'Live workday command started',
 		parameters,
 		context: {
 			cwd: context.cwd,
@@ -1014,46 +1662,14 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 			...(authMode === 'local_acceptance_admin' ? { auth: { mode: authMode, bearerToken: '[redacted]' } } : {}),
 		},
 	});
-	const localTreeDxRepositoryIds = new Map<string, string>();
-	if (!parameters.dryRun && profile.id === 'local') {
-		try {
-			const localTreeDx = await ensureLocalTreeDxForWorkdayTest(context, projectSlugs);
-			for (const [slug, repositoryId] of Object.entries(localTreeDx.repositoryIdsBySlug)) {
-				localTreeDxRepositoryIds.set(slug, repositoryId);
-			}
-			await event({
-				eventType: 'treedx.local_reconciled',
-				status: 'recorded',
-				title: 'Local TreeDX repositories reconciled for workday test',
-				context: localTreeDx,
-			});
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await event({
-				eventType: 'treedx.local_reconcile_failed',
-				status: 'error',
-				title: 'Local TreeDX reconciliation failed before assignment creation',
-				context: { error: message },
-			});
-			await client.updateWorkdayTestRun(teamId, runId, {
-				status: 'failed',
-				completedAt: new Date().toISOString(),
-				summaryMetrics: {
-					score: 0,
-					status: 'failed',
-					blockers: [message],
-				},
-			}).catch(() => null);
-			return fail(`Local TreeDX readiness failed: ${message}`);
-		}
+	if (localTreeDxSetup) {
+		await event({
+			eventType: 'treedx.local_ready',
+			status: 'recorded',
+			title: 'Local TreeDX repositories ready for API-owned workday',
+			context: localTreeDxSetup,
+		});
 	}
-	const projectsResponse = teamResolution.projects.length > 0
-		? { payload: teamResolution.projects }
-		: await client.projects(teamId);
-	const projects = (projectsResponse.payload as Array<Record<string, unknown>>)
-		.filter((project) => projectSlugs.includes(String(project.slug ?? project.id)));
-	const unexpectedSeedProjects = (projectsResponse.payload as Array<Record<string, unknown>>)
-		.filter((project) => String(project.slug ?? project.id) === 'karyon');
 	if (unexpectedSeedProjects.length > 0) {
 		await event({
 			eventType: 'seed.boundary.warning',
@@ -1062,164 +1678,18 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 			context: { projectIds: unexpectedSeedProjects.map((project) => project.id) },
 		});
 	}
-	if (!parameters.dryRun) {
-		const allocationSet = await prepareWorkdayTestAllocation(client, teamId, providerId, runId, projects);
-		await event({
-			eventType: 'allocation.prepared',
-			status: allocationSet ? 'recorded' : 'warning',
-			title: allocationSet ? 'Prepared workday test allocation set and project grants' : 'Workday test allocation set was not created',
-			context: { providerId, allocationSetId: allocationSet && typeof allocationSet === 'object' ? (allocationSet as Record<string, unknown>).id : null },
-		});
-	}
 	const providerSessions = await client.providerAvailabilitySessions(teamId, { providerId }).catch(() => ({ payload: [] as unknown[] }));
 	const providerReady = (providerSessions.payload as Array<Record<string, unknown>>).some((session) => ['open', 'active', 'available'].includes(String(session.status ?? session.state ?? '').toLowerCase()));
-	const projectStates: Array<{
-		projectId: string;
-		slug: string;
-		workdayId: string | null;
-		agentClasses: Array<Record<string, unknown>>;
-		contentAgents: WorkdayTestAgentSpec[];
-		contentAgentCount: number;
-		assignmentIds: string[];
-		assignmentCount: number;
-		blockers: string[];
-	}> = [];
-	let assignmentBudget = parameters.maxAssignments;
-	const perProjectAssignmentLimit = Math.max(1, Math.ceil(parameters.maxAssignments / Math.max(1, projects.length)));
-	for (const project of projects) {
-		const projectId = String(project.id);
-		const slug = String(project.slug ?? project.id);
-		const blockers: string[] = [];
-		const agentClassesResponse = await client.projectAgentClasses(projectId).catch(() => ({ payload: [] as unknown[] }));
-		const preparedAgents = await ensureWorkdayTestAgentClasses(client, context, projectId, slug, agentClassesResponse.payload as Array<Record<string, unknown>>);
-		const agentClasses = preparedAgents.agentClasses;
-		if (preparedAgents.created.length > 0) {
-			await event({
-				eventType: 'agent_classes.materialized',
-				projectId,
-				status: 'recorded',
-				title: `Materialized ${preparedAgents.created.length} agent classes for ${slug}`,
-				context: {
-					contentAgentCount: preparedAgents.contentAgentCount,
-					createdAgentClassIds: preparedAgents.created.map((agentClass) => agentClass.id),
-				},
-			});
-		}
-		let workdayId: string | null = null;
-		let assignmentCount = 0;
-		const assignmentIds: string[] = [];
-		if (!parameters.dryRun) {
-			const created = await client.createWorkday({
-				id: safeWorkdayIdPart(`workday-test-${runId}-${slug}`),
-				projectId,
-				environment: 'local',
-				status: 'draft',
-				availableCredits: 10,
-				metadata: { source: 'workday_test', runId, slug },
-			}).catch((error) => {
-				blockers.push(error instanceof Error ? error.message : String(error));
-				return null;
-			});
-			workdayId = created?.payload?.id ? String(created.payload.id) : null;
-			if (workdayId) {
-				await client.startWorkday(workdayId).catch((error) => blockers.push(error instanceof Error ? error.message : String(error)));
-				await event({ eventType: 'workday.started', projectId, workdayId, title: `Started test workday for ${slug}` });
-			}
-			const projectAssignmentLimit = Math.max(0, Math.min(WORKDAY_TEST_AGENT_COUNT, assignmentBudget, perProjectAssignmentLimit));
-			const preferredAgents = [
-				...preparedAgents.contentAgents.filter((agent) => agent.handler === 'plan'),
-				...preparedAgents.contentAgents.filter((agent) => agent.handler !== 'plan'),
-			].slice(0, projectAssignmentLimit);
-			const classById = new Map(agentClasses.map((agentClass) => [String(agentClass.id ?? agentClass.slug), agentClass]));
-			for (const agent of preferredAgents) {
-				const agentClass = classById.get(agent.projectAgentClassId);
-				if (!agentClass) {
-					blockers.push(`agent ${agent.slug} references missing project agent class ${agent.projectAgentClassId}`);
-					continue;
-				}
-				const contentRoot = slug === 'market' ? 'src/content' : 'docs/src/content';
-				const assignmentId = safeWorkdayIdPart(`workday-test-${runId}-${slug}-${agent.slug}`);
-				const treeDxRepositoryId = localTreeDxRepositoryIds.get(slug) ?? treeDxRepositoryIdForProjectSlug(slug);
-				const treedxProxyHandle = {
-					id: `tdx_${assignmentId}`,
-					teamId,
-					projectId,
-					assignmentId,
-					repositoryId: treeDxRepositoryId,
-					allowedOperations: ['files:read', 'files:search'],
-					allowedPaths: [`${contentRoot}/**`],
-					expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-					metadata: {
-						source: 'workday_test',
-						scenarioId: parameters.scenarioId,
-						runId,
-						repositoryId: treeDxRepositoryId,
-					},
-				};
-				const assignment = await client.createProviderAssignment(teamId, {
-					id: assignmentId,
-					projectId,
-					capacityProviderId: providerId,
-					projectAgentClassId: agentClass.id,
-					workDayId: workdayId,
-					mode: 'planning',
-					status: 'pending',
-					agentId: agent.slug,
-					handlerId: agent.handler,
-					capacityEnvelope: {
-						workDayId: workdayId,
-						projectId,
-						capacityProviderId: providerId,
-						environment: 'local',
-						reservedCredits: 1,
-					},
-					decisionInput: {
-						kind: 'workday_test_planning',
-						projectId,
-						agentId: agent.slug,
-						handlerId: agent.handler,
-						input: {
-							objective: 'Verify package knowledge hub readiness and planning behavior.',
-							agentSlug: agent.slug,
-							artifactKind: 'planning_note',
-							subjectModel: 'objective',
-							subjectId: 'core',
-							contentRoot,
-							dryRun: false,
-						},
-					},
-					allowedOutputs: { paths: [`${contentRoot}/**`], types: ['content_artifact_refs', 'planning_note'] },
-					workspaceContext: {
-						workspaceAccessMode: 'context_only',
-						treedxProxyHandle,
-					},
-					treedxProxyHandle,
-					explanation: { source: 'workday_test', scenarioId: parameters.scenarioId, runId, agentSlug: agent.slug },
-					synthesizedFrom: 'workday_test',
-					synthesisKey: `${runId}:${projectId}:${agent.slug}`,
-					metadata: { workdayTestRunId: runId, agentSlug: agent.slug, contentRoot, treeDxRepositoryId },
-				}).catch((error) => {
-					blockers.push(error instanceof Error ? error.message : String(error));
-					return null;
-				});
-				if (assignment?.payload?.id) {
-					assignmentBudget -= 1;
-					assignmentCount += 1;
-					assignmentIds.push(String(assignment.payload.id));
-					await event({ eventType: 'assignment.created', projectId, workdayId, assignmentId: String(assignment.payload.id), title: `Created planning assignment for ${slug}` });
-				}
-			}
-		}
-		projectStates.push({
-			projectId,
-			slug,
-			workdayId,
-			agentClasses,
-			contentAgents: preparedAgents.contentAgents,
-			contentAgentCount: preparedAgents.contentAgentCount,
-			assignmentIds,
-			assignmentCount,
-			blockers,
+	const completedDurationWorkdayIds = new Set<string>();
+	let durationWindow: { startedAt: string; deadlineAt: string; completedAt: string } | null = null;
+	for (const projectState of projectStates) {
+		projectState.workdayId = safeWorkdayIdPart(`workday-${runId}-${projectState.slug}`);
+	}
+	if (!parameters.dryRun && parameters.durationSeconds > 0) {
+		durationWindow = await holdWorkdayOpen({
+			runId,
+			durationSeconds: parameters.durationSeconds,
+			event,
 		});
 	}
 	let waitedAssignmentSnapshots: Map<string, Record<string, unknown>[]> | null = null;
@@ -1231,7 +1701,7 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 			title: `Waiting up to ${parameters.waitSeconds}s for provider manager and runner lease consumption`,
 			context: { waitSeconds: parameters.waitSeconds },
 		});
-		const waitResult = await waitForWorkdayTestAssignments(client, teamId, projectStates, providerId, parameters.waitSeconds);
+		const waitResult = await waitForWorkdayTestAssignments(client, teamId, projectStates, providerId, parameters.waitSeconds, runId);
 		waitedAssignmentSnapshots = waitResult.snapshots;
 		waitTimedOutAssignmentIds = new Set(waitResult.unfinished.map((assignment) => String(assignment.id ?? '')).filter(Boolean));
 		await event({
@@ -1250,22 +1720,57 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 			},
 		});
 	}
+	if (!parameters.dryRun && durationWindow) {
+		for (const projectState of projectStates) {
+			if (!projectState.workdayId || completedDurationWorkdayIds.has(projectState.workdayId)) continue;
+			await client.completeWorkday(projectState.workdayId).catch((error) => {
+				projectState.blockers.push(`timed workday close failed: ${error instanceof Error ? error.message : String(error)}`);
+			});
+			completedDurationWorkdayIds.add(projectState.workdayId);
+			await event({
+				eventType: 'workday.duration.closed',
+				status: 'recorded',
+				projectId: projectState.projectId,
+				workdayId: projectState.workdayId,
+				title: `Closed timed workday for ${projectState.slug}`,
+				context: {
+					durationSeconds: parameters.durationSeconds,
+					deadlineAt: durationWindow.deadlineAt,
+					completedAt: new Date().toISOString(),
+					settleWaitSeconds: parameters.waitSeconds,
+					reason: 'duration_elapsed_after_settlement_wait',
+				},
+			});
+		}
+	}
 	const actualProjects: Array<Record<string, unknown>> = [];
 	for (const projectState of projectStates) {
 		const projectAssignments = waitedAssignmentSnapshots?.get(projectState.projectId)
-			?? (await fetchWorkdayTestAssignments(client, teamId, [projectState], providerId)).get(projectState.projectId)
+			?? (await fetchWorkdayTestAssignments(client, teamId, [projectState], providerId, runId)).get(projectState.projectId)
 			?? [];
 		const projectAssignmentIds = projectAssignments.map((assignment) => String(assignment.id ?? '')).filter(Boolean);
+		const actingAssignments = projectAssignments.filter((assignment) => String(recordValue(assignment, 'mode') ?? '').toLowerCase() === 'acting');
 		const modeRunResponses = await Promise.all(projectAssignmentIds.map((assignmentId) => (
 			client.projectAgentModeRuns(projectState.projectId, { assignmentId }).catch(() => ({ payload: [] as unknown[] }))
 		)));
-		const projectModeRuns = modeRunResponses.flatMap((response) => Array.isArray(response.payload) ? response.payload : []);
+		const projectModeRuns = dedupeModeRunRecords(modeRunResponses.flatMap((response) => Array.isArray(response.payload) ? response.payload : []));
 		const planningRuns = projectModeRuns.filter((run) => String(recordValue(run, 'mode') ?? '').toLowerCase() === 'planning');
 		const actingRuns = projectModeRuns.filter((run) => String(recordValue(run, 'mode') ?? '').toLowerCase() === 'acting');
 		const executionRuns = await executionRunsForAssignments(client, teamId, projectAssignmentIds);
 		const pendingAssignments = projectAssignments.filter((assignment) => {
 			return isUnfinishedAssignment(assignment);
 		});
+		const durationBoundedPendingAssignments = durationWindow
+			? pendingAssignments.filter((assignment) => {
+				const leaseState = String(recordValue(assignment, 'leaseState') ?? '').toLowerCase();
+				const status = String(recordValue(assignment, 'status') ?? '').toLowerCase();
+				return !['leased', 'running', 'in_progress'].includes(leaseState)
+					&& !['leased', 'running', 'in_progress'].includes(status);
+			})
+			: [];
+		const activeUnfinishedAssignments = durationWindow
+			? pendingAssignments.filter((assignment) => !durationBoundedPendingAssignments.includes(assignment))
+			: pendingAssignments;
 		const failedAssignments = projectAssignments.filter((assignment) => {
 			const status = String(recordValue(assignment, 'status') ?? '').toLowerCase();
 			const lifecycleCode = String(recordValue(assignment, 'lifecycleCode') ?? '').trim();
@@ -1297,23 +1802,36 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 					metadata: {},
 				};
 		}))).filter(Boolean);
-		if (pendingAssignments.length > 0 && leaseDiagnostics.length === 0) {
-			projectState.blockers.push(`${pendingAssignments.length} assignment(s) remained unfinished without lease diagnostics`);
-		} else if (pendingAssignments.length > 0) {
+		if (activeUnfinishedAssignments.length > 0 && leaseDiagnostics.length === 0) {
+			projectState.blockers.push(`${activeUnfinishedAssignments.length} active assignment(s) remained unfinished without lease diagnostics`);
+		} else if (activeUnfinishedAssignments.length > 0) {
 			const reasons = leaseDiagnostics.flatMap((diagnostic) => Array.isArray((diagnostic as Record<string, unknown>).reasons)
 				? ((diagnostic as Record<string, unknown>).reasons as unknown[]).map(String)
 				: []);
-			const timedOutCount = pendingAssignments.filter((assignment) => waitTimedOutAssignmentIds.has(String(assignment.id ?? ''))).length;
-			projectState.blockers.push(`${pendingAssignments.length} assignment(s) remained unfinished${timedOutCount > 0 ? ` after ${parameters.waitSeconds}s` : ''}${reasons.length ? `: ${[...new Set(reasons)].join(', ')}` : ''}`);
+			const timedOutCount = activeUnfinishedAssignments.filter((assignment) => waitTimedOutAssignmentIds.has(String(assignment.id ?? ''))).length;
+			projectState.blockers.push(`${activeUnfinishedAssignments.length} active assignment(s) remained unfinished${timedOutCount > 0 ? ` after ${parameters.waitSeconds}s` : ''}${reasons.length ? `: ${[...new Set(reasons)].join(', ')}` : ''}`);
 		}
 		const contentArtifacts = uniqueContentArtifacts([
 			...projectAssignments.flatMap(assignmentContentArtifacts),
 			...projectModeRuns.flatMap(modeRunContentArtifacts),
 			...executionRuns.flatMap(modeRunContentArtifacts),
 		]);
+		const expectedPlanningRuns = Math.min(WORKDAY_TEST_AGENT_COUNT, projectState.contentAgentCount);
 		if (projectState.contentAgentCount < WORKDAY_TEST_AGENT_COUNT) projectState.blockers.push(`expected ${WORKDAY_TEST_AGENT_COUNT} content agents, found ${projectState.contentAgentCount}`);
+		if (!parameters.dryRun && expectedPlanningRuns > 0 && planningRuns.length < expectedPlanningRuns) {
+			projectState.blockers.push(`planning portfolio incomplete: expected at least ${expectedPlanningRuns} planning run(s), observed ${planningRuns.length}`);
+		}
+		if (!parameters.dryRun && durationWindow && projectAssignmentIds.length > 0 && planningRuns.length === 0) {
+			projectState.blockers.push('timed workday elapsed without any planning mode run telemetry');
+		}
 		if (!parameters.dryRun && projectAssignmentIds.length > 0 && projectModeRuns.length === 0) {
 			projectState.blockers.push('created assignments did not produce assignment-scoped mode-run telemetry');
+		}
+		if (!parameters.dryRun && projectAssignments.length === 0) {
+			projectState.blockers.push('API workday scheduling did not synthesize any provider assignments during the timed workday window');
+		}
+		if (!parameters.dryRun && projectAssignments.length > 0 && planningRuns.length === 0) {
+			projectState.blockers.push('provider assignments did not produce planning mode runs');
 		}
 		if (!parameters.dryRun && projectModeRuns.length > 0 && executionRuns.length === 0) {
 			projectState.blockers.push('mode runs did not appear in the execution-run audit projection');
@@ -1331,6 +1849,12 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 		if (!parameters.dryRun && projectAssignmentIds.length > 0 && contentArtifacts.length === 0) {
 			projectState.blockers.push('completed workday did not produce durable content artifact refs');
 		}
+		const badTestArtifacts = contentArtifacts
+			.map((artifact) => String(recordValue(artifact, 'contentPath') ?? ''))
+			.filter((contentPath) => contentPath.split('/').some((part) => part.startsWith('workday-') && part.endsWith('tests')));
+		if (badTestArtifacts.length > 0) {
+			projectState.blockers.push(`agent content used non-production namespace: ${badTestArtifacts.join(', ')}`);
+		}
 		actualProjects.push({
 			projectId: projectState.projectId,
 			slug: projectState.slug,
@@ -1338,7 +1862,11 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 			agentCount: projectState.contentAgentCount,
 			agentClassCount: projectState.agentClasses.length,
 			assignments: Math.max(projectState.assignmentCount, projectAssignments.length),
+			actingAssignments: actingAssignments.length,
 			pendingAssignments: pendingAssignments.length,
+			durationBoundedPendingAssignments: durationBoundedPendingAssignments.length,
+			activeUnfinishedAssignments: activeUnfinishedAssignments.length,
+			durationWindow,
 			leaseDiagnostics,
 			planningRuns: planningRuns.length,
 			actingRuns: actingRuns.length,
@@ -1358,14 +1886,16 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 			blockers: projectState.blockers,
 		});
 		if (projectState.workdayId && !parameters.dryRun) {
+			if (!completedDurationWorkdayIds.has(projectState.workdayId)) {
 			await client.completeWorkday(projectState.workdayId).catch(() => null);
 			await event({
 				eventType: 'workday.completed',
 				projectId: projectState.projectId,
 				workdayId: projectState.workdayId,
-				title: `Completed test workday for ${projectState.slug}`,
+				title: `Completed workday for ${projectState.slug}`,
 			});
 		}
+	}
 	}
 	const metrics = workdayTestScore({
 		expectedProjects: projectSlugs,
@@ -1374,7 +1904,7 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 		auditEvents: eventCount,
 		planningOnly: parameters.planningOnly,
 	});
-	const reportRefs = await writeWorkdayTestReportFiles(context, {
+	const reportRefs = await writeWorkdayRunReportFiles(context, {
 		runId,
 		reportDir: parameters.reportDir,
 		parameters,
@@ -1382,7 +1912,7 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 		actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
 		metrics,
 	});
-	await client.updateWorkdayTestRun(teamId, runId, {
+	await client.updateWorkdayRun(teamId, runId, {
 		status: metrics.status,
 		completedAt: new Date().toISOString(),
 		summary: {
@@ -1396,10 +1926,19 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 		reportRefs,
 		error: metrics.status === 'failed' ? { blockers: metrics.blockers } : {},
 	});
-	await event({ eventType: 'command.completed', status: metrics.status, title: 'Workday test command completed', refs: reportRefs });
+	const abortFailure = parameters.abortOnDegradation && metrics.status !== 'completed';
+	await event({
+		eventType: abortFailure ? 'command.aborted' : 'command.completed',
+		status: abortFailure ? 'failed' : metrics.status,
+		title: abortFailure ? 'Workday aborted after degradation' : 'Workday command completed',
+		refs: reportRefs,
+		context: abortFailure ? { blockers: metrics.blockers, score: metrics.score } : {},
+	});
 	return guidedResult({
-		command: 'capacity workday-test',
-		summary: `Workday test ${runId} finished with status ${metrics.status} and score ${metrics.score}.`,
+		command: 'capacity workday-run',
+		summary: abortFailure
+			? `Workday ${runId} aborted after status ${metrics.status} and score ${metrics.score}.`
+			: `Workday ${runId} finished with status ${metrics.status} and score ${metrics.score}.`,
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: teamId },
@@ -1413,7 +1952,7 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 			{ title: 'Checks', lines: metrics.checks.map((check) => `${check.name}: ${check.actual}/${check.expected} (${check.score})`) },
 			{ title: 'Blockers', lines: metrics.blockers.length ? metrics.blockers : ['none'] },
 		],
-		exitCode: metrics.status === 'failed' ? 1 : 0,
+		exitCode: abortFailure || metrics.status === 'failed' ? 1 : 0,
 		report: {
 			runId,
 			parameters,
@@ -1425,8 +1964,9 @@ async function runWorkdayTest(invocation: TreeseedParsedInvocation, context: Tre
 }
 
 async function runMarketInspection(action: string, invocation: TreeseedParsedInvocation, context: TreeseedCommandContext) {
-	if (action === 'workday-test') return runWorkdayTest(invocation, context);
+	if (action === 'workday-run') return runWorkdayRun(invocation, context);
 	if (action === 'execution-runs') return runExecutionRunsInspection(invocation, context);
+	if (action === 'workday-log') return runExecutionRunsInspection(invocation, context, { action: 'workday-log' });
 	const teamId = stringArg(invocation, 'team');
 	const projectId = stringArg(invocation, 'project');
 	const providerId = stringArg(invocation, 'provider');
@@ -1454,18 +1994,22 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 	if (action === 'assignment-explanation' && !assignmentId) {
 		return fail('Missing --assignment. Use `trsd capacity assignment-explanation --assignment <assignment-id> --json`.');
 	}
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client, authMode } = createWorkdayTestMarketClient(invocation, context);
+	const resolvedTeam = teamId
+		? await resolveWorkdayTestTeam(client, teamId).catch(() => ({ teamId, teamSelector: teamId, team: null, projects: [] }))
+		: null;
+	const resolvedTeamId = resolvedTeam?.teamId ?? teamId;
 	let path = '';
 	let scopeLabel = '';
 	if (action === 'allocation-sets') {
-		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/allocation-sets`;
-		scopeLabel = `team ${teamId}`;
+		path = `/v1/teams/${encodeURIComponent(resolvedTeamId!)}/capacity/allocation-sets`;
+		scopeLabel = `team ${resolvedTeamId}`;
 	} else if (action === 'provider-sessions') {
-		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/provider-sessions${queryFromFilters({ providerId, status })}`;
-		scopeLabel = `team ${teamId}`;
+		path = `/v1/teams/${encodeURIComponent(resolvedTeamId!)}/capacity/provider-sessions${queryFromFilters({ providerId, status })}`;
+		scopeLabel = `team ${resolvedTeamId}`;
 	} else if (action === 'assignments') {
-		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/assignments${queryFromFilters({ projectId, providerId, status })}`;
-		scopeLabel = `team ${teamId}`;
+		path = `/v1/teams/${encodeURIComponent(resolvedTeamId!)}/capacity/assignments${queryFromFilters({ projectId, providerId, status })}`;
+		scopeLabel = `team ${resolvedTeamId}`;
 	} else if (action === 'agent-classes') {
 		path = `/v1/projects/${encodeURIComponent(projectId!)}/agent-classes`;
 		scopeLabel = `project ${projectId}`;
@@ -1497,8 +2041,8 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 		path = `/v1/workdays/${encodeURIComponent(workdayId!)}/summary`;
 		scopeLabel = `workday ${workdayId}`;
 	} else if (action === 'assignment-explanation') {
-		path = `/v1/teams/${encodeURIComponent(teamId!)}/capacity/assignments/${encodeURIComponent(assignmentId!)}/explanation`;
-		scopeLabel = `team ${teamId}`;
+		path = `/v1/teams/${encodeURIComponent(resolvedTeamId!)}/capacity/assignments/${encodeURIComponent(assignmentId!)}/explanation`;
+		scopeLabel = `team ${resolvedTeamId}`;
 	}
 	const response = await marketRequest<{
 		ok: true;
@@ -1512,7 +2056,7 @@ async function runMarketInspection(action: string, invocation: TreeseedParsedInv
 	return guidedResult({
 		command: `capacity ${action}`,
 		summary: `Read ${records.length} ${action.replace(/-/gu, ' ')} record${records.length === 1 ? '' : 's'} for ${scopeLabel}.`,
-		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Scope', value: scopeLabel }, { label: 'Records', value: records.length }, ...(providerId ? [{ label: 'Provider filter', value: providerId }] : []), ...(status ? [{ label: 'Status filter', value: status }] : []), ...(mode ? [{ label: 'Mode filter', value: mode }] : []), ...(assignmentId ? [{ label: 'Assignment filter', value: assignmentId }] : [])],
+		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Auth', value: authMode === 'local_acceptance_admin' ? 'local_acceptance_admin' : 'session' }, { label: 'Scope', value: scopeLabel }, { label: 'Records', value: records.length }, ...(providerId ? [{ label: 'Provider filter', value: providerId }] : []), ...(status ? [{ label: 'Status filter', value: status }] : []), ...(mode ? [{ label: 'Mode filter', value: mode }] : []), ...(assignmentId ? [{ label: 'Assignment filter', value: assignmentId }] : [])],
 		sections: [
 			{ title: 'Records', lines: listLines(decoratedRecords, action) },
 			...(explanationVisibility ? [{ title: 'Execution capability match', lines: capabilityMatchLines(explanationVisibility) }] : []),
@@ -1986,5 +2530,5 @@ export const handleCapacity: TreeseedCommandHandler = async (invocation, context
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
-	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, allocation-sets, agent-classes, provider-sessions, assignments, mode-runs, execution-runs, decision-planning, execution-inputs, capacity-plans, capacity-plan, workday, workday-summary, workday-test, assignment-explanation, fallback-outputs, treedx-proxy-audit, build, up, down, restart, logs, status, or test-local.`);
+	return fail(`Unknown capacity action "${action}". Use doctor, register, plan, migrate, allocation-sets, agent-classes, provider-sessions, assignments, mode-runs, execution-runs, workday-log, decision-planning, execution-inputs, capacity-plans, capacity-plan, workday, workday-summary, workday-run, assignment-explanation, fallback-outputs, treedx-proxy-audit, build, up, down, restart, logs, status, or test-local.`);
 };
