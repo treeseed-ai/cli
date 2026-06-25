@@ -38,6 +38,7 @@ treeseed status --json
 treeseed config
 treeseed ready local --json
 treeseed switch feature/my-change --plan --json
+treeseed switch release --worktree --json
 treeseed dev start --web-runtime local --json
 treeseed save --verify local --json "describe the checkpoint"
 treeseed stage --plan --json "describe the staging change"
@@ -124,8 +125,11 @@ treeseed save --lane promotion --json "describe the checkpoint"
 
 ```bash
 treeseed stage --plan --json "describe the staging change"
+treeseed stage --verify-deployed-resources --json "describe the staging change"
 treeseed release --patch --verify-deployed-resources --plan --json
 ```
+
+Managed task worktrees created by `treeseed switch <branch> --worktree --json` live under `.treeseed/worktrees/<branch-slug>`. A branch may have only one active managed worktree. Successful `stage` merges the task branch into `staging`, waits on the selected verification/deployment gates, and removes the staged branch/worktree. If a root or package merge conflicts, the workflow records the conflicted paths, aborts the integration where possible, and stops before hosted deployment.
 
 Interrupted workflow runs are journaled under `.treeseed/workflow`:
 

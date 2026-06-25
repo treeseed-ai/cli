@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { findNearestTreeseedRoot, findNearestTreeseedWorkspaceRoot } from '@treeseed/sdk/workflow-support';
+import { findNearestTreeseedWorkspaceRoot, resolveTreeseedWorkflowPaths } from '@treeseed/sdk/workflow-support';
 import { TreeseedOperationsSdk as SdkOperationsRuntime } from '@treeseed/sdk/operations';
 import type {
 	TreeseedCommandContext,
@@ -143,6 +143,8 @@ function defaultSpawn(command: string, args: string[], options: { cwd: string; e
 }
 
 function resolveCoreAgentCliEntrypoint(cwd: string) {
+	const unavailableMessage = 'Treeseed agent commands require the integrated `@treeseed/core` runtime. '
+		+ 'Install `@treeseed/core` in the current project or run the CLI inside a Treeseed workspace.';
 	const workspaceRoot = findNearestTreeseedWorkspaceRoot(cwd) ?? cwd;
 	const workspacePackageJsonPath = resolve(workspaceRoot, 'packages', 'core', 'package.json');
 	const siblingPackageJsonPath = resolve(cwd, '..', 'core', 'package.json');
@@ -164,10 +166,7 @@ function resolveCoreAgentCliEntrypoint(cwd: string) {
 			}
 			packageJsonPath = resolve(currentDir, 'package.json');
 		} catch {
-			throw new Error(
-				'Treeseed agent commands require the integrated `@treeseed/core` runtime. '
-				+ 'Install `@treeseed/core` in the current project or run the CLI inside a Treeseed workspace.',
-			);
+			throw new Error(unavailableMessage);
 		}
 	}
 
@@ -184,7 +183,11 @@ function resolveCoreAgentCliEntrypoint(cwd: string) {
 	const distRelativePath = typeof exportedEntrypoint === 'string'
 		? exportedEntrypoint
 		: exportedEntrypoint?.default ?? './dist/agents/cli.js';
-	return pathToFileURL(resolve(packageRoot, distRelativePath)).href;
+	const distEntrypoint = resolve(packageRoot, distRelativePath);
+	if (!existsSync(distEntrypoint)) {
+		throw new Error(unavailableMessage);
+	}
+	return pathToFileURL(distEntrypoint).href;
 }
 
 const sdkOperationsRuntime = new SdkOperationsRuntime();
@@ -456,6 +459,7 @@ function commandNeedsProjectRoot(spec: TreeseedOperationSpec) {
 		'capacity',
 		'packs',
 		'template',
+		'scene',
 	]).has(spec.name);
 }
 
@@ -468,7 +472,8 @@ export function resolveTreeseedCommandCwd(spec: TreeseedOperationSpec, cwd: stri
 		};
 	}
 
-	const resolvedProjectRoot = findNearestTreeseedRoot(cwd);
+	const workflowPaths = resolveTreeseedWorkflowPaths(cwd);
+	const resolvedProjectRoot = workflowPaths.tenantRoot;
 	const resolvedWorkspaceRoot = resolvedProjectRoot ? findNearestTreeseedWorkspaceRoot(resolvedProjectRoot) : null;
 
 	return {

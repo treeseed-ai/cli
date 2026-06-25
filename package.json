@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.11.1-dev.demo.20260625T152622Z",
+  "version": "0.11.1-dev.demo.20260625T235346Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -31,7 +31,7 @@
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
     "lint": "npm run build:dist",
-    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/secrets-escrow.test.ts",
+    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts",
     "build:dist": "node --import tsx ./scripts/build-dist.ts",
     "prepare": "node --import tsx ./scripts/prepare.ts",
     "prepack": "npm run build:dist",

@@ -4,6 +4,7 @@ import {
 	type TreeseedDesiredUnit,
 } from '@treeseed/sdk/reconcile';
 import { resolveTreeseedLaunchEnvironment } from '@treeseed/sdk/workflow-support';
+import { execFileSync } from 'node:child_process';
 import type { TreeseedCommandHandler, TreeseedParsedInvocation } from '../types.js';
 import { fail, guidedResult } from './utils.js';
 import { workflowErrorResult } from './workflow.js';
@@ -49,6 +50,7 @@ function workflowDispatchUnit(input: {
 	inputs: Record<string, string>;
 	wait: boolean;
 	timeoutMs: number | null;
+	expectedHeadSha?: string | null;
 }) {
 	const unit: TreeseedDesiredUnit = {
 		unitId: `github-workflow-dispatch:${input.repository}:${input.branch}:${input.workflow}`.replace(/[^A-Za-z0-9:._/-]+/gu, '-'),
@@ -70,6 +72,7 @@ function workflowDispatchUnit(input: {
 			inputs: input.inputs,
 			wait: input.wait,
 			...(input.timeoutMs ? { timeoutMs: input.timeoutMs } : {}),
+			...(input.expectedHeadSha ? { expectedHeadSha: input.expectedHeadSha } : {}),
 		},
 		secrets: {},
 		metadata: {
@@ -80,6 +83,36 @@ function workflowDispatchUnit(input: {
 		},
 	};
 	return unit;
+}
+
+function normalizeRepositoryUrl(value: string) {
+	const trimmed = value.trim().replace(/\.git$/u, '');
+	const sshMatch = /^git@github\.com:(?<repo>[^/]+\/[^/]+)$/u.exec(trimmed);
+	if (sshMatch?.groups?.repo) return sshMatch.groups.repo.toLowerCase();
+	const urlMatch = /^https:\/\/github\.com\/(?<repo>[^/]+\/[^/]+)$/u.exec(trimmed);
+	if (urlMatch?.groups?.repo) return urlMatch.groups.repo.toLowerCase();
+	return trimmed.toLowerCase();
+}
+
+function resolveExpectedHeadSha(cwd: string, repository: string, branch: string) {
+	try {
+		const remoteUrl = execFileSync('git', ['remote', 'get-url', 'origin'], {
+			cwd,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'ignore'],
+		}).trim();
+		if (normalizeRepositoryUrl(remoteUrl) !== repository.toLowerCase()) return null;
+		const output = execFileSync('git', ['ls-remote', 'origin', `refs/heads/${branch}`], {
+			cwd,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'ignore'],
+			timeout: 30_000,
+		}).trim();
+		const [sha] = output.split(/\s+/u);
+		return /^[0-9a-f]{40}$/iu.test(sha) ? sha : null;
+	} catch {
+		return null;
+	}
 }
 
 export const handleWorkflow: TreeseedCommandHandler = async (invocation, context) => {
@@ -107,7 +140,8 @@ export const handleWorkflow: TreeseedCommandHandler = async (invocation, context
 			baseEnv: context.env,
 		});
 		const target = { kind: 'persistent' as const, scope: 'staging' as const };
-		const units = [workflowDispatchUnit({ repository, workflow, branch, inputs, wait, timeoutMs })];
+		const expectedHeadSha = resolveExpectedHeadSha(context.cwd, repository, branch);
+		const units = [workflowDispatchUnit({ repository, workflow, branch, inputs, wait, timeoutMs, expectedHeadSha })];
 		const result = execute
 			? await reconcileTreeseedTarget({
 				tenantRoot: context.cwd,

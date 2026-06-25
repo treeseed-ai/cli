@@ -1,11 +1,29 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { runTreeseedManagedDev } from '@treeseed/sdk';
 import { discoverTreeseedApplications } from '@treeseed/sdk/hosting';
-import { collectTreeseedReconcileStatus, destroyTreeseedTargetUnits, planTreeseedReconciliation, reconcileTreeseedTarget, type TreeseedReconcileSelector } from '@treeseed/sdk/reconcile';
+import {
+	collectTreeseedReconcileStatus,
+	destroyTreeseedTargetUnits,
+	planTreeseedReconciliation,
+	reconcileTreeseedTarget,
+	type TreeseedReconcileSelector,
+} from '@treeseed/sdk/reconcile';
 import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
 import type { TreeseedCommandHandler } from '../types.js';
 import { workflowErrorResult } from './workflow.js';
 import { fail } from './utils.js';
+
+function stringOption(args: Record<string, unknown>, name: string) {
+	const value = args[name];
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function numberOption(args: Record<string, unknown>, name: string) {
+	const value = args[name];
+	const parsed = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : Number.NaN;
+	return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 export const handleDev: TreeseedCommandHandler = async (invocation, context) => {
 	try {
@@ -16,23 +34,45 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		if (removedOptions.length > 0) {
 			return fail(`\`trsd dev\` no longer accepts ${removedOptions.map((name) => `--${name.replace(/[A-Z]/gu, (char) => `-${char.toLowerCase()}`)}`).join(', ')}. It always starts fixed Market web/API/dev-runner surfaces; use \`trsd capacity ...\` for providers.`);
 		}
+
 		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
 		const watch = feedback !== 'off';
-		const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim() ? invocation.args.app.trim() : undefined;
-		const apiMode = typeof invocation.args.api === 'string' && invocation.args.api.trim() ? invocation.args.api.trim() : 'auto';
+		const appId = stringOption(invocation.args, 'app');
+		const apiMode = stringOption(invocation.args, 'api') ?? 'auto';
 		const subcommand = typeof invocation.positionals[0] === 'string' ? invocation.positionals[0] : '';
 		const effectiveSubcommand = subcommand || 'start';
 		const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
 		if (subcommand && !managedSubcommands.has(subcommand)) {
 			return fail(`Unknown dev subcommand "${subcommand}". Use start, status, logs, stop, or restart.`);
 		}
+
 		const discoveredApps = discoverTreeseedApplications(context.cwd);
-		const hasApiApp = discoveredApps.some((app) => app.id === 'api');
-		const selectedSurfaces = appId === 'api' ? 'api' : appId === 'web' || apiMode === 'remote' ? 'web' : hasApiApp ? 'web,api' : 'web';
-		const passthroughArgs: string[] = [];
+		const localContent = (stringOption(invocation.args, 'localContent') as 'auto' | 'none' | 'preview' | 'edit' | undefined) ?? 'auto';
+		const target = { kind: 'persistent' as const, scope: 'local' as const };
+		const desiredGraph = compileTreeseedDesiredResourceGraph({
+			tenantRoot: context.cwd,
+			target,
+			localContent,
+		});
+		const localProcessServiceIds = new Set(
+			compileTreeseedDesiredUnitsFromGraph(desiredGraph, {
+				environment: 'local',
+				resourceKind: ['local-process'],
+			}).map((unit) => typeof unit.metadata.serviceId === 'string' ? unit.metadata.serviceId : null),
+		);
+		const hasLocalApi = localProcessServiceIds.has('api') || localProcessServiceIds.has('operations-runner');
+		const selectedSurfaces = appId === 'api'
+			? 'api'
+			: appId === 'web' || apiMode === 'remote'
+				? 'web'
+				: hasLocalApi
+					? 'web,api'
+					: 'web';
+
+		const passthroughArgs: string[] = ['--surfaces', selectedSurfaces];
 		const forwardStringOption = (name: string, flag: string) => {
-			const value = invocation.args[name];
-			if (typeof value === 'string' && value.trim().length > 0) {
+			const value = stringOption(invocation.args, name);
+			if (value) {
 				passthroughArgs.push(flag, value);
 			}
 		};
@@ -58,6 +98,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		forwardBooleanOption('all', '--all');
 		forwardBooleanOption('follow', '--follow');
 		forwardBooleanOption('json', '--json');
+
 		if (!existsSync(resolve(context.cwd, 'packages', 'api'))) {
 			return {
 				exitCode: 0,
@@ -80,15 +121,50 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 				},
 			};
 		}
-		const target = { kind: 'persistent' as const, scope: 'local' as const };
-		const localContent = typeof invocation.args.localContent === 'string' && invocation.args.localContent.trim()
-			? invocation.args.localContent.trim() as 'auto' | 'none' | 'preview' | 'edit'
-			: 'auto';
-		const desiredGraph = compileTreeseedDesiredResourceGraph({
-			tenantRoot: context.cwd,
-			target,
-			localContent,
-		});
+
+		const localProcessOptions = {
+			...(stringOption(invocation.args, 'host') ? { host: stringOption(invocation.args, 'host') } : {}),
+			...(numberOption(invocation.args, 'port') !== undefined ? { port: numberOption(invocation.args, 'port') } : {}),
+			...(stringOption(invocation.args, 'apiHost') ? { apiHost: stringOption(invocation.args, 'apiHost') } : {}),
+			...(numberOption(invocation.args, 'apiPort') !== undefined ? { apiPort: numberOption(invocation.args, 'apiPort') } : {}),
+			...(stringOption(invocation.args, 'webRuntime') ? { webRuntime: stringOption(invocation.args, 'webRuntime') } : {}),
+			...(invocation.args.reset === true ? { reset: true } : {}),
+			...(invocation.args.force === true ? { force: true } : {}),
+			...(invocation.args.forceConflicts === true ? { forceConflicts: true } : {}),
+			...(invocation.args.all === true ? { all: true } : {}),
+			...(invocation.args.follow === true ? { follow: true } : {}),
+		};
+		const planOnly = invocation.args.plan === true;
+
+		if (effectiveSubcommand === 'stop' && invocation.args.all === true && !planOnly) {
+			const result = await runTreeseedManagedDev({
+				action: 'stop',
+				cwd: context.cwd,
+				surfaces: selectedSurfaces,
+				...localProcessOptions,
+				all: true,
+				env: context.env,
+			});
+			return {
+				exitCode: result.ok ? 0 : 1,
+				report: {
+					command: 'dev stop',
+					ok: result.ok,
+					action: result.action,
+					instances: result.instances.map((instance) => ({
+						id: instance.id,
+						surface: instance.surface,
+						pid: instance.pid,
+						running: instance.running,
+						logPath: instance.logPath,
+					})),
+				},
+				message: result.ok
+					? `Treeseed dev stopped ${result.instances.length} managed instance record${result.instances.length === 1 ? '' : 's'} across worktrees.`
+					: 'Treeseed dev stop found managed instances that could not be stopped.',
+			};
+		}
+
 		const selectedServiceIds = selectedSurfaces
 			.split(',')
 			.map((surface) => surface.trim())
@@ -120,11 +196,15 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 							spec: {
 								...unit.spec,
 								action: effectiveSubcommand === 'restart' ? 'restart' : 'start',
+								options: {
+									...(unit.spec.options as Record<string, unknown> | undefined),
+									...localProcessOptions,
+									...(unit.metadata.serviceId === 'operations-runner' ? { reset: false } : {}),
+								},
 							},
 						}
 					: unit,
 			);
-		const planOnly = invocation.args.plan === true;
 		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
 		const stopLike = effectiveSubcommand === 'stop';
 		const statusLike = effectiveSubcommand === 'status' || effectiveSubcommand === 'logs';
@@ -189,7 +269,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 				})),
 				selectedSurfaces,
 				localContent,
-				desiredGraph,
+				...(invocation.args.plan === true || invocation.args.verbose === true ? { desiredGraph } : {}),
 				reconcile: result,
 			},
 		};

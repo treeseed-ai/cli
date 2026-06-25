@@ -10,6 +10,7 @@ import { handleClose } from './handlers/close.js';
 import { handleSave } from './handlers/save.js';
 import { handleUpdate } from './handlers/update.js';
 import { handleRelease } from './handlers/release.js';
+import { handleReleaseCandidate } from './handlers/release-candidate.js';
 import { handleDestroy } from './handlers/destroy.js';
 import { handleStatus } from './handlers/status.js';
 import { handleCi } from './handlers/ci.js';
@@ -53,6 +54,7 @@ import { handleWorkspace } from './handlers/workspace.js';
 import { handleAudit } from './handlers/audit.js';
 import { handleSeed } from './handlers/seed.js';
 import { handleDemo } from './handlers/demo.js';
+import { handleScene } from './handlers/scene.js';
 
 const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
 
@@ -74,6 +76,7 @@ export const COMMAND_HANDLERS = {
 	tasks: handleTasks,
 	switch: handleSwitch,
 	stage: handleStage,
+	'release-candidate': handleReleaseCandidate,
 	'tags:cleanup': handleTagsCleanup,
 	resume: handleResume,
 	recover: handleRecover,
@@ -109,6 +112,7 @@ export const COMMAND_HANDLERS = {
 	audit: handleAudit,
 	seed: handleSeed,
 	demo: handleDemo,
+	scene: handleScene,
 } as const;
 
 export const TRESEED_COMMAND_SPECS: TreeseedCommandSpec[] = TRESEED_OPERATION_SPECS;
