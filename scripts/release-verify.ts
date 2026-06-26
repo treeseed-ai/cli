@@ -130,6 +130,21 @@ function ensureWorkspaceRuntimePackageLinks() {
 	}
 }
 
+function prepareWorkspaceRuntimePackageBuilds() {
+	for (const runtimePackageRoot of resolveWorkspaceRuntimePackageRoots().values()) {
+		const packageJson = JSON.parse(readFileSync(resolve(runtimePackageRoot, 'package.json'), 'utf8')) as {
+			scripts?: Record<string, string>;
+		};
+		if (packageJson.scripts?.['build:dist']) {
+			run('npm', ['run', 'build:dist'], runtimePackageRoot);
+			continue;
+		}
+		if (packageJson.scripts?.build) {
+			run('npm', ['run', 'build'], runtimePackageRoot);
+		}
+	}
+}
+
 function collectRuntimeDependenciesForPackaging() {
 	const dependencyNames = new Set<string>(runtimeDependencyNames());
 	const workspaceRuntimePackageRoots = resolveWorkspaceRuntimePackageRoots();
@@ -285,6 +300,7 @@ function assertPackageDependencyShape() {
 
 assertNoLocalDependencyLinks();
 ensureWorkspaceRuntimePackageLinks();
+prepareWorkspaceRuntimePackageBuilds();
 run('npm', ['run', 'lint']);
 assertPackageDependencyShape();
 scanDirectory(resolve(packageRoot, 'dist'));
