@@ -244,7 +244,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				dryRun: false,
 				write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 			});
-		const status = dryRun
+		let status = dryRun
 			? null
 			: await collectTreeseedReconcileStatus({
 				tenantRoot: context.cwd,
@@ -287,6 +287,16 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				...liveHostedServices.liveObservation.issues,
 			]
 			: [];
+		if (!dryRun && status?.ready === false && liveHostedServices && liveFailures.length === 0) {
+			status = await collectTreeseedReconcileStatus({
+				tenantRoot: context.cwd,
+				target: targetFor(environment),
+				env: selectedSeedEnv(context, environment),
+				selector,
+			});
+			report.status = status;
+			report.ok = status.ready;
+		}
 		const finalReport = liveHostedServices
 			? {
 				...report,
