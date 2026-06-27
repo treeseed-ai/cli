@@ -1424,9 +1424,6 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	['test:release:full', command({ examples: ['treeseed test:release:full', 'treeseed release:verify'], executionMode: 'adapter' })],
 	['release:publish:changed', command({ examples: ['treeseed release:publish:changed'], executionMode: 'adapter' })],
 	['astro', command({ examples: ['treeseed astro -- --help'], executionMode: 'adapter', buildAdapterInput: PASS_THROUGH_ARGS })],
-	['mailpit:up', command({ examples: ['treeseed mailpit:up'], executionMode: 'adapter' })],
-	['mailpit:down', command({ examples: ['treeseed mailpit:down'], executionMode: 'adapter' })],
-	['mailpit:logs', command({ examples: ['treeseed mailpit:logs'], executionMode: 'adapter' })],
 	['d1:migrate:local', command({ examples: ['treeseed d1:migrate:local'], executionMode: 'adapter' })],
 	['cleanup:markdown', command({
 		examples: ['treeseed cleanup:markdown docs/README.md'],

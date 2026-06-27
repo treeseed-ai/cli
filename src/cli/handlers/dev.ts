@@ -178,6 +178,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 		const selectedUnitIds = [
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
+			'local-docker-compose:mailpit',
 			'local-treedx:team-primary',
 			'local-docker-compose:treedx',
 			...localContentUnitIds,
