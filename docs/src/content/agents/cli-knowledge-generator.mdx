@@ -92,6 +92,14 @@ execution:
   worktree:
     enabled: false
     branchPrefix: cli-knowledge-generator
+tools:
+  allowed:
+    - treedx.build_context
+    - treedx.search_workspace
+    - treedx.read_workspace_file
+    - treedx.write_workspace_file
+    - treedx.commit_workspace
+    - treeseed.status
 outputs:
   messageTypes:
     - knowledge_draft_created
@@ -100,9 +108,6 @@ outputs:
     - message:create
 governance:
   mutationClass: draft_only
-  approvalRequiredForCanonicalContent: true
-  approvalRequiredForCode: true
-  requireHumanApproval: false
   requireSourceMap: true
 ---
 

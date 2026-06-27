@@ -1017,6 +1017,11 @@ test('config bootstraps the local workspace and reports next steps', async () =>
 	assert.equal(localEntryIds.has('TREESEED_CLOUDFLARE_ACCOUNT_ID'), true);
 	assert.equal(localEntryIds.has('TREESEED_RAILWAY_WORKSPACE'), false);
 	assert.equal(payload.toolHealth.ghActExtension.attemptedInstall, false);
+	assert.ok(Array.isArray(payload.nextSteps));
+	assert.equal(payload.nextSteps.some((step) => /Host env injection exposes runtime secrets/u.test(step)), false);
+	assert.equal(payload.nextSteps.some((step) => /Bootstrap service secrets are crown-jewel/u.test(step)), false);
+	assert.equal(payload.nextSteps.some((step) => /Admin browser encryption depends/u.test(step)), false);
+	assert.equal(payload.nextSteps.some((step) => /Secret-bearing workflows must use/u.test(step)), false);
 });
 
 test('config defaults to all environments and supports explicit all', async () => {

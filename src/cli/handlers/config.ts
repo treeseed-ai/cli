@@ -205,6 +205,16 @@ function buildConfigSecretCapabilityReport(payload: Record<string, any>) {
 	return { records, counts, warnings };
 }
 
+function actionableSecretCapabilityNextSteps(warnings: string[]) {
+	return warnings.filter((warning) =>
+		/re-enter|fail-closed|expired|tombstoned/iu.test(warning),
+	);
+}
+
+function isGenericSecretPolicyNote(step: string) {
+	return /Host env injection exposes runtime secrets|Bootstrap service secrets are crown-jewel|Admin browser encryption depends|Secret-bearing workflows must use allowlisted GitHub Actions operations/iu.test(step);
+}
+
 function renderConfigResult(commandName: string, result: any) {
 	const payload = result.payload as Record<string, any>;
 	const toolHealth = payload.toolHealth as Record<string, any> | undefined;
@@ -238,6 +248,12 @@ function renderConfigResult(commandName: string, result: any) {
 					? 'Treeseed platform bootstrap completed successfully.'
 				: 'Treeseed config completed successfully.';
 	const market = payload.market as Record<string, any> | undefined;
+	const nextSteps = [
+		...(payload.passphraseEnv?.configured ? [] : [payload.passphraseEnv?.recommendedLaunch].filter(Boolean)),
+		...actionableSecretCapabilityNextSteps(secretCapability.warnings),
+		...renderWorkflowNextSteps(result),
+	].filter((step): step is string => typeof step === 'string' && step.trim().length > 0)
+		.filter((step) => !isGenericSecretPolicyNote(step));
 	return guidedResult({
 		command: commandName,
 		summary,
@@ -280,11 +296,7 @@ function renderConfigResult(commandName: string, result: any) {
 				{ label: 'Runtime ready', value: market.runtimeReady ? 'yes' : 'no' },
 			] : []),
 		],
-		nextSteps: [
-			...(payload.passphraseEnv?.configured ? [] : [payload.passphraseEnv?.recommendedLaunch].filter(Boolean)),
-			...secretCapability.warnings,
-			...renderWorkflowNextSteps(result),
-		],
+		nextSteps,
 		report: {
 			...payload,
 			secretCapability,
@@ -390,7 +402,13 @@ export const handleConfig: TreeseedCommandHandler = async (invocation, context) 
 				value: page.finalValue,
 				reused: !(page.key in editorResult.overrides),
 			}));
-			context.write('Applying config updates, validating environments, and syncing managed providers...', 'stdout');
+			const effectiveSync = sync ?? 'all';
+			context.write(
+				effectiveSync !== 'none'
+					? 'Applying config updates, validating environments, and syncing selected managed providers...'
+					: 'Applying config updates and validating environments...',
+				'stdout',
+			);
 			const result = await workflow.config({
 				environment: scopes as never,
 				systems: systems as never,

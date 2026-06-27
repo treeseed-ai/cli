@@ -1106,7 +1106,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'full', flags: '--full', description: 'Open the advanced full editor directly in human interactive mode.', kind: 'boolean' },
 			{ name: 'mouse', flags: '--mouse', description: 'Opt into mouse capture for the config UI. Keyboard-first terminal behavior remains the default.', kind: 'boolean' },
 			{ name: 'environment', flags: '--environment <scope>', description: 'Select all environments or limit configuration to local, staging, or prod. Defaults to all.', kind: 'enum', repeatable: true, values: ['all', 'local', 'staging', 'prod'] },
-			{ name: 'sync', flags: '--sync <mode>', description: 'Sync hosted secrets/variables to GitHub, Cloudflare, Railway, or all providers. Defaults to all.', kind: 'enum', values: ['none', 'github', 'cloudflare', 'railway', 'all'] },
+			{ name: 'sync', flags: '--sync <mode>', description: 'Sync hosted secrets/variables to GitHub, Cloudflare, Railway, or all providers. Defaults to all; GitHub binding changes are applied through reconciler-owned units.', kind: 'enum', values: ['none', 'github', 'cloudflare', 'railway', 'all'] },
 			{ name: 'bootstrap', flags: '--bootstrap', description: 'Skip the editor and run platform reconciliation/bootstrap from the currently saved required values.', kind: 'boolean' },
 			{ name: 'system', flags: '--system <system>', description: 'Limit bootstrap to a system group. Repeatable. Values: all, github, data, web, api, agents.', kind: 'enum', repeatable: true, values: ['all', 'github', 'data', 'web', 'api', 'agents'] },
 			{ name: 'systems', flags: '--systems <systems>', description: 'Comma-separated bootstrap system groups. Values: all, github, data, web, api, agents.', kind: 'string' },
