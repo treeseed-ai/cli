@@ -210,7 +210,7 @@ export async function runPackageImageCommand(
 	if (json) return json;
 	return guidedResult({
 		command: options.commandName ?? 'package image',
-		summary: execute ? 'Package development image workflow dispatched.' : 'Package development image plan ready.',
+		summary: execute ? 'Package image workflow dispatched.' : 'Package deployment source/image plan ready.',
 		facts: [
 			{ label: 'Package', value: `${imagePlan.package.id} (${imagePlan.package.path})` },
 			{ label: 'Workflow', value: `${selectedWorkflow} @ ${imagePlan.branch}` },

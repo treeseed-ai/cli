@@ -658,8 +658,6 @@
 ### Added
 
 - feat(cli): add provider cli wrappers and refresh railway sdk lock (ea24f06dc0d1)
-- feat(cli): add tags:cleanup command (96e015f194c4)
-
 ### Dependencies
 
 - build(build): sync package dependency references (21fdd5d1118a)
