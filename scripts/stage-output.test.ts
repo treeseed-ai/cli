@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTenantWorkspace } from './cli-test-fixtures.ts';
+import { mkdtempSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const { runTreeseedCli } = await import('../dist/cli/main.js');
 
@@ -27,24 +31,36 @@ function parseJsonOutput(output) {
 	return JSON.parse(output.slice(start));
 }
 
-test('staging release-gate plan json stays compact', async () => {
+test('staging promotion plan json stays compact', async () => {
 	const root = makeTenantWorkspace('staging');
+	const origin = mkdtempSync(join(tmpdir(), 'treeseed-stage-origin-'));
+	spawnSync('git', ['init', '--bare'], { cwd: origin, stdio: 'ignore' });
+	spawnSync('git', ['remote', 'add', 'origin', origin], { cwd: root, stdio: 'ignore' });
+	spawnSync('git', ['push', '-u', 'origin', 'staging'], { cwd: root, stdio: 'ignore' });
+	spawnSync('git', ['checkout', '-b', 'feature/stage-plan'], { cwd: root, stdio: 'ignore' });
+	spawnSync('git', ['push', '-u', 'origin', 'feature/stage-plan'], { cwd: root, stdio: 'ignore' });
 
-	const result = await runCli(['stage', '--plan', '--json', 'staging release-gate plan'], root);
+	const result = await runCli(['stage', '--plan', '--json', 'staging promotion plan'], root);
 
 	assert.equal(result.exitCode, 0);
 	const payload = parseJsonOutput(result.output);
 	assert.equal(payload.command, 'stage');
 	assert.equal(payload.ok, true);
-	assert.equal(payload.summary, 'Treeseed stage release-gate plan ready.');
-	assert.equal(payload.payload.mode, 'reconcile-release-gates');
-	assert.equal(payload.payload.branchName, 'staging');
+	assert.equal(payload.summary, 'Treeseed stage promotion plan ready.');
+	assert.equal(payload.payload.mode, 'stage-promotion');
+	assert.equal(payload.payload.branchName, 'feature/stage-plan');
 	assert.equal(payload.payload.mergeTarget, 'staging');
-	assert.ok(Array.isArray(payload.payload.units));
-	assert.ok(Array.isArray(payload.payload.plannedSteps));
+	assert.equal(payload.payload.verifyMode, 'action');
+	assert.equal(payload.payload.ciMode, 'off');
+	assert.equal(payload.payload.cleanupMode, 'success');
+	assert.ok(Array.isArray(payload.payload.phases));
+	assert.equal(payload.payload.phases.includes('promote-to-staging'), true);
+	assert.equal(payload.payload.plan.targetBranch, 'staging');
 	assert.equal(payload.hostingGraph, undefined);
 	assert.equal(payload.desiredGraph, undefined);
 	assert.equal(payload.payload.finalState, undefined);
 	assert.equal(payload.payload.repos, undefined);
 	assert.equal(payload.payload.readiness, undefined);
+	assert.equal(payload.payload.units, undefined);
+	assert.equal(payload.payload.plannedSteps, undefined);
 });

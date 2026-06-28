@@ -6,7 +6,10 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 	try {
 		const result = await createWorkflowSdk(context).stage({
 			message: invocation.positionals.join(' ').trim(),
-			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'auto' | 'hosted' | 'off' : undefined,
+			verifyMode: typeof invocation.args.verify === 'string' ? invocation.args.verify as 'action' | 'local' | 'none' : undefined,
+			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'hosted' | 'off' : undefined,
+			cleanupMode: typeof invocation.args.cleanup === 'string' ? invocation.args.cleanup as 'success' | 'manual' : undefined,
+			updateFrom: typeof invocation.args.updateFrom === 'string' ? invocation.args.updateFrom : undefined,
 			releaseCandidate: typeof invocation.args.releaseCandidate === 'string' ? invocation.args.releaseCandidate as 'hybrid' | 'strict' | 'skip' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
@@ -17,10 +20,13 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			branchName?: string;
 			mergeTarget?: string;
 			mergeStrategy?: string;
+			verifyMode?: string;
+			cleanupMode?: string;
 			autoSaved?: boolean;
 			repos?: Array<{ merged: boolean; deletedLocal: boolean; deletedRemote: boolean; skippedReason: string | null }>;
 			rootRepo?: { deletedLocal: boolean; deletedRemote: boolean; tagName: string | null };
 			stagingWait?: { status: string };
+			hostedCi?: { status?: string };
 			releaseCandidateMode?: string;
 			previewCleanup?: { performed: boolean };
 			finalBranch?: string;
@@ -80,7 +86,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			};
 			return guidedResult({
 				command: invocation.commandName || 'stage',
-				summary: result.executionMode === 'plan' ? 'Treeseed stage release-gate plan ready.' : 'Treeseed stage release gates reconciled.',
+				summary: result.executionMode === 'plan' ? 'Treeseed stage promotion plan ready.' : 'Treeseed stage promotion completed.',
 				facts: [
 					{ label: 'Mode', value: payload.mode },
 					{ label: 'Merge target', value: payload.mergeTarget ?? 'staging' },
@@ -97,7 +103,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 		}
 		const mergedPackages = (payload.repos ?? []).filter((repo) => repo.merged).length;
 		const blocked = (payload.blockers?.length ?? 0) > 0;
-		const hostingGraph = blocked ? null : resolveWorkflowHostingGraph(context, 'staging', payload.applicationSelection);
+		const hostingGraph = blocked || payload.mode === 'stage-promotion' ? null : resolveWorkflowHostingGraph(context, 'staging', payload.applicationSelection);
 		const report = blocked
 			? {
 				schemaVersion: result.schemaVersion,
@@ -120,24 +126,29 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			}
 			: {
 				...result,
-				hostingGraph,
+				...(hostingGraph ? { hostingGraph } : {}),
 			};
 		return guidedResult({
 			command: invocation.commandName || 'stage',
 			summary: blocked
 				? 'Treeseed stage plan blocked.'
-				: result.executionMode === 'plan' ? 'Treeseed stage plan ready.' : 'Treeseed stage completed successfully.',
+				: result.executionMode === 'plan' && payload.mode === 'stage-promotion'
+					? 'Treeseed stage promotion plan ready.'
+					: result.executionMode === 'plan' ? 'Treeseed stage plan ready.' : 'Treeseed stage completed successfully.',
 			facts: [
 				{ label: 'Mode', value: payload.mode },
 				{ label: 'Merged branch', value: payload.branchName },
 				{ label: 'Merge target', value: payload.mergeTarget },
 				{ label: 'Merge strategy', value: payload.mergeStrategy },
+				{ label: 'Verify mode', value: payload.verifyMode ?? 'action' },
+				{ label: 'CI mode', value: payload.ciMode ?? 'off' },
+				{ label: 'Cleanup mode', value: payload.cleanupMode ?? 'success' },
 				{ label: 'Auto-saved', value: payload.autoSaved ? 'yes' : 'no' },
 				{ label: 'Package merges', value: String(mergedPackages) },
 				...(payload.blockers?.length
 					? [{ label: 'Blockers', value: payload.blockers.join('; ') }]
 					: []),
-				{ label: 'Staging wait', value: payload.stagingWait?.status ?? (result.executionMode === 'plan' ? 'planned' : 'unknown') },
+				{ label: 'Staging wait', value: payload.hostedCi?.status ?? payload.stagingWait?.status ?? (payload.ciMode === 'off' ? 'skipped' : result.executionMode === 'plan' ? 'planned' : 'unknown') },
 				{ label: 'Release candidate', value: payload.releaseCandidateMode ?? 'skip' },
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
