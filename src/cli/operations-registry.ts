@@ -1916,7 +1916,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		help: {
 			longSummary: ['The Docker wrapper resolves Docker, decrypts scoped Treeseed DockerHub credentials, logs in through an isolated `DOCKER_CONFIG`, and forwards Docker arguments without printing secrets.'],
 			whenToUse: ['Use this for authenticated DockerHub manifest checks, image pulls, and emergency image publication diagnostics. Official image publication should still use package image reconciliation unless explicitly repairing a blocked provider state.'],
-			beforeYouRun: ['Run from a Treeseed project. Use `--environment prod` for production image checks. Staging services build from source and should be inspected through hosting plans.'],
+			beforeYouRun: ['Run from a Treeseed project. Use `--environment staging` or `--environment prod` for hosted image checks. API and operations runner staging services deploy from Docker images produced by the API deploy workflow.'],
 			automationNotes: ['Use `--` before target Docker flags when a flag could be parsed by Treeseed itself. The wrapper removes its temporary Docker config after the command exits.'],
 		},
 		helpVisible: true,
@@ -2433,7 +2433,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 			longSummary: ['TreeDX commands manage the Treeseed control-plane records that bind each team to one primary knowledge-library instance, bind project content to TreeDX libraries, and plan deterministic TreeDX source-build or production image behavior.'],
 			whenToUse: ['Use this when provisioning a private TreeDX, attaching a public team to federation, creating mirror/share records, inspecting project content/site/project topology, or publishing the TreeDX image that the API app should reconcile.'],
 			beforeYouRun: ['Log in to the selected Treeseed API first for team/project actions. For `db image --execute`, configure GitHub credentials through Treeseed-managed config. Do not pass secrets on the command line; TreeDX credentials belong in host secret managers or encrypted config.'],
-			automationNotes: ['Use `--json` for stable TreeDX binding, mirror, share, library, topology, and image policy records. Staging hosting plans consume the package repository source build; production image refs are semantic release artifacts.'],
+			automationNotes: ['Use `--json` for stable TreeDX binding, mirror, share, library, topology, and image policy records. TreeDX staging still uses source builds; API and operations runner staging services consume Docker image refs produced by their deploy workflow. Production image refs are semantic release artifacts.'],
 		},
 		helpVisible: true,
 		helpFeatured: false,
