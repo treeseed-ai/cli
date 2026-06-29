@@ -11,7 +11,7 @@ function sleep(ms: number) {
 }
 
 function localWebApprovalUrlFromApiUrl(value: string, profileId: string) {
-	const explicit = process.env.TREESEED_SITE_URL?.trim() || process.env.BETTER_AUTH_URL?.trim();
+	const explicit = process.env.TREESEED_SITE_URL?.trim() || process.env.TREESEED_BETTER_AUTH_URL?.trim();
 	if (explicit && profileId === 'local') {
 		const url = new URL(value);
 		return new URL(`${url.pathname}${url.search}${url.hash}`, explicit.replace(/\/+$/u, '')).toString();
