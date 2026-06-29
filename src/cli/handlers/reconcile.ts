@@ -174,10 +174,14 @@ function graphSummary(desiredGraph: ReturnType<typeof compileTreeseedDesiredReso
 }
 
 function resultSummary(result: Awaited<ReturnType<typeof reconcileTreeseedTarget>>) {
+	const units = Array.isArray(result.units) ? result.units : [];
+	const plans = Array.isArray(result.plans) ? result.plans : [];
+	const results = Array.isArray(result.results) ? result.results : [];
+	const timings = Array.isArray(result.timings) ? result.timings : [];
 	return {
-		unitCount: result.units.length,
-		resultCount: result.results.length,
-		plans: result.plans.map((plan) => ({
+		unitCount: units.length,
+		resultCount: results.length,
+		plans: plans.map((plan) => ({
 			unitId: plan.unit.unitId,
 			unitType: plan.unit.unitType,
 			provider: plan.unit.provider,
@@ -185,17 +189,17 @@ function resultSummary(result: Awaited<ReturnType<typeof reconcileTreeseedTarget
 			action: plan.diff.action,
 			reasons: plan.diff.reasons,
 		})),
-		results: result.results.map((entry) => ({
+		results: results.map((entry) => ({
 			unitId: entry.unit.unitId,
 			unitType: entry.unit.unitType,
 			provider: entry.unit.provider,
 			logicalName: entry.unit.logicalName,
-			action: entry.result.action,
-			status: entry.result.status,
-			warnings: entry.result.warnings,
-			error: entry.result.error,
+			action: entry.action ?? entry.result?.action ?? 'unknown',
+			status: entry.result?.status ?? entry.observed?.status ?? 'unknown',
+			warnings: entry.warnings ?? entry.result?.warnings ?? [],
+			error: entry.error ?? entry.result?.error ?? null,
 		})),
-		timings: result.timings.map((timing) => ({
+		timings: timings.map((timing) => ({
 			name: timing.name,
 			durationMs: timing.durationMs,
 			status: timing.status,
