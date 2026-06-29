@@ -52,7 +52,7 @@ test('staging promotion plan json stays compact', async () => {
 	assert.equal(payload.payload.mergeTarget, 'staging');
 	assert.equal(payload.payload.verifyMode, 'action');
 	assert.equal(payload.payload.ciMode, 'off');
-	assert.equal(payload.payload.cleanupMode, 'success');
+	assert.equal(payload.payload.cleanupMode, 'manual');
 	assert.ok(Array.isArray(payload.payload.phases));
 	assert.equal(payload.payload.phases.includes('promote-to-staging'), true);
 	assert.equal(payload.payload.plan.targetBranch, 'staging');

@@ -600,7 +600,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
 		examples: ['treeseed stage "feat: add search filters"', 'treeseed stage --plan "feat: add search filters"', 'treeseed stage --verify none --cleanup manual "handoff to staging agent"'],
-		notes: ['Stage merges staging down into the feature branch before staging is mutated.', 'Stage runs local action-parity proof by default and does not wait for hosted CI/CD unless --ci hosted is provided.', 'Source branches and managed worktrees are deleted only after staging refs are promoted and verified.'],
+		notes: ['Stage merges staging down into the feature branch before staging is mutated.', 'Stage runs local action-parity proof by default and does not wait for hosted CI/CD unless --ci hosted is provided.', 'Source branches and managed worktrees are preserved by default; use --cleanup success only when cleanup is intentionally safe.'],
 		help: {
 			workflowPosition: 'merge to staging',
 			longSummary: [
@@ -615,7 +615,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Merges staging into the feature branch first.',
 				'Runs local proof before staging mutation by default.',
 				'Promotes exact verified package and root SHAs to staging.',
-				'Performs source branch/worktree cleanup only after staging refs are verified.',
+				'Preserves source branches and managed worktrees by default after staging refs are verified.',
 			],
 			examples: [
 				example('treeseed stage "feat: add search filters"', 'Promote a completed task', 'Merge the current task branch into staging with a resolution message.'),
@@ -1920,7 +1920,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		help: {
 			longSummary: ['The Docker wrapper resolves Docker, decrypts scoped Treeseed DockerHub credentials, logs in through an isolated `DOCKER_CONFIG`, and forwards Docker arguments without printing secrets.'],
 			whenToUse: ['Use this for authenticated DockerHub manifest checks, image pulls, and emergency image publication diagnostics. Official image publication should still use package image reconciliation unless explicitly repairing a blocked provider state.'],
-			beforeYouRun: ['Run from a Treeseed project. Use `--environment staging` or `--environment prod` for hosted image checks. API and operations runner staging services deploy from Docker images produced by the API deploy workflow.'],
+			beforeYouRun: ['Run from a Treeseed project. Use `--environment staging` or `--environment prod` for hosted image checks. API and operations runner staging services deploy from Railway Git source builds; production uses Docker images produced by release workflows.'],
 			automationNotes: ['Use `--` before target Docker flags when a flag could be parsed by Treeseed itself. The wrapper removes its temporary Docker config after the command exits.'],
 		},
 		helpVisible: true,
@@ -2437,7 +2437,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 			longSummary: ['TreeDX commands manage the Treeseed control-plane records that bind each team to one primary knowledge-library instance, bind project content to TreeDX libraries, and plan deterministic TreeDX source-build or production image behavior.'],
 			whenToUse: ['Use this when provisioning a private TreeDX, attaching a public team to federation, creating mirror/share records, inspecting project content/site/project topology, or publishing the TreeDX image that the API app should reconcile.'],
 			beforeYouRun: ['Log in to the selected Treeseed API first for team/project actions. For `db image --execute`, configure GitHub credentials through Treeseed-managed config. Do not pass secrets on the command line; TreeDX credentials belong in host secret managers or encrypted config.'],
-			automationNotes: ['Use `--json` for stable TreeDX binding, mirror, share, library, topology, and image policy records. TreeDX staging still uses source builds; API and operations runner staging services consume Docker image refs produced by their deploy workflow. Production image refs are semantic release artifacts.'],
+			automationNotes: ['Use `--json` for stable TreeDX binding, mirror, share, library, topology, and image policy records. TreeDX, API, operations runner, and agent staging services use source builds. Production image refs are semantic release artifacts.'],
 		},
 		helpVisible: true,
 		helpFeatured: false,

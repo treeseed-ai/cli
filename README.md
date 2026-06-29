@@ -126,11 +126,11 @@ treeseed save --lane promotion --json "describe the checkpoint"
 ```bash
 treeseed stage --plan --json "describe the staging change"
 treeseed stage --verify action --json "describe the staging change"
-treeseed stage --verify none --cleanup manual --json "handoff to staging agent"
+treeseed stage --verify none --json "handoff to staging agent"
 treeseed release --patch --verify-deployed-resources --plan --json
 ```
 
-Managed task worktrees created by `treeseed switch <branch> --worktree --json` live under `.treeseed/worktrees/<branch-slug>`. A branch may have only one active managed worktree. Successful `stage` merges `staging` down into the task branch first, runs local proof by default, promotes exact verified refs to `staging`, and removes the staged branch/worktree only after remote staging refs are verified. It does not wait on hosted CI/CD or provider resource checks by default; staging release repair is a separate workflow. If a root or package merge conflicts, the workflow records the conflicted paths, preserves the feature branch/worktree, and stops before staging is mutated.
+Managed task worktrees created by `treeseed switch <branch> --worktree --json` live under `.treeseed/worktrees/<branch-slug>`. A branch may have only one active managed worktree. Successful `stage` merges `staging` down into the task branch first, runs local proof by default, promotes exact verified refs to `staging`, and preserves the staged branch/worktree by default. Use `--cleanup success` only when source cleanup is intentionally safe after promotion. It does not wait on hosted CI/CD or provider resource checks by default; staging release repair is a separate workflow. If a root or package merge conflicts, the workflow records the conflicted paths, preserves the feature branch/worktree, and stops before staging is mutated.
 
 Interrupted workflow runs are journaled under `.treeseed/workflow`:
 
