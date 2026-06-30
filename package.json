@@ -45,7 +45,7 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "github:treeseed-ai/sdk#dde342e7a9112a53c69148b0617112552dc84042",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#9f15e0939d610659df091c2225b17be95195158d",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
