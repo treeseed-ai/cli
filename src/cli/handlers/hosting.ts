@@ -50,6 +50,7 @@ function targetFor(environment: TreeseedHostingEnvironment): TreeseedReconcileTa
 }
 
 function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostingGraph>): TreeseedReconcileSelector {
+	const includesApi = graph.units.some((unit) => unit.id === 'api' || unit.config.serviceName === 'treeseed-api');
 	const exactServiceIds = [...new Set(graph.units.flatMap((unit) => [
 		unit.id,
 		typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null,
@@ -58,7 +59,10 @@ function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostin
 			: null,
 	]).filter((value): value is string => Boolean(value)))];
 	return {
-		host: [...new Set(graph.units.map((unit) => unit.host.id).filter((hostId) => hostId !== 'smtp' && hostId !== 'local-process' && hostId !== 'local-docker'))],
+		host: [...new Set([
+			...graph.units.map((unit) => unit.host.id),
+			...(includesApi ? ['cloudflare-dns'] : []),
+		].filter((hostId) => hostId !== 'smtp' && hostId !== 'local-process' && hostId !== 'local-docker'))],
 		serviceId: exactServiceIds,
 		serviceType: [...new Set(graph.units.flatMap((unit) => {
 			if (unit.id === 'api') return ['api-runtime', 'railway-service:api', 'custom-domain:api', 'dns-record'];
