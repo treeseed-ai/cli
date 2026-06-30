@@ -62,7 +62,7 @@ function templateCatalogItemBase(id, displayName, summary, fulfillmentSource, la
 		category: 'starter',
 		audience: ['maintainers'],
 		tags: ['starter'],
-		publisher: { id: 'treeseed', name: 'TreeSeed', url: 'https://treeseed.ai' },
+		publisher: { id: 'treeseed', name: 'TreeSeed', url: 'https://treeseed.dev' },
 		publisherVerified: true,
 		templateVersion: '1.0.0',
 		templateApiVersion: 1,
@@ -416,8 +416,8 @@ test('auth:login defaults to central and sanitizes loopback approval links from 
 			},
 		});
 		assertSuccessWithDiagnostics(result, 'auth:login central default');
-		assert.equal(calls[0], 'https://api.treeseed.ai/v1/auth/device/start');
-		assert.match(result.stdout, /Open https:\/\/treeseed\.ai\/auth\/device\/approve\?user_code=ABCD-EFGH/u);
+		assert.equal(calls[0], 'https://api.treeseed.dev/v1/auth/device/start');
+		assert.match(result.stdout, /Open https:\/\/treeseed\.dev\/auth\/device\/approve\?user_code=ABCD-EFGH/u);
 		assert.doesNotMatch(result.stdout, /127\.0\.0\.1/u);
 	} finally {
 		globalThis.fetch = previousFetch;

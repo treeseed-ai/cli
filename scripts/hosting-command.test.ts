@@ -10,7 +10,7 @@ function makeMarketWorkspace() {
 	const root = makeWorkspaceRoot();
 	writeFileSync(resolve(root, 'treeseed.site.yaml'), `name: TreeSeed Market
 slug: treeseed-market
-siteUrl: https://treeseed.ai
+siteUrl: https://treeseed.dev
 contactEmail: hello@treeseed.email
 hosting:
   kind: treeseed_control_plane
@@ -72,7 +72,7 @@ function makeSplitMarketWorkspace() {
 	}, null, 2));
 	writeFileSync(resolve(root, 'treeseed.site.yaml'), `name: TreeSeed Market
 slug: treeseed-market
-siteUrl: https://treeseed.ai
+siteUrl: https://treeseed.dev
 contactEmail: hello@treeseed.email
 hosting:
   kind: self_hosted_project
@@ -92,7 +92,7 @@ connections:
 	}, null, 2));
 	writeFileSync(resolve(root, 'packages', 'api', 'treeseed.site.yaml'), `name: TreeSeed API
 slug: treeseed-api
-siteUrl: https://api.treeseed.ai
+siteUrl: https://api.treeseed.dev
 contactEmail: hello@treeseed.email
 hosting:
   kind: treeseed_control_plane

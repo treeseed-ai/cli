@@ -8,7 +8,7 @@
     "url": "https://github.com/treeseed-ai/cli.git",
     "directory": "."
   },
-  "homepage": "https://treeseed.ai",
+  "homepage": "https://treeseed.dev",
   "bugs": {
     "url": "https://github.com/treeseed-ai/cli/issues"
   },
@@ -45,7 +45,7 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "github:treeseed-ai/sdk#bd5b0a179c59a42f41a06dfabb3d270f9b8743ec",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#f4fba089b7c9a26e95aecdbcadfbc3455fbec65b",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },

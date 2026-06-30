@@ -33,7 +33,7 @@ function centralWebApprovalUrlFromApiUrl(value: string, profileId: string) {
 		return value;
 	}
 	const explicit = process.env.TREESEED_CENTRAL_MARKET_WEB_URL?.trim();
-	const fallback = explicit || 'https://treeseed.ai';
+	const fallback = explicit || 'https://treeseed.dev';
 	const url = new URL(value);
 	if (
 		url.protocol === 'http:'

@@ -10,7 +10,7 @@ function makeMarketWorkspace(rootDir = 'packages/api') {
 	const root = makeWorkspaceRoot();
 	writeFileSync(resolve(root, 'treeseed.site.yaml'), `name: TreeSeed Market
 slug: treeseed-market
-siteUrl: https://treeseed.ai
+siteUrl: https://treeseed.dev
 contactEmail: hello@treeseed.ai
 hosting:
   kind: treeseed_control_plane
