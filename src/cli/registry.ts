@@ -11,6 +11,7 @@ import { handleSave } from './handlers/save.js';
 import { handleUpdate } from './handlers/update.js';
 import { handleRelease } from './handlers/release.js';
 import { handleReleaseCandidate } from './handlers/release-candidate.js';
+import { handleProof } from './handlers/proof.js';
 import { handleDestroy } from './handlers/destroy.js';
 import { handleStatus } from './handlers/status.js';
 import { handleCi } from './handlers/ci.js';
@@ -76,6 +77,7 @@ export const COMMAND_HANDLERS = {
 	switch: handleSwitch,
 	stage: handleStage,
 	'release-candidate': handleReleaseCandidate,
+	proof: handleProof,
 	resume: handleResume,
 	recover: handleRecover,
 	[workspaceCommand('status')]: handleWorkspace,

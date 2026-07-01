@@ -670,6 +670,45 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		executionMode: 'handler',
 		handlerName: 'release-candidate',
 	})],
+	['proof', command({
+		usage: 'treeseed proof <plan|run|status|failures|explain|clean> [--target <environment>] [--driver <driver>] [--subject <id>] [--json]',
+		arguments: [{ name: 'action', description: 'Proof action to run.', required: false }],
+		options: [
+			{ name: 'target', flags: '--target <environment>', description: 'Select proof target environment.', kind: 'enum', values: ['local', 'staging', 'prod'] },
+			{ name: 'driver', flags: '--driver <driver>', description: 'Select proof driver. github-hosted is authoritative; act is advisory.', kind: 'enum', values: ['github-hosted', 'act', 'local', 'railway-live', 'cloudflare-live', 'reconcile-live'] },
+			{ name: 'subject', flags: '--subject <id>', description: 'Limit proof to one subject, such as package:treedx.', kind: 'string' },
+			{ name: 'last', flags: '--last', description: 'Explain the most recent proof record.', kind: 'boolean' },
+			{ name: 'olderThan', flags: '--older-than <duration>', description: 'Clean proof records older than a duration like 30d or 12h.', kind: 'string' },
+			{ name: 'plan', flags: '--plan', description: 'Plan proof work without writing records.', kind: 'boolean' },
+			{ name: 'dryRun', flags: '--dry-run', description: 'Alias for --plan.', kind: 'boolean' },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON.', kind: 'boolean' },
+		],
+		examples: [
+			'treeseed proof plan --target staging --json',
+			'treeseed proof run --target staging --json',
+			'treeseed proof run --subject package:treedx --driver github-hosted --json',
+			'treeseed proof failures --json',
+			'treeseed proof explain --last --json',
+		],
+		help: {
+			workflowPosition: 'release proof',
+			longSummary: [
+				'Proof manages reusable release proof records for exact package refs, hosted GitHub workflows, and future provider live checks.',
+				'GitHub-hosted workflow proof is authoritative for CI/CD. Local `act` proof is advisory and cannot satisfy promotion proof.',
+			],
+			whenToUse: [
+				'Use `proof plan` before a promotion save to see which exact-SHA proof records are missing.',
+				'Use `proof run` to observe or create authoritative hosted proof records.',
+				'Use `proof failures` and `proof explain` after a slow or failed promotion run.',
+			],
+			outcomes: [
+				'Reads or writes `.treeseed/workflow/proofs` records keyed by subject, driver, and input hash.',
+				'Reports reusable proof records separately from missing or failed proof records.',
+			],
+		},
+		executionMode: 'handler',
+		handlerName: 'proof',
+	})],
 	['resume', command({
 		arguments: [{ name: 'run-id', description: 'Interrupted workflow run id to resume.', required: true }],
 		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
