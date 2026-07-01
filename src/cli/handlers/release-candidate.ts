@@ -27,38 +27,37 @@ export const handleReleaseCandidate: TreeseedCommandHandler = async (invocation,
 		});
 		const payload = result.payload as {
 			mode?: string;
+			driver?: string;
 			verifyDriver?: string;
 			selectedPackageNames?: string[];
+			plan?: { subjects?: unknown[]; summary?: { reusable?: number; pending?: number } };
 			proof?: {
-				status?: string;
-				proofId?: string;
-				graph?: { order?: string[] };
-				artifacts?: Array<{ packageId?: string; status?: string }>;
-				actionChecks?: Array<{ packageId?: string; status?: string }>;
-				failures?: Array<{ scope?: string; message?: string }>;
+				ok?: boolean;
+				records?: unknown[];
+				reused?: unknown[];
+				failures?: Array<{ subject?: { id?: string }; invalidationReasons?: string[]; status?: string }>;
 			};
-			graph?: { order?: string[] };
-			failures?: Array<{ scope?: string; message?: string }>;
+			failures?: Array<{ subject?: { id?: string }; invalidationReasons?: string[]; status?: string }>;
 		};
 		const proof = payload.proof;
 		const failures = proof?.failures ?? payload.failures ?? [];
 		return guidedResult({
 			command: invocation.commandName || 'release-candidate',
 			summary: result.executionMode === 'plan'
-				? 'Treeseed release-candidate rehearsal plan ready.'
-				: 'Treeseed local release graph rehearsal passed.',
+				? 'Treeseed release-candidate proof plan ready.'
+				: 'Treeseed release-candidate proof passed.',
 			facts: [
 				{ label: 'Mode', value: payload.mode ?? 'strict' },
+				{ label: 'Driver', value: payload.driver ?? 'github-hosted' },
 				{ label: 'Verify driver', value: payload.verifyDriver ?? 'auto' },
-				{ label: 'Proof', value: proof?.proofId?.slice(0, 12) ?? (result.executionMode === 'plan' ? 'planned' : 'unknown') },
-				{ label: 'Graph order', value: (proof?.graph?.order ?? payload.graph?.order ?? []).join(', ') || 'none' },
-				{ label: 'Artifacts', value: String(proof?.artifacts?.length ?? 0) },
-				{ label: 'Action checks', value: String(proof?.actionChecks?.length ?? 0) },
+				{ label: 'Proof subjects', value: String(payload.plan?.subjects?.length ?? 0) },
+				{ label: 'Reusable', value: String(proof?.reused?.length ?? payload.plan?.summary?.reusable ?? 0) },
+				{ label: 'Executed', value: String(proof?.records?.length ?? 0) },
 				{ label: 'Failures', value: String(failures.length) },
 			],
 			sections: failures.length > 0 ? [{
 				title: 'Failures',
-				lines: failures.map((failure) => `- ${failure.scope ?? 'unknown'}: ${failure.message ?? 'failed'}`),
+				lines: failures.map((failure) => `- ${failure.subject?.id ?? 'unknown'}: ${failure.invalidationReasons?.[0] ?? failure.status ?? 'failed'}`),
 			}] : [],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: result,
@@ -67,4 +66,3 @@ export const handleReleaseCandidate: TreeseedCommandHandler = async (invocation,
 		return workflowErrorResult(error);
 	}
 };
-
