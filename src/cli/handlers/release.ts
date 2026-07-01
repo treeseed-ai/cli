@@ -1,6 +1,7 @@
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
 import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
+import { discoverTreeseedGuarantees, planTreeseedGuarantees, runTreeseedGuarantees } from '@treeseed/sdk/guarantees';
 
 function formatReleasePlanSections(payload: {
 	packageSelection?: { changed?: string[]; dependents?: string[]; selected?: string[] };
@@ -77,6 +78,60 @@ function formatReleasePlanSections(payload: {
 
 export const handleRelease: TreeseedCommandHandler = async (invocation, context) => {
 	try {
+		const guaranteeRegistry = discoverTreeseedGuarantees({ workspaceRoot: context.cwd });
+		if (!guaranteeRegistry.ok) {
+			return {
+				exitCode: 1,
+				stdout: [
+					'Treeseed release blocked by invalid guarantee registry.',
+					...guaranteeRegistry.diagnostics
+						.filter((entry) => entry.severity === 'error')
+						.map((entry) => `${entry.code}: ${entry.message}${entry.sourcePath ? ` (${entry.sourcePath})` : ''}`),
+				],
+				stderr: [],
+				report: {
+					command: invocation.commandName || 'release',
+					ok: false,
+					error: 'guarantee_registry_invalid',
+					guarantees: guaranteeRegistry,
+				},
+			};
+		}
+		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: 'prod' });
+		const releasePlanOnly = invocation.args.plan === true || invocation.args.dryRun === true;
+		const guaranteeReleaseRun = releasePlanOnly ? null : await runTreeseedGuarantees({
+			workspaceRoot: context.cwd,
+			filter: { gate: 'release', status: 'active' },
+			environment: 'prod',
+			evidenceTarget: 'release',
+			record: true,
+			failOnSkippedReleaseGuarantees: true,
+		});
+		if (guaranteeReleaseRun && !guaranteeReleaseRun.ok) {
+			return {
+				exitCode: 1,
+				stdout: [
+					'Treeseed release blocked by failing product guarantees.',
+					`Run: ${guaranteeReleaseRun.runId}`,
+					`Failed: ${guaranteeReleaseRun.counts.failed}`,
+					`Blocked: ${guaranteeReleaseRun.counts.blocked}`,
+					`Skipped: ${guaranteeReleaseRun.counts.skipped}`,
+					`Release blocking failures: ${guaranteeReleaseRun.counts.releaseBlockingFailures}`,
+					`Evidence: ${guaranteeReleaseRun.outputRoot}`,
+				],
+				stderr: [],
+				report: {
+					command: invocation.commandName || 'release',
+					ok: false,
+					error: 'guarantee_release_run_failed',
+					guarantees: {
+						validation: guaranteeRegistry,
+						releasePlan: guaranteeReleasePlan,
+						releaseRun: guaranteeReleaseRun,
+					},
+				},
+			};
+		}
 		const repairVersionLine = invocation.args.repairVersionLine === true;
 		const bump = (['major', 'minor', 'patch'] as const).find((candidate) => invocation.args[candidate] === true) ?? 'patch';
 		const result = await createWorkflowSdk(context).release({
@@ -87,7 +142,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			verifyDeployedResources: invocation.args.verifyDeployedResources === true,
 			fresh: invocation.args.fresh === true,
-			plan: invocation.args.plan === true || invocation.args.dryRun === true,
+			plan: releasePlanOnly,
 			dryRun: invocation.args.dryRun === true,
 		});
 		const payload = result.payload as {
@@ -143,17 +198,32 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Fresh release', value: payload.fresh === true ? 'yes' : 'no' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
+				{ label: 'Release guarantees', value: String(guaranteeReleasePlan.counts.withDependencies) },
+				{ label: 'Guarantee evidence', value: guaranteeReleaseRun?.outputRoot ?? (result.executionMode === 'plan' ? '(planned)' : '(none)') },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? (result.executionMode === 'plan' ? payload.stagingBranch : '(unknown)') },
 			],
 			sections: result.executionMode === 'plan' ? [
 				...hostingGraphSections(hostingGraph),
+				{
+					title: 'Product guarantees',
+					lines: [
+						`Selected release guarantees: ${guaranteeReleasePlan.counts.selected}`,
+						`With dependencies: ${guaranteeReleasePlan.counts.withDependencies}`,
+						'Guarantee execution is enforced by the TreeSeed guarantee runner when release execution is enabled.',
+					],
+				},
 				...formatReleasePlanSections(payload),
 			] : [],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: {
 				...result,
 				hostingGraph,
+				guarantees: {
+					validation: guaranteeRegistry,
+					releasePlan: guaranteeReleasePlan,
+					...(guaranteeReleaseRun ? { releaseRun: guaranteeReleaseRun } : {}),
+				},
 			},
 		});
 	} catch (error) {

@@ -31,7 +31,7 @@
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
     "lint": "npm run build:dist",
-    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts",
+    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/guarantees-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts",
     "build:dist": "node --import tsx ./scripts/build-dist.ts",
     "prepare": "node --import tsx ./scripts/prepare.ts",
     "prepack": "npm run build:dist",
@@ -45,7 +45,7 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "github:treeseed-ai/sdk#5fe8dfbdd9d9d69a6f85b66d9afad47b55205dac",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#9eb9207eca553c1b14fc2703322af6e4f8d49539",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
