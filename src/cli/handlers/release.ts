@@ -1,7 +1,72 @@
 import type { TreeseedCommandHandler } from '../types.js';
+import { spawnSync } from 'node:child_process';
 import { guidedResult } from './utils.js';
 import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
 import { discoverTreeseedGuarantees, planTreeseedGuarantees, runTreeseedGuarantees } from '@treeseed/sdk/guarantees';
+
+function normalizeVariableList(payload: unknown): Record<string, string> {
+	if (Array.isArray(payload)) {
+		const out: Record<string, string> = {};
+		for (const entry of payload) {
+			if (!entry || typeof entry !== 'object') continue;
+			const record = entry as Record<string, unknown>;
+			const key = typeof record.name === 'string' ? record.name : typeof record.key === 'string' ? record.key : '';
+			const value = typeof record.value === 'string' ? record.value : '';
+			if (key && value) out[key] = value;
+		}
+		return out;
+	}
+	if (!payload || typeof payload !== 'object') return {};
+	return Object.fromEntries(Object.entries(payload as Record<string, unknown>)
+		.filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0));
+}
+
+function loadReleaseGuaranteeServiceEnv(environment: string) {
+	if (environment !== 'staging') return { loaded: false, diagnostics: [] as string[] };
+	if (process.env.TREESEED_RELEASE_GUARANTEE_ENV_DISCOVERY === '1') {
+		return { loaded: false, diagnostics: [] as string[] };
+	}
+	if (process.env.TREESEED_WEB_SERVICE_SECRET || process.env.TREESEED_API_WEB_SERVICE_SECRET) {
+		return { loaded: true, diagnostics: [] as string[] };
+	}
+	const cliPath = process.argv[1];
+	if (!cliPath) return { loaded: false, diagnostics: ['Treeseed CLI path is unavailable for staging service credential discovery.'] };
+	const result = spawnSync(process.execPath, [
+		cliPath,
+		'railway',
+		'--environment',
+		environment,
+		'--',
+		'variable',
+		'list',
+		'--service',
+		'treeseed-api',
+		'--json',
+	], {
+		cwd: process.cwd(),
+		encoding: 'utf8',
+		env: {
+			...process.env,
+			TREESEED_RELEASE_GUARANTEE_ENV_DISCOVERY: '1',
+		},
+		maxBuffer: 1024 * 1024 * 8,
+	});
+	if ((result.status ?? 1) !== 0 || !result.stdout.trim()) {
+		return { loaded: false, diagnostics: ['Could not load staging API service variables for release guarantees.'] };
+	}
+	try {
+		const variables = normalizeVariableList(JSON.parse(result.stdout));
+		for (const key of ['TREESEED_WEB_SERVICE_ID', 'TREESEED_API_WEB_SERVICE_ID', 'TREESEED_WEB_SERVICE_SECRET', 'TREESEED_API_WEB_SERVICE_SECRET']) {
+			if (!process.env[key] && variables[key]) process.env[key] = variables[key];
+		}
+		return {
+			loaded: Boolean(process.env.TREESEED_WEB_SERVICE_SECRET || process.env.TREESEED_API_WEB_SERVICE_SECRET),
+			diagnostics: [] as string[],
+		};
+	} catch {
+		return { loaded: false, diagnostics: ['Staging API service variables were not valid JSON.'] };
+	}
+}
 
 function formatReleasePlanSections(payload: {
 	packageSelection?: { changed?: string[]; dependents?: string[]; selected?: string[] };
@@ -100,6 +165,9 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const guaranteeEnvironment = 'staging';
 		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: guaranteeEnvironment });
 		const releasePlanOnly = invocation.args.plan === true || invocation.args.dryRun === true;
+		const guaranteeServiceEnv = releasePlanOnly
+			? { loaded: false, diagnostics: [] as string[] }
+			: loadReleaseGuaranteeServiceEnv(guaranteeEnvironment);
 		const guaranteeReleaseRun = releasePlanOnly ? null : await runTreeseedGuarantees({
 			workspaceRoot: context.cwd,
 			filter: { gate: 'release', status: 'active' },
@@ -119,6 +187,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 					`Skipped: ${guaranteeReleaseRun.counts.skipped}`,
 					`Release blocking failures: ${guaranteeReleaseRun.counts.releaseBlockingFailures}`,
 					`Evidence: ${guaranteeReleaseRun.outputRoot}`,
+					...guaranteeServiceEnv.diagnostics,
 				],
 				stderr: [],
 				report: {
