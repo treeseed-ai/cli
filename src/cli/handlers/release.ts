@@ -97,12 +97,13 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				},
 			};
 		}
-		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: 'prod' });
+		const guaranteeEnvironment = 'staging';
+		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: guaranteeEnvironment });
 		const releasePlanOnly = invocation.args.plan === true || invocation.args.dryRun === true;
 		const guaranteeReleaseRun = releasePlanOnly ? null : await runTreeseedGuarantees({
 			workspaceRoot: context.cwd,
 			filter: { gate: 'release', status: 'active' },
-			environment: 'prod',
+			environment: guaranteeEnvironment,
 			evidenceTarget: 'release',
 			record: true,
 			failOnSkippedReleaseGuarantees: true,
@@ -199,6 +200,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Fresh release', value: payload.fresh === true ? 'yes' : 'no' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
 				{ label: 'Release guarantees', value: String(guaranteeReleasePlan.counts.withDependencies) },
+				{ label: 'Guarantee environment', value: guaranteeEnvironment },
 				{ label: 'Guarantee evidence', value: guaranteeReleaseRun?.outputRoot ?? (result.executionMode === 'plan' ? '(planned)' : '(none)') },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? (result.executionMode === 'plan' ? payload.stagingBranch : '(unknown)') },
@@ -210,7 +212,8 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 					lines: [
 						`Selected release guarantees: ${guaranteeReleasePlan.counts.selected}`,
 						`With dependencies: ${guaranteeReleasePlan.counts.withDependencies}`,
-						'Guarantee execution is enforced by the TreeSeed guarantee runner when release execution is enabled.',
+						`Execution environment: ${guaranteeEnvironment}`,
+						'Guarantee execution is enforced by the TreeSeed guarantee runner before production promotion when release execution is enabled.',
 					],
 				},
 				...formatReleasePlanSections(payload),
