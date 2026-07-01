@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.12.0] - 2026-07-01
+
+### Added
+
+- feat(source): fix guarantees CLI help metadata (f61ab9c18bbb)
+
+### Fixed
+
+- build(build): fix image release root directory verification (7667cb1ced86)
+- build(build): fix Railway runtime config verification (4775cc39ed8f)
+- build(build): fix release guarantee API verifiers (fa6551340c73)
+- build(build): fix staging release guarantee auth (fbf86838c14e)
+- build(build): fix production release gates (447169a3b251)
+- build(build): promotion proof after CI and acceptance fixes (03347521d14e)
+- build(build): fix SDK proof regressions after guarantee framework (2bdaf80cc7ac)
+- build(build): fix proof tests for clean hosted runners (a68360e33629)
+- build(build): fix promotion release gate assertions (f31bf15fe077)
+- build(build): fix TreeDX release gate Beam setup (7cd189c9ca04)
+- build(build): fix scoped project domains for staging Pages (5b734d826dc1)
+- build(build): fix Railway deploy live verification settle window (ab946475f820)
+- build(build): fix Railway runtime secret sync for staging smoke (fa1bc202cb79)
+- fix(cli): update @treeseed/sdk dependency (704386e40876)
+- build(build): fix Railway IaC-only reconciliation and TreeDX env names (5064a0b79166)
+- ci(build): fix Railway staging Dockerfile builds and persistent volumes (876aa231736c)
+- build(build): fix staging Railway source builds and volumes (0e31d0c6c9bd)
+- build(build): fix API staging source builds and runner volumes (f7a3de6005c0)
+- build(build): fix api and agent staging source builds (82a287bf6dc2)
+- build(build): fix api and agent staging source builds (4095b3fc4221)
+- 18 additional changes omitted from this summary.
+
+### Tests
+
+- build(source): checkpoint user and team guarantees passing locally (823dc0464915)
+- build(tests): switch hosted domains to treeseed.dev (11caa1548555)
+- build(build): update stage command help text (1764e9a28e3f)
+- build(build): rework stage promotion workflow (fd3b6d056362)
+- build(docs): implement model-aware agent content tools (fdac5343417f)
+- build(source): checkpoint before verify action and local dev stack (54c6e4635326)
+- build(build): prepare linked runtime deps during cli release verify (40934290d27c)
+
+### Dependencies
+
+- build(build): allow first production API domain validation (a79d7e0d6919)
+- build(build): merge package main history back to staging (d845f53f024f)
+- build(build): replace legacy strict tail with proof ledger (f51f4540278e)
+- build(source): implement incremental release proof (09e991f2c0d1)
+- build(build): pin hosted workflow API domains to treeseed.dev (cfdac5ef9b1b)
+- build(build): use configured API domains for hosted reconciliation (e24f2159b9b8)
+- build(build): include domain units in promotion hosted reconciliation (2dd3a75b0974)
+- build(build): harden Railway IaC reconciliation and domain verification (09596c6fa8c6)
+- build(deps): repair managed worktree cleanup after docker verification (c27373b40955)
+- build(build): harden action verification and document independent (9a725cb296b3)
+- build(build): exclude build artifacts from stage proof workspace (e140f96321c7)
+- build(build): use image-backed Railway API staging services (b2d9e343faf4)
+- build(build): skip opaque railway sync provider errors after retries (5f36050d2029)
+- build(build): tolerate railway deploy trigger processing errors (dca2cac1c921)
+- build(build): retry transient railway hosted sync failures (a6113378f904)
+- build(build): tolerate railway existing service source update limits (3de2744f6d85)
+- build(build): repair railway existing service deployment recovery (6486dea5c177)
+- build(build): implement proposal governance decision pipeline (2a6941fb14b5)
+- build(build): remove legacy Mailpit dev hooks (23408401b694)
+- build(build): restore Mailpit as reconciled local dev service (e74fc9dadbd8)
+- 14 additional changes omitted from this summary.
+
 ## [0.11.0] - 2026-06-12
 
 ### Added
