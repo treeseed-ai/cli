@@ -1759,10 +1759,24 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 			example('treeseed guarantees export --format csv --output .treeseed/generated/guarantees/guarantees.csv --json', 'Generate CSV', 'Creates a CSV report from canonical YAML manifests.'),
 		],
 		help: {
+			longSummary: [
+				'Guarantees are TreeSeed product contracts backed by package-local YAML manifests, scene workflows, API acceptance verifier references, and evidence reports.',
+				'The command validates the guarantee registry, plans focused or release-wide execution, runs active guarantees, and exports generated reports from the canonical YAML source.',
+			],
 			whenToUse: [
 				'Use this before completing work that changes a product promise.',
 				'Use type/subtype filters for fast spot checks while developing one system area.',
 				'Use full validation and release planning before release work.',
+			],
+			beforeYouRun: [
+				'Make sure package-local guarantee YAML files use lowercase type and subtype values.',
+				'Start the local platform before running local scene-backed guarantees.',
+				'Use --json for automation and for preserving diagnostics in CI logs.',
+			],
+			automationNotes: [
+				'Filtered validate, plan, export, and run commands accept canonical lowercase --type and --subtype values.',
+				'Run reports are written under .treeseed/guarantees/runs unless an explicit output target is provided.',
+				'Release guarantees are enforced by the release command; do not bypass them from CI workflows.',
 			],
 			warnings: [
 				'Guarantee YAML is the source of truth. Generated CSV files must not be hand-edited.',
