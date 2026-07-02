@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.9",
+  "version": "0.12.10",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,7 +45,7 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "github:treeseed-ai/sdk#7e0115daadb6df39b3e8b069ab6d971bd8332659",
+    "@treeseed/sdk": "0.12.13",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },

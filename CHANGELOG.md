@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.12.10] - 2026-07-02
+
+### Fixed
+
+- fix(release): advance staging sdk lock recovery ref (3955923974ce)
+- fix(release): advance staging sdk ref (0c299aaed2e7)
+- fix(hosting): fail plans with blocked verification (092772500ad1)
+- fix(release): advance staging sdk verification ref (7c7695860518)
+- fix(release): advance staging sdk reference (1784a414a1f9)
+- fix(release): restore staging dependency refs (d6bb265cd366)
+
+### Infrastructure
+
+- Wire cleanup and screenshot release options (03b16a756153)
+
 ## [0.12.9] - 2026-07-02
 
 ### Fixed
