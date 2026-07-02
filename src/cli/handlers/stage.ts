@@ -12,6 +12,8 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			updateFrom: typeof invocation.args.updateFrom === 'string' ? invocation.args.updateFrom : undefined,
 			releaseCandidate: typeof invocation.args.releaseCandidate === 'string' ? invocation.args.releaseCandidate as 'hybrid' | 'strict' | 'skip' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
+			skipCleanup: invocation.args.skipCleanup === true,
+			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 		});

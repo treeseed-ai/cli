@@ -56,6 +56,7 @@ import { handleSeed } from './handlers/seed.js';
 import { handleDemo } from './handlers/demo.js';
 import { handleScene } from './handlers/scene.js';
 import { handleGuarantees } from './handlers/guarantees.js';
+import { handleCleanup } from './handlers/cleanup.js';
 
 const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
 
@@ -115,6 +116,7 @@ export const COMMAND_HANDLERS = {
 	demo: handleDemo,
 	scene: handleScene,
 	guarantees: handleGuarantees,
+	cleanup: handleCleanup,
 } as const;
 
 export const TRESEED_COMMAND_SPECS: TreeseedCommandSpec[] = TRESEED_OPERATION_SPECS;

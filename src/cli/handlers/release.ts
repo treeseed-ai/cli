@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { guidedResult } from './utils.js';
 import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
 import { discoverTreeseedGuarantees, planTreeseedGuarantees, runTreeseedGuarantees } from '@treeseed/sdk/guarantees';
+import { runTreeseedLocalCleanup } from '@treeseed/sdk/workflow-support';
 
 function normalizeVariableList(payload: unknown): Record<string, string> {
 	if (Array.isArray(payload)) {
@@ -26,7 +27,11 @@ function loadReleaseGuaranteeServiceEnv(environment: string) {
 	if (process.env.TREESEED_RELEASE_GUARANTEE_ENV_DISCOVERY === '1') {
 		return { loaded: false, diagnostics: [] as string[] };
 	}
-	if (process.env.TREESEED_WEB_SERVICE_SECRET || process.env.TREESEED_API_WEB_SERVICE_SECRET) {
+	if (
+		(process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET)
+		|| process.env.TREESEED_WEB_SERVICE_SECRET
+		|| process.env.TREESEED_API_WEB_SERVICE_SECRET
+	) {
 		return { loaded: true, diagnostics: [] as string[] };
 	}
 	const cliPath = process.argv[1];
@@ -56,11 +61,17 @@ function loadReleaseGuaranteeServiceEnv(environment: string) {
 	}
 	try {
 		const variables = normalizeVariableList(JSON.parse(result.stdout));
-		for (const key of ['TREESEED_WEB_SERVICE_ID', 'TREESEED_API_WEB_SERVICE_ID', 'TREESEED_WEB_SERVICE_SECRET', 'TREESEED_API_WEB_SERVICE_SECRET']) {
+		for (const key of ['TREESEED_ACCEPTANCE_SERVICE_ID', 'TREESEED_ACCEPTANCE_SERVICE_SECRET', 'TREESEED_WEB_SERVICE_ID', 'TREESEED_API_WEB_SERVICE_ID', 'TREESEED_WEB_SERVICE_SECRET', 'TREESEED_API_WEB_SERVICE_SECRET']) {
 			if (!process.env[key] && variables[key]) process.env[key] = variables[key];
 		}
+		if (!process.env.TREESEED_ACCEPTANCE_SERVICE_ID) {
+			process.env.TREESEED_ACCEPTANCE_SERVICE_ID = variables.TREESEED_API_WEB_SERVICE_ID || variables.TREESEED_WEB_SERVICE_ID;
+		}
+		if (!process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) {
+			process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET = variables.TREESEED_API_WEB_SERVICE_SECRET || variables.TREESEED_WEB_SERVICE_SECRET;
+		}
 		return {
-			loaded: Boolean(process.env.TREESEED_WEB_SERVICE_SECRET || process.env.TREESEED_API_WEB_SERVICE_SECRET),
+			loaded: Boolean((process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) || process.env.TREESEED_WEB_SERVICE_SECRET || process.env.TREESEED_API_WEB_SERVICE_SECRET),
 			diagnostics: [] as string[],
 		};
 	} catch {
@@ -165,6 +176,22 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const guaranteeEnvironment = 'staging';
 		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: guaranteeEnvironment });
 		const releasePlanOnly = invocation.args.plan === true || invocation.args.dryRun === true;
+		const releaseCleanup = !releasePlanOnly && invocation.args.skipCleanup !== true
+			? runTreeseedLocalCleanup({ root: context.cwd, mode: 'aggressive' })
+			: null;
+		if (releaseCleanup && !releaseCleanup.ok) {
+			return {
+				exitCode: 1,
+				stdout: ['Treeseed release blocked by local cleanup failure.'],
+				stderr: releaseCleanup.actions.filter((entry) => entry.status === 'failed').map((entry) => `${entry.id}: ${entry.error ?? 'failed'}`),
+				report: {
+					command: invocation.commandName || 'release',
+					ok: false,
+					error: 'local_cleanup_failed',
+					localCleanup: releaseCleanup,
+				},
+			};
+		}
 		const guaranteeServiceEnv = releasePlanOnly
 			? { loaded: false, diagnostics: [] as string[] }
 			: loadReleaseGuaranteeServiceEnv(guaranteeEnvironment);
@@ -174,6 +201,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			environment: guaranteeEnvironment,
 			evidenceTarget: 'release',
 			record: true,
+			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			failOnSkippedReleaseGuarantees: true,
 		});
 		if (guaranteeReleaseRun && !guaranteeReleaseRun.ok) {
@@ -212,6 +240,8 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			verifyDeployedResources: invocation.args.verifyDeployedResources === true,
 			fresh: invocation.args.fresh === true,
+			skipCleanup: invocation.args.skipCleanup === true || releaseCleanup !== null,
+			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			plan: releasePlanOnly,
 			dryRun: invocation.args.dryRun === true,
 		});

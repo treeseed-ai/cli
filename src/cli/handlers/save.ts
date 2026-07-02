@@ -133,6 +133,8 @@ export const handleSave: TreeseedCommandHandler = async (invocation, context) =>
 			verifyMode: typeof invocation.args.verifyMode === 'string' ? invocation.args.verifyMode as 'fast' | 'local' | 'hosted' | 'both' | 'skip' : undefined,
 			releaseCandidate: typeof invocation.args.releaseCandidate === 'string' ? invocation.args.releaseCandidate as 'hybrid' | 'strict' | 'skip' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
+			skipCleanup: invocation.args.skipCleanup === true,
+			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			plan: invocation.args.plan === true || invocation.args.dryRun === true,
 			dryRun: invocation.args.dryRun === true,
 		});

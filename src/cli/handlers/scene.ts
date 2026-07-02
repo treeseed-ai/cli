@@ -234,6 +234,7 @@ export const handleScene: TreeseedCommandHandler = async (invocation, context) =
 				scene,
 				environment,
 				record: invocation.args.record === true,
+				artifactMode: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 				mode,
 				devices: requestedDevices,
 			});
@@ -262,6 +263,7 @@ export const handleScene: TreeseedCommandHandler = async (invocation, context) =
 			environment,
 			device: deviceArg,
 			record: invocation.args.record === true,
+			artifactMode: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			mode,
 			interactive: context.interactiveUi,
 			pauseController: context.confirm
