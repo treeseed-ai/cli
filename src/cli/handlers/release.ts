@@ -154,6 +154,10 @@ function formatReleasePlanSections(payload: {
 
 export const handleRelease: TreeseedCommandHandler = async (invocation, context) => {
 	try {
+		const traceRelease = (phase: string) => {
+			console.error(`[release][cli] ${phase}`);
+		};
+		traceRelease('discover guarantees');
 		const guaranteeRegistry = discoverTreeseedGuarantees({ workspaceRoot: context.cwd });
 		if (!guaranteeRegistry.ok) {
 			return {
@@ -174,8 +178,10 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			};
 		}
 		const guaranteeEnvironment = 'staging';
+		traceRelease('plan release guarantees');
 		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: guaranteeEnvironment });
 		const releasePlanOnly = invocation.args.plan === true || invocation.args.dryRun === true;
+		traceRelease('cleanup');
 		const releaseCleanup = !releasePlanOnly && invocation.args.skipCleanup !== true
 			? runTreeseedLocalCleanup({ root: context.cwd, mode: 'aggressive' })
 			: null;
@@ -192,9 +198,11 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				},
 			};
 		}
+		traceRelease('load staging guarantee service env');
 		const guaranteeServiceEnv = releasePlanOnly
 			? { loaded: false, diagnostics: [] as string[] }
 			: loadReleaseGuaranteeServiceEnv(guaranteeEnvironment);
+		traceRelease('run staging release guarantees');
 		const guaranteeReleaseRun = releasePlanOnly ? null : await runTreeseedGuarantees({
 			workspaceRoot: context.cwd,
 			filter: { gate: 'release', status: 'active' },
@@ -230,6 +238,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				},
 			};
 		}
+		traceRelease('start workflow release');
 		const repairVersionLine = invocation.args.repairVersionLine === true;
 		const bump = (['major', 'minor', 'patch'] as const).find((candidate) => invocation.args[candidate] === true) ?? 'patch';
 		const result = await createWorkflowSdk(context).release({
