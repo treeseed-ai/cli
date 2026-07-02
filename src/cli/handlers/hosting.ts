@@ -186,7 +186,16 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 		if (subcommand === 'plan' || subcommand === 'verify') {
 			const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, ...filterInput });
 			const report = serializeHostingPlan(plan);
-			const liveHostedServices = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
+			const planFailures = report.ok === false || report.liveVerification?.ok === false
+				? report.units
+					.filter((entry) => entry.verification?.verified !== true)
+					.flatMap((entry) => entry.verification?.checks
+						?.filter((check) => check.ok === false)
+						.flatMap((check) => check.issues.length > 0
+							? check.issues.map((issue) => `${entry.unit.id}:${check.key}: ${issue}`)
+							: [`${entry.unit.id}:${check.key}: failed`]) ?? [`${entry.unit.id}: verification failed`])
+				: [];
+			const liveHostedServices = planFailures.length === 0 && subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
 				? await collectLiveChecks({
 					tenantRoot: context.cwd,
 					target: environment,
@@ -229,8 +238,8 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					},
 				],
 				report: liveHostedServices ? { ...report, hostedServices: liveHostedServices } : report,
-				exitCode: liveFailures.length > 0 ? 1 : 0,
-				stderr: liveFailures,
+				exitCode: planFailures.length > 0 || liveFailures.length > 0 ? 1 : 0,
+				stderr: [...planFailures, ...liveFailures],
 			});
 		}
 
