@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.14] - 2026-07-03
+
+### Changed
+
+- Load hosted API acceptance credentials from config (ce22a4c921d5)
+- Honor hosting verification environment refs (1d7248faf6b6)
+
 ## [0.12.13] - 2026-07-03
 
 ### Infrastructure
