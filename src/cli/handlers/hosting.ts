@@ -82,26 +82,27 @@ function selectedSeedEnv(context: Parameters<TreeseedCommandHandler>[1], environ
 }
 
 export const handleHosting: TreeseedCommandHandler = async (invocation, context) => {
-	try {
-		const subcommand = subcommandFor(invocation.positionals[0]);
-		const environment = environmentFor(invocation.args.environment);
-		const dryRun = invocation.args.dryRun !== false && invocation.args.execute !== true;
-		const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim()
-			? invocation.args.app.trim()
-			: undefined;
-		const filter = {
-			serviceIds: listArg(invocation.args.service),
-			placements: listArg(invocation.args.placement) as any,
-			hosts: listArg(invocation.args.host),
+		try {
+			const subcommand = subcommandFor(invocation.positionals[0]);
+			const environment = environmentFor(invocation.args.environment);
+			const dryRun = invocation.args.dryRun !== false && invocation.args.execute !== true;
+			const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim()
+				? invocation.args.app.trim()
+				: undefined;
+			const env = selectedSeedEnv(context, environment);
+			const filter = {
+				serviceIds: listArg(invocation.args.service),
+				placements: listArg(invocation.args.placement) as any,
+				hosts: listArg(invocation.args.host),
 		};
 		const filterInput = filter.serviceIds.length || filter.placements.length || filter.hosts.length
 			? { filter }
 			: {};
 
-		if (subcommand === 'status') {
-			const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, ...filterInput });
-			const units = graph.units.map((unit) => serializeHostingUnit(unit));
-			return guidedResult({
+			if (subcommand === 'status') {
+				const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
+				const units = graph.units.map((unit) => serializeHostingUnit(unit));
+				return guidedResult({
 				command: 'hosting status',
 				summary: `Hosting graph status for ${environment}`,
 				facts: [
@@ -145,14 +146,14 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			if (!appId) {
 				throw new Error('hosting destroy requires --app so the teardown boundary is explicit.');
 			}
-			const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, ...filterInput });
+				const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 			const selector = selectorFromHostingGraph(graph);
 			const result = dryRun
 				? { target: targetFor(environment), results: graph.units.map((unit) => ({ unit: serializeHostingUnit(unit), action: 'destroy', dryRun: true })) }
 				: await destroyTreeseedTargetUnits({
 					tenantRoot: context.cwd,
 					target: targetFor(environment),
-					env: selectedSeedEnv(context, environment),
+						env,
 					selector,
 					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 				});
@@ -183,9 +184,9 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			});
 		}
 
-		if (subcommand === 'plan' || subcommand === 'verify') {
-			const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, ...filterInput });
-			const report = serializeHostingPlan(plan);
+			if (subcommand === 'plan' || subcommand === 'verify') {
+				const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, env, ...filterInput });
+				const report = serializeHostingPlan(plan);
 			const planFailures = report.ok === false || report.liveVerification?.ok === false
 				? report.units
 					.filter((entry) => entry.verification?.verified !== true)
@@ -196,20 +197,17 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 							: [`${entry.unit.id}:${check.key}: failed`]) ?? [`${entry.unit.id}: verification failed`])
 				: [];
 			const liveHostedServices = planFailures.length === 0 && subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
-				? await collectLiveChecks({
-					tenantRoot: context.cwd,
-					target: environment,
-					appId,
-					serviceKeys: filter.serviceIds,
-					strict: true,
-					requireLiveRailway: !appId || appId === 'api',
-					requireLiveHttp: true,
-					env: {
-						...context.env,
-						...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
-					},
-				})
-				: null;
+					? await collectLiveChecks({
+						tenantRoot: context.cwd,
+						target: environment,
+						appId,
+						serviceKeys: filter.serviceIds,
+						strict: true,
+						requireLiveRailway: !appId || appId === 'api',
+						requireLiveHttp: true,
+						env,
+					})
+					: null;
 			const liveFailures = liveHostedServices
 				? [
 					...liveHostedServices.checks.filter((check) => check.status === 'failed').map((check) => `${check.id}: ${check.issues.join('; ') || 'failed'}`),
@@ -243,28 +241,28 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			});
 		}
 
-		const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, ...filterInput });
-		const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, ...filterInput });
-		const planReport = serializeHostingPlan(plan);
+			const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
+			const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, env, ...filterInput });
+			const planReport = serializeHostingPlan(plan);
 		const selector = selectorFromHostingGraph(graph);
 		const reconcileResult = dryRun
-			? null
-			: await reconcileTreeseedTarget({
-				tenantRoot: context.cwd,
-				target: targetFor(environment),
-				env: selectedSeedEnv(context, environment),
-				selector,
-				dryRun: false,
-				write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
-			});
+				? null
+				: await reconcileTreeseedTarget({
+					tenantRoot: context.cwd,
+					target: targetFor(environment),
+					env,
+					selector,
+					dryRun: false,
+					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
+				});
 		let status = dryRun
-			? null
-			: await collectTreeseedReconcileStatus({
-				tenantRoot: context.cwd,
-				target: targetFor(environment),
-				env: selectedSeedEnv(context, environment),
-				selector,
-			});
+				? null
+				: await collectTreeseedReconcileStatus({
+					tenantRoot: context.cwd,
+					target: targetFor(environment),
+					env,
+					selector,
+				});
 		const report = {
 			...planReport,
 			dryRun,
@@ -280,33 +278,30 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			ok: status ? status.ready : true,
 		};
 		const liveHostedServices = !dryRun && environment !== 'local'
-			? await collectLiveChecks({
-				tenantRoot: context.cwd,
-				target: environment,
-				appId,
-				serviceKeys: filter.serviceIds,
-				strict: true,
-				requireLiveRailway: !appId || appId === 'api',
-				requireLiveHttp: true,
-				env: {
-					...context.env,
-					...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
-				},
-			})
-			: null;
+				? await collectLiveChecks({
+					tenantRoot: context.cwd,
+					target: environment,
+					appId,
+					serviceKeys: filter.serviceIds,
+					strict: true,
+					requireLiveRailway: !appId || appId === 'api',
+					requireLiveHttp: true,
+					env,
+				})
+				: null;
 		const liveFailures = liveHostedServices
 			? [
 				...liveHostedServices.checks.filter((check) => check.status === 'failed').map((check) => `${check.id}: ${check.issues.join('; ') || 'failed'}`),
 				...liveHostedServices.liveObservation.issues,
 			]
 			: [];
-		if (!dryRun && status?.ready === false && liveHostedServices && liveFailures.length === 0) {
-			status = await collectTreeseedReconcileStatus({
-				tenantRoot: context.cwd,
-				target: targetFor(environment),
-				env: selectedSeedEnv(context, environment),
-				selector,
-			});
+			if (!dryRun && status?.ready === false && liveHostedServices && liveFailures.length === 0) {
+				status = await collectTreeseedReconcileStatus({
+					tenantRoot: context.cwd,
+					target: targetFor(environment),
+					env,
+					selector,
+				});
 			report.status = status;
 			report.ok = status.ready;
 		}
