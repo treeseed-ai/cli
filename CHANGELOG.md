@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.18] - 2026-07-03
+
+### Fixed
+
+- fix: use https sdk git ref in lockfile (bd4699e3a2ff)
+- chore: use latest sdk live verifier fix (a40f0818cb54)
+- chore: use latest sdk staging reconciler fix (1829a0979ba2)
+- chore: use sdk staging reconciler fix (e61778a99d6b)
+
+### Dependencies
+
+- chore: update sdk staging dependency (180609b6af2c)
+
 ## [0.12.17] - 2026-07-03
 
 ### Fixed
