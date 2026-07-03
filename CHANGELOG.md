@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.17] - 2026-07-03
+
+### Fixed
+
+- fix: infer production hosting image refs (798724f7d03a)
+
 ## [0.12.16] - 2026-07-03
 
 ### Changed
