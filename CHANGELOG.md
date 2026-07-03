@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.13] - 2026-07-03
+
+### Infrastructure
+
+- Trace release CLI phases (6a3fbf7fd0af)
+
 ## [0.12.12] - 2026-07-02
 
 ### Changed
