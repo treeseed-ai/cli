@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { guidedResult } from './utils.js';
 import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
 import { discoverTreeseedGuarantees, planTreeseedGuarantees, runTreeseedGuarantees } from '@treeseed/sdk/guarantees';
-import { runTreeseedLocalCleanup } from '@treeseed/sdk/workflow-support';
+import { collectTreeseedConfigSeedValues, runTreeseedLocalCleanup } from '@treeseed/sdk/workflow-support';
 
 function normalizeVariableList(payload: unknown): Record<string, string> {
 	if (Array.isArray(payload)) {
@@ -32,6 +32,19 @@ function loadReleaseGuaranteeServiceEnv(environment: string) {
 		|| process.env.TREESEED_WEB_SERVICE_SECRET
 		|| process.env.TREESEED_API_WEB_SERVICE_SECRET
 	) {
+		return { loaded: true, diagnostics: [] as string[] };
+	}
+	const configured = collectTreeseedConfigSeedValues(process.cwd(), environment, process.env);
+	for (const key of ['TREESEED_ACCEPTANCE_SERVICE_ID', 'TREESEED_ACCEPTANCE_SERVICE_SECRET', 'TREESEED_WEB_SERVICE_ID', 'TREESEED_API_WEB_SERVICE_ID', 'TREESEED_WEB_SERVICE_SECRET', 'TREESEED_API_WEB_SERVICE_SECRET']) {
+		if (!process.env[key] && configured[key]) process.env[key] = configured[key];
+	}
+	if (!process.env.TREESEED_ACCEPTANCE_SERVICE_ID) {
+		process.env.TREESEED_ACCEPTANCE_SERVICE_ID = configured.TREESEED_API_WEB_SERVICE_ID || configured.TREESEED_WEB_SERVICE_ID;
+	}
+	if (!process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) {
+		process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET = configured.TREESEED_API_WEB_SERVICE_SECRET || configured.TREESEED_WEB_SERVICE_SECRET;
+	}
+	if (process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) {
 		return { loaded: true, diagnostics: [] as string[] };
 	}
 	const cliPath = process.argv[1];
@@ -202,6 +215,23 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const guaranteeServiceEnv = releasePlanOnly
 			? { loaded: false, diagnostics: [] as string[] }
 			: loadReleaseGuaranteeServiceEnv(guaranteeEnvironment);
+		if (!releasePlanOnly && !guaranteeServiceEnv.loaded) {
+			return {
+				exitCode: 1,
+				stdout: [
+					'Treeseed release blocked before guarantee execution.',
+					'Staging API acceptance credentials are unavailable.',
+					...guaranteeServiceEnv.diagnostics,
+				],
+				stderr: [],
+				report: {
+					command: invocation.commandName || 'release',
+					ok: false,
+					error: 'guarantee_acceptance_credentials_missing',
+					diagnostics: guaranteeServiceEnv.diagnostics,
+				},
+			};
+		}
 		traceRelease('run staging release guarantees');
 		const guaranteeReleaseRun = releasePlanOnly ? null : await runTreeseedGuarantees({
 			workspaceRoot: context.cwd,

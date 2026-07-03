@@ -12,6 +12,7 @@ import {
 	type TreeseedGuaranteeGate,
 	type TreeseedGuaranteeStatus,
 } from '@treeseed/sdk/guarantees';
+import { collectTreeseedConfigSeedValues } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../operations-types.ts';
 import { spawnSync } from 'node:child_process';
 
@@ -86,6 +87,17 @@ function normalizeVariableList(payload: unknown): Record<string, string> {
 function loadApiAcceptanceServiceEnv(environment: string) {
 	if (environment !== 'staging' && environment !== 'prod') return { loaded: false, diagnostics: [] as string[] };
 	if (process.env.TREESEED_GUARANTEE_ENV_DISCOVERY === '1') return { loaded: false, diagnostics: [] as string[] };
+	if (process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) return { loaded: true, diagnostics: [] as string[] };
+	const configured = collectTreeseedConfigSeedValues(process.cwd(), environment, process.env);
+	for (const key of ['TREESEED_ACCEPTANCE_SERVICE_ID', 'TREESEED_ACCEPTANCE_SERVICE_SECRET', 'TREESEED_WEB_SERVICE_ID', 'TREESEED_API_WEB_SERVICE_ID', 'TREESEED_WEB_SERVICE_SECRET', 'TREESEED_API_WEB_SERVICE_SECRET']) {
+		if (!process.env[key] && configured[key]) process.env[key] = configured[key];
+	}
+	if (!process.env.TREESEED_ACCEPTANCE_SERVICE_ID) {
+		process.env.TREESEED_ACCEPTANCE_SERVICE_ID = configured.TREESEED_API_WEB_SERVICE_ID || configured.TREESEED_WEB_SERVICE_ID;
+	}
+	if (!process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) {
+		process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET = configured.TREESEED_API_WEB_SERVICE_SECRET || configured.TREESEED_WEB_SERVICE_SECRET;
+	}
 	if (process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) return { loaded: true, diagnostics: [] as string[] };
 	const cliPath = process.argv[1];
 	if (!cliPath) return { loaded: false, diagnostics: ['Treeseed CLI path is unavailable for API acceptance credential discovery.'] };
@@ -231,6 +243,24 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 			: undefined;
 		const device = typeof invocation.args.device === 'string' ? invocation.args.device : undefined;
 		const acceptanceEnv = loadApiAcceptanceServiceEnv(environment);
+		if ((environment === 'staging' || environment === 'prod') && !acceptanceEnv.loaded) {
+			return {
+				exitCode: 1,
+				stdout: [
+					'Treeseed guarantee run blocked before execution.',
+					`${environment} API acceptance credentials are unavailable.`,
+					...acceptanceEnv.diagnostics,
+				],
+				stderr: [],
+				report: {
+					command: 'guarantees run',
+					ok: false,
+					environment,
+					error: 'api_acceptance_credentials_missing',
+					diagnostics: acceptanceEnv.diagnostics.map((message) => ({ severity: 'error', code: 'guarantees.acceptance_credentials_missing', message })),
+				},
+			};
+		}
 		const report = await runTreeseedGuarantees({
 			workspaceRoot: context.cwd,
 			filter,
