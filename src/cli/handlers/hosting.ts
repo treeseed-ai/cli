@@ -5,6 +5,8 @@ import {
 	serializeHostingUnit,
 	type TreeseedHostingEnvironment,
 } from '@treeseed/sdk/hosting';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
 	collectTreeseedReconcileStatus,
 	destroyTreeseedTargetUnits,
@@ -49,6 +51,45 @@ function targetFor(environment: TreeseedHostingEnvironment): TreeseedReconcileTa
 	return { kind: 'persistent', scope: environment };
 }
 
+function readPackageVersion(packageJsonPath: string) {
+	if (!existsSync(packageJsonPath)) return null;
+	try {
+		const manifest = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { version?: unknown };
+		return typeof manifest.version === 'string' && manifest.version.trim() ? manifest.version.trim() : null;
+	} catch {
+		return null;
+	}
+}
+
+function readTreeDxVersion(root: string) {
+	const tsSdkVersion = readPackageVersion(resolve(root, 'packages/treedx/packages/ts-sdk/package.json'));
+	if (tsSdkVersion) return tsSdkVersion;
+	const pyprojectPath = resolve(root, 'packages/treedx/packages/python-sdk/pyproject.toml');
+	if (!existsSync(pyprojectPath)) return null;
+	const match = readFileSync(pyprojectPath, 'utf8').match(/^version\s*=\s*"([^"]+)"/mu);
+	return match?.[1] ?? null;
+}
+
+function productionImageRefDefaults(root: string, environment: TreeseedHostingEnvironment) {
+	if (environment !== 'prod') return {};
+	const apiVersion = readPackageVersion(resolve(root, 'packages/api/package.json'));
+	const agentVersion = readPackageVersion(resolve(root, 'packages/agent/package.json'));
+	const treedxVersion = readTreeDxVersion(root);
+	return {
+		...(apiVersion ? {
+			TREESEED_API_IMAGE_REF: `treeseed/api:${apiVersion}`,
+			TREESEED_OPERATIONS_RUNNER_IMAGE_REF: `treeseed/op-runner:${apiVersion}`,
+		} : {}),
+		...(agentVersion ? {
+			TREESEED_AGENT_MANAGER_IMAGE_REF: `treeseed/agent-manager:${agentVersion}`,
+			TREESEED_AGENT_RUNNER_IMAGE_REF: `treeseed/agent-runner:${agentVersion}`,
+		} : {}),
+		...(treedxVersion ? {
+			TREESEED_PUBLIC_TREEDX_IMAGE_REF: `treeseed/treedx:${treedxVersion}`,
+		} : {}),
+	};
+}
+
 function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostingGraph>): TreeseedReconcileSelector {
 	const includesApi = graph.units.some((unit) => unit.id === 'api' || unit.config.serviceName === 'treeseed-api');
 	const exactServiceIds = [...new Set(graph.units.flatMap((unit) => [
@@ -76,6 +117,7 @@ function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostin
 
 function selectedSeedEnv(context: Parameters<TreeseedCommandHandler>[1], environment: TreeseedHostingEnvironment) {
 	return {
+		...productionImageRefDefaults(context.cwd, environment),
 		...context.env,
 		...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
 	};
