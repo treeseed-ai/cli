@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.21] - 2026-07-03
+
+### Fixed
+
+- Fix live hosting verify from reconcile state (f7a99de5b511)
+
 ## [0.12.20] - 2026-07-03
 
 ### Changed
