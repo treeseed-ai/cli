@@ -224,6 +224,9 @@ test('hosting apply selects API custom domain and DNS reconcile units', async ()
 
 	assert.equal(payload.dryRun, true);
 	assert.ok(payload.selector.serviceId.includes('api'));
+	assert.ok(payload.selector.serviceId.includes('public-treedx-node-01'));
+	assert.ok(payload.selector.serviceType.includes('api-runtime'));
+	assert.ok(payload.selector.serviceType.includes('railway-service:api'));
 	assert.ok(payload.selector.serviceType.includes('custom-domain:api'));
 	assert.ok(payload.selector.serviceType.includes('dns-record'));
 });

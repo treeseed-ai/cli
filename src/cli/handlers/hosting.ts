@@ -108,10 +108,89 @@ function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostin
 		serviceType: [...new Set(graph.units.flatMap((unit) => {
 			if (unit.id === 'api') return ['api-runtime', 'railway-service:api', 'custom-domain:api', 'dns-record'];
 			if (unit.id === 'operationsRunner') return ['operations-runner-runtime', 'railway-service:operations-runner'];
+			if (unit.id.startsWith('public-treedx-node-') || unit.serviceType.id === 'treedx-node') return ['api-runtime', 'railway-service:api'];
 			if (unit.placement === 'runner-capacity') return ['api-runtime', 'operations-runner-runtime', 'railway-service:api', 'railway-service:operations-runner'];
 			if (unit.host.id === 'cloudflare') return ['web-ui', 'edge-worker', 'content-store', 'queue', 'database', 'kv-form-guard', 'turnstile-widget', 'pages-project', 'custom-domain:web', 'dns-record'];
 			return [];
 		}))],
+	};
+}
+
+function reconcileResultMatchesHostingUnit(result: any, unit: any) {
+	const serviceKey = typeof result?.unit?.metadata?.serviceKey === 'string' ? result.unit.metadata.serviceKey : null;
+	const logicalName = typeof result?.unit?.logicalName === 'string' ? result.unit.logicalName : null;
+	const unitId = typeof result?.unit?.unitId === 'string' ? result.unit.unitId : null;
+	const serviceName = typeof unit?.config?.serviceName === 'string' ? unit.config.serviceName : null;
+	return Boolean(
+		serviceKey === unit.id
+		|| logicalName === unit.id
+		|| logicalName === serviceName
+		|| unitId === unit.id
+		|| (typeof unitId === 'string' && (unitId.endsWith(`:${unit.id}`) || (serviceName && unitId.endsWith(`:${serviceName}`))))
+	);
+}
+
+function preferConcreteReconcileResult(left: any, right: any) {
+	if (!left) return right;
+	const leftProvider = typeof left?.unit?.provider === 'string' ? left.unit.provider : '';
+	const rightProvider = typeof right?.unit?.provider === 'string' ? right.unit.provider : '';
+	if (leftProvider === 'treeseed' && rightProvider !== 'treeseed') return right;
+	return left;
+}
+
+function hostingReportWithLiveReconcile(report: any, reconcileResult: any) {
+	const results = Array.isArray(reconcileResult?.results) ? reconcileResult.results : [];
+	const units = Array.isArray(report?.units)
+		? report.units.map((entry: any) => {
+			const matched = results
+				.filter((result: any) => reconcileResultMatchesHostingUnit(result, entry.unit))
+				.reduce((selected: any, result: any) => preferConcreteReconcileResult(selected, result), null);
+			if (!matched?.verification) return entry;
+			return {
+				...entry,
+				observed: {
+					status: matched.verification.verified ? 'ready' : 'blocked',
+					locators: matched.resourceLocators ?? {},
+					state: matched.state ?? matched.observed?.live ?? {},
+					warnings: matched.warnings ?? [],
+				},
+				plan: {
+					...entry.plan,
+					action: matched.diff?.action === 'noop' ? 'noop' : entry.plan?.action ?? 'verify',
+					reasons: matched.diff?.reasons ?? entry.plan?.reasons ?? [],
+					before: matched.observed?.live ?? entry.plan?.before ?? {},
+				},
+				verification: {
+					unitId: entry.unit.id,
+					status: matched.verification.verified ? 'ready' : 'blocked',
+					verified: matched.verification.verified === true,
+					checks: matched.verification.checks.map((check: any) => ({
+						key: check.key,
+						label: check.description,
+						ok: check.verified === true,
+						expected: check.expected,
+						observed: check.observed,
+						issues: check.issues ?? [],
+					})),
+					warnings: matched.verification.warnings ?? [],
+				},
+				reconcile: matched,
+			};
+		})
+		: [];
+	const liveIssues = units
+		.filter((entry: any) => entry.verification?.verified !== true)
+		.map((entry: any) => `${entry.unit.id}: live reconcile verification did not pass`);
+	return {
+		...report,
+		units,
+		reconcile: reconcileResult,
+		liveVerification: {
+			ok: liveIssues.length === 0,
+			source: 'reconcile-dry-run',
+			issues: liveIssues,
+		},
+		ok: liveIssues.length === 0,
 	};
 }
 
@@ -228,7 +307,20 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 
 			if (subcommand === 'plan' || subcommand === 'verify') {
 				const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, env, ...filterInput });
-				const report = serializeHostingPlan(plan);
+				const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
+				const liveReconcile = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
+					? await reconcileTreeseedTarget({
+						tenantRoot: context.cwd,
+						target: targetFor(environment),
+						env,
+						selector: selectorFromHostingGraph(graph),
+						dryRun: true,
+						write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
+					})
+					: null;
+				const report = liveReconcile
+					? hostingReportWithLiveReconcile(serializeHostingPlan(plan), liveReconcile)
+					: serializeHostingPlan(plan);
 			const planFailures = report.ok === false || report.liveVerification?.ok === false
 				? report.units
 					.filter((entry) => entry.verification?.verified !== true)
