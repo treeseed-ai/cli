@@ -1859,12 +1859,12 @@ test('capacity project plan reads Market derived capacity projection', async () 
 	}
 });
 
-test('capacity migrate to derived requires native facts and supports dry-run', async () => {
-	const missing = await runCli(['capacity', 'migrate', '--to-derived', '--dry-run']);
+test('capacity migrate to derived requires native facts and supports plan mode', async () => {
+	const missing = await runCli(['capacity', 'migrate', '--to-derived', '--plan']);
 	assert.notEqual(missing.exitCode, 0);
 	assert.match(missing.stderr, /Missing native capacity facts: --team, --provider, --kind, --native-unit, --limit/u);
 
-	const dryRun = await runCli([
+	const plan = await runCli([
 		'capacity',
 		'migrate',
 		'--to-derived',
@@ -1884,12 +1884,12 @@ test('capacity migrate to derived requires native facts and supports dry-run', a
 		'100',
 		'--project',
 		'project_123',
-		'--dry-run',
+		'--plan',
 		'--json',
 	]);
-	assert.equal(dryRun.exitCode, 0, dryRun.stderr);
-	const payload = JSON.parse(dryRun.output);
-	assert.equal(payload.dryRun, true);
+	assert.equal(plan.exitCode, 0, plan.stderr);
+	const payload = JSON.parse(plan.output);
+	assert.equal(payload.planOnly, true);
 	assert.equal(payload.executionProvider.nativeLimits[0].limitAmount, 480);
 	assert.equal(payload.grant.portfolioAllocationPercent, 100);
 	assert.equal(payload.grant.projectId, 'project_123');

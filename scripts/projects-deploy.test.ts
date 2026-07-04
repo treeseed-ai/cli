@@ -248,7 +248,7 @@ test('projects deploy, publish, and monitor post canonical deployment bodies', a
 	await withFetch(() => json(queueResponse()), async (calls) => {
 		const deploy = await runCli(['projects', 'deploy', 'project-1', '--market', 'local', '--environment', 'staging'], { cwd: root, env: { HOME: root } });
 		const publish = await runCli(['projects', 'publish', 'project-1', '--market', 'local', '--environment', 'staging', '--reason', 'content refresh', '--idempotency-key', 'idem-publish'], { cwd: root, env: { HOME: root } });
-		const monitor = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging', '--dry-run'], { cwd: root, env: { HOME: root } });
+		const monitor = await runCli(['projects', 'monitor', 'project-1', '--market', 'local', '--environment', 'staging'], { cwd: root, env: { HOME: root } });
 
 		assert.equal(deploy.exitCode, 0);
 		assert.equal(publish.exitCode, 0);
@@ -256,7 +256,7 @@ test('projects deploy, publish, and monitor post canonical deployment bodies', a
 		assert.deepEqual(calls.map((call) => call.body), [
 			{ environment: 'staging', action: 'deploy_web', source: 'cli' },
 			{ environment: 'staging', action: 'publish_content', source: 'cli', reason: 'content refresh', idempotencyKey: 'idem-publish' },
-			{ environment: 'staging', action: 'monitor', source: 'cli', dryRun: true },
+			{ environment: 'staging', action: 'monitor', source: 'cli' },
 		]);
 		assert(calls.every((call) => call.path === '/v1/projects/project-1/deployments/web'));
 	});

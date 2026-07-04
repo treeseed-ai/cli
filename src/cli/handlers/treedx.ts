@@ -291,7 +291,6 @@ async function publish(invocation: TreeseedParsedInvocation, context: Parameters
 				source: 'cli',
 				reason: stringArg(invocation, 'reason') ?? 'TreeDX content publish',
 				confirmProduction: environment === 'prod',
-				dryRun: boolArg(invocation, 'dryRun'),
 			},
 			requireAuth: true,
 		},

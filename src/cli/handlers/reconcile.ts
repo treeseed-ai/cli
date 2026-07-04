@@ -273,23 +273,19 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 				});
 			}
 			if (subcommand === 'apply') {
-				const execute = executeRequested(invocation.args.execute);
 				const result = await reconcileTreeseedTarget({
 					tenantRoot: context.cwd,
 					target,
 					env: resolvedEnv,
 					units: desiredUnits,
-					dryRun: !execute,
+					planOnly: false,
 					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 				});
 				return guidedResult({
 					command: 'reconcile apply',
-					summary: execute
-						? `Reconciled ${result.results.length} unit${result.results.length === 1 ? '' : 's'} for ${environment}.`
-						: `Rendered non-mutating reconcile apply plan for ${environment}.`,
+					summary: `Reconciled ${result.results.length} unit${result.results.length === 1 ? '' : 's'} for ${environment}.`,
 					facts: [
 						{ label: 'Environment', value: environment },
-						{ label: 'Execute', value: execute ? 'yes' : 'no' },
 						{ label: 'Units', value: result.units.length },
 						{ label: 'Results', value: result.results.length },
 					],

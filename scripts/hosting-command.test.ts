@@ -158,7 +158,8 @@ async function runCli(args, cwd) {
 		},
 	});
 	const stdout = writes.filter((entry) => entry.stream === 'stdout').map((entry) => entry.output).join('\n');
-	return { exitCode, stdout };
+	const stderr = writes.filter((entry) => entry.stream === 'stderr').map((entry) => entry.output).join('\n');
+	return { exitCode, stdout, stderr };
 }
 
 function parseJsonOutput(stdout) {
@@ -181,15 +182,12 @@ test('hosting plan emits placement-first JSON for staging', async () => {
 		&& entry.unit.projectGroupId === 'public-treedx-federation'));
 });
 
-test('hosting apply is dry-run by default', async () => {
+test('hosting plan refuses live verification claims', async () => {
 	const cwd = makeMarketWorkspace();
-	const result = await runCli(['hosting', 'apply', '--environment', 'staging', '--json'], cwd);
-	assert.equal(result.exitCode, 0);
-	const payload = parseJsonOutput(result.stdout);
+	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--live', '--json'], cwd);
+	assert.equal(result.exitCode, 1);
 
-	assert.equal(payload.dryRun, true);
-	assert.ok(payload.results.length > 0);
-	assert.equal(payload.results.every((entry) => entry.verification.verified), true);
+	assert.match(result.stdout + result.stderr, /cannot prove live provider state/u);
 });
 
 test('hosting plan can target API service only', async () => {
@@ -216,17 +214,13 @@ test('hosting plan can target split web and api applications', async () => {
 	assert.ok(apiPayload.units.some((entry) => entry.unit.id === 'public-treedx-node-01'));
 });
 
-test('hosting apply selects API custom domain and DNS reconcile units', async () => {
+test('hosting plan selects split API runtime and public TreeDX units', async () => {
 	const cwd = makeSplitMarketWorkspace();
-	const result = await runCli(['hosting', 'apply', '--environment', 'staging', '--app', 'api', '--json'], cwd);
+	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--app', 'api', '--json'], cwd);
 	assert.equal(result.exitCode, 0);
 	const payload = parseJsonOutput(result.stdout);
 
-	assert.equal(payload.dryRun, true);
-	assert.ok(payload.selector.serviceId.includes('api'));
-	assert.ok(payload.selector.serviceId.includes('public-treedx-node-01'));
-	assert.ok(payload.selector.serviceType.includes('api-runtime'));
-	assert.ok(payload.selector.serviceType.includes('railway-service:api'));
-	assert.ok(payload.selector.serviceType.includes('custom-domain:api'));
-	assert.ok(payload.selector.serviceType.includes('dns-record'));
+	const unitIds = payload.units.map((entry) => entry.unit.id);
+	assert.ok(unitIds.includes('api'));
+	assert.ok(unitIds.includes('public-treedx-node-01'));
 });

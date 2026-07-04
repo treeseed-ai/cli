@@ -371,7 +371,6 @@ function deploymentRequestBody(invocation: TreeseedParsedInvocation, action: Pro
 	};
 	const reason = stringArg(invocation, 'reason');
 	const idempotencyKey = stringArg(invocation, 'idempotencyKey');
-	if (boolArg(invocation, 'dryRun')) body.dryRun = true;
 	if (reason) body.reason = reason;
 	if (idempotencyKey) body.idempotencyKey = idempotencyKey;
 	if (environment === 'prod' && action !== 'monitor') body.confirmProduction = true;

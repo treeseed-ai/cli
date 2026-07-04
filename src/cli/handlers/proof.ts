@@ -61,8 +61,7 @@ export const handleProof: TreeseedCommandHandler = async (invocation, context) =
 			subject: typeof invocation.args.subject === 'string' ? invocation.args.subject : null,
 			last: invocation.args.last === true,
 			olderThan: typeof invocation.args.olderThan === 'string' ? invocation.args.olderThan : null,
-			plan: invocation.args.plan === true || invocation.args.dryRun === true || action === 'plan',
-			dryRun: invocation.args.dryRun === true,
+			plan: invocation.args.plan === true || action === 'plan',
 		});
 		const payload = result.payload as Record<string, any>;
 		const timing = payload.timing;

@@ -7,8 +7,7 @@ export const handleClose: TreeseedCommandHandler = async (invocation, context) =
 		const result = await createWorkflowSdk(context).close({
 			message: invocation.positionals.join(' ').trim(),
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
-			plan: invocation.args.plan === true || invocation.args.dryRun === true,
-			dryRun: invocation.args.dryRun === true,
+			plan: invocation.args.plan === true,
 		});
 		const payload = result.payload as {
 			mode: 'root-only' | 'recursive-workspace';

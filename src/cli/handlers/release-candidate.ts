@@ -22,8 +22,7 @@ export const handleReleaseCandidate: TreeseedCommandHandler = async (invocation,
 				: invocation.args.skipAction === true ? 'local' : 'auto',
 			package: packageArgs(invocation.args.package),
 			keepWorkspace: invocation.args.keepWorkspace === true,
-			plan: invocation.args.plan === true || invocation.args.dryRun === true,
-			dryRun: invocation.args.dryRun === true,
+			plan: invocation.args.plan === true,
 		});
 		const payload = result.payload as {
 			mode?: string;

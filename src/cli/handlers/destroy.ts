@@ -27,8 +27,7 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 			},
 		}).destroy({
 			environment: String(invocation.args.environment) as 'local' | 'staging' | 'prod',
-			plan: invocation.args.plan === true || invocation.args.dryRun === true,
-			dryRun: invocation.args.dryRun === true,
+			plan: invocation.args.plan === true,
 			force: invocation.args.force === true,
 			deleteData: invocation.args.deleteData === true,
 			sweepTreeseed: invocation.args.sweepTreeseed === true,
@@ -36,7 +35,6 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 		});
 		const payload = result.payload as {
 			scope: string;
-			dryRun: boolean;
 			deleteData?: boolean;
 			sweepTreeseed?: boolean;
 			removeBuildArtifacts: boolean;
@@ -55,7 +53,6 @@ export const handleDestroy: TreeseedCommandHandler = async (invocation, context)
 				: 'Treeseed destroy completed successfully.',
 			facts: [
 				{ label: 'Environment', value: payload.scope },
-				{ label: 'Dry run', value: payload.dryRun ? 'yes' : 'no' },
 				{ label: 'Delete data', value: payload.deleteData ? 'yes' : 'no' },
 				{ label: 'Sweep TreeSeed resources', value: payload.sweepTreeseed ? 'yes' : 'no' },
 				{ label: 'Removed build artifacts', value: payload.removeBuildArtifacts ? 'yes' : 'no' },

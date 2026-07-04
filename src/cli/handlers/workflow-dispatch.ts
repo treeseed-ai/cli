@@ -148,7 +148,7 @@ export const handleWorkflow: TreeseedCommandHandler = async (invocation, context
 				target,
 				env,
 				units,
-				dryRun: false,
+				planOnly: false,
 				write: (line) => context.write(`[workflow] ${line}`, 'stderr'),
 			})
 			: await planTreeseedReconciliation({

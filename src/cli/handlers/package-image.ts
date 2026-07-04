@@ -190,7 +190,7 @@ export async function runPackageImageCommand(
 				target,
 				env: resolvedEnv,
 				units,
-				dryRun: false,
+				planOnly: false,
 				write: (line) => context.write(`[package-image] ${line}`, 'stderr'),
 			})
 			: await planTreeseedReconciliation({

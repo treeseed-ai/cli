@@ -187,7 +187,7 @@ function hostingReportWithLiveReconcile(report: any, reconcileResult: any) {
 		reconcile: reconcileResult,
 		liveVerification: {
 			ok: liveIssues.length === 0,
-			source: 'reconcile-dry-run',
+			source: 'live-reconcile',
 			issues: liveIssues,
 		},
 		ok: liveIssues.length === 0,
@@ -202,11 +202,23 @@ function selectedSeedEnv(context: Parameters<TreeseedCommandHandler>[1], environ
 	};
 }
 
+function stripLegacyPlanningFields(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map((entry) => stripLegacyPlanningFields(entry));
+	if (value && typeof value === 'object') {
+		return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+			.filter(([key]) => key !== 'planOnly')
+			.map(([key, entry]) => [key, stripLegacyPlanningFields(entry)]));
+	}
+	return value;
+}
+
 export const handleHosting: TreeseedCommandHandler = async (invocation, context) => {
 		try {
 			const subcommand = subcommandFor(invocation.positionals[0]);
 			const environment = environmentFor(invocation.args.environment);
-			const dryRun = invocation.args.dryRun !== false && invocation.args.execute !== true;
+			if (invocation.args.planOnly === true) {
+				throw new Error('hosting planning is available only through `hosting plan`; hosted verification and apply commands always use real provider state.');
+			}
 			const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim()
 				? invocation.args.app.trim()
 				: undefined;
@@ -269,9 +281,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			}
 				const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 			const selector = selectorFromHostingGraph(graph);
-			const result = dryRun
-				? { target: targetFor(environment), results: graph.units.map((unit) => ({ unit: serializeHostingUnit(unit), action: 'destroy', dryRun: true })) }
-				: await destroyTreeseedTargetUnits({
+			const result = await destroyTreeseedTargetUnits({
 					tenantRoot: context.cwd,
 					target: targetFor(environment),
 						env,
@@ -280,11 +290,10 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				});
 			return guidedResult({
 				command: 'hosting destroy',
-				summary: `${dryRun ? 'Planned' : 'Destroyed'} hosting resources for ${appId} in ${environment}`,
+				summary: `Destroyed hosting resources for ${appId} in ${environment}`,
 				facts: [
 					{ label: 'Environment', value: environment },
 					{ label: 'Application', value: appId },
-					{ label: 'Dry run', value: dryRun ? 'yes' : 'no' },
 					{ label: 'Selected units', value: graph.units.length },
 				],
 				sections: [
@@ -299,14 +308,40 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					command: 'hosting destroy',
 					environment,
 					appId,
-					dryRun,
-					result,
+					result: stripLegacyPlanningFields(result),
 				},
 			});
 		}
 
+			if (subcommand === 'plan' && invocation.args.live === true) {
+				return guidedResult({
+					command: 'hosting plan',
+					summary: 'Hosting plan is not a live verification command. Use `trsd hosting verify --live` to check provider state.',
+					facts: [
+						{ label: 'Environment', value: environment },
+						{ label: 'Application', value: appId ?? '(workspace)' },
+					],
+					sections: [],
+					report: {
+						command: 'hosting plan',
+						environment,
+						appId,
+						ok: false,
+						liveVerification: {
+							ok: false,
+							source: 'hosting-plan',
+							checkedAt: new Date().toISOString(),
+							issues: ['hosting plan cannot prove live provider state'],
+							checks: [],
+						},
+					},
+					exitCode: 1,
+					stderr: ['hosting plan cannot prove live provider state; use hosting verify --live'],
+				});
+			}
+
 			if (subcommand === 'plan' || subcommand === 'verify') {
-				const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, env, ...filterInput });
+				const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 				const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 				const liveReconcile = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
 					? await reconcileTreeseedTarget({
@@ -314,7 +349,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 						target: targetFor(environment),
 						env,
 						selector: selectorFromHostingGraph(graph),
-						dryRun: true,
+						planOnly: false,
 						write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 					})
 					: null;
@@ -354,7 +389,6 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				facts: [
 					{ label: 'Environment', value: environment },
 					{ label: 'Application', value: appId ?? '(workspace)' },
-					{ label: 'Dry run', value: 'yes' },
 					{ label: 'Units', value: String(report.units.length) },
 					{ label: 'Verified units', value: String(report.units.filter((entry) => entry.verification.verified).length) },
 				],
@@ -369,29 +403,25 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 						lines: report.units.map((entry) => renderUnitLine(entry)),
 					},
 				],
-				report: liveHostedServices ? { ...report, hostedServices: liveHostedServices } : report,
+				report: stripLegacyPlanningFields(liveHostedServices ? { ...report, hostedServices: liveHostedServices } : report),
 				exitCode: planFailures.length > 0 || liveFailures.length > 0 ? 1 : 0,
 				stderr: [...planFailures, ...liveFailures],
 			});
 		}
 
 			const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
-			const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, dryRun: true, env, ...filterInput });
+			const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 			const planReport = serializeHostingPlan(plan);
 		const selector = selectorFromHostingGraph(graph);
-		const reconcileResult = dryRun
-				? null
-				: await reconcileTreeseedTarget({
+		const reconcileResult = await reconcileTreeseedTarget({
 					tenantRoot: context.cwd,
 					target: targetFor(environment),
 					env,
 					selector,
-					dryRun: false,
+					planOnly: false,
 					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 				});
-		let status = dryRun
-				? null
-				: await collectTreeseedReconcileStatus({
+		let status = await collectTreeseedReconcileStatus({
 					tenantRoot: context.cwd,
 					target: targetFor(environment),
 					env,
@@ -399,7 +429,6 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				});
 		const report = {
 			...planReport,
-			dryRun,
 			selector,
 			results: planReport.units.map((entry) => ({
 				unit: entry.unit,
@@ -411,7 +440,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			status,
 			ok: status ? status.ready : true,
 		};
-		const liveHostedServices = !dryRun && environment !== 'local'
+		const liveHostedServices = environment !== 'local'
 				? await collectLiveChecks({
 					tenantRoot: context.cwd,
 					target: environment,
@@ -429,7 +458,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				...liveHostedServices.liveObservation.issues,
 			]
 			: [];
-			if (!dryRun && status?.ready === false && liveHostedServices && liveFailures.length === 0) {
+			if (status?.ready === false && liveHostedServices && liveFailures.length === 0) {
 				status = await collectTreeseedReconcileStatus({
 					tenantRoot: context.cwd,
 					target: targetFor(environment),
@@ -455,11 +484,10 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			: report;
 		return guidedResult({
 			command: 'hosting apply',
-			summary: `${dryRun ? 'Dry-run applied' : 'Applied'} hosting graph for ${environment}`,
+			summary: `Applied hosting graph for ${environment}`,
 			facts: [
 				{ label: 'Environment', value: environment },
 				{ label: 'Application', value: appId ?? '(workspace)' },
-				{ label: 'Dry run', value: dryRun ? 'yes' : 'no' },
 				{ label: 'Units', value: String(finalReport.results.length) },
 				{ label: 'Verified units', value: String(finalReport.results.filter((entry) => entry.verification.verified).length) },
 				{ label: 'Selected systems', value: finalReport.selectedSystems?.join(', ') || '(none)' },
@@ -477,8 +505,8 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					})),
 				},
 			],
-			report: finalReport,
-			exitCode: !dryRun && (liveFailures.length > 0 || finalReport.ok === false) ? 1 : 0,
+			report: removeDryRunFields(finalReport),
+			exitCode: liveFailures.length > 0 || finalReport.ok === false ? 1 : 0,
 			stderr: liveFailures,
 		});
 	} catch (error) {

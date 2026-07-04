@@ -1537,7 +1537,7 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 		maxActiveAssignments: positiveNumberArg(invocation, 'maxActiveAssignments', Math.max(1, Math.min(projectSlugs.length * WORKDAY_TEST_AGENT_COUNT, 9))),
 		planningOnly: boolArg(invocation, 'planningOnly') || !actingEnabled,
 		abortOnDegradation,
-		dryRun: boolArg(invocation, 'dryRun') || !execute,
+		planOnly: !execute,
 		reportDir: stringArg(invocation, 'reportDir') ?? '.treeseed/workday-reports',
 	};
 	const projectsResponse = teamResolution.projects.length > 0
@@ -1549,7 +1549,7 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 		.filter((project) => String(project.slug ?? project.id) === 'karyon');
 	const localTreeDxRepositoryIds = new Map<string, string>();
 	let localTreeDxSetup: Record<string, unknown> | null = null;
-	if (!parameters.dryRun && profile.id === 'local') {
+	if (!parameters.planOnly && profile.id === 'local') {
 		try {
 			await Promise.all(projects.map(async (project) => {
 				const slug = String(project.slug ?? project.id);
@@ -1630,9 +1630,9 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 	const runResponse = await client.createWorkdayRun(teamId, {
 		capacityProviderId: providerId,
 		scenarioId: parameters.purpose,
-		status: parameters.dryRun ? 'planned' : 'running',
+		status: parameters.planOnly ? 'planned' : 'running',
 		environment: 'local',
-		startedAt: parameters.dryRun ? null : new Date().toISOString(),
+		startedAt: parameters.planOnly ? null : new Date().toISOString(),
 		parameters: { ...parameters, repositoryIdsBySlug },
 		expected: {
 			projects: projectSlugs,
@@ -1685,7 +1685,7 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 	for (const projectState of projectStates) {
 		projectState.workdayId = safeWorkdayIdPart(`workday-${runId}-${projectState.slug}`);
 	}
-	if (!parameters.dryRun && parameters.durationSeconds > 0) {
+	if (!parameters.planOnly && parameters.durationSeconds > 0) {
 		durationWindow = await holdWorkdayOpen({
 			runId,
 			durationSeconds: parameters.durationSeconds,
@@ -1694,7 +1694,7 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 	}
 	let waitedAssignmentSnapshots: Map<string, Record<string, unknown>[]> | null = null;
 	let waitTimedOutAssignmentIds = new Set<string>();
-	if (!parameters.dryRun && parameters.waitSeconds > 0) {
+	if (!parameters.planOnly && parameters.waitSeconds > 0) {
 		await event({
 			eventType: 'provider.wait.started',
 			status: 'recorded',
@@ -1720,7 +1720,7 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 			},
 		});
 	}
-	if (!parameters.dryRun && durationWindow) {
+	if (!parameters.planOnly && durationWindow) {
 		for (const projectState of projectStates) {
 			if (!projectState.workdayId || completedDurationWorkdayIds.has(projectState.workdayId)) continue;
 			await client.completeWorkday(projectState.workdayId).catch((error) => {
@@ -1818,25 +1818,25 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 		]);
 		const expectedPlanningRuns = Math.min(WORKDAY_TEST_AGENT_COUNT, projectState.contentAgentCount);
 		if (projectState.contentAgentCount < WORKDAY_TEST_AGENT_COUNT) projectState.blockers.push(`expected ${WORKDAY_TEST_AGENT_COUNT} content agents, found ${projectState.contentAgentCount}`);
-		if (!parameters.dryRun && expectedPlanningRuns > 0 && planningRuns.length < expectedPlanningRuns) {
+		if (!parameters.planOnly && expectedPlanningRuns > 0 && planningRuns.length < expectedPlanningRuns) {
 			projectState.blockers.push(`planning portfolio incomplete: expected at least ${expectedPlanningRuns} planning run(s), observed ${planningRuns.length}`);
 		}
-		if (!parameters.dryRun && durationWindow && projectAssignmentIds.length > 0 && planningRuns.length === 0) {
+		if (!parameters.planOnly && durationWindow && projectAssignmentIds.length > 0 && planningRuns.length === 0) {
 			projectState.blockers.push('timed workday elapsed without any planning mode run telemetry');
 		}
-		if (!parameters.dryRun && projectAssignmentIds.length > 0 && projectModeRuns.length === 0) {
+		if (!parameters.planOnly && projectAssignmentIds.length > 0 && projectModeRuns.length === 0) {
 			projectState.blockers.push('created assignments did not produce assignment-scoped mode-run telemetry');
 		}
-		if (!parameters.dryRun && projectAssignments.length === 0) {
+		if (!parameters.planOnly && projectAssignments.length === 0) {
 			projectState.blockers.push('API workday scheduling did not synthesize any provider assignments during the timed workday window');
 		}
-		if (!parameters.dryRun && projectAssignments.length > 0 && planningRuns.length === 0) {
+		if (!parameters.planOnly && projectAssignments.length > 0 && planningRuns.length === 0) {
 			projectState.blockers.push('provider assignments did not produce planning mode runs');
 		}
-		if (!parameters.dryRun && projectModeRuns.length > 0 && executionRuns.length === 0) {
+		if (!parameters.planOnly && projectModeRuns.length > 0 && executionRuns.length === 0) {
 			projectState.blockers.push('mode runs did not appear in the execution-run audit projection');
 		}
-		if (!parameters.dryRun && failedAssignments.length > 0) {
+		if (!parameters.planOnly && failedAssignments.length > 0) {
 			const reasons = failedAssignments.map((assignment) => {
 				const id = String(recordValue(assignment, 'id') ?? 'assignment');
 				const status = String(recordValue(assignment, 'status') ?? 'failed');
@@ -1846,7 +1846,7 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 			});
 			projectState.blockers.push(`terminal assignment failure: ${reasons.join('; ')}`);
 		}
-		if (!parameters.dryRun && projectAssignmentIds.length > 0 && contentArtifacts.length === 0) {
+		if (!parameters.planOnly && projectAssignmentIds.length > 0 && contentArtifacts.length === 0) {
 			projectState.blockers.push('completed workday did not produce durable content artifact refs');
 		}
 		const badTestArtifacts = contentArtifacts
@@ -1885,7 +1885,7 @@ async function runWorkdayRun(invocation: TreeseedParsedInvocation, context: Tree
 			status: projectState.blockers.length ? 'degraded' : 'ready',
 			blockers: projectState.blockers,
 		});
-		if (projectState.workdayId && !parameters.dryRun) {
+		if (projectState.workdayId && !parameters.planOnly) {
 			if (!completedDurationWorkdayIds.has(projectState.workdayId)) {
 			await client.completeWorkday(projectState.workdayId).catch(() => null);
 			await event({
@@ -2141,7 +2141,7 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 		return fail('Missing --to-derived. Phase 8 supports `trsd capacity migrate --to-derived`.');
 	}
 	const missing = migrationMissingFields(invocation);
-	const example = 'trsd capacity migrate --to-derived --team team_123 --provider provider_123 --kind codex_subscription --native-unit wall_minute --limit 480 --scope daily --reset-cadence daily --quota-visibility opaque --reserve-buffer-percent 20 --max-concurrent-workers 4 --project project_123 --portfolio-allocation-percent 100 --dry-run';
+	const example = 'trsd capacity migrate --to-derived --team team_123 --provider provider_123 --kind codex_subscription --native-unit wall_minute --limit 480 --scope daily --reset-cadence daily --quota-visibility opaque --reserve-buffer-percent 20 --max-concurrent-workers 4 --project project_123 --portfolio-allocation-percent 100 --plan';
 	if (missing.length > 0) {
 		return fail(`Missing native capacity facts: ${missing.join(', ')}.\nExample: ${example}`);
 	}
@@ -2158,9 +2158,9 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 	const environment = environmentSelector(invocation);
 	const projectId = stringArg(invocation, 'project');
 	const allocationPercent = numberArg(invocation, 'portfolioAllocationPercent');
-	const dryRun = boolArg(invocation, 'dryRun');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: !dryRun });
-	const providerList = dryRun ? { payload: [{ id: providerSelectorValue, name: providerSelectorValue }] } : await marketRequest<{ ok: true; payload: unknown[] }>(client, `/v1/teams/${encodeURIComponent(teamId)}/capacity-providers`, { requireAuth: true });
+	const planOnly = boolArg(invocation, 'plan');
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: !planOnly });
+	const providerList = planOnly ? { payload: [{ id: providerSelectorValue, name: providerSelectorValue }] } : await marketRequest<{ ok: true; payload: unknown[] }>(client, `/v1/teams/${encodeURIComponent(teamId)}/capacity-providers`, { requireAuth: true });
 	const provider = (providerList.payload as unknown[]).find(providerMatcher(providerSelectorValue));
 	if (!provider) return fail(`Capacity provider "${providerSelectorValue}" was not found in team ${teamId}.`);
 	const providerId = String(recordValue(provider, 'id'));
@@ -2202,7 +2202,7 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 						source: 'trsd capacity migrate --to-derived',
 					},
 				};
-	if (!dryRun) {
+	if (!planOnly) {
 		await marketRequest(client, `/v1/teams/${encodeURIComponent(teamId)}/capacity-providers/${encodeURIComponent(providerId)}`, {
 			method: 'PATCH',
 			body: {
@@ -2226,7 +2226,7 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 	}
 	return guidedResult({
 		command: 'capacity migrate',
-		summary: dryRun ? 'Dry run: derived native capacity migration plan.' : 'Derived native capacity migration applied.',
+		summary: planOnly ? 'Derived native capacity migration plan.' : 'Derived native capacity migration applied.',
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: teamId },
@@ -2243,7 +2243,7 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 				label: 'Allocation percent',
 				value: allocationPercent === null ? null : `${formatNumber(allocationPercent)}%`,
 			},
-			{ label: 'Dry run', value: dryRun },
+			{ label: 'Plan only', value: planOnly },
 		],
 		sections: [
 			{
@@ -2261,7 +2261,7 @@ async function runMigrateToDerived(invocation: TreeseedParsedInvocation, context
 		],
 		report: {
 			action: 'migrate',
-			dryRun,
+			planOnly,
 			teamId,
 			providerId,
 			executionProvider,
@@ -2392,7 +2392,7 @@ async function runLifecycleAction(action: string, invocation: TreeseedParsedInvo
 						},
 						units,
 						selector,
-						dryRun: planOnly,
+						planOnly: planOnly,
 						write: (line) => context.write(`[capacity] ${line}`, 'stderr'),
 					});
 	return guidedResult({

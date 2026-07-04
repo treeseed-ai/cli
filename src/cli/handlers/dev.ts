@@ -248,7 +248,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 							env: context.env,
 							units,
 							selector,
-							dryRun: false,
+							planOnly: false,
 							write: (line) => context.write(`[dev] ${line}`, 'stderr'),
 						});
 		const ok = 'ready' in result ? result.ready : true;

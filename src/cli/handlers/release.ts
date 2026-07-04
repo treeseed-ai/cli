@@ -193,7 +193,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 		const guaranteeEnvironment = 'staging';
 		traceRelease('plan release guarantees');
 		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: guaranteeEnvironment });
-		const releasePlanOnly = invocation.args.plan === true || invocation.args.dryRun === true;
+		const releasePlanOnly = invocation.args.plan === true;
 		traceRelease('cleanup');
 		const releaseCleanup = !releasePlanOnly && invocation.args.skipCleanup !== true
 			? runTreeseedLocalCleanup({ root: context.cwd, mode: 'aggressive' })
@@ -282,7 +282,6 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			skipCleanup: invocation.args.skipCleanup === true || releaseCleanup !== null,
 			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			plan: releasePlanOnly,
-			dryRun: invocation.args.dryRun === true,
 		});
 		const payload = result.payload as {
 			mode: 'root-only' | 'recursive-workspace';
