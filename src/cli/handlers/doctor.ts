@@ -46,8 +46,9 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 	if (state.packageSync.completeCheckout) {
 		for (const repo of state.packageSync.repos) {
 			const publishWorkflowPath = resolve(state.cwd, repo.path, '.github', 'workflows', 'publish.yml');
-			if (!existsSync(publishWorkflowPath)) {
-				mustFixNow.push(`${repo.name} is missing .github/workflows/publish.yml required for recursive release.`);
+			const releaseGateWorkflowPath = resolve(state.cwd, repo.path, '.github', 'workflows', 'release-gate.yml');
+			if (!existsSync(publishWorkflowPath) && !existsSync(releaseGateWorkflowPath)) {
+				mustFixNow.push(`${repo.name} is missing a package release workflow required for recursive release.`);
 			}
 		}
 	}
