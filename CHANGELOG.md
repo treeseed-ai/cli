@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.25] - 2026-07-04
+
+### Fixed
+
+- fix: return hosting apply report directly (753f0d674f29)
+
 ## [0.12.24] - 2026-07-04
 
 ### Changed
