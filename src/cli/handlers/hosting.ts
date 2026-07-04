@@ -505,7 +505,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					})),
 				},
 			],
-			report: removeDryRunFields(finalReport),
+			report: finalReport,
 			exitCode: liveFailures.length > 0 || finalReport.ok === false ? 1 : 0,
 			stderr: liveFailures,
 		});

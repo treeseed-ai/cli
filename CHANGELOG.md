@@ -4,7 +4,6 @@
 
 ### Changed
 
-- docs: remove dry-run wording from changelog (48d68bb74f09)
 
 ## [0.12.23] - 2026-07-04
 
@@ -371,7 +370,6 @@
 
 ### Dependencies
 
-- build(build): avoid live queue lookup during destroy dry runs (d1656120ecca)
 - build(build): harden provider cleanup api calls for clean destroy (f375e4b9409e)
 - build(build): wait for delayed Railway service instances before (fc9762f2201a)
 - Release @treeseed/cli 0.10.16.
