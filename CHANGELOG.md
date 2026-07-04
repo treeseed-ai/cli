@@ -4,7 +4,7 @@
 
 ### Changed
 
-- refactor: remove dry-run CLI mode (47875afd49f1)
+- refactor: remove preview CLI mode (47875afd49f1)
 
 ## [0.12.22] - 2026-07-03
 
