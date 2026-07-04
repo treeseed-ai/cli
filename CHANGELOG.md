@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.31] - 2026-07-04
+
+### Fixed
+
+- fix(release): accept package-owned release gates (aa81b4e9ad63)
+
 ## [0.12.30] - 2026-07-04
 
 ### Changed
