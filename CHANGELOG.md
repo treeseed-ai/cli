@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.37] - 2026-07-05
+
+### Changed
+
+- Release metadata and deployment history updated.
+
 ## [0.12.36] - 2026-07-05
 
 ### Dependencies
