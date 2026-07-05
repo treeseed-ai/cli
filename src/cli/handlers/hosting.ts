@@ -156,8 +156,10 @@ function hostingReportWithLiveReconcile(report: any, reconcileResult: any) {
 				},
 				plan: {
 					...entry.plan,
-					action: matched.diff?.action === 'noop' ? 'noop' : entry.plan?.action ?? 'verify',
-					reasons: matched.diff?.reasons ?? entry.plan?.reasons ?? [],
+					action: matched.verification.verified === true ? 'noop' : matched.diff?.action ?? entry.plan?.action ?? 'verify',
+					reasons: matched.verification.verified === true
+						? ['live provider state verified']
+						: matched.diff?.reasons ?? entry.plan?.reasons ?? [],
 					before: matched.observed?.live ?? entry.plan?.before ?? {},
 				},
 				verification: {
