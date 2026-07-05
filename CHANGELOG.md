@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.36] - 2026-07-05
+
+### Dependencies
+
+- build(build): add final production release guarantee gate (3bb18480ad7a)
+
 ## [0.12.35] - 2026-07-05
 
 ### Fixed
