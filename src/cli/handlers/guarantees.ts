@@ -136,6 +136,122 @@ function loadApiAcceptanceServiceEnv(environment: string) {
 	}
 }
 
+export type AgentGuaranteeExecutionProviderMode = 'mock' | 'live-codex' | 'auto';
+
+function codexAuthAvailable(env: NodeJS.ProcessEnv) {
+	const explicit = env.TREESEED_CODEX_AUTH_FILE || env.CODEX_AUTH_FILE;
+	if (explicit?.trim()) return true;
+	const home = env.HOME || process.env.HOME;
+	if (!home) return false;
+	return spawnSync('test', ['-f', `${home}/.codex/auth.json`]).status === 0;
+}
+
+function resolveAgentGuaranteeExecutionProviderMode(input: { environment: string; env: NodeJS.ProcessEnv }): AgentGuaranteeExecutionProviderMode {
+	const configured = input.env.TREESEED_AGENT_GUARANTEE_EXECUTION_PROVIDER?.trim();
+	if (configured === 'mock' || configured === 'live-codex' || configured === 'auto') return configured;
+	if (input.env.CI === 'true' || input.env.GITHUB_ACTIONS === 'true') return 'mock';
+	if (input.environment === 'staging') return 'live-codex';
+	return 'auto';
+}
+
+function applyAgentGuaranteeExecutionProviderMode(input: { environment: string; env: NodeJS.ProcessEnv }) {
+	const mode = resolveAgentGuaranteeExecutionProviderMode(input);
+	input.env.TREESEED_AGENT_GUARANTEE_EXECUTION_PROVIDER = mode;
+	if (mode === 'mock') {
+		input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'mock';
+		return { ok: true, diagnostics: ['Agent guarantees will use the deterministic mock execution provider.'] };
+	}
+	if (mode === 'live-codex') {
+		if (!codexAuthAvailable(input.env)) {
+			return { ok: false, diagnostics: ['missing_codex_auth: live Codex agent guarantees require ~/.codex/auth.json or TREESEED_CODEX_AUTH_FILE.'] };
+		}
+		input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'codex';
+		return { ok: true, diagnostics: ['Agent guarantees will use the live Codex execution provider.'] };
+	}
+	if (codexAuthAvailable(input.env)) {
+		input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'codex';
+		return { ok: true, diagnostics: ['Agent guarantee auto mode selected live Codex because Codex auth was detected.'] };
+	}
+	input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'mock';
+	return { ok: true, diagnostics: ['Agent guarantee auto mode selected deterministic mock provider because Codex auth was not detected.'] };
+}
+
+function planNeedsLocalDev(input: { environment: string; filter: TreeseedGuaranteeFilter; includeDependencies?: boolean; includePlanned?: boolean; cwd: string }) {
+	if (input.environment !== 'local') return false;
+	const plan = planTreeseedGuarantees({
+		workspaceRoot: input.cwd,
+		filter: input.filter,
+		environment: input.environment,
+		includeDependencies: input.includeDependencies,
+	});
+	return plan.entries.some((entry) => {
+		if (entry.status !== 'active') return false;
+		return Boolean(entry.sceneManifest || entry.apiVerifierRefs.length > 0);
+	});
+}
+
+async function localDevEndpointsReady() {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 2_500);
+	try {
+		const [web, api] = await Promise.all([
+			fetch('http://127.0.0.1:4321/', { method: 'GET', signal: controller.signal }),
+			fetch('http://127.0.0.1:3000/healthz', { method: 'GET', signal: controller.signal }),
+		]);
+		return web.ok && api.ok;
+	} catch {
+		return false;
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+async function ensureLocalDevForGuaranteeRun(context: Parameters<TreeseedCommandHandler>[1], input: { filter: TreeseedGuaranteeFilter; includeDependencies?: boolean; includePlanned?: boolean }) {
+	if (process.env.TREESEED_GUARANTEE_SKIP_LOCAL_DEV === '1') return { ok: true, diagnostics: [] as string[] };
+	if (!planNeedsLocalDev({ environment: 'local', filter: input.filter, includeDependencies: input.includeDependencies, includePlanned: input.includePlanned, cwd: context.cwd })) {
+		return { ok: true, diagnostics: [] as string[] };
+	}
+	if (context.env.TREESEED_GUARANTEE_BYPASS_LOCAL_DEV_PREFLIGHT !== '1' && await localDevEndpointsReady()) {
+		return { ok: true, diagnostics: ['Managed local dev web/API endpoints were already healthy before local guarantee execution.'] };
+	}
+	const cliPath = process.argv[1];
+	const command = cliPath ? process.execPath : 'npx';
+	const args = cliPath ? [
+		cliPath,
+		'dev',
+		'restart',
+		'--web-runtime',
+		'local',
+		'--force',
+		'--force-conflicts',
+		'--json',
+	] : [
+		'trsd',
+		'dev',
+		'restart',
+		'--web-runtime',
+		'local',
+		'--force',
+		'--force-conflicts',
+		'--json',
+	];
+	const result = context.spawn(command, args, {
+		cwd: context.cwd,
+		env: context.env,
+		stdio: 'inherit',
+	});
+	if ((result.status ?? 1) !== 0) {
+		return {
+			ok: false,
+			diagnostics: ['Managed local dev startup failed before guarantee execution. Run `npx trsd dev restart --web-runtime local --force --force-conflicts --json` and retry.'],
+		};
+	}
+	return {
+		ok: true,
+		diagnostics: ['Managed local dev was started or verified before local guarantee execution.'],
+	};
+}
+
 export const handleGuarantees: TreeseedCommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'status';
 	const { filter, diagnostics: filterDiagnostics } = filterFromArgs(invocation.args);
@@ -242,6 +358,50 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 			? invocation.args.evidenceTarget as 'local' | 'ci' | 'release'
 			: undefined;
 		const device = typeof invocation.args.device === 'string' ? invocation.args.device : undefined;
+		const includeDependencies = invocation.args.dependencies === false || invocation.args.noDependencies === true ? false : undefined;
+		const includePlanned = invocation.args.includePlanned === true;
+		const agentExecutionProvider = filter.ownerPackage === '@treeseed/agent'
+			? applyAgentGuaranteeExecutionProviderMode({ environment, env: context.env })
+			: { ok: true, diagnostics: [] as string[] };
+		if (!agentExecutionProvider.ok) {
+			return {
+				exitCode: 1,
+				stdout: [
+					'Treeseed guarantee run blocked before execution.',
+					'Agent live execution provider credentials are unavailable.',
+					...agentExecutionProvider.diagnostics,
+				],
+				stderr: [],
+				report: {
+					command: 'guarantees run',
+					ok: false,
+					environment,
+					error: 'missing_codex_auth',
+					diagnostics: agentExecutionProvider.diagnostics.map((message) => ({ severity: 'error', code: 'guarantees.missing_codex_auth', message })),
+				},
+			};
+		}
+		const localDev = environment === 'local'
+			? await ensureLocalDevForGuaranteeRun(context, { filter, includeDependencies, includePlanned })
+			: { ok: true, diagnostics: [] as string[] };
+		if (!localDev.ok) {
+			return {
+				exitCode: 1,
+				stdout: [
+					'Treeseed guarantee run blocked before execution.',
+					'Managed local dev could not be started for local guarantee execution.',
+					...localDev.diagnostics,
+				],
+				stderr: [],
+				report: {
+					command: 'guarantees run',
+					ok: false,
+					environment,
+					error: 'local_dev_start_failed',
+					diagnostics: localDev.diagnostics.map((message) => ({ severity: 'error', code: 'guarantees.local_dev_start_failed', message })),
+				},
+			};
+		}
 		const acceptanceEnv = loadApiAcceptanceServiceEnv(environment);
 		if ((environment === 'staging' || environment === 'prod') && !acceptanceEnv.loaded) {
 			return {
@@ -266,8 +426,8 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 			filter,
 			environment,
 			outputRoot,
-			includeDependencies: invocation.args.dependencies === false || invocation.args.noDependencies === true ? false : undefined,
-			includePlanned: invocation.args.includePlanned === true,
+			includeDependencies,
+			includePlanned,
 			record: invocation.args.record === true,
 			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			device,
@@ -283,7 +443,9 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 					`Passed: ${report.counts.passed}`,
 					`Skipped: ${report.counts.skipped}`,
 					`Output: ${report.outputRoot}`,
+					...localDev.diagnostics,
 					...acceptanceEnv.diagnostics,
+					...agentExecutionProvider.diagnostics,
 				]
 				: [
 					'Treeseed guarantee run failed.',
@@ -293,7 +455,9 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 					`Blocked: ${report.counts.blocked}`,
 					`Release blocking failures: ${report.counts.releaseBlockingFailures}`,
 					`Output: ${report.outputRoot}`,
+					...localDev.diagnostics,
 					...acceptanceEnv.diagnostics,
+					...agentExecutionProvider.diagnostics,
 					...humanDiagnostics(report.diagnostics.filter((entry) => entry.severity === 'error')).slice(0, 20),
 				],
 			stderr: [],

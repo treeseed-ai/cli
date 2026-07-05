@@ -175,12 +175,15 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 					.filter((resource) => resource.kind === 'local-content-materialization' && resource.spec.executeRequested === true)
 					.map((resource) => resource.id)
 			: [];
+		const includeTreeDxUnits = selectedSurfaces.split(',').map((surface) => surface.trim()).includes('web');
 		const selectedUnitIds = [
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
 			'local-docker-compose:mailpit',
-			'local-treedx:team-primary',
-			'local-docker-compose:treedx',
+			...(includeTreeDxUnits ? [
+				'local-treedx:team-primary',
+				'local-docker-compose:treedx',
+			] : []),
 			...localContentUnitIds,
 		];
 		const selectedUnitIdSet = new Set(selectedUnitIds);
@@ -204,6 +207,14 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 								},
 							},
 						}
+					: unit.unitType === 'local-docker-compose' && invocation.args.force === true
+						? {
+								...unit,
+								spec: {
+									...unit.spec,
+									forceRecreate: true,
+								},
+							}
 					: unit,
 			);
 		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');

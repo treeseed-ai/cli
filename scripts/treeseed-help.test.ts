@@ -1685,6 +1685,46 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	assert.doesNotMatch(stopAll.output, /"reconcile"/u);
 });
 
+test('treeseed dev api-only plans avoid local treedx reconciliation units', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-api-only');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+	const apiRoot = resolve(workspaceRoot, 'packages', 'api');
+	mkdirSync(apiRoot, { recursive: true });
+	writeFileSync(resolve(apiRoot, 'package.json'), `${JSON.stringify({
+		name: '@treeseed/api',
+		version: '0.0.0',
+		type: 'module',
+		scripts: {
+			dev: 'node ./dev.js',
+			'dev:operations-runner': 'node ./runner.js',
+		},
+	}, null, 2)}\n`, 'utf8');
+
+	const result = await runCli(['dev', 'restart', '--app', 'api', '--web-runtime', 'local', '--force', '--plan', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.spawns.length, 0);
+	const payload = JSON.parse(result.stdout || result.output);
+	const serialized = JSON.stringify({
+		units: payload.reconcile?.units,
+		plans: payload.reconcile?.plans,
+		results: payload.reconcile?.results,
+		timings: payload.reconcile?.timings,
+	});
+	assert.equal(payload.command, 'dev restart');
+	assert.equal(payload.ok, true);
+	assert.equal(payload.selectedSurfaces, 'api');
+	assert.match(serialized, /local-process:api/u);
+	assert.match(serialized, /local-process:operations-runner/u);
+	assert.doesNotMatch(serialized, /local-treedx:team-primary/u);
+	assert.doesNotMatch(serialized, /local-docker-compose:treedx/u);
+});
+
 test('treeseed dev rejects removed surface and worker options', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-surfaces');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
