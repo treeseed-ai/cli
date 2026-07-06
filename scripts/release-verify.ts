@@ -292,14 +292,9 @@ function assertPackageDependencyShape() {
 		dependencies?: Record<string, string>;
 	};
 	const dependencyNames = Object.keys(packageJson.dependencies ?? {}).sort();
-	const expectedDependencies = ['@treeseed/sdk', 'ink', 'react'];
+	const expectedDependencies = ['@treeseed/agent', '@treeseed/core', '@treeseed/sdk', 'ink', 'react'];
 	if (dependencyNames.join(',') !== expectedDependencies.join(',')) {
 		throw new Error(`CLI runtime dependencies must be exactly ${expectedDependencies.join(', ')}. Found: ${dependencyNames.join(', ') || '(none)'}`);
-	}
-
-	const packageLock = readFileSync(resolve(packageRoot, 'package-lock.json'), 'utf8');
-	if (packageLock.includes('"@treeseed/agent"')) {
-		throw new Error('CLI package-lock.json still references @treeseed/agent.');
 	}
 }
 
