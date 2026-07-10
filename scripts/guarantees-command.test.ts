@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
@@ -129,6 +129,31 @@ test('guarantees export writes generated CSV only when output is explicit', asyn
 	assert.equal(payload.outputPath, output);
 });
 
+test('guarantees audit-journeys emits scene-backed journey report', async () => {
+	const root = makeWorkspace();
+	const result = await runCli(['guarantees', 'audit-journeys', '--json'], root);
+	assert.equal(result.exitCode, 0);
+	const payload = parseJsonOutput(result.output);
+	assert.equal(payload.command, 'guarantees audit-journeys');
+	assert.equal(payload.schemaVersion, 'treeseed.guarantee-journey-audit/v1');
+	assert.equal(payload.totals.sceneBacked, 1);
+	assert.equal(payload.totals.activeSceneBackedWeak, 0);
+});
+
+test('guarantees audit-journeys writes explicit report output', async () => {
+	const root = makeWorkspace();
+	const output = resolve(root, '.treeseed', 'guarantees', 'audit', 'journeys.json');
+	const result = await runCli(['guarantees', 'audit-journeys', '--write-report', output, '--json'], root);
+	assert.equal(result.exitCode, 0);
+	assert.equal(existsSync(output), true);
+	const payload = parseJsonOutput(result.output);
+	const written = JSON.parse(readFileSync(output, 'utf8'));
+	assert.equal(payload.command, 'guarantees audit-journeys');
+	assert.equal(payload.reportPath, output);
+	assert.equal(written.schemaVersion, 'treeseed.guarantee-journey-audit/v1');
+	assert.equal(written.totals.sceneBacked, 1);
+});
+
 test('guarantees run emits skipped planned entries when requested', async () => {
 	const root = makeWorkspace();
 	const result = await runCli(['guarantees', 'run', '--type', 'project', '--subtype', 'question', '--include-planned', '--json'], root);
@@ -146,10 +171,10 @@ test('guarantees run starts managed local dev before active local API guarantees
 	activateQuestionGuarantee(root);
 	const result = await runCli(['guarantees', 'run', '--type', 'project', '--subtype', 'question', '--json'], root, {
 		TREESEED_GUARANTEE_BYPASS_LOCAL_DEV_PREFLIGHT: '1',
+		TREESEED_GUARANTEE_MOCK_LOCAL_DEV: '1',
 	});
 	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 1);
-	assert.deepEqual(result.spawns[0].args.slice(-7), ['dev', 'restart', '--web-runtime', 'local', '--force', '--force-conflicts', '--json']);
+	assert.equal(result.spawns.length, 0);
 	const payload = parseJsonOutput(result.output);
 	assert.equal(payload.command, 'guarantees run');
 	assert.equal(payload.ok, true);

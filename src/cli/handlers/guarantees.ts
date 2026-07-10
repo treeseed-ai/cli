@@ -1,4 +1,5 @@
 import {
+	auditTreeseedGuaranteeJourneys,
 	createTreeseedGuaranteeStatusReport,
 	discoverTreeseedGuarantees,
 	exportTreeseedGuaranteesCsv,
@@ -12,6 +13,7 @@ import {
 	type TreeseedGuaranteeGate,
 	type TreeseedGuaranteeStatus,
 } from '@treeseed/sdk/guarantees';
+import { runTreeseedManagedDev } from '@treeseed/sdk';
 import { collectTreeseedConfigSeedValues } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../operations-types.ts';
 import { spawnSync } from 'node:child_process';
@@ -214,41 +216,26 @@ async function ensureLocalDevForGuaranteeRun(context: Parameters<TreeseedCommand
 	if (context.env.TREESEED_GUARANTEE_BYPASS_LOCAL_DEV_PREFLIGHT !== '1' && await localDevEndpointsReady()) {
 		return { ok: true, diagnostics: ['Managed local dev web/API endpoints were already healthy before local guarantee execution.'] };
 	}
-	const cliPath = process.argv[1];
-	const command = cliPath ? process.execPath : 'npx';
-	const args = cliPath ? [
-		cliPath,
-		'dev',
-		'restart',
-		'--web-runtime',
-		'local',
-		'--force',
-		'--force-conflicts',
-		'--json',
-	] : [
-		'trsd',
-		'dev',
-		'restart',
-		'--web-runtime',
-		'local',
-		'--force',
-		'--force-conflicts',
-		'--json',
-	];
-	const result = context.spawn(command, args, {
-		cwd: context.cwd,
-		env: context.env,
-		stdio: 'inherit',
-	});
-	if ((result.status ?? 1) !== 0) {
+	const result = context.env.TREESEED_GUARANTEE_MOCK_LOCAL_DEV === '1'
+		? { ok: true }
+		: await runTreeseedManagedDev({
+				action: 'start',
+				cwd: context.cwd,
+				surfaces: 'web,api',
+				webRuntime: 'local',
+				force: true,
+				forceConflicts: true,
+				env: context.env,
+			});
+	if (!result.ok) {
 		return {
 			ok: false,
-			diagnostics: ['Managed local dev startup failed before guarantee execution. Run `npx trsd dev restart --web-runtime local --force --force-conflicts --json` and retry.'],
+			diagnostics: ['Managed local dev startup failed before guarantee execution. Run `npx trsd dev restart --web-runtime local --app web --force --force-conflicts --json` and retry, then verify API health at http://127.0.0.1:3000/healthz.'],
 		};
 	}
 	return {
 		ok: true,
-		diagnostics: ['Managed local dev was started or verified before local guarantee execution.'],
+		diagnostics: ['Managed local dev web/API surfaces were started or verified before local guarantee execution.'],
 	};
 }
 
@@ -312,6 +299,30 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 				: ['Treeseed guarantee plan failed.', ...humanDiagnostics(report.diagnostics)],
 			stderr: [],
 			report: { command: 'guarantees plan', ...report },
+		};
+	}
+
+	if (action === 'audit-journeys') {
+		const writeReport = typeof invocation.args.writeReport === 'string'
+			? invocation.args.writeReport
+			: typeof invocation.args.output === 'string'
+				? invocation.args.output
+				: undefined;
+		const audit = auditTreeseedGuaranteeJourneys({ workspaceRoot: context.cwd, filter, writeReport });
+		return {
+			exitCode: audit.ok ? 0 : 1,
+			stdout: [
+				'Treeseed guarantee journey audit completed.',
+				`Guarantees: ${audit.totals.guarantees}`,
+				`Scene-backed: ${audit.totals.sceneBacked}`,
+				`Active scene-backed: ${audit.totals.activeSceneBacked}`,
+				`Active weak scene-backed: ${audit.totals.activeSceneBackedWeak}`,
+				`Active missing routes: ${audit.totals.activeMissingRoutes}`,
+				`Active missing selectors: ${audit.totals.activeMissingSelectors}`,
+				...(writeReport ? [`Report: ${writeReport}`] : []),
+			],
+			stderr: audit.ok ? [] : humanDiagnostics(audit.diagnostics.filter((entry) => entry.severity === 'error')).slice(0, 30),
+			report: { command: 'guarantees audit-journeys', ...(writeReport ? { reportPath: writeReport } : {}), ...audit },
 		};
 	}
 
@@ -432,6 +443,7 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			device,
 			evidenceTarget,
+			onProgress: (line, stream = 'stderr') => context.write(line, stream === 'stdout' ? 'stderr' : stream),
 		});
 		return {
 			exitCode: report.ok ? 0 : 1,
@@ -468,7 +480,7 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 	return {
 		exitCode: 1,
 		stdout: [],
-		stderr: [`Unsupported guarantees action "${action}". Use status, validate, plan, export, or run.`],
+		stderr: [`Unsupported guarantees action "${action}". Use status, validate, audit-journeys, plan, export, or run.`],
 		report: { command: 'guarantees', ok: false, error: `Unsupported action: ${action}` },
 	};
 };

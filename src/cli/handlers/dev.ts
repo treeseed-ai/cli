@@ -175,7 +175,8 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 					.filter((resource) => resource.kind === 'local-content-materialization' && resource.spec.executeRequested === true)
 					.map((resource) => resource.id)
 			: [];
-		const includeTreeDxUnits = selectedSurfaces.split(',').map((surface) => surface.trim()).includes('web');
+		const includeTreeDxUnits = localContent !== 'none'
+			&& selectedSurfaces.split(',').map((surface) => surface.trim()).includes('web');
 		const selectedUnitIds = [
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',

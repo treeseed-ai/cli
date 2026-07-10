@@ -1750,9 +1750,9 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		description: 'Discovers package-local guarantee YAML manifests, validates lowercase taxonomy and dependency graphs, plans focused or release-wide guarantee coverage, executes active guarantees, and exports generated CSV/JSON/Markdown reports from the canonical YAML source.',
 		provider: 'default',
 		related: ['scene', 'release', 'ready'],
-		usage: 'treeseed guarantees [status] [--json]\n       treeseed guarantees validate [--type <type>] [--subtype <subtype>] [--gate <gate>] [--json]\n       treeseed guarantees plan [--environment local|staging|prod] [--type <type>] [--subtype <subtype>] [--gate <gate>] [--json]\n       treeseed guarantees export [--format csv|json|markdown] [--output <path>] [--type <type>] [--subtype <subtype>] [--json]\n       treeseed guarantees run [--environment local|staging|prod] [--gate <gate>] [--include-planned] [--json]',
+		usage: 'treeseed guarantees [status] [--json]\n       treeseed guarantees validate [--type <type>] [--subtype <subtype>] [--gate <gate>] [--json]\n       treeseed guarantees audit-journeys [--owner-package <package>] [--write-report <path>] [--json]\n       treeseed guarantees plan [--environment local|staging|prod] [--type <type>] [--subtype <subtype>] [--gate <gate>] [--json]\n       treeseed guarantees export [--format csv|json|markdown] [--output <path>] [--type <type>] [--subtype <subtype>] [--json]\n       treeseed guarantees run [--environment local|staging|prod] [--gate <gate>] [--include-planned] [--json]',
 		arguments: [
-			{ name: 'action', description: 'Guarantee action. Use status, validate, plan, export, or run.', required: false },
+			{ name: 'action', description: 'Guarantee action. Use status, validate, audit-journeys, plan, export, or run.', required: false },
 		],
 		options: [
 			{ name: 'environment', flags: '--environment <scope>', description: 'Environment to select for guarantee planning or execution.', kind: 'enum', values: ['local', 'staging', 'prod'] },
@@ -1765,6 +1765,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 			{ name: 'journeyIndex', flags: '--journey-index <index>', description: 'Filter by journey index. Comma-separated values are accepted.', kind: 'string' },
 			{ name: 'format', flags: '--format <format>', description: 'Export format for guarantees export.', kind: 'enum', values: ['csv', 'json', 'markdown'] },
 			{ name: 'output', flags: '--output <path>', description: 'Write generated export to this path. Without --output, export prints to stdout.', kind: 'string' },
+			{ name: 'writeReport', flags: '--write-report <path>', description: 'Write a guarantee journey audit report to this workspace-relative path.', kind: 'string' },
 			{ name: 'includePlanned', flags: '--include-planned', description: 'Include planned/backlog guarantees in run reports as skipped entries.', kind: 'boolean' },
 			{ name: 'noDependencies', flags: '--no-dependencies', description: 'Do not expand guarantee dependencies in plan or run.', kind: 'boolean' },
 			{ name: 'record', flags: '--record', description: 'Record scene/video evidence while running guarantees.', kind: 'boolean' },
