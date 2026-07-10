@@ -451,6 +451,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					strict: true,
 					requireLiveRailway: !appId || appId === 'api',
 					requireLiveHttp: true,
+					httpRetry: { attempts: 30, intervalMs: 5_000 },
 					env,
 				})
 				: null;
