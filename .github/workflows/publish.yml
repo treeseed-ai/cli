@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm run release:setup || (echo "dependency install failed; retrying" && npm run release:setup)
+      - run: npm run release:setup
       - run: bash -lc 'npm run verify:local'
       - run: npm publish --access public
         env:

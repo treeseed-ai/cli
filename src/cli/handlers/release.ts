@@ -1,96 +1,9 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { createTreeseedManagedToolEnv, resolveTreeseedToolBinary, run, workspaceRoot } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
-import { spawnSync } from 'node:child_process';
 import { guidedResult } from './utils.js';
 import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from './workflow.js';
-import { discoverTreeseedGuarantees, planTreeseedGuarantees, runTreeseedGuarantees } from '@treeseed/sdk/guarantees';
-import { collectTreeseedConfigSeedValues, runTreeseedLocalCleanup } from '@treeseed/sdk/workflow-support';
-
-function normalizeVariableList(payload: unknown): Record<string, string> {
-	if (Array.isArray(payload)) {
-		const out: Record<string, string> = {};
-		for (const entry of payload) {
-			if (!entry || typeof entry !== 'object') continue;
-			const record = entry as Record<string, unknown>;
-			const key = typeof record.name === 'string' ? record.name : typeof record.key === 'string' ? record.key : '';
-			const value = typeof record.value === 'string' ? record.value : '';
-			if (key && value) out[key] = value;
-		}
-		return out;
-	}
-	if (!payload || typeof payload !== 'object') return {};
-	return Object.fromEntries(Object.entries(payload as Record<string, unknown>)
-		.filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0));
-}
-
-function loadReleaseGuaranteeServiceEnv(environment: string) {
-	if (environment !== 'staging') return { loaded: false, diagnostics: [] as string[] };
-	if (process.env.TREESEED_RELEASE_GUARANTEE_ENV_DISCOVERY === '1') {
-		return { loaded: false, diagnostics: [] as string[] };
-	}
-	if (
-		(process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET)
-		|| process.env.TREESEED_WEB_SERVICE_SECRET
-		|| process.env.TREESEED_API_WEB_SERVICE_SECRET
-	) {
-		return { loaded: true, diagnostics: [] as string[] };
-	}
-	const configured = collectTreeseedConfigSeedValues(process.cwd(), environment, process.env);
-	for (const key of ['TREESEED_ACCEPTANCE_SERVICE_ID', 'TREESEED_ACCEPTANCE_SERVICE_SECRET', 'TREESEED_WEB_SERVICE_ID', 'TREESEED_API_WEB_SERVICE_ID', 'TREESEED_WEB_SERVICE_SECRET', 'TREESEED_API_WEB_SERVICE_SECRET']) {
-		if (!process.env[key] && configured[key]) process.env[key] = configured[key];
-	}
-	if (!process.env.TREESEED_ACCEPTANCE_SERVICE_ID) {
-		process.env.TREESEED_ACCEPTANCE_SERVICE_ID = configured.TREESEED_API_WEB_SERVICE_ID || configured.TREESEED_WEB_SERVICE_ID;
-	}
-	if (!process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) {
-		process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET = configured.TREESEED_API_WEB_SERVICE_SECRET || configured.TREESEED_WEB_SERVICE_SECRET;
-	}
-	if (process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) {
-		return { loaded: true, diagnostics: [] as string[] };
-	}
-	const cliPath = process.argv[1];
-	if (!cliPath) return { loaded: false, diagnostics: ['Treeseed CLI path is unavailable for staging service credential discovery.'] };
-	const result = spawnSync(process.execPath, [
-		cliPath,
-		'railway',
-		'--environment',
-		environment,
-		'--',
-		'variable',
-		'list',
-		'--service',
-		'treeseed-api',
-		'--json',
-	], {
-		cwd: process.cwd(),
-		encoding: 'utf8',
-		env: {
-			...process.env,
-			TREESEED_RELEASE_GUARANTEE_ENV_DISCOVERY: '1',
-		},
-		maxBuffer: 1024 * 1024 * 8,
-	});
-	if ((result.status ?? 1) !== 0 || !result.stdout.trim()) {
-		return { loaded: false, diagnostics: ['Could not load staging API service variables for release guarantees.'] };
-	}
-	try {
-		const variables = normalizeVariableList(JSON.parse(result.stdout));
-		for (const key of ['TREESEED_ACCEPTANCE_SERVICE_ID', 'TREESEED_ACCEPTANCE_SERVICE_SECRET', 'TREESEED_WEB_SERVICE_ID', 'TREESEED_API_WEB_SERVICE_ID', 'TREESEED_WEB_SERVICE_SECRET', 'TREESEED_API_WEB_SERVICE_SECRET']) {
-			if (!process.env[key] && variables[key]) process.env[key] = variables[key];
-		}
-		if (!process.env.TREESEED_ACCEPTANCE_SERVICE_ID) {
-			process.env.TREESEED_ACCEPTANCE_SERVICE_ID = variables.TREESEED_API_WEB_SERVICE_ID || variables.TREESEED_WEB_SERVICE_ID;
-		}
-		if (!process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) {
-			process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET = variables.TREESEED_API_WEB_SERVICE_SECRET || variables.TREESEED_WEB_SERVICE_SECRET;
-		}
-		return {
-			loaded: Boolean((process.env.TREESEED_ACCEPTANCE_SERVICE_ID && process.env.TREESEED_ACCEPTANCE_SERVICE_SECRET) || process.env.TREESEED_WEB_SERVICE_SECRET || process.env.TREESEED_API_WEB_SERVICE_SECRET),
-			diagnostics: [] as string[],
-		};
-	} catch {
-		return { loaded: false, diagnostics: ['Staging API service variables were not valid JSON.'] };
-	}
-}
 
 function formatReleasePlanSections(payload: {
 	packageSelection?: { changed?: string[]; dependents?: string[]; selected?: string[] };
@@ -165,112 +78,69 @@ function formatReleasePlanSections(payload: {
 	return sections;
 }
 
+function dispatchProductionRelease(context: Parameters<TreeseedCommandHandler>[1], bump: 'major' | 'minor' | 'patch') {
+	const root = workspaceRoot(context.cwd);
+	const attestationPath = resolve(root, '.treeseed', 'workflow', 'stage-candidates', 'latest.attestation.json');
+	if (!existsSync(attestationPath)) throw new Error('No staging candidate attestation is available. Complete `trsd stage` before release.');
+	const attestation = JSON.parse(readFileSync(attestationPath, 'utf8')) as {
+		candidateId?: string;
+		rootSha?: string;
+		status?: string;
+		counts?: { failed?: number; blocked?: number; skipped?: number; releaseBlockingFailures?: number };
+	};
+	if (!attestation.candidateId || !attestation.rootSha || attestation.status !== 'passed') {
+		throw new Error('The latest staging candidate attestation is incomplete or unsuccessful.');
+	}
+	if (attestation.counts?.failed || attestation.counts?.blocked || attestation.counts?.skipped || attestation.counts?.releaseBlockingFailures) {
+		throw new Error(`Staging candidate ${attestation.candidateId} is not a complete passing guarantee run.`);
+	}
+	const gh = resolveTreeseedToolBinary('gh', { env: context.env });
+	if (!gh) throw new Error('GitHub CLI is unavailable. Run `trsd install --json` and retry.');
+	const env = createTreeseedManagedToolEnv(context.env);
+	run(gh, [
+		'workflow', 'run', 'production-release.yml', '--ref', 'staging',
+		'-f', `candidate_id=${attestation.candidateId}`,
+		'-f', `bump=${bump}`,
+	], { cwd: root, env });
+	let runId: number | null = null;
+	for (let attempt = 0; attempt < 120 && runId == null; attempt += 1) {
+		const output = run(gh, [
+			'run', 'list', '--workflow', 'production-release.yml', '--branch', 'staging',
+			'--commit', attestation.rootSha, '--event', 'workflow_dispatch', '--limit', '1', '--json', 'databaseId',
+		], { cwd: root, env, capture: true });
+		const rows = JSON.parse(output || '[]') as Array<{ databaseId?: number }>;
+		runId = typeof rows[0]?.databaseId === 'number' ? rows[0].databaseId : null;
+		if (runId == null) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5_000);
+	}
+	if (runId == null) throw new Error(`Production release workflow did not start for candidate ${attestation.candidateId}.`);
+	run(gh, ['run', 'watch', String(runId), '--exit-status'], { cwd: root, env });
+	return { attestation, runId };
+}
+
 export const handleRelease: TreeseedCommandHandler = async (invocation, context) => {
 	try {
 		const traceRelease = (phase: string) => {
 			console.error(`[release][cli] ${phase}`);
 		};
-		traceRelease('discover guarantees');
-		const guaranteeRegistry = discoverTreeseedGuarantees({ workspaceRoot: context.cwd });
-		if (!guaranteeRegistry.ok) {
-			return {
-				exitCode: 1,
-				stdout: [
-					'Treeseed release blocked by invalid guarantee registry.',
-					...guaranteeRegistry.diagnostics
-						.filter((entry) => entry.severity === 'error')
-						.map((entry) => `${entry.code}: ${entry.message}${entry.sourcePath ? ` (${entry.sourcePath})` : ''}`),
-				],
-				stderr: [],
-				report: {
-					command: invocation.commandName || 'release',
-					ok: false,
-					error: 'guarantee_registry_invalid',
-					guarantees: guaranteeRegistry,
-				},
-			};
-		}
-		const guaranteeEnvironment = 'staging';
-		traceRelease('plan release guarantees');
-		const guaranteeReleasePlan = planTreeseedGuarantees({ workspaceRoot: context.cwd, filter: { gate: 'release' }, environment: guaranteeEnvironment });
 		const releasePlanOnly = invocation.args.plan === true;
-		traceRelease('cleanup');
-		const releaseCleanup = !releasePlanOnly && invocation.args.skipCleanup !== true
-			? runTreeseedLocalCleanup({ root: context.cwd, mode: 'aggressive' })
-			: null;
-		if (releaseCleanup && !releaseCleanup.ok) {
-			return {
-				exitCode: 1,
-				stdout: ['Treeseed release blocked by local cleanup failure.'],
-				stderr: releaseCleanup.actions.filter((entry) => entry.status === 'failed').map((entry) => `${entry.id}: ${entry.error ?? 'failed'}`),
-				report: {
-					command: invocation.commandName || 'release',
-					ok: false,
-					error: 'local_cleanup_failed',
-					localCleanup: releaseCleanup,
-				},
-			};
-		}
-		traceRelease('load staging guarantee service env');
-		const guaranteeServiceEnv = releasePlanOnly
-			? { loaded: false, diagnostics: [] as string[] }
-			: loadReleaseGuaranteeServiceEnv(guaranteeEnvironment);
-		if (!releasePlanOnly && !guaranteeServiceEnv.loaded) {
-			return {
-				exitCode: 1,
-				stdout: [
-					'Treeseed release blocked before guarantee execution.',
-					'Staging API acceptance credentials are unavailable.',
-					...guaranteeServiceEnv.diagnostics,
-				],
-				stderr: [],
-				report: {
-					command: invocation.commandName || 'release',
-					ok: false,
-					error: 'guarantee_acceptance_credentials_missing',
-					diagnostics: guaranteeServiceEnv.diagnostics,
-				},
-			};
-		}
-		traceRelease('run staging release guarantees');
-		const guaranteeReleaseRun = releasePlanOnly ? null : await runTreeseedGuarantees({
-			workspaceRoot: context.cwd,
-			filter: { gate: 'release', status: 'active' },
-			environment: guaranteeEnvironment,
-			evidenceTarget: 'release',
-			record: true,
-			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
-			failOnSkippedReleaseGuarantees: true,
-		});
-		if (guaranteeReleaseRun && !guaranteeReleaseRun.ok) {
-			return {
-				exitCode: 1,
-				stdout: [
-					'Treeseed release blocked by failing product guarantees.',
-					`Run: ${guaranteeReleaseRun.runId}`,
-					`Failed: ${guaranteeReleaseRun.counts.failed}`,
-					`Blocked: ${guaranteeReleaseRun.counts.blocked}`,
-					`Skipped: ${guaranteeReleaseRun.counts.skipped}`,
-					`Release blocking failures: ${guaranteeReleaseRun.counts.releaseBlockingFailures}`,
-					`Evidence: ${guaranteeReleaseRun.outputRoot}`,
-					...guaranteeServiceEnv.diagnostics,
-				],
-				stderr: [],
-				report: {
-					command: invocation.commandName || 'release',
-					ok: false,
-					error: 'guarantee_release_run_failed',
-					guarantees: {
-						validation: guaranteeRegistry,
-						releasePlan: guaranteeReleasePlan,
-						releaseRun: guaranteeReleaseRun,
-					},
-				},
-			};
-		}
-		traceRelease('start workflow release');
 		const repairVersionLine = invocation.args.repairVersionLine === true;
 		const bump = (['major', 'minor', 'patch'] as const).find((candidate) => invocation.args[candidate] === true) ?? 'patch';
+		if (!releasePlanOnly && context.env.TREESEED_RELEASE_EXECUTION !== 'hosted') {
+			traceRelease('dispatch production release');
+			const dispatched = dispatchProductionRelease(context, bump);
+			return guidedResult({
+				command: invocation.commandName || 'release',
+				summary: 'Treeseed production release completed in GitHub Actions.',
+				facts: [
+					{ label: 'Candidate', value: dispatched.attestation.candidateId ?? '(unknown)' },
+					{ label: 'Release level', value: bump },
+					{ label: 'Workflow run', value: String(dispatched.runId) },
+				],
+				nextSteps: [],
+				report: { schemaVersion: 1, kind: 'treeseed.production-release-dispatch', ...dispatched, bump },
+			});
+		}
+		traceRelease('start workflow release');
 		const result = await createWorkflowSdk(context).release({
 			bump,
 			repairVersionLine,
@@ -279,7 +149,7 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
 			verifyDeployedResources: invocation.args.verifyDeployedResources === true,
 			fresh: invocation.args.fresh === true,
-			skipCleanup: invocation.args.skipCleanup === true || releaseCleanup !== null,
+			skipCleanup: invocation.args.skipCleanup === true,
 			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			plan: releasePlanOnly,
 		});
@@ -336,34 +206,17 @@ export const handleRelease: TreeseedCommandHandler = async (invocation, context)
 				{ label: 'Selected apps', value: payload.applicationSelection?.selected?.join(', ') || 'all' },
 				{ label: 'Fresh release', value: payload.fresh === true ? 'yes' : 'no' },
 				{ label: 'Workflow gates', value: String(payload.workflowGates?.length ?? 0) },
-				{ label: 'Release guarantees', value: String(guaranteeReleasePlan.counts.withDependencies) },
-				{ label: 'Guarantee environment', value: guaranteeEnvironment },
-				{ label: 'Guarantee evidence', value: guaranteeReleaseRun?.outputRoot ?? (result.executionMode === 'plan' ? '(planned)' : '(none)') },
 				{ label: 'Worktree path', value: payload.worktreePath ?? '(in-place)' },
 				{ label: 'Final branch', value: payload.finalBranch ?? (result.executionMode === 'plan' ? payload.stagingBranch : '(unknown)') },
 			],
 			sections: result.executionMode === 'plan' ? [
 				...hostingGraphSections(hostingGraph),
-				{
-					title: 'Product guarantees',
-					lines: [
-						`Selected release guarantees: ${guaranteeReleasePlan.counts.selected}`,
-						`With dependencies: ${guaranteeReleasePlan.counts.withDependencies}`,
-						`Execution environment: ${guaranteeEnvironment}`,
-						'Guarantee execution is enforced by the TreeSeed guarantee runner before production promotion when release execution is enabled.',
-					],
-				},
 				...formatReleasePlanSections(payload),
 			] : [],
 			nextSteps: renderWorkflowNextSteps(result),
 			report: {
 				...result,
 				hostingGraph,
-				guarantees: {
-					validation: guaranteeRegistry,
-					releasePlan: guaranteeReleasePlan,
-					...(guaranteeReleaseRun ? { releaseRun: guaranteeReleaseRun } : {}),
-				},
 			},
 		});
 	} catch (error) {

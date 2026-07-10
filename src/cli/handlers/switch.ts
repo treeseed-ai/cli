@@ -10,6 +10,7 @@ export const handleSwitch: TreeseedCommandHandler = async (invocation, context) 
 			preview: invocation.args.preview === true,
 			worktreeMode: invocation.args.worktree === true ? 'on' : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
+			adoptChanges: invocation.args.adoptChanges === true,
 			plan: invocation.args.plan === true,
 		});
 		const payload = result.payload as {

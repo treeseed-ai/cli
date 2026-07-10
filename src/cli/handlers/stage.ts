@@ -8,6 +8,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 			message: invocation.positionals.join(' ').trim(),
 			verifyMode: typeof invocation.args.verify === 'string' ? invocation.args.verify as 'action' | 'local' | 'none' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'hosted' | 'off' : undefined,
+			async: invocation.args.async === true,
 			cleanupMode: typeof invocation.args.cleanup === 'string' ? invocation.args.cleanup as 'success' | 'manual' : undefined,
 			updateFrom: typeof invocation.args.updateFrom === 'string' ? invocation.args.updateFrom : undefined,
 			releaseCandidate: typeof invocation.args.releaseCandidate === 'string' ? invocation.args.releaseCandidate as 'hybrid' | 'strict' | 'skip' : undefined,

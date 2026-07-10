@@ -21,31 +21,22 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.12.0
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: |
-          cp package.json package.json.verify-action.bak
-          restore_package_json() {
-            mv package.json.verify-action.bak package.json
-          }
-          trap restore_package_json EXIT
-          node -e "const fs = require('fs'); const p = JSON.parse(fs.readFileSync('package.json', 'utf8')); if (p.scripts) delete p.scripts.prepare; fs.writeFileSync('package.json', JSON.stringify(p, null, '\t') + '\n');"
-          install_with_retry() {
-            for attempt in 1 2 3; do
-              if "$@"; then
-                return 0
-              fi
-              echo "dependency install failed; retrying (${attempt}/3)."
-              sleep $((attempt * 5))
-            done
-            "$@"
-          }
-          if test -f package-lock.json; then
-            install_with_retry npm ci
-          else
-            install_with_retry npm install --no-audit --no-fund
-          fi
+        timeout-minutes: 20
+        run: npm ci --no-audit --no-fund
 
       - name: Verify package
         run: npm run verify:direct
+
+      - name: Pack verified artifact
+        run: mkdir -p artifacts && npm pack --json --ignore-scripts --pack-destination artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ github.sha }}
+          path: artifacts/*.tgz
+          if-no-files-found: error

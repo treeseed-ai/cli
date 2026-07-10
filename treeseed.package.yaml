@@ -4,6 +4,7 @@ kind: node-typescript
 type: node-cli
 repository: treeseed-ai/cli
 publishTarget: npm
+capabilities: { save: true, verify: true, publish: true, deploy: false, localOnly: false }
 workflowTemplateVersion: "1"
 githubEnvironments:
   - production
@@ -17,7 +18,7 @@ artifacts:
   - provider: npm
     name: "@treeseed/cli"
 releaseGate:
-  workflow: release-gate.yml
+  workflow: verify.yml
 projectArchitecture:
   topology: single_repository_site
   rootPath: .
