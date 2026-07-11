@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.12.41] - 2026-07-11
+
+### Fixed
+
+- ci(build): Fix deployment build and CLI artifact closure (3c7de0eff8aa)
+- build(build): fix stage completion and API SMTP routing (2c82b7d231d2)
+- build(build): Bind hosted API SMTP settings from root staging registry (5d9bd4e392db)
+- build(build): fix staging candidate credential handoff (f7f86010312e)
+- build(build): lock in UI shell architecture and test fixes (8f20f08b28fe)
+
+### Tests
+
+- build(build): Standardize verify release-gate and deploy workflows (e4696cd96f63)
+- ci(source): recover reliable save stage release workflow (7c5ca5735b94)
+- build(source): release guarantee reviewer and coverage updates (30b36eae1dff)
+
+### Dependencies
+
+- build(build): Exclude verification-only packages from release (d1def3c1139b)
+- build(build): seed verified login fixture without browser session (9173291439cd)
+- build(build): preserve dependency graph during artifact hydration (e6be0569744f)
+- build(build): hydrate exact candidate artifacts before staging deploy (1320b6c00f2b)
+- build(build): Propagate API web service secret through staging (fe95a3227df6)
+- build(build): Propagate control-plane secrets through staging (de706209157f)
+- build(build): Expose API surface URLs to strict live staging checks (f1ace7675494)
+- build(build): Make hosted apply wait for transient HTTP readiness (1d39256f23f0)
+- build(build): inject protected TreeDX secrets into staging (0a1a840e35cb)
+- build(build): make staging candidate retries resumable (8d10dc700f90)
+- build(build): release guarantee reviewer and coverage updates (63f82aea9aa2)
+- build(build): release guarantee reviewer and coverage updates (23639ed3b773)
+- build(build): release guarantee reviewer and coverage updates (9babe1fe23ee)
+- build(build): guard API workflow entrypoints and staging fanout (2b4c52c41d74)
+- build(build): block dependents on API deploy workflow (7ba2f515f4e7)
+- build(build): sync package dependency references (ce6e1e256bbb)
+
 ## [0.12.40] - 2026-07-06
 
 ### Changed
