@@ -57,7 +57,10 @@ function filterFromArgs(args: Record<string, string | string[] | boolean | undef
 		if (!VALID_STATUSES.has(status)) diagnostics.push(`Unsupported --status value: ${status}.`);
 		filter.status = status as TreeseedGuaranteeStatus;
 	}
-	if (typeof args.ownerPackage === 'string' && args.ownerPackage.trim()) filter.ownerPackage = args.ownerPackage.trim();
+	const ownerPackages = splitOption(args.ownerPackage);
+	if (ownerPackages?.length === 1) filter.ownerPackage = ownerPackages[0];
+	if (ownerPackages && ownerPackages.length > 1) filter.ownerPackages = ownerPackages;
+	if (args.sceneBacked === true) filter.sceneBacked = true;
 	const ids = splitOption(args.id);
 	if (ids) filter.ids = ids;
 	const journeyIndexes = integerOptions(args.journeyIndex);
@@ -371,7 +374,7 @@ export const handleGuarantees: TreeseedCommandHandler = async (invocation, conte
 		const device = typeof invocation.args.device === 'string' ? invocation.args.device : undefined;
 		const includeDependencies = invocation.args.dependencies === false || invocation.args.noDependencies === true ? false : undefined;
 		const includePlanned = invocation.args.includePlanned === true;
-		const agentExecutionProvider = filter.ownerPackage === '@treeseed/agent'
+		const agentExecutionProvider = filter.ownerPackage === '@treeseed/agent' || filter.ownerPackages?.includes('@treeseed/agent')
 			? applyAgentGuaranteeExecutionProviderMode({ environment, env: context.env })
 			: { ok: true, diagnostics: [] as string[] };
 		if (!agentExecutionProvider.ok) {
