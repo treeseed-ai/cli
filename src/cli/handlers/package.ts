@@ -1,4 +1,4 @@
-import { buildTreeseedPackageArtifact, syncTreeseedPackageWorkflows, validateTreeseedPackageManifests, verifyTreeseedPackageArtifact } from '@treeseed/sdk/workflow-support';
+import { buildTreeseedPackageArtifact, hydrateTreeseedPackageArtifacts, syncTreeseedPackageWorkflows, validateTreeseedPackageManifests, verifyTreeseedPackageArtifact } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { runPackageImageCommand } from './package-image.js';
 import { fail, guidedResult } from './utils.js';
@@ -38,7 +38,19 @@ export const handlePackage: TreeseedCommandHandler = async (invocation, context)
 					report: result,
 				});
 			}
-			return fail('Unknown package artifact action. Use build or verify.');
+			if (artifactAction === 'hydrate') {
+				const result = hydrateTreeseedPackageArtifacts({
+					artifactsRoot: typeof invocation.args.artifactsRoot === 'string' ? invocation.args.artifactsRoot : '.treeseed/artifacts/packages',
+					projectRoot: typeof invocation.args.projectRoot === 'string' ? invocation.args.projectRoot : context.cwd,
+				});
+				return guidedResult({
+					command: 'package artifact hydrate',
+					summary: `Hydrated ${result.packages.length} verified candidate package artifacts.`,
+					facts: result.packages.map((pkg) => ({ label: pkg.packageName, value: `${pkg.packageVersion} (${pkg.sourceSha.slice(0, 12)})` })),
+					report: result,
+				});
+			}
+			return fail('Unknown package artifact action. Use build, verify, or hydrate.');
 		}
 		if (action === 'workflow') {
 			const workflowAction = invocation.positionals[1] ?? 'sync';
