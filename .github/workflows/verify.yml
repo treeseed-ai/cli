@@ -32,8 +32,8 @@ jobs:
       - name: Verify package
         run: npm run verify:direct
 
-      - name: Pack verified artifact
-        run: mkdir -p artifacts && npm pack --json --ignore-scripts --pack-destination artifacts
+      - name: Pack verified deployment tool closure
+        run: node --import tsx ./scripts/pack-ci-tool-closure.ts artifacts
 
       - uses: actions/upload-artifact@v4
         with:
