@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.48] - 2026-07-12
+
+### Dependencies
+
+- build(cli): update dependencies and package version (8bd48b07751d)
+
 ## [0.12.47] - 2026-07-12
 
 ### Dependencies
