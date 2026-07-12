@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.45] - 2026-07-12
+
+### Dependencies
+
+- chore(cli): bump version and update dependencies to git pointers (44b112aa73e0)
+
 ## [0.12.44] - 2026-07-12
 
 ### Dependencies

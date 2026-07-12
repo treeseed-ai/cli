@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.45-dev.recovery-prod-treedx-image-binding.20260712T160650Z",
+  "version": "0.12.45",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#04a449668a7b13348e2e1d703607008db2c3c0df",
-    "@treeseed/core": "github:treeseed-ai/core#e8136b12c3411348685d252896afed369f8c30d5",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#9d64dce58d9e92b46a7ebf27f194c34a6f8d84a4",
+    "@treeseed/agent": "0.12.45",
+    "@treeseed/core": "0.12.46",
+    "@treeseed/sdk": "0.12.49",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
