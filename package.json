@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.42",
+  "version": "0.12.43-dev.recovery-release-managed-tsx.20260712T061709Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "0.12.42",
-    "@treeseed/core": "0.12.43",
-    "@treeseed/sdk": "0.12.46",
+    "@treeseed/agent": "github:treeseed-ai/agent#774672eee1614cff99bcfbc8d38a1c6e1c8cfe35",
+    "@treeseed/core": "github:treeseed-ai/core#472816e4ff0dea8740bb6d399b275ef2bb0d3b97",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#96482a9bbe9a41565a64e51d01c251bc993a19a9",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
