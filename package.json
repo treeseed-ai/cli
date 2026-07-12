@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.42-dev.recovery-release-gate-dependency-hydrati.20260712T023025Z",
+  "version": "0.12.42",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#36866a6fb7596325067afea697318f2e5bcc7fec",
-    "@treeseed/core": "github:treeseed-ai/core#412ed4ca6f22bb17a49411fa6936bed8fcc998a4",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#de6fe53d8132dd6c1d8b28c9cc333c25ee0e6651",
+    "@treeseed/agent": "0.12.42",
+    "@treeseed/core": "0.12.43",
+    "@treeseed/sdk": "0.12.46",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
