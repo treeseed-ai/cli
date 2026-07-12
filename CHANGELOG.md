@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.46] - 2026-07-12
+
+### Dependencies
+
+- build(cli): update dependencies and bump version (58c0c929dba4)
+
 ## [0.12.45] - 2026-07-12
 
 ### Dependencies
