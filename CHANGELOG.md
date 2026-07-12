@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.47] - 2026-07-12
+
+### Dependencies
+
+- build(cli): update dependencies to use git SHAs (7ea89abe911c)
+
 ## [0.12.46] - 2026-07-12
 
 ### Dependencies

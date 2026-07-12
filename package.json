@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.47-dev.recovery-production-image-source-policy.20260712T193731Z",
+  "version": "0.12.47",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#9dc625531c05487d0fe194806483326cc87d9c3a",
-    "@treeseed/core": "github:treeseed-ai/core#c15ddd7439d313f38bb6df332adcce6e47c2fe21",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#b0a8cb9532b80b853c29bb4f66dd0c0265539cfd",
+    "@treeseed/agent": "0.12.47",
+    "@treeseed/core": "0.12.48",
+    "@treeseed/sdk": "0.12.51",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
