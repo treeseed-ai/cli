@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.12.50] - 2026-07-13
+
+### Fixed
+
+- build(source): Fix release readiness and merged branch cleanup (97c09804013b)
+
+### Tests
+
+- test(tests): Align CLI stage cleanup contract (84e6641fac63)
+
+### Dependencies
+
+- build(build): Retry transient GitHub job setup failures once (2d1e55c1dc59)
+- build(build): Avoid repeated fetches during merged branch cleanup (fdf9cda6c954)
+- build(build): Delete merged feature branches after successful stage (4571578869f6)
+- build(build): Require explicit workflow resume and prevent stale (187ef4f18320)
+- build(build): Permanently isolate Railway staging Git sources (249e9a0c358a)
+
 ## [0.12.49] - 2026-07-13
 
 ### Dependencies

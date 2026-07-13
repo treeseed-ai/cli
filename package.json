@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.50-dev.recovery-bulk-branch-cleanup-performance.20260713T130747Z",
+  "version": "0.12.50",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#2e402ca5acbfe131ae97f847ab23362a66b6e5f3",
-    "@treeseed/core": "github:treeseed-ai/core#8476b78c9bddd8fe933c1c77cd4ecd493620c6a5",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#d7cb7bd0fba1c9d3901c44b033b2b66885a9d538",
+    "@treeseed/agent": "0.12.50",
+    "@treeseed/core": "0.12.51",
+    "@treeseed/sdk": "0.12.54",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
