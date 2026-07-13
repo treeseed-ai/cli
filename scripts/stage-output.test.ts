@@ -52,7 +52,7 @@ test('staging promotion plan json stays compact', async () => {
 	assert.equal(payload.payload.mergeTarget, 'staging');
 	assert.equal(payload.payload.verifyMode, 'action');
 	assert.equal(payload.payload.ciMode, 'hosted');
-	assert.equal(payload.payload.cleanupMode, 'manual');
+	assert.equal(payload.payload.cleanupMode, 'success');
 	assert.ok(Array.isArray(payload.payload.phases));
 	assert.equal(payload.payload.phases.includes('promote-to-staging'), true);
 	assert.equal(payload.payload.plan.targetBranch, 'staging');
@@ -63,4 +63,7 @@ test('staging promotion plan json stays compact', async () => {
 	assert.equal(payload.payload.readiness, undefined);
 	assert.equal(payload.payload.units, undefined);
 	assert.equal(payload.payload.plannedSteps, undefined);
+
+	const manualResult = await runCli(['stage', '--plan', '--cleanup', 'manual', '--json', 'manual cleanup plan'], root);
+	assert.equal(parseJsonOutput(manualResult.output).payload.cleanupMode, 'manual');
 });
