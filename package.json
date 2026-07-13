@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.51-dev.recovery-production-railway-environment-.20260713T151656Z",
+  "version": "0.12.51",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#716d48d9addd233e89213217023e7192088faa2d",
-    "@treeseed/core": "github:treeseed-ai/core#d602007781f812c7f7dd1022e83581d70ed5a20e",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#7b7f39c1cc51d6285129fab267bc7a95cbcbc2e6",
+    "@treeseed/agent": "0.12.51",
+    "@treeseed/core": "0.12.52",
+    "@treeseed/sdk": "0.12.55",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
