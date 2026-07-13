@@ -355,8 +355,11 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 		handlerName: 'ci',
 	})],
 	['tasks', command({
-		options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
-		examples: ['treeseed tasks', 'treeseed tasks --json'],
+		options: [
+			{ name: 'cleanupMerged', flags: '--cleanup-merged <mode>', description: 'Plan or execute deletion of exact remote task heads already merged into staging or main.', kind: 'enum', values: ['plan', 'live'] },
+			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
+		],
+		examples: ['treeseed tasks', 'treeseed tasks --json', 'treeseed tasks --cleanup-merged plan', 'treeseed tasks --cleanup-merged live'],
 		help: {
 			workflowPosition: 'inspect',
 			longSummary: [
@@ -368,10 +371,14 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			],
 			outcomes: [
 				'Prints the task inventory and any surfaced preview metadata without changing the repo state.',
+				'With `--cleanup-merged plan`, reports exact remote task heads that are safely merged into staging or main.',
+				'With `--cleanup-merged live`, deletes only those exact merged remote heads and preserves active or unmerged work.',
 			],
 			examples: [
 				example('treeseed tasks', 'List task branches', 'Show active task branches in the current workspace.'),
 				example('treeseed tasks --json', 'Machine-readable task inventory', 'Emit the task list in JSON for scripts or agent tooling.'),
+				example('treeseed tasks --cleanup-merged plan', 'Plan stale branch cleanup', 'Inspect every managed repository without changing remote refs.'),
+				example('treeseed tasks --cleanup-merged live', 'Clean merged remote branches', 'Delete exact remote task heads already contained by staging or main.'),
 				example('trsd tasks', 'Use the short alias', 'Run the same task listing flow through the shorter CLI entrypoint.'),
 			],
 			relatedDetails: [
@@ -588,7 +595,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
 		examples: ['treeseed stage "feat: add search filters"', 'treeseed stage --plan "feat: add search filters"', 'treeseed stage --verify none --cleanup manual "handoff to staging agent"'],
-		notes: ['Stage merges staging down into the feature branch before staging is mutated.', 'Stage monitors hosted staging CI by default; use --async for deliberate asynchronous promotion.', 'Source branches and managed worktrees are preserved by default; use --cleanup success only when cleanup is intentionally safe.'],
+		notes: ['Stage merges staging down into the feature branch before staging is mutated.', 'Stage monitors hosted staging CI by default; use --async for deliberate asynchronous promotion.', 'After every required workflow succeeds, stage deletes the exact merged source branches by default; use --cleanup manual only when they must be preserved intentionally.'],
 		help: {
 			workflowPosition: 'merge to staging',
 			longSummary: [
@@ -603,7 +610,7 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 				'Merges staging into the feature branch first.',
 				'Runs local proof before staging mutation by default.',
 				'Promotes exact verified package and root SHAs to staging.',
-				'Preserves source branches and managed worktrees by default after staging refs are verified.',
+				'Deletes exact merged source branches and cleans managed worktrees after staging refs are verified.',
 			],
 			examples: [
 				example('treeseed stage "feat: add search filters"', 'Promote a completed task', 'Merge the current task branch into staging with a resolution message.'),

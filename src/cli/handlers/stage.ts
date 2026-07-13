@@ -144,7 +144,7 @@ export const handleStage: TreeseedCommandHandler = async (invocation, context) =
 				{ label: 'Merge strategy', value: payload.mergeStrategy },
 				{ label: 'Verify mode', value: payload.verifyMode ?? 'action' },
 				{ label: 'CI mode', value: payload.ciMode ?? 'off' },
-				{ label: 'Cleanup mode', value: payload.cleanupMode ?? 'manual' },
+				{ label: 'Cleanup mode', value: payload.cleanupMode ?? 'success' },
 				{ label: 'Auto-saved', value: payload.autoSaved ? 'yes' : 'no' },
 				{ label: 'Package merges', value: String(mergedPackages) },
 				...(payload.blockers?.length
