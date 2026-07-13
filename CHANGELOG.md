@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.12.52] - 2026-07-13
+
+### Fixed
+
+- build(build): retain declared sibling operations runner resources (35eddbe0bc46)
+
+### Dependencies
+
+- build(deps): update dependencies to specific git commits (59793922db91)
+
 ## [0.12.51] - 2026-07-13
 
 ### Dependencies
