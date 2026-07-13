@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.49] - 2026-07-13
+
+### Dependencies
+
+- build(deps): update dependencies to git references (030fbdff218b)
+
 ## [0.12.48] - 2026-07-12
 
 ### Dependencies
