@@ -296,8 +296,9 @@ function makeFakeAgentPackageRoot() {
 async function runCli(args, options = {}) {
 	const writes = [];
 	const spawns = [];
-	ensureTestManagedGh(options.env);
-	ensureTestManagedRailway(options.env);
+	const effectiveEnv = { ...process.env, ...(options.env ?? {}) };
+	ensureTestManagedGh(effectiveEnv);
+	ensureTestManagedRailway(effectiveEnv);
 	const envOverrides = {
 		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
 		CI: undefined,
