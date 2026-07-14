@@ -244,20 +244,22 @@ function assertSuccessWithDiagnostics(result, label) {
 }
 
 function ensureTestManagedGh(env) {
-	const toolsHome = env?.TREESEED_TOOLS_HOME
-		?? (env?.XDG_CACHE_HOME ? resolve(env.XDG_CACHE_HOME, 'treeseed', 'tools') : null)
-		?? (env?.HOME ? resolve(env.HOME, '.cache', 'treeseed', 'tools') : null);
-	if (!toolsHome) return;
+	const toolsHome = env?.TREESEED_TOOLS_HOME?.trim()
+		? resolve(env.TREESEED_TOOLS_HOME)
+		: env?.XDG_CACHE_HOME?.trim()
+			? resolve(env.XDG_CACHE_HOME, 'treeseed', 'tools')
+			: resolve(process.cwd(), '.treeseed', 'tools');
 	const ghPath = resolve(toolsHome, 'gh', '2.90.0', `${process.platform}-${process.arch}`, 'bin', 'gh');
 	mkdirSync(dirname(ghPath), { recursive: true });
 	writeFileSync(ghPath, '#!/bin/sh\necho gh version 2.90.0\n', { mode: 0o755 });
 }
 
 function ensureTestManagedRailway(env) {
-	const toolsHome = env?.TREESEED_TOOLS_HOME
-		?? (env?.XDG_CACHE_HOME ? resolve(env.XDG_CACHE_HOME, 'treeseed', 'tools') : null)
-		?? (env?.HOME ? resolve(env.HOME, '.cache', 'treeseed', 'tools') : null);
-	if (!toolsHome) return;
+	const toolsHome = env?.TREESEED_TOOLS_HOME?.trim()
+		? resolve(env.TREESEED_TOOLS_HOME)
+		: env?.XDG_CACHE_HOME?.trim()
+			? resolve(env.XDG_CACHE_HOME, 'treeseed', 'tools')
+			: resolve(process.cwd(), '.treeseed', 'tools');
 	const railwayPath = resolve(toolsHome, 'railway', '5.23.2', `${process.platform}-${process.arch}`, 'bin', 'railway');
 	mkdirSync(dirname(railwayPath), { recursive: true });
 	writeFileSync(railwayPath, '#!/bin/sh\necho railway 5.23.2\n', { mode: 0o755 });
@@ -346,7 +348,7 @@ async function runCli(args, options = {}) {
 
 test('treeseed with no args prints top-level help and exits successfully', async () => {
 	const result = await runCli([]);
-	assert.equal(result.exitCode, 0);
+	assert.equal(result.exitCode, 0, result.output);
 	assert.match(result.output, /Treeseed CLI/);
 	assert.match(result.output, /Featured Commands/);
 	assert.match(result.output, /Utilities/);
@@ -445,7 +447,7 @@ test('auth:login defaults to central and sanitizes loopback approval links from 
 test('save help documents optional generated commit message hints', async () => {
 	const result = await runCli(['help', 'save']);
 	const saveSpec = findCommandSpec('save');
-	assert.equal(result.exitCode, 0);
+	assert.equal(result.exitCode, 0, result.output);
 	assert.equal(saveSpec.arguments[0].required, false);
 	assert.match(result.output, /treeseed save/);
 	assert.match(result.output, /generated message/);
