@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.55",
+  "version": "0.12.56-dev.fix-railway-service-dedup.20260714T023047Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "0.12.55",
-    "@treeseed/core": "0.12.56",
-    "@treeseed/sdk": "0.12.59",
+    "@treeseed/agent": "github:treeseed-ai/agent#de5efa96e2edf493224d77958a34e081f958738f",
+    "@treeseed/core": "github:treeseed-ai/core#9f9b1f07e5a9c8cef67166098929d16bac532827",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#425cd3a525337dfebcbaf34be216e9b78eb3a81e",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
