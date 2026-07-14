@@ -253,6 +253,16 @@ function ensureTestManagedGh(env) {
 	writeFileSync(ghPath, '#!/bin/sh\necho gh version 2.90.0\n', { mode: 0o755 });
 }
 
+function ensureTestManagedRailway(env) {
+	const toolsHome = env?.TREESEED_TOOLS_HOME
+		?? (env?.XDG_CACHE_HOME ? resolve(env.XDG_CACHE_HOME, 'treeseed', 'tools') : null)
+		?? (env?.HOME ? resolve(env.HOME, '.cache', 'treeseed', 'tools') : null);
+	if (!toolsHome) return;
+	const railwayPath = resolve(toolsHome, 'railway', '5.23.2', `${process.platform}-${process.arch}`, 'bin', 'railway');
+	mkdirSync(dirname(railwayPath), { recursive: true });
+	writeFileSync(railwayPath, '#!/bin/sh\necho railway 5.23.2\n', { mode: 0o755 });
+}
+
 function npmInstallTestEnv() {
 	return {
 		NODE_ENV: 'test',
@@ -287,6 +297,7 @@ async function runCli(args, options = {}) {
 	const writes = [];
 	const spawns = [];
 	ensureTestManagedGh(options.env);
+	ensureTestManagedRailway(options.env);
 	const envOverrides = {
 		TREESEED_KEY_AGENT_TRANSPORT: 'inline',
 		CI: undefined,
