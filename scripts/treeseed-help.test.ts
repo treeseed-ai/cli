@@ -761,7 +761,7 @@ test('tools command emits managed executable paths and auth status as json', asy
 	assert.ok(Array.isArray(report.auth.github.remediation));
 });
 
-test('install --force repairs npm dependencies even when node_modules exists', async () => {
+test('install --force leaves a healthy installed dependency graph untouched', async () => {
 	const workspaceRoot = makeWorkspaceRoot();
 	mkdirSync(resolve(workspaceRoot, 'node_modules'), { recursive: true });
 	const result = await runCli(['install', '--force', '--json'], {
@@ -776,8 +776,9 @@ test('install --force repairs npm dependencies even when node_modules exists', a
 	assertSuccessWithDiagnostics(result, 'install-force-json');
 	const report = JSON.parse(result.stdout);
 	assert.equal(report.ok, true);
-	assert.equal(report.npmInstalls[0].status, 'installed');
-	assert.match(report.npmInstalls[0].command.join(' '), /install --no-audit --no-fund/);
+	assert.equal(report.npmInstalls[0].status, 'already-present');
+	assert.match(report.npmInstalls[0].detail, /force is limited to Treeseed-managed tool repair/);
+	assert.match(report.npmInstalls[0].command.join(' '), /install --ignore-scripts --prefer-offline --workspaces=false --no-audit --no-fund/);
 });
 
 test('agents help is rendered locally without requiring the core runtime', async () => {
