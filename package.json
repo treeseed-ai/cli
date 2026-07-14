@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#298ba77cfc245b48bc96da838cf4c4d8e3e2a67d",
-    "@treeseed/core": "github:treeseed-ai/core#a975e448cb95c09de41798e2056fa7296462a60e",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#c7698d2a7cc264856a1d18c0345de641de701b11",
+    "@treeseed/agent": "github:treeseed-ai/agent#d5769807726694c8d370314494cefa295d0d4cd8",
+    "@treeseed/core": "github:treeseed-ai/core#d22e348ccbd6e7987838a3706af5f480d8528b84",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#70cda94a2f10bec991c7b228e5ee6a17015715d1",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
