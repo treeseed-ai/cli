@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.56",
+  "version": "0.12.57-dev.fix-railway-environment-source-isolation.20260714T115135Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "0.12.56",
-    "@treeseed/core": "0.12.57",
-    "@treeseed/sdk": "0.12.60",
+    "@treeseed/agent": "github:treeseed-ai/agent#396fa07a945991fbb98fff2a4318fbf9b34ababe",
+    "@treeseed/core": "github:treeseed-ai/core#ef40d729552065855cf77c0a7a1e0b6596f86df2",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#b0c561c0d492f085790b595e9e1c7efa939df4c7",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },

@@ -1725,6 +1725,39 @@ test('treeseed dev api-only plans avoid local treedx reconciliation units', asyn
 	assert.doesNotMatch(serialized, /local-docker-compose:treedx/u);
 });
 
+test('treeseed dev web-only restart retains runtime dependencies without selecting treedx content sync', async () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-web-only');
+	installCoreDevFixture(workspaceRoot, { workspace: true });
+	const apiRoot = resolve(workspaceRoot, 'packages', 'api');
+	mkdirSync(apiRoot, { recursive: true });
+	writeFileSync(resolve(apiRoot, 'package.json'), `${JSON.stringify({
+		name: '@treeseed/api',
+		version: '0.0.0',
+		type: 'module',
+		scripts: {
+			dev: 'node ./dev.js',
+			'dev:operations-runner': 'node ./runner.js',
+		},
+	}, null, 2)}\n`, 'utf8');
+
+	const result = await runCli(['dev', 'restart', '--app', 'web', '--web-runtime', 'local', '--local-content', 'none', '--plan', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(result.exitCode, 0, result.output);
+	const payload = JSON.parse(result.stdout || result.output);
+	const serialized = JSON.stringify(payload.reconcile);
+	assert.match(serialized, /local-process:market-web/u);
+	assert.match(serialized, /local-process:api/u);
+	assert.match(serialized, /local-docker-compose:api-postgres/u);
+	assert.match(serialized, /local-docker-compose:mailpit/u);
+	assert.doesNotMatch(serialized, /local-treedx:team-primary/u);
+	assert.doesNotMatch(serialized, /local-docker-compose:treedx/u);
+});
+
 test('treeseed dev rejects removed surface and worker options', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-surfaces');
 	installCoreDevFixture(workspaceRoot, { workspace: true });

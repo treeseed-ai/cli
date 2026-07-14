@@ -193,14 +193,13 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			unitId: selectedUnitIds,
 		};
 		const units = compileTreeseedDesiredUnitsFromGraph(desiredGraph, selector)
-			.filter((unit) => selectedUnitIdSet.has(unit.unitId))
 			.map((unit) =>
 				unit.unitType === 'local-process'
 					? {
 							...unit,
 							spec: {
 								...unit.spec,
-								action: effectiveSubcommand === 'restart' ? 'restart' : 'start',
+								action: effectiveSubcommand === 'restart' && selectedUnitIdSet.has(unit.unitId) ? 'restart' : 'start',
 								options: {
 									...(unit.spec.options as Record<string, unknown> | undefined),
 									...localProcessOptions,
@@ -208,15 +207,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 								},
 							},
 						}
-					: unit.unitType === 'local-docker-compose' && invocation.args.force === true
-						? {
-								...unit,
-								spec: {
-									...unit.spec,
-									forceRecreate: true,
-								},
-							}
-					: unit,
+						: unit,
 			);
 		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
 		const stopLike = effectiveSubcommand === 'stop';

@@ -116,51 +116,22 @@ function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostin
 	};
 }
 
-function reconcileResultMatchesHostingUnit(result: any, unit: any) {
-	const serviceKey = typeof result?.unit?.metadata?.serviceKey === 'string' ? result.unit.metadata.serviceKey : null;
-	const logicalName = typeof result?.unit?.logicalName === 'string' ? result.unit.logicalName : null;
-	const unitId = typeof result?.unit?.unitId === 'string' ? result.unit.unitId : null;
-	const serviceName = typeof unit?.config?.serviceName === 'string' ? unit.config.serviceName : null;
-	return Boolean(
-		serviceKey === unit.id
-		|| logicalName === unit.id
-		|| logicalName === serviceName
-		|| unitId === unit.id
-		|| (typeof unitId === 'string' && (unitId.endsWith(`:${unit.id}`) || (serviceName && unitId.endsWith(`:${serviceName}`))))
-	);
-}
-
-function preferConcreteReconcileResult(left: any, right: any) {
-	if (!left) return right;
-	const leftProvider = typeof left?.unit?.provider === 'string' ? left.unit.provider : '';
-	const rightProvider = typeof right?.unit?.provider === 'string' ? right.unit.provider : '';
-	if (leftProvider === 'treeseed' && rightProvider !== 'treeseed') return right;
-	return left;
-}
-
-function hostingReportWithLiveReconcile(report: any, reconcileResult: any) {
-	const results = Array.isArray(reconcileResult?.results) ? reconcileResult.results : [];
+function hostingReportWithReadOnlyStatus(report: any, status: any) {
+	const statuses = Array.isArray(status?.units) ? status.units : [];
 	const units = Array.isArray(report?.units)
 		? report.units.map((entry: any) => {
-			const matched = results
-				.filter((result: any) => reconcileResultMatchesHostingUnit(result, entry.unit))
-				.reduce((selected: any, result: any) => preferConcreteReconcileResult(selected, result), null);
+			const serviceName = typeof entry.unit?.config?.serviceName === 'string' ? entry.unit.config.serviceName : null;
+			const matched = statuses.find((candidate: any) =>
+				candidate.unitId === entry.unit.id
+				|| String(candidate.unitId ?? '').endsWith(`:${entry.unit.id}`)
+				|| (serviceName && String(candidate.unitId ?? '').endsWith(`:${serviceName}`)));
 			if (!matched?.verification) return entry;
 			return {
 				...entry,
 				observed: {
 					status: matched.verification.verified ? 'ready' : 'blocked',
-					locators: matched.resourceLocators ?? {},
-					state: matched.state ?? matched.observed?.live ?? {},
+					locators: matched.locators ?? {},
 					warnings: matched.warnings ?? [],
-				},
-				plan: {
-					...entry.plan,
-					action: matched.verification.verified === true ? 'noop' : matched.diff?.action ?? entry.plan?.action ?? 'verify',
-					reasons: matched.verification.verified === true
-						? ['live provider state verified']
-						: matched.diff?.reasons ?? entry.plan?.reasons ?? [],
-					before: matched.observed?.live ?? entry.plan?.before ?? {},
 				},
 				verification: {
 					unitId: entry.unit.id,
@@ -176,23 +147,19 @@ function hostingReportWithLiveReconcile(report: any, reconcileResult: any) {
 					})),
 					warnings: matched.verification.warnings ?? [],
 				},
-				reconcile: matched,
 			};
 		})
 		: [];
-	const liveIssues = units
-		.filter((entry: any) => entry.verification?.verified !== true)
-		.map((entry: any) => `${entry.unit.id}: live reconcile verification did not pass`);
 	return {
 		...report,
 		units,
-		reconcile: reconcileResult,
+		reconcileStatus: status,
 		liveVerification: {
-			ok: liveIssues.length === 0,
-			source: 'live-reconcile',
-			issues: liveIssues,
+			ok: status?.ready === true,
+			source: 'read-only-reconcile-status',
+			issues: status?.blockers ?? [],
 		},
-		ok: liveIssues.length === 0,
+		ok: status?.ready === true,
 	};
 }
 
@@ -345,18 +312,16 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			if (subcommand === 'plan' || subcommand === 'verify') {
 				const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 				const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
-				const liveReconcile = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
-					? await reconcileTreeseedTarget({
+				const liveStatus = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
+					? await collectTreeseedReconcileStatus({
 						tenantRoot: context.cwd,
 						target: targetFor(environment),
 						env,
 						selector: selectorFromHostingGraph(graph),
-						planOnly: false,
-						write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 					})
 					: null;
-				const report = liveReconcile
-					? hostingReportWithLiveReconcile(serializeHostingPlan(plan), liveReconcile)
+				const report = liveStatus
+					? hostingReportWithReadOnlyStatus(serializeHostingPlan(plan), liveStatus)
 					: serializeHostingPlan(plan);
 			const planFailures = report.ok === false || report.liveVerification?.ok === false
 				? report.units
