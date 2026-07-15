@@ -190,6 +190,17 @@ test('hosting plan refuses live verification claims', async () => {
 	assert.match(result.stdout + result.stderr, /cannot prove live provider state/u);
 });
 
+test('hosting pending-volume replacement is apply-only and requires explicit confirmation', async () => {
+	const cwd = makeMarketWorkspace();
+	const planResult = await runCli(['hosting', 'plan', '--environment', 'prod', '--replace-pending-volumes', '--yes', '--json'], cwd);
+	assert.equal(planResult.exitCode, 1);
+	assert.match(planResult.stdout + planResult.stderr, /available only with `hosting apply`/u);
+
+	const unconfirmedApply = await runCli(['hosting', 'apply', '--environment', 'prod', '--replace-pending-volumes', '--json'], cwd);
+	assert.equal(unconfirmedApply.exitCode, 1);
+	assert.match(unconfirmedApply.stdout + unconfirmedApply.stderr, /permanently discards queued Railway volume data and requires --yes/u);
+});
+
 test('hosting plan can target API service only', async () => {
 	const cwd = makeMarketWorkspace();
 	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--service', 'api', '--placement-only', '--json'], cwd);

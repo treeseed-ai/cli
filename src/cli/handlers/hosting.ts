@@ -228,7 +228,17 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim()
 				? invocation.args.app.trim()
 				: undefined;
-			const env = selectedSeedEnv(context, environment);
+			const replacePendingVolumes = invocation.args.replacePendingVolumes === true;
+			if (replacePendingVolumes && subcommand !== 'apply') {
+				throw new Error('--replace-pending-volumes is available only with `hosting apply`.');
+			}
+			if (replacePendingVolumes && invocation.args.yes !== true) {
+				throw new Error('--replace-pending-volumes permanently discards queued Railway volume data and requires --yes.');
+			}
+			const env = {
+				...selectedSeedEnv(context, environment),
+				...(replacePendingVolumes ? { TREESEED_REPLACE_PENDING_RAILWAY_VOLUMES: '1' } : {}),
+			};
 			const filter = {
 				serviceIds: listArg(invocation.args.service),
 				placements: listArg(invocation.args.placement) as any,
