@@ -17,6 +17,8 @@ import {
 import {
 	collectTreeseedConfigSeedValues,
 	collectTreeseedLiveHostedServiceChecks as collectLiveChecks,
+	configuredRailwayServices,
+	waitForRailwayManagedDeploymentsSettled,
 } from '@treeseed/sdk/workflow-support';
 import type { TreeseedCommandHandler } from '../types.js';
 import { guidedResult } from './utils.js';
@@ -443,6 +445,28 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					env,
 					selector,
 				});
+		const selectedRailwayServiceNames = new Set(graph.units
+			.filter((unit) => unit.host.id === 'railway')
+			.map((unit) => typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null)
+			.filter((value): value is string => Boolean(value)));
+		const selectedRailwayServices = environment === 'local'
+			? []
+			: configuredRailwayServices(context.cwd, environment, env)
+				.filter((service) => selectedRailwayServiceNames.has(service.serviceName));
+		const deployments = selectedRailwayServices.length > 0
+			? await waitForRailwayManagedDeploymentsSettled(context.cwd, environment, {
+				services: selectedRailwayServices,
+				env,
+				timeoutMs: 600_000,
+				onProgress: (line, stream) => context.write(`[railway] ${line}`, stream === 'stdout' ? 'stderr' : stream),
+			})
+			: null;
+		if (deployments?.ok === false) {
+			const failures = deployments.checks
+				.filter((check) => check.ok !== true && check.skipped !== true)
+				.map((check) => `${check.serviceName ?? check.service}: ${check.message ?? check.status ?? 'deployment did not settle'}`);
+			throw new Error(`Railway deployments did not settle before live verification:\n${failures.join('\n')}`);
+		}
 		const report = {
 			...planReport,
 			selector,
@@ -453,6 +477,7 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 				reconcile: reconcileResult?.results.find((result) => result.unit.logicalName === entry.unit.id || result.unit.unitId.includes(entry.unit.id)) ?? null,
 			})),
 			reconcile: reconcileResult,
+			deployments,
 			status,
 			ok: status ? status.ready : true,
 		};

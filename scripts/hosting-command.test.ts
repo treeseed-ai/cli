@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { makeWorkspaceRoot } from './cli-test-fixtures.ts';
 
@@ -223,4 +223,17 @@ test('hosting plan selects split API runtime and public TreeDX units', async () 
 	const unitIds = payload.units.map((entry) => entry.unit.id);
 	assert.ok(unitIds.includes('api'));
 	assert.ok(unitIds.includes('public-treedx-node-01'));
+});
+
+test('hosting apply waits for selected Railway deployments before live verification', () => {
+	const source = readFileSync(resolve(import.meta.dirname, '..', 'src', 'cli', 'handlers', 'hosting.ts'), 'utf8');
+	const waitIndex = source.indexOf('waitForRailwayManagedDeploymentsSettled');
+	const liveIndex = source.indexOf('const liveHostedServices = environment');
+
+	assert.notEqual(waitIndex, -1);
+	assert.notEqual(liveIndex, -1);
+	assert.ok(waitIndex < liveIndex);
+	assert.match(source, /selectedRailwayServiceNames/u);
+	assert.match(source, /timeoutMs: 600_000/u);
+	assert.match(source, /Railway deployments did not settle before live verification/u);
 });
