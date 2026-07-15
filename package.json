@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.57-dev.fix-scalable-hosting-release.20260715T114339Z",
+  "version": "0.12.57",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#4f3a0a15803e6b2e7f1a99dca7e8a6bcbd2509b2",
-    "@treeseed/core": "github:treeseed-ai/core#900201fa3672fc54434d90fd5843d5e851b6e4a9",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#c7ee6806eda332196102fe07bb02b22ca042026e",
+    "@treeseed/agent": "0.12.57",
+    "@treeseed/core": "0.12.58",
+    "@treeseed/sdk": "0.12.61",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },

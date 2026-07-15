@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.12.57] - 2026-07-15
+
+### Added
+
+- feat(hosting): integrate reconciliation plan and support placement-only (3373c03c4cf0)
+
+### Fixed
+
+- build(build): archive stale stage resumes after repository heads (ccee11914823)
+- build(build): wait for Railway deployments before live hosting (76fcbba26933)
+- build(build): honor package deployment capabilities during staging (37be8e89b29a)
+- build(build): sync package dependency references (16d73fd07f05)
+- test(tests): fix managed Railway CLI test environment (f1be193ff6ec)
+- build(build): bound remote Git workflow probes (f39cecbf1d81)
+- build(build): handle orphaned Railway volume migration (f49843f002f8)
+- build(build): use Railway SDK for environment patch operations (6a2db2d180fe)
+- build(build): classify stale Railway attachments from blocker records (ba9dae9363ac)
+- build(build): scope Railway migration cleanup to target environment (234f95fc67d2)
+- build(build): resolve qualified Railway service from project inventory (f74fe834854a)
+- build(build): unblock exact inactive Railway migration attachment (5c66dbd756d3)
+- build(build): detach only known empty Railway migration volumes (868b1891176f)
+- build(build): commit Railway restored volume patch (ad1dacf26ee4)
+- build(build): restore Railway volumes through native source snapshots (b46f02a93199)
+- build(build): retry Railway backup propagation safely (115ff7ba63f9)
+- build(build): treat Railway backup workflows as opaque (635381064722)
+- build(build): support Railway backup workflow identifiers (abf7bd1bf170)
+- build(build): preserve Railway volume data while splitting environment (9b0e9591ec10)
+- test(tests): isolate Railway staging and production service sources (83003cd0d589)
+- 1 additional change omitted from this summary.
+
+### Tests
+
+- test(ready-command): update railway service name and volume (8f18e836717f)
+- test(tests): align managed tool test fallback with SDK (969251fd459a)
+- test(tests): enforce SDK-first Railway reconciliation (8625330499e1)
+
+### Dependencies
+
+- chore(deps): update treeseed dependencies (5a285e4b847b)
+- build(build): enforce SDK-first Railway reconciliation (12b1f22642b8)
+- build(build): wait for Railway volume detach propagation (072532cbd6dd)
+
 ## [0.12.56] - 2026-07-14
 
 ### Fixed
