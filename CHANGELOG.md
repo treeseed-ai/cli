@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.58] - 2026-07-15
+
+### Fixed
+
+- build(build): checkpoint release recovery fixes (ba1dbd1da4fa)
+
 ## [0.12.57] - 2026-07-15
 
 ### Added
