@@ -2279,7 +2279,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		description: 'Resolve host-agnostic service types into environment-specific host bindings for local dev, staging, and production.',
 		provider: 'default',
 		related: ['status', 'dev', 'config', 'stage', 'release'],
-		usage: 'treeseed hosting [status|plan|apply|verify|destroy] [--environment local|staging|prod] [--app web|api] [--service api] [--json]',
+		usage: 'treeseed hosting [status|plan|apply|verify|destroy] [--environment local|staging|prod] [--app web|api] [--service api] [--placement-only] [--json]',
 		arguments: [{ name: 'action', description: 'Hosting action.', required: false }],
 		options: [
 			{ name: 'environment', flags: '--environment <scope>', description: 'Hosting environment to resolve.', kind: 'enum', values: ['local', 'staging', 'prod'] },
@@ -2288,6 +2288,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 			{ name: 'placement', flags: '--placement <placement>', description: 'Limit hosting graph work to one service placement.', kind: 'string' },
 			{ name: 'host', flags: '--host <host-id>', description: 'Limit hosting graph work to one host id.', kind: 'string' },
 			{ name: 'live', flags: '--live', description: 'Request live provider verification where supported.', kind: 'boolean' },
+			{ name: 'placementOnly', flags: '--placement-only', description: 'Limit hosting plan output to deterministic placement compilation without provider-state reconciliation.', kind: 'boolean' },
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
 		examples: [

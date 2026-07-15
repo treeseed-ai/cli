@@ -138,7 +138,13 @@ function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 	}
 }
 
-function defaultSpawn(command: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; stdio?: 'inherit' }) {
+function defaultSpawn(command: string, args: string[], options: {
+	cwd: string;
+	env: NodeJS.ProcessEnv;
+	stdio?: 'inherit' | 'pipe';
+	timeout?: number;
+	killSignal?: NodeJS.Signals;
+}) {
 	return spawnSync(command, args, options);
 }
 

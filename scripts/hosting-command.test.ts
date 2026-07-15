@@ -51,7 +51,7 @@ services:
     provider: railway
     rootDir: packages/api
     railway:
-      serviceName: treeseed-api-operations-runner-01
+      serviceName: treeseed-ops-01
       rootDir: packages/api
       buildCommand: npm run build
       startCommand: npm run start:runner
@@ -119,7 +119,7 @@ services:
     provider: railway
     rootDir: .
     railway:
-      serviceName: treeseed-api-operations-runner-01
+      serviceName: treeseed-ops-01
       rootDir: .
       buildCommand: npm run build
       startCommand: npm run start:runner
@@ -170,8 +170,8 @@ function parseJsonOutput(stdout) {
 
 test('hosting plan emits placement-first JSON for staging', async () => {
 	const cwd = makeMarketWorkspace();
-	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--json'], cwd);
-	assert.equal(result.exitCode, 0);
+	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--placement-only', '--json'], cwd);
+	assert.equal(result.exitCode, 0, result.stderr);
 	const payload = parseJsonOutput(result.stdout);
 
 	assert.equal(payload.environment, 'staging');
@@ -192,8 +192,8 @@ test('hosting plan refuses live verification claims', async () => {
 
 test('hosting plan can target API service only', async () => {
 	const cwd = makeMarketWorkspace();
-	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--service', 'api', '--json'], cwd);
-	assert.equal(result.exitCode, 0);
+	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--service', 'api', '--placement-only', '--json'], cwd);
+	assert.equal(result.exitCode, 0, result.stderr);
 	const payload = parseJsonOutput(result.stdout);
 
 	assert.deepEqual(payload.units.map((entry) => entry.unit.id), ['api']);
@@ -202,10 +202,10 @@ test('hosting plan can target API service only', async () => {
 
 test('hosting plan can target split web and api applications', async () => {
 	const cwd = makeSplitMarketWorkspace();
-	const webResult = await runCli(['hosting', 'plan', '--environment', 'staging', '--app', 'web', '--json'], cwd);
-	const apiResult = await runCli(['hosting', 'plan', '--environment', 'staging', '--app', 'api', '--json'], cwd);
-	assert.equal(webResult.exitCode, 0);
-	assert.equal(apiResult.exitCode, 0);
+	const webResult = await runCli(['hosting', 'plan', '--environment', 'staging', '--app', 'web', '--placement-only', '--json'], cwd);
+	const apiResult = await runCli(['hosting', 'plan', '--environment', 'staging', '--app', 'api', '--placement-only', '--json'], cwd);
+	assert.equal(webResult.exitCode, 0, webResult.stderr);
+	assert.equal(apiResult.exitCode, 0, apiResult.stderr);
 	const webPayload = parseJsonOutput(webResult.stdout);
 	const apiPayload = parseJsonOutput(apiResult.stdout);
 
@@ -216,8 +216,8 @@ test('hosting plan can target split web and api applications', async () => {
 
 test('hosting plan selects split API runtime and public TreeDX units', async () => {
 	const cwd = makeSplitMarketWorkspace();
-	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--app', 'api', '--json'], cwd);
-	assert.equal(result.exitCode, 0);
+	const result = await runCli(['hosting', 'plan', '--environment', 'staging', '--app', 'api', '--placement-only', '--json'], cwd);
+	assert.equal(result.exitCode, 0, result.stderr);
 	const payload = parseJsonOutput(result.stdout);
 
 	const unitIds = payload.units.map((entry) => entry.unit.id);

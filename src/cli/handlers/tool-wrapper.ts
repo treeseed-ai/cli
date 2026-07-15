@@ -291,6 +291,7 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 			};
 		}
 		if (toolName === 'railway' && scope !== 'local' && railwayCommandNeedsProjectContext(targetArgs)) {
+			const railwaySetupTimeoutMs = 60_000;
 			const environmentName = railwayEnvironmentName(scope);
 			const projectId = await resolveLiveRailwayProjectId({
 				cwd: context.cwd,
@@ -320,6 +321,8 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 					cwd: railwayCwd,
 					env: railwayEnv,
 					stdio: 'pipe',
+					timeout: railwaySetupTimeoutMs,
+					killSignal: 'SIGTERM',
 				});
 				if ((linkResult.status ?? 1) !== 0) {
 					return {
@@ -352,6 +355,8 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 					cwd: railwayCwd,
 					env: railwayEnv,
 					stdio: 'pipe',
+					timeout: railwaySetupTimeoutMs,
+					killSignal: 'SIGTERM',
 				});
 				if ((environmentResult.status ?? 1) !== 0) {
 					return {
@@ -386,6 +391,7 @@ export const handleToolWrapper: TreeseedCommandHandler = async (invocation, cont
 			cwd: railwayTargetCwd,
 			env: targetEnv,
 			stdio: 'inherit',
+			...(toolName === 'railway' ? { timeout: 15 * 60_000, killSignal: 'SIGTERM' as const } : {}),
 		});
 		return {
 			exitCode: result.status ?? 1,

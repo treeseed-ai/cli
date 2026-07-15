@@ -47,6 +47,13 @@ function renderUnitLine(entry: { unit: ReturnType<typeof serializeHostingUnit>; 
 	return `${entry.unit.id}: ${entry.unit.serviceType} -> ${entry.unit.hostId} (${entry.unit.placement})${entry.plan?.action ? ` ${entry.plan.action}` : ''}${entry.verification ? ` verified=${entry.verification.verified ? 'yes' : 'no'}` : ''}`;
 }
 
+function renderReconcilePlanLine(entry: any) {
+	const name = entry.unit?.logicalName ?? entry.unit?.unitId ?? 'unknown';
+	const action = entry.diff?.action ?? 'unknown';
+	const reasons = Array.isArray(entry.diff?.reasons) ? entry.diff.reasons.filter(Boolean) : [];
+	return `${name}: ${action}${reasons.length > 0 ? ` (${reasons.join('; ')})` : ''}`;
+}
+
 function targetFor(environment: TreeseedHostingEnvironment): TreeseedReconcileTarget {
 	return { kind: 'persistent', scope: environment };
 }
@@ -94,6 +101,7 @@ function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostin
 	const includesApi = graph.units.some((unit) => unit.id === 'api' || unit.config.serviceName === 'treeseed-api');
 	const exactServiceIds = [...new Set(graph.units.flatMap((unit) => [
 		unit.id,
+		typeof unit.config.poolKey === 'string' ? unit.config.poolKey : null,
 		typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null,
 		!['api', 'operationsRunner', 'capacityProviderApi', 'capacityProviderManager', 'capacityProviderRunner'].includes(unit.id)
 			? unit.id
@@ -107,7 +115,7 @@ function selectorFromHostingGraph(graph: ReturnType<typeof compileTreeseedHostin
 		serviceId: exactServiceIds,
 		serviceType: [...new Set(graph.units.flatMap((unit) => {
 			if (unit.id === 'api') return ['api-runtime', 'railway-service:api', 'custom-domain:api', 'dns-record'];
-			if (unit.id === 'operationsRunner') return ['operations-runner-runtime', 'railway-service:operations-runner'];
+			if (unit.id === 'operationsRunner' || unit.config.poolKey === 'operationsRunner') return ['operations-runner-runtime', 'railway-service:operations-runner'];
 			if (unit.id.startsWith('public-treedx-node-') || unit.serviceType.id === 'treedx-node') return ['api-runtime', 'railway-service:api'];
 			if (unit.placement === 'runner-capacity') return ['api-runtime', 'operations-runner-runtime', 'railway-service:api', 'railway-service:operations-runner'];
 			if (unit.host.id === 'cloudflare') return ['web-ui', 'edge-worker', 'content-store', 'queue', 'database', 'kv-form-guard', 'turnstile-widget', 'pages-project', 'custom-domain:web', 'dns-record'];
@@ -179,6 +187,33 @@ function stripLegacyPlanningFields(value: unknown): unknown {
 			.map(([key, entry]) => [key, stripLegacyPlanningFields(entry)]));
 	}
 	return value;
+}
+
+function serializeReconcilePlan(result: any) {
+	return {
+		target: result?.target ?? null,
+		plans: Array.isArray(result?.plans) ? result.plans.map((entry: any) => ({
+			unit: {
+				unitId: entry.unit?.unitId ?? null,
+				provider: entry.unit?.provider ?? null,
+				unitType: entry.unit?.unitType ?? null,
+				logicalName: entry.unit?.logicalName ?? null,
+			},
+			observed: {
+				exists: entry.observed?.exists === true,
+				status: entry.observed?.status ?? null,
+				locators: entry.observed?.locators ?? {},
+				warnings: entry.observed?.warnings ?? [],
+			},
+			diff: entry.diff ?? null,
+		})) : [],
+		results: Array.isArray(result?.results) ? result.results.map((entry: any) => ({
+			unitId: entry.unit?.unitId ?? null,
+			action: entry.action ?? null,
+			warnings: entry.warnings ?? [],
+		})) : [],
+		timings: result?.timings ?? [],
+	};
 }
 
 export const handleHosting: TreeseedCommandHandler = async (invocation, context) => {
@@ -312,17 +347,29 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 			if (subcommand === 'plan' || subcommand === 'verify') {
 				const plan = await planTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 				const graph = compileTreeseedHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
+				const selector = selectorFromHostingGraph(graph);
+				const reconcilePlan = subcommand === 'plan' && invocation.args.placementOnly !== true
+					? await reconcileTreeseedTarget({
+						tenantRoot: context.cwd,
+						target: targetFor(environment),
+						env,
+						selector,
+						planOnly: true,
+						write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
+					})
+					: null;
 				const liveStatus = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
 					? await collectTreeseedReconcileStatus({
 						tenantRoot: context.cwd,
 						target: targetFor(environment),
 						env,
-						selector: selectorFromHostingGraph(graph),
+						selector,
 					})
 					: null;
-				const report = liveStatus
+				const graphReport = liveStatus
 					? hostingReportWithReadOnlyStatus(serializeHostingPlan(plan), liveStatus)
 					: serializeHostingPlan(plan);
+				const report = reconcilePlan ? { ...graphReport, reconcile: serializeReconcilePlan(reconcilePlan) } : graphReport;
 			const planFailures = report.ok === false || report.liveVerification?.ok === false
 				? report.units
 					.filter((entry) => entry.verification?.verified !== true)
@@ -367,7 +414,9 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					},
 					{
 						title: 'Plan',
-						lines: report.units.map((entry) => renderUnitLine(entry)),
+						lines: reconcilePlan
+							? report.reconcile.plans.map((entry: any) => renderReconcilePlanLine(entry))
+							: report.units.map((entry) => renderUnitLine(entry)),
 					},
 				],
 				report: stripLegacyPlanningFields(liveHostedServices ? { ...report, hostedServices: liveHostedServices } : report),
