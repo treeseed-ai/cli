@@ -22,10 +22,11 @@ export const handleCleanup: TreeseedCommandHandler = async (invocation, context)
 			report: { command: 'cleanup', ok: false, error: `Unsupported action: ${action}` },
 		};
 	}
+	const mode = cleanupMode(invocation.args.mode);
 	const report = runTreeseedLocalCleanup({
 		root: context.cwd,
-		mode: cleanupMode(invocation.args.mode),
-		docker: invocation.args.noDocker === true ? false : undefined,
+		mode,
+		docker: invocation.args.noDocker !== true && mode === 'aggressive',
 		npmCache: invocation.args.noNpmCache === true ? false : undefined,
 	});
 	return {
