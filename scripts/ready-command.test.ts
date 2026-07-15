@@ -39,13 +39,14 @@ services:
     rootDir: packages/api
     railway:
       projectName: treeseed-api
-      serviceName: treeseed-api-operations-runner-01
+      serviceName: treeseed-ops-01
       rootDir: packages/api
       buildCommand: npm run build
       startCommand: npm run start:runner
       healthcheckPath: /healthz
       runtimeMode: service
       volumeMountPath: /data
+      volumeName: treeseed-ops-01-volume
   treeseedDatabase:
     enabled: true
     provider: railway
