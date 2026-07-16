@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.fix-railway-staged-apply.20260715T222317Z",
+  "version": "0.12.59-dev.fix-local-dev-unhealthy-restart.20260716T025832Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#069cd01f4eb70fa109b016dbca2e7549d1817f29",
-    "@treeseed/core": "github:treeseed-ai/core#3d6a2e47992cdbd399ddcfd8b6b3900be5c61e18",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#aa0ce40dfbe416fd791675a5660cbe937b6d52f7",
+    "@treeseed/agent": "github:treeseed-ai/agent#fc3702fb7095f7ce0f393d4c905446392a11b3d8",
+    "@treeseed/core": "github:treeseed-ai/core#92947586ed8829b36921018c61d81a2f655f0410",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#42d9e8308e1eb7bdb31a6d204e6b0aa7358e775a",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },
