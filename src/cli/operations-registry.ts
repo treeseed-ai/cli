@@ -595,12 +595,12 @@ const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 			{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 		],
 		examples: ['treeseed stage "feat: add search filters"', 'treeseed stage --plan "feat: add search filters"', 'treeseed stage --verify none --cleanup manual "handoff to staging agent"'],
-		notes: ['Stage merges staging down into the feature branch before staging is mutated.', 'Stage monitors hosted staging CI by default; use --async for deliberate asynchronous promotion.', 'After every required workflow succeeds, stage deletes the exact merged source branches by default; use --cleanup manual only when they must be preserved intentionally.'],
+		notes: ['Stage merges staging down into the feature branch before staging is mutated.', 'Stage performs local branch promotion by default; use --ci hosted only when hosted verification is intentionally required.', 'After staging refs are verified, stage deletes the exact merged source branches by default; use --cleanup manual only when they must be preserved intentionally.'],
 		help: {
 			workflowPosition: 'merge to staging',
 			longSummary: [
 				'Stage is the task completion command for the normal promotion path. It first merges staging down into the current feature branch, runs local proof, then promotes exact verified refs to staging.',
-				'After exact refs move, it monitors the root-owned staging workflow and returns structured failure diagnostics.',
+				'Hosted workflow monitoring is opt-in with --ci hosted; normal stage promotion does not deploy provider infrastructure.',
 			],
 			whenToUse: [
 				'Use this when a task branch is ready for the staging environment.',

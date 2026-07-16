@@ -52,7 +52,7 @@ export const handleDoctor: TreeseedCommandHandler = async (invocation, context) 
 			}
 		}
 	}
-	for (const workflowName of ['verify.yml', 'deploy.yml']) {
+	for (const workflowName of ['verify.yml']) {
 		const workflowPath = resolve(state.cwd, '.github', 'workflows', workflowName);
 		if (!existsSync(workflowPath)) {
 			mustFixNow.push(`Missing root workflow contract .github/workflows/${workflowName}.`);
