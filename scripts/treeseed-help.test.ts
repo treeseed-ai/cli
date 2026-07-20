@@ -283,7 +283,7 @@ function makeFakeAgentPackageRoot() {
 			executionProviders: [{
 				id: 'local-codex',
 				name: 'Local Codex',
-				kind: 'codex_subscription',
+				kind: 'codex',
 				nativeUnit: 'wall_minute',
 				maxConcurrentWorkers: 4,
 				nativeLimits: [{ scope: 'daily', nativeUnit: 'wall_minute', limitAmount: 480, reserveBufferPercent: 20 }],
@@ -1901,7 +1901,7 @@ test('capacity diagnostics reads Market derived capacity projection', async () =
 				derivedCapacity: {
 					totalDerivedAvailableCredits: 42,
 					entries: [{
-						executionProviderKind: 'codex_subscription',
+						executionProviderKind: 'codex',
 						nativeUnit: 'wall_minute',
 						configuredNativeLimit: 480,
 						observedNativeRemaining: 300,
@@ -1933,7 +1933,7 @@ test('capacity diagnostics reads Market derived capacity projection', async () =
 		assert.equal(result.exitCode, 0, result.stderr);
 		assert.equal(calls.length, 1);
 		assert.match(result.output, /Native projection/u);
-		assert.match(result.output, /codex_subscription:wall_minute/u);
+		assert.match(result.output, /codex:wall_minute/u);
 		assert.match(result.output, /derived 24 credits/u);
 		assert.match(result.output, /allocation 100%/u);
 	} finally {
