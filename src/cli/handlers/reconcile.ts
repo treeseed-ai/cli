@@ -4,6 +4,7 @@ import {
 	planTreeseedReconciliation,
 	reconcileTreeseedTarget,
 	runTreeseedLiveReconcileTests,
+	type TreeseedCapacityAcceptanceExecutionInput,
 	type TreeseedLiveReconcileEnvironment,
 	type TreeseedLiveReconcileMode,
 	type TreeseedLiveReconcileProvider,
@@ -331,12 +332,19 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 			...collectTreeseedConfigSeedValues(context.cwd, environment, context.env),
 		};
 		const shouldStreamProgress = mode !== 'smoke';
+		const capacityAssignmentExecutor = environment === 'local' && providers.includes('local') && mode !== 'smoke'
+			? async (input: TreeseedCapacityAcceptanceExecutionInput) => {
+				const { executeDeterministicCapacityAcceptance } = await import('@treeseed/agent/provider-acceptance');
+				return executeDeterministicCapacityAcceptance({ ...input, cwd: context.cwd, env: resolvedEnv });
+			}
+			: undefined;
 		const result = await runTreeseedLiveReconcileTests({
 			cwd: context.cwd,
 			environment,
 			providers,
 			mode,
 			env: resolvedEnv,
+			capacityAssignmentExecutor,
 			onProgress: shouldStreamProgress
 				? (event) => {
 						const elapsed = typeof event.elapsedMs === 'number' ? ` (${formatDuration(event.elapsedMs)})` : '';

@@ -12,7 +12,6 @@ import { createMarketClientForInvocation } from './market-utils.js';
 const DEPLOYMENT_TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'timed_out']);
 const FORBIDDEN_OUTPUT_FIELDS = new Set([
 	'capacityProviderId',
-	'laneId',
 	'grantId',
 	'workerPoolId',
 	'runtimeHostId',

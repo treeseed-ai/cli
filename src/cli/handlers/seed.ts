@@ -3,7 +3,6 @@ import { pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, type SeedPlan } from '@treeseed/sdk/seeds';
-import { persistCapacityProviderConnectionToTreeseedConfig } from '@treeseed/sdk/capacity-provider';
 import { MarketClientError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketAuthRoot, marketSelector } from './market-utils.js';
 import { MarketClient, resolveMarketProfile, resolveMarketSession, setMarketSession, type MarketSession } from '@treeseed/sdk/market-client';
@@ -224,7 +223,6 @@ function remoteSeedResult(payload: Record<string, unknown>, command: string, exi
 						`  unchanged: ${plan.summary.unchanged}`,
 						`  skipped: ${plan.summary.skip}`,
 						`  failed: ${plan.summary.error}`,
-						...formatCapacityProviderKeyNotes(result),
 					]
 					: []),
 			]
@@ -236,21 +234,6 @@ function remoteSeedResult(payload: Record<string, unknown>, command: string, exi
 			ok: exitCode === 0,
 		},
 	};
-}
-
-function formatCapacityProviderKeyNotes(result: Record<string, unknown>) {
-	const capacityProviderKeys = result.capacityProviderKeys && typeof result.capacityProviderKeys === 'object'
-		? result.capacityProviderKeys as Record<string, unknown>
-		: null;
-	const created = Array.isArray(capacityProviderKeys?.created) ? capacityProviderKeys.created as Record<string, unknown>[] : [];
-	if (created.length === 0) return [];
-	return [
-		'',
-		'Provider connection:',
-		...created.map((entry) =>
-			`  ${String(entry.providerName ?? entry.providerKey ?? entry.providerId)} (${String(entry.keyPrefix ?? 'new key')}): stored in encrypted Treeseed config`),
-		'  Use `treeseed capacity up --market local --provider local` to launch the provider.',
-	];
 }
 
 function projectArchitectureLines(plan: SeedPlan) {
@@ -278,51 +261,6 @@ function formatSeedPlanWithProjectArchitecture(plan: SeedPlan) {
 		...architecture,
 		...lines.slice(summaryIndex),
 	];
-}
-
-function redactLocalCapacityProviderKeys(result: Record<string, unknown>) {
-	const capacityProviderKeys = result.capacityProviderKeys && typeof result.capacityProviderKeys === 'object'
-		? result.capacityProviderKeys as Record<string, unknown>
-		: null;
-	if (!capacityProviderKeys) return result;
-	return {
-		...result,
-		capacityProviderKeys: {
-			...capacityProviderKeys,
-			created: Array.isArray(capacityProviderKeys.created)
-				? capacityProviderKeys.created.map((entry) => {
-					if (!entry || typeof entry !== 'object') return entry;
-					const { plaintextKey: _plaintextKey, ...safeEntry } = entry as Record<string, unknown>;
-					return {
-						...safeEntry,
-						storedInTreeseedConfig: true,
-					};
-				})
-				: [],
-		},
-	};
-}
-
-function storeLocalCapacityProviderConnection(input: {
-	context: Parameters<TreeseedCommandHandler>[1];
-	profile: ReturnType<typeof resolveMarketProfile>;
-	result: Record<string, unknown>;
-}) {
-	const capacityProviderKeys = input.result.capacityProviderKeys && typeof input.result.capacityProviderKeys === 'object'
-		? input.result.capacityProviderKeys as Record<string, unknown>
-		: null;
-	const created = Array.isArray(capacityProviderKeys?.created) ? capacityProviderKeys.created as Record<string, unknown>[] : [];
-	const first = created.find((entry) => typeof entry.plaintextKey === 'string' && String(entry.plaintextKey).length > 0);
-	if (!first) return null;
-	return persistCapacityProviderConnectionToTreeseedConfig({
-		tenantRoot: input.context.cwd,
-		scope: 'local',
-		marketUrl: input.profile.baseUrl,
-		marketId: input.profile.id,
-		apiKey: String(first.plaintextKey),
-		providerHostDataDir: '.treeseed/local-capacity-provider/data',
-		providerEnvironment: 'local',
-	});
 }
 
 function remoteSeedError(error: unknown, command: string) {
@@ -521,26 +459,7 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 			accessToken: localAuth?.session.accessToken,
 			env: context.env,
 		});
-		let providerConnection: ReturnType<typeof storeLocalCapacityProviderConnection> = null;
-		try {
-			providerConnection = storeLocalCapacityProviderConnection({
-				context,
-				profile: localAuth.profile,
-				result: applied.result,
-			});
-		} catch (error) {
-			const message = `Unable to store local capacity provider connection in encrypted Treeseed config. ${error instanceof Error ? error.message : String(error)}`;
-			return {
-				exitCode: 4,
-				stderr: [message],
-				report: {
-					command: 'seed',
-					ok: false,
-					error: message,
-				},
-			};
-		}
-		const safeResult = redactLocalCapacityProviderKeys(applied.result);
+		const safeResult = applied.result;
 		const message = 'Local seed apply completed.';
 		return {
 			exitCode: 0,
@@ -555,7 +474,6 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 					`  unchanged: ${applied.plan.summary.unchanged}`,
 					`  skipped: ${applied.plan.summary.skip}`,
 					`  failed: ${applied.plan.summary.error}`,
-					...formatCapacityProviderKeyNotes(safeResult),
 				],
 			report: {
 				...applied.plan,
@@ -564,13 +482,6 @@ export const handleSeed: TreeseedCommandHandler = async (invocation, context) =>
 				result: {
 					message,
 					...safeResult,
-					...(providerConnection ? {
-						capacityProviderConnection: {
-							scope: providerConnection.scope,
-							writtenKeys: providerConnection.writtenKeys,
-							redactedEnv: providerConnection.redactedEnv,
-						},
-					} : {}),
 				},
 			},
 		};

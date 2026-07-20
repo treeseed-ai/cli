@@ -21,10 +21,18 @@ export function marketSelector(invocation: TreeseedParsedInvocation) {
 			: null;
 }
 
-export function createMarketClientForInvocation(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext, options: { requireAuth?: boolean } = {}) {
+export function localAcceptanceAdminToken(env: NodeJS.ProcessEnv) {
+	return env.TREESEED_CAPACITY_ACCEPTANCE_ADMIN_TOKEN?.trim() || 'tsk_local_treeseed_acceptance_admin';
+}
+
+export function createMarketClientForInvocation(invocation: TreeseedParsedInvocation, context: TreeseedCommandContext, options: { requireAuth?: boolean; allowLocalAcceptanceAdmin?: boolean } = {}) {
 	const profile = resolveMarketProfile(marketSelector(invocation));
 	const session = resolveMarketSession(marketAuthRoot(context), profile.id);
-	if (options.requireAuth && !session?.accessToken) {
+	const localAccessToken = options.allowLocalAcceptanceAdmin && profile.id === 'local'
+		? localAcceptanceAdminToken(context.env)
+		: null;
+	const accessToken = localAccessToken ?? session?.accessToken ?? null;
+	if (options.requireAuth && !accessToken) {
 		throw new Error(`Not logged in to market "${profile.id}". Run treeseed auth:login --market ${profile.id}.`);
 	}
 	return {
@@ -32,7 +40,7 @@ export function createMarketClientForInvocation(invocation: TreeseedParsedInvoca
 		session,
 		client: new MarketClient({
 			profile,
-			accessToken: session?.accessToken ?? null,
+			accessToken,
 			userAgent: 'treeseed-cli',
 		}),
 	};

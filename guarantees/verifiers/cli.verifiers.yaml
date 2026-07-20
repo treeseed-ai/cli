@@ -1,0 +1,8 @@
+schemaVersion: treeseed.guarantee-verifiers/v1
+ownerPackage: "@treeseed/cli"
+verifiers:
+  cli.capacity.assignment.forensic-reads-fail-visible:
+    kind: nodeScript
+    ownerPackage: "@treeseed/cli"
+    command: packages/cli/scripts/capacity-forensics.test.ts
+    description: "CLI forensic loaders preserve bounded assignment/mode-run evidence and propagate API failure instead of rendering an empty successful report."

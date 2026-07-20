@@ -72,10 +72,10 @@ Capacity lifecycle commands reconcile or inspect provider runtime. Assignment po
 Capacity coordination inspection:
 
 ```bash
-treeseed capacity plan --market local --project project_123 --environment local --json
+treeseed capacity diagnostics --market local --project project_123 --environment local --json
 treeseed capacity allocation-sets --market local --team team_123 --json
 treeseed capacity agent-classes --market local --project project_123 --json
-treeseed capacity provider-sessions --market local --team team_123 --provider provider_123 --json
+treeseed capacity availability-sessions --market local --team team_123 --provider provider_123 --json
 treeseed capacity assignments --market local --team team_123 --status leased --json
 treeseed capacity mode-runs --market local --project project_123 --mode planning --json
 treeseed capacity decision-planning --market local --decision decision_123 --json

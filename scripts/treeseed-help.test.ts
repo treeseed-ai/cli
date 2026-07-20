@@ -1841,7 +1841,7 @@ test('treeseed dev:manager and dev:watch are no longer public aliases', async ()
 test('capacity lifecycle commands route through package-owned scripts and Compose with redacted env', async () => {
 	const agentRoot = makeFakeAgentPackageRoot();
 	const workspaceRoot = makeWorkspaceRoot();
-	const secret = 'tscp_capacity_cli_test_secret';
+	const secret = Buffer.from('{"tokens":{"access_token":"sensitive"}}').toString('base64');
 	try {
 		const build = await runCli(['capacity', 'build', '--agent-package-root', agentRoot, '--plan', '--json'], { cwd: workspaceRoot });
 		assert.equal(build.exitCode, 0);
@@ -1850,7 +1850,7 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 		const up = await runCli(['capacity', 'up', '--market', 'local', '--provider', 'local', '--agent-package-root', agentRoot, '--plan', '--json'], {
 			cwd: workspaceRoot,
 			env: {
-				TREESEED_CAPACITY_PROVIDER_API_KEY: secret,
+				TREESEED_CODEX_AUTH_JSON_B64: secret,
 			},
 		});
 		assert.equal(up.exitCode, 0);
@@ -1878,7 +1878,7 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 	}
 });
 
-test('capacity project plan reads Market derived capacity projection', async () => {
+test('capacity diagnostics reads Market derived capacity projection', async () => {
 	const root = makeWorkspaceRoot();
 	const previousHome = process.env.HOME;
 	const previousPassphrase = process.env[TREESEED_MACHINE_KEY_PASSPHRASE_ENV];
@@ -1891,7 +1891,7 @@ test('capacity project plan reads Market derived capacity projection', async () 
 	const calls = [];
 	globalThis.fetch = async (input, init) => {
 		calls.push({ input: String(input), init });
-		assert.match(String(input), /\/v1\/projects\/project_123\/capacity-plan\?environment=local$/u);
+		assert.match(String(input), /\/v1\/projects\/project_123\/capacity-diagnostics\?environment=local$/u);
 		assert.equal(init?.headers?.authorization, 'Bearer test-access-token');
 		return new Response(JSON.stringify({
 			ok: true,
@@ -1929,7 +1929,7 @@ test('capacity project plan reads Market derived capacity projection', async () 
 			accessToken: 'test-access-token',
 			principal: { id: 'user-1', roles: [], permissions: [] },
 		});
-		const result = await runCli(['capacity', 'plan', '--market', 'local', '--project', 'project_123', '--environment', 'local'], { cwd: root, env: { HOME: root } });
+		const result = await runCli(['capacity', 'diagnostics', '--market', 'local', '--project', 'project_123', '--environment', 'local'], { cwd: root, env: { HOME: root } });
 		assert.equal(result.exitCode, 0, result.stderr);
 		assert.equal(calls.length, 1);
 		assert.match(result.output, /Native projection/u);
@@ -1947,42 +1947,6 @@ test('capacity project plan reads Market derived capacity projection', async () 
 	}
 });
 
-test('capacity migrate to derived requires native facts and supports plan mode', async () => {
-	const missing = await runCli(['capacity', 'migrate', '--to-derived', '--plan']);
-	assert.notEqual(missing.exitCode, 0);
-	assert.match(missing.stderr, /Missing native capacity facts: --team, --provider, --kind, --native-unit, --limit/u);
-
-	const plan = await runCli([
-		'capacity',
-		'migrate',
-		'--to-derived',
-		'--team',
-		'team_123',
-		'--provider',
-		'provider_123',
-		'--kind',
-		'codex_subscription',
-		'--native-unit',
-		'wall_minute',
-		'--limit',
-		'480',
-		'--scope',
-		'daily',
-		'--portfolio-allocation-percent',
-		'100',
-		'--project',
-		'project_123',
-		'--plan',
-		'--json',
-	]);
-	assert.equal(plan.exitCode, 0, plan.stderr);
-	const payload = JSON.parse(plan.output);
-	assert.equal(payload.planOnly, true);
-	assert.equal(payload.executionProvider.nativeLimits[0].limitAmount, 480);
-	assert.equal(payload.grant.portfolioAllocationPercent, 100);
-	assert.equal(payload.grant.projectId, 'project_123');
-});
-
 test('capacity removes old helper-capacity actions', async () => {
 	const agentRoot = makeFakeAgentPackageRoot();
 	try {
@@ -1995,12 +1959,11 @@ test('capacity removes old helper-capacity actions', async () => {
 });
 
 test('capacity inspection exposes read-only execution visibility summaries', () => {
-	const capacityHandler = readFileSync(resolve(cliPackageRoot, 'src/cli/handlers/capacity.ts'), 'utf8');
+	const capacityHandler = readFileSync(resolve(cliPackageRoot, 'src/cli/handlers/capacity-inspection-projection.ts'), 'utf8');
 	const operationsRegistry = readFileSync(resolve(cliPackageRoot, 'src/cli/operations-registry.ts'), 'utf8');
 
 	assert.match(capacityHandler, /decorateExecutionProviderVisibility/u);
 	assert.match(capacityHandler, /summarizeExecutionProviderVisibility/u);
-	assert.match(capacityHandler, /executionCapabilityMatch/u);
 	assert.match(capacityHandler, /execution=/u);
 	assert.match(capacityHandler, /adapter=/u);
 	assert.match(capacityHandler, /external=/u);

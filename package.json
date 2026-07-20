@@ -31,7 +31,7 @@
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
     "lint": "npm run build:dist",
-    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/guarantees-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts",
+    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/guarantees-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts ./scripts/dev-lifecycle.test.ts ./scripts/capacity-output-security.test.ts ./scripts/capacity-forensics.test.ts ./scripts/capacity-governance-confirmation.test.ts ./scripts/capacity-operator-parity.test.ts ./scripts/capacity-workday-provider.test.ts ./scripts/capacity-workday-agent-class.test.ts ./scripts/capacity-workday-summary.test.ts ./scripts/capacity-workday-treedx.test.ts ./scripts/operations-registry-options.test.ts",
     "build:dist": "node --import tsx ./scripts/build-dist.ts",
     "prepare": "node --import tsx ./scripts/prepare.ts",
     "prepack": "npm run build:dist",
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#8bcbd838044523073e3eea15d9ef4721a7c33053",
-    "@treeseed/core": "github:treeseed-ai/core#fb8bcbac2144d9a814169142d3bdebea1a14ded1",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#14cef4cbec20b1224be1d0daa1a798c206c69987",
+    "@treeseed/agent": "github:treeseed-ai/agent#1f536c8b2d874021c3b3ec420af32244e6c684ad",
+    "@treeseed/core": "github:treeseed-ai/core#b3c2fab3a0e8327a2972fa577a6779afe7eac4c9",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#5f6ea344a98555079790742a99fb303781f79fed",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },

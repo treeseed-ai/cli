@@ -119,26 +119,6 @@ export async function applyLocalSeedFromCli(input) {
 			appliedAt: '2026-01-01T00:00:00.000Z',
 			manifestHash: 'test-manifest-hash',
 			actionCount: alreadyApplied ? 0 : input.plan.summary.create + input.plan.summary.update,
-			capacityProviderKeys: alreadyApplied
-				? {
-					created: [],
-					existing: [{
-						providerId: 'provider-local',
-						providerKey: 'capacity-provider:treeseed/local-dev',
-						providerName: 'treeseed-local-dev',
-						keyPrefix: 'tsp_existingkey',
-					}],
-				}
-				: {
-					created: [{
-						providerId: 'provider-local',
-						providerKey: 'capacity-provider:treeseed/local-dev',
-						providerName: 'treeseed-local-dev',
-						keyPrefix: 'tsp_createdkey1',
-						plaintextKey: 'tsp_createdkey1_secret',
-					}],
-					existing: [],
-				},
 		},
 	};
 }
@@ -310,7 +290,7 @@ function jsonResponse(payload, status = 200) {
 	});
 }
 
-function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary = { create: 2, update: 0, unchanged: 0, skip: 2, delete: 0, error: 0 }, result = undefined } = {}) {
+function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary = { create: 1, update: 0, unchanged: 0, skip: 1, delete: 0, error: 0 }, result = undefined } = {}) {
 	return {
 		ok: true,
 		seed: 'treeseed',
@@ -319,7 +299,6 @@ function remoteSeedPayload({ mode = 'plan', environments = ['staging'], summary 
 		summary,
 		actions: [
 			{ action: 'create', kind: 'team', key: 'team:treeseed', label: 'TreeSeed', environments, payload: {} },
-			{ action: 'create', kind: 'workPolicy', key: `work-policy:treeseed/${environments[0]}/market`, label: `market/${environments[0]}`, environments, payload: {} },
 		],
 		diagnostics: [],
 		run: { id: 'seed-run-1', state: result?.blocked ? 'blocked' : 'completed', mode, seedName: 'treeseed' },
@@ -365,95 +344,6 @@ resources:
           bucket: treeseed-content-local
           prefix: treeseed/market
           manifestPath: manifests/treeseed/market/latest.json
-  capacityProviders:
-    - key: capacity-provider:treeseed/local-dev
-      environments: [local]
-      team: team:treeseed
-      name: treeseed-local-dev
-      kind: local
-      provider: local
-      billingScope: team
-      creditBudgetMode: derived
-      maxConcurrentWorkdays: 2
-      maxConcurrentWorkers: 4
-      executionProviders:
-        - id: treeseed-local-codex
-          name: Local Codex capacity
-          kind: codex_subscription
-          nativeUnit: wall_minute
-          quotaVisibility: opaque
-          maxConcurrentWorkers: 4
-          resetCadence: daily
-          nativeLimits:
-            - scope: daily
-              nativeUnit: wall_minute
-              limitAmount: 600
-              reserveBufferPercent: 20
-              resetCadence: daily
-              confidence: estimated
-              source: configured
-      registration:
-        apiKey:
-          createIfMissing: true
-          name: TreeSeed local provider security code
-          scopes:
-            - provider:register
-            - provider:heartbeat
-            - provider:portfolio:read
-            - provider:assignments:read
-            - provider:assignments:write
-            - provider:usage:report
-            - provider:reports:write
-            - provider:capabilities:write
-  capacityGrants:
-    - key: capacity-grant:treeseed/local/market
-      environments: [local]
-      provider: capacity-provider:treeseed/local-dev
-      team: team:treeseed
-      project: project:treeseed/market
-      environment: local
-      grantScope: project
-      portfolioAllocationPercent: 100
-      reservePoolPercent: 10
-      priorityWeight: 1
-      overflowPolicy: soft_grant
-  workPolicies:
-    - key: work-policy:treeseed/local/market
-      environments: [local]
-      project: project:treeseed/market
-      environment: local
-      enabled: true
-      startCron: "0 9 * * 1-5"
-      durationMinutes: 480
-      maxRunners: 1
-      maxWorkersPerRunner: 4
-      dailyCreditBudget: 5000
-      maxQueuedTasks: 100
-      maxQueuedCredits: 10000
-    - key: work-policy:treeseed/staging/market
-      environments: [staging]
-      project: project:treeseed/market
-      environment: staging
-      enabled: true
-      startCron: "0 9 * * 1-5"
-      durationMinutes: 480
-      maxRunners: 1
-      maxWorkersPerRunner: 4
-      dailyCreditBudget: 2500
-      maxQueuedTasks: 50
-      maxQueuedCredits: 5000
-    - key: work-policy:treeseed/prod/market
-      environments: [prod]
-      project: project:treeseed/market
-      environment: prod
-      enabled: true
-      startCron: "0 9 * * 1-5"
-      durationMinutes: 480
-      maxRunners: 1
-      maxWorkersPerRunner: 4
-      dailyCreditBudget: 2500
-      maxQueuedTasks: 50
-      maxQueuedCredits: 5000
   repositoryHosts:
     - key: repository-host:treeseed/market-github
       team: team:treeseed
@@ -496,7 +386,6 @@ resources:
         owner: knowledge-coop
         repository: market
         gitUrl: https://github.com/knowledge-coop/market.git
-  agentPools: []
 `;
 
 const VALID_MINIMAL_SEED = `
@@ -530,9 +419,6 @@ resources:
         localContentMaterialization: existing_path
         contentPublishTarget:
           kind: none
-  capacityProviders: []
-  capacityGrants: []
-  workPolicies: []
 `;
 
 test('seed validates the canonical treeseed manifest', async () => {
@@ -553,14 +439,13 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /Environments: local/);
 	assert.match(result.stdout, /CREATE team TreeSeed/);
 	assert.match(result.stdout, /CREATE project treeseed\/market/);
-	assert.match(result.stdout, /CREATE capacity provider treeseed-local-dev/);
-	assert.match(result.stdout, /CREATE grant treeseed\/local-dev -> treeseed\/market/);
-	assert.match(result.stdout, /CREATE work policy market\/local/);
+	assert.doesNotMatch(result.stdout, /capacity provider|capacity grant/u);
+	assert.doesNotMatch(result.stdout, /work policy/u);
 	assert.match(result.stdout, /CREATE repository host github\/knowledge-coop/);
 	assert.match(result.stdout, /CREATE product template\/treeseed-market/);
 	assert.match(result.stdout, /CREATE catalog artifact treeseed\/market-template@1\.0\.0/);
-	assert.match(result.stdout, /  create: 8/);
-	assert.match(result.stdout, /  skipped: 2/);
+	assert.match(result.stdout, /  create: 5/);
+	assert.match(result.stdout, /  skipped: 0/);
 	assert.doesNotMatch(result.stdout, /CREATE lane /);
 	assert.doesNotMatch(result.stdout, /codex-production/);
 });
@@ -576,8 +461,8 @@ test('seed local plan does not require a saved market session', async () => {
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 8);
-	assert.equal(payload.summary.skip, 2);
+	assert.equal(payload.summary.create, 5);
+	assert.equal(payload.summary.skip, 0);
 });
 
 test('seed prod plan excludes seeded providers and grants', async () => {
@@ -588,9 +473,9 @@ test('seed prod plan excludes seeded providers and grants', async () => {
 	assert.equal(result.exitCode, 0);
 	assert.doesNotMatch(result.stdout, /CREATE capacity provider/);
 	assert.doesNotMatch(result.stdout, /CREATE grant/);
-	assert.match(result.stdout, /CREATE work policy market\/prod/);
-	assert.match(result.stdout, /  create: 2/);
-	assert.match(result.stdout, /  skipped: 2/);
+	assert.doesNotMatch(result.stdout, /work policy/u);
+	assert.match(result.stdout, /  create: 1/);
+	assert.match(result.stdout, /  skipped: 1/);
 	assert.doesNotMatch(result.stdout, /local-codex/);
 });
 
@@ -601,13 +486,13 @@ test('seed staging plan excludes seeded providers and grants', async () => {
 	assert.match(result.stdout, /Environments: staging/);
 	assert.doesNotMatch(result.stdout, /CREATE capacity provider/);
 	assert.doesNotMatch(result.stdout, /CREATE grant/);
-	assert.match(result.stdout, /CREATE work policy market\/staging/);
-	assert.match(result.stdout, /  create: 2/);
-	assert.match(result.stdout, /  skipped: 2/);
+	assert.doesNotMatch(result.stdout, /work policy/u);
+	assert.match(result.stdout, /  create: 1/);
+	assert.match(result.stdout, /  skipped: 1/);
 	assert.doesNotMatch(result.stdout, /local-codex/);
 });
 
-test('seed json output includes skipped resources for agent review', async () => {
+test('seed json output includes canonical resources for agent review', async () => {
 	const root = seedWorkspace();
 	prepareLocalMarketSession(root);
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan', '--json'], {
@@ -619,9 +504,9 @@ test('seed json output includes skipped resources for agent review', async () =>
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 8);
-	assert.equal(payload.summary.skip, 2);
-	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 2);
+	assert.equal(payload.summary.create, 5);
+	assert.equal(payload.summary.skip, 0);
+	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 0);
 	assert.equal(payload.actions[0].key, 'team:treeseed');
 });
 
@@ -636,15 +521,9 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(first.exitCode, 0, first.stderr);
 	const firstPayload = JSON.parse(first.stdout);
 	assert.equal(firstPayload.ok, true);
-	assert.equal(firstPayload.summary.create, 8);
-	assert.equal(firstPayload.summary.skip, 2);
-	assert.equal(firstPayload.result.actionCount, 8);
-	assert.equal(firstPayload.result.capacityProviderKeys.created.length, 1);
-	assert.equal(firstPayload.result.capacityProviderKeys.created[0].plaintextKey, undefined);
-	assert.equal(firstPayload.result.capacityProviderKeys.created[0].storedInTreeseedConfig, true);
-	assert.equal(firstPayload.result.capacityProviderConnection.scope, 'local');
-	assert.match(firstPayload.result.capacityProviderConnection.redactedEnv.TREESEED_CAPACITY_PROVIDER_API_KEY, /<redacted>/);
-	assert.doesNotMatch(first.stdout, /tsp_createdkey1_secret/);
+	assert.equal(firstPayload.summary.create, 5);
+	assert.equal(firstPayload.summary.skip, 0);
+	assert.equal(firstPayload.result.actionCount, 5);
 
 	const second = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
@@ -653,12 +532,9 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(second.exitCode, 0, second.stderr);
 	const secondPayload = JSON.parse(second.stdout);
 	assert.equal(secondPayload.summary.create, 0);
-	assert.equal(secondPayload.summary.unchanged, 8);
-	assert.equal(secondPayload.summary.skip, 2);
+	assert.equal(secondPayload.summary.unchanged, 5);
+	assert.equal(secondPayload.summary.skip, 0);
 	assert.equal(secondPayload.result.actionCount, 0);
-	assert.equal(secondPayload.result.capacityProviderKeys.created.length, 0);
-	assert.equal(secondPayload.result.capacityProviderKeys.existing.length, 1);
-	assert.equal(secondPayload.result.capacityProviderKeys.existing[0].plaintextKey, undefined);
 	assert.equal(secondPayload.actions.find((action) => action.key === 'team:treeseed').action, 'unchanged');
 });
 
@@ -672,9 +548,8 @@ test('seed local apply can bootstrap without a saved market session', async () =
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.ok, true);
 	assert.equal(payload.result.message, 'Local seed apply completed.');
-	assert.equal(payload.summary.create, 8);
-	assert.equal(payload.result.actionCount, 8);
-	assert.equal(payload.result.capacityProviderKeys.created.length, 1);
+	assert.equal(payload.summary.create, 5);
+	assert.equal(payload.result.actionCount, 5);
 });
 
 test('seed export emits a productized manifest from local state', async () => {
@@ -718,7 +593,6 @@ test('seed staging apply uses the remote API', async () => {
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.ok, true);
 	assert.equal(payload.result.actionCount, 2);
-	assert.equal(payload.result.capacityProviderKeys, undefined);
 });
 
 test('seed prod apply returns blocked approval response', async () => {

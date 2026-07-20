@@ -11,6 +11,7 @@ import {
 } from '@treeseed/sdk/reconcile';
 import { compileTreeseedDesiredResourceGraph, compileTreeseedDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
 import type { TreeseedCommandHandler } from '../types.js';
+import { resolveTreeseedDevProcessAction } from './dev-lifecycle.js';
 import { workflowErrorResult } from './workflow.js';
 import { fail } from './utils.js';
 
@@ -181,6 +182,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
 			'local-docker-compose:mailpit',
+			...(selectedServiceIds.includes('api') ? ['local-seed-bootstrap:treeseed'] : []),
 			...(includeTreeDxUnits ? [
 				'local-treedx:team-primary',
 				'local-docker-compose:treedx',
@@ -188,6 +190,10 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 			...localContentUnitIds,
 		];
 		const selectedUnitIdSet = new Set(selectedUnitIds);
+		const localProcessAction = resolveTreeseedDevProcessAction({
+			subcommand: effectiveSubcommand,
+			reset: invocation.args.reset === true,
+		});
 		const selector: TreeseedReconcileSelector = {
 			environment: 'local',
 			unitId: selectedUnitIds,
@@ -199,7 +205,7 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 							...unit,
 							spec: {
 								...unit.spec,
-								action: effectiveSubcommand === 'restart' && selectedUnitIdSet.has(unit.unitId) ? 'restart' : 'start',
+								action: selectedUnitIdSet.has(unit.unitId) ? localProcessAction : 'start',
 								options: {
 									...(unit.spec.options as Record<string, unknown> | undefined),
 									...localProcessOptions,
@@ -207,6 +213,14 @@ export const handleDev: TreeseedCommandHandler = async (invocation, context) => 
 								},
 							},
 						}
+					: unit.unitType === 'local-docker-compose' && invocation.args.reset === true
+						? {
+								...unit,
+								spec: {
+									...unit.spec,
+									resetData: true,
+								},
+							}
 						: unit,
 			);
 		const execute = !planOnly && (effectiveSubcommand === 'start' || effectiveSubcommand === 'restart' || effectiveSubcommand === 'stop');
