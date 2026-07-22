@@ -141,7 +141,7 @@ function loadApiAcceptanceServiceEnv(environment: string) {
 	}
 }
 
-export type AgentGuaranteeExecutionProviderMode = 'mock' | 'live-codex' | 'auto';
+export type AgentGuaranteeExecutionProviderMode = 'live-codex' | 'auto';
 
 function codexAuthAvailable(env: NodeJS.ProcessEnv) {
 	const explicit = env.TREESEED_CODEX_AUTH_FILE || env.CODEX_AUTH_FILE;
@@ -153,8 +153,8 @@ function codexAuthAvailable(env: NodeJS.ProcessEnv) {
 
 function resolveAgentGuaranteeExecutionProviderMode(input: { environment: string; env: NodeJS.ProcessEnv }): AgentGuaranteeExecutionProviderMode {
 	const configured = input.env.TREESEED_AGENT_GUARANTEE_EXECUTION_PROVIDER?.trim();
-	if (configured === 'mock' || configured === 'live-codex' || configured === 'auto') return configured;
-	if (input.env.CI === 'true' || input.env.GITHUB_ACTIONS === 'true') return 'mock';
+	if (configured === 'live-codex' || configured === 'auto') return configured;
+	if (input.env.CI === 'true' || input.env.GITHUB_ACTIONS === 'true') return 'live-codex';
 	if (input.environment === 'staging') return 'live-codex';
 	return 'auto';
 }
@@ -162,10 +162,6 @@ function resolveAgentGuaranteeExecutionProviderMode(input: { environment: string
 function applyAgentGuaranteeExecutionProviderMode(input: { environment: string; env: NodeJS.ProcessEnv }) {
 	const mode = resolveAgentGuaranteeExecutionProviderMode(input);
 	input.env.TREESEED_AGENT_GUARANTEE_EXECUTION_PROVIDER = mode;
-	if (mode === 'mock') {
-		input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'mock';
-		return { ok: true, diagnostics: ['Agent guarantees will use the deterministic mock execution provider.'] };
-	}
 	if (mode === 'live-codex') {
 		if (!codexAuthAvailable(input.env)) {
 			return { ok: false, diagnostics: ['missing_codex_auth: live Codex agent guarantees require ~/.codex/auth.json or TREESEED_CODEX_AUTH_FILE.'] };
@@ -177,8 +173,7 @@ function applyAgentGuaranteeExecutionProviderMode(input: { environment: string; 
 		input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'codex';
 		return { ok: true, diagnostics: ['Agent guarantee auto mode selected live Codex because Codex auth was detected.'] };
 	}
-	input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'mock';
-	return { ok: true, diagnostics: ['Agent guarantee auto mode selected deterministic mock provider because Codex auth was not detected.'] };
+	return { ok: false, diagnostics: ['missing_codex_auth: agent guarantees require a real execution provider; no mock or synthetic provider fallback is permitted.'] };
 }
 
 function planNeedsLocalDev(input: { environment: string; filter: TreeseedGuaranteeFilter; includeDependencies?: boolean; includePlanned?: boolean; cwd: string }) {
@@ -195,38 +190,21 @@ function planNeedsLocalDev(input: { environment: string; filter: TreeseedGuarant
 	});
 }
 
-async function localDevEndpointsReady() {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), 2_500);
-	try {
-		const [web, api] = await Promise.all([
-			fetch('http://127.0.0.1:4321/', { method: 'GET', signal: controller.signal }),
-			fetch('http://127.0.0.1:3000/healthz', { method: 'GET', signal: controller.signal }),
-		]);
-		return web.ok && api.ok;
-	} catch {
-		return false;
-	} finally {
-		clearTimeout(timeout);
-	}
-}
-
-async function ensureLocalDevForGuaranteeRun(context: Parameters<TreeseedCommandHandler>[1], input: { filter: TreeseedGuaranteeFilter; includeDependencies?: boolean; includePlanned?: boolean }) {
+export async function ensureLocalDevForGuaranteeRun(
+	context: Parameters<TreeseedCommandHandler>[1],
+	input: { filter: TreeseedGuaranteeFilter; includeDependencies?: boolean; includePlanned?: boolean },
+	runManagedDev: typeof runTreeseedManagedDev = runTreeseedManagedDev,
+) {
 	if (process.env.TREESEED_GUARANTEE_SKIP_LOCAL_DEV === '1') return { ok: true, diagnostics: [] as string[] };
 	if (!planNeedsLocalDev({ environment: 'local', filter: input.filter, includeDependencies: input.includeDependencies, includePlanned: input.includePlanned, cwd: context.cwd })) {
 		return { ok: true, diagnostics: [] as string[] };
 	}
-	if (context.env.TREESEED_GUARANTEE_BYPASS_LOCAL_DEV_PREFLIGHT !== '1' && await localDevEndpointsReady()) {
-		return { ok: true, diagnostics: ['Managed local dev web/API endpoints were already healthy before local guarantee execution.'] };
-	}
-	const result = context.env.TREESEED_GUARANTEE_MOCK_LOCAL_DEV === '1'
-		? { ok: true }
-		: await runTreeseedManagedDev({
+	const result = await runManagedDev({
 				action: 'start',
 				cwd: context.cwd,
 				surfaces: 'web,api',
 				webRuntime: 'local',
-				force: true,
+				force: false,
 				forceConflicts: true,
 				env: context.env,
 			});
@@ -238,7 +216,7 @@ async function ensureLocalDevForGuaranteeRun(context: Parameters<TreeseedCommand
 	}
 	return {
 		ok: true,
-		diagnostics: ['Managed local dev web/API surfaces were started or verified before local guarantee execution.'],
+		diagnostics: ['Managed local dev web/API source closures and health were verified before local guarantee execution.'],
 	};
 }
 

@@ -218,6 +218,17 @@ function serializeReconcilePlan(result: any) {
 	};
 }
 
+function reconcilePlanFailures(result: any) {
+	const plans = Array.isArray(result?.plans) ? result.plans : [];
+	return plans
+		.filter((entry: any) => entry?.diff?.action === 'blocked')
+		.map((entry: any) => {
+			const name = entry.unit?.logicalName ?? entry.unit?.unitId ?? 'unknown';
+			const reasons = Array.isArray(entry.diff?.reasons) ? entry.diff.reasons.filter(Boolean) : [];
+			return `${name}: ${reasons.join('; ') || 'reconciliation plan is blocked'}`;
+		});
+}
+
 export const handleHosting: TreeseedCommandHandler = async (invocation, context) => {
 		try {
 			const subcommand = subcommandFor(invocation.positionals[0]);
@@ -382,15 +393,19 @@ export const handleHosting: TreeseedCommandHandler = async (invocation, context)
 					? hostingReportWithReadOnlyStatus(serializeHostingPlan(plan), liveStatus)
 					: serializeHostingPlan(plan);
 				const report = reconcilePlan ? { ...graphReport, reconcile: serializeReconcilePlan(reconcilePlan) } : graphReport;
-			const planFailures = report.ok === false || report.liveVerification?.ok === false
-				? report.units
-					.filter((entry) => entry.verification?.verified !== true)
-					.flatMap((entry) => entry.verification?.checks
-						?.filter((check) => check.ok === false)
-						.flatMap((check) => check.issues.length > 0
-							? check.issues.map((issue) => `${entry.unit.id}:${check.key}: ${issue}`)
-							: [`${entry.unit.id}:${check.key}: failed`]) ?? [`${entry.unit.id}: verification failed`])
-				: [];
+			const planFailures = invocation.args.placementOnly === true
+				? []
+				: reconcilePlan
+					? reconcilePlanFailures(reconcilePlan)
+					: report.ok === false || report.liveVerification?.ok === false
+						? report.units
+							.filter((entry) => entry.verification?.verified !== true)
+							.flatMap((entry) => entry.verification?.checks
+								?.filter((check) => check.ok === false)
+								.flatMap((check) => check.issues.length > 0
+									? check.issues.map((issue) => `${entry.unit.id}:${check.key}: ${issue}`)
+									: [`${entry.unit.id}:${check.key}: failed`]) ?? [`${entry.unit.id}: verification failed`])
+						: [];
 			const liveHostedServices = planFailures.length === 0 && subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
 					? await collectLiveChecks({
 						tenantRoot: context.cwd,

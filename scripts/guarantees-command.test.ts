@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
 const { runTreeseedCli } = await import('../dist/cli/main.js');
+const { ensureLocalDevForGuaranteeRun } = await import('../dist/cli/handlers/guarantees.js');
 
 async function runCli(args, cwd, env = {}) {
 	const writes = [];
@@ -166,19 +167,21 @@ test('guarantees run emits skipped planned entries when requested', async () => 
 	assert.equal(result.spawns.length, 0);
 });
 
-test('guarantees run starts managed local dev before active local API guarantees', async () => {
+test('guarantee preflight verifies managed source closure even when endpoints may already be healthy', async () => {
 	const root = makeWorkspace();
 	activateQuestionGuarantee(root);
-	const result = await runCli(['guarantees', 'run', '--type', 'project', '--subtype', 'question', '--json'], root, {
-		TREESEED_GUARANTEE_BYPASS_LOCAL_DEV_PREFLIGHT: '1',
-		TREESEED_GUARANTEE_MOCK_LOCAL_DEV: '1',
+	const calls = [];
+	const result = await ensureLocalDevForGuaranteeRun({ cwd: root, env: { ...process.env } }, {
+		filter: { type: 'project', subtype: 'question' },
+	}, async (options) => {
+		calls.push(options);
+		return { ok: true, action: 'start', plan: { processes: [] }, instances: [] };
 	});
-	assert.equal(result.exitCode, 0);
-	assert.equal(result.spawns.length, 0);
-	const payload = parseJsonOutput(result.output);
-	assert.equal(payload.command, 'guarantees run');
-	assert.equal(payload.ok, true);
-	assert.equal(payload.counts.skipped, 1);
+	assert.equal(result.ok, true);
+	assert.equal(calls.length, 1);
+	assert.equal(calls[0].action, 'start');
+	assert.equal(calls[0].force, false);
+	assert.equal(calls[0].forceConflicts, true);
 });
 
 test('agent guarantees live-codex mode fails closed when Codex auth is missing', async () => {

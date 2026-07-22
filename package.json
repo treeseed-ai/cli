@@ -31,7 +31,7 @@
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
     "lint": "npm run build:dist",
-    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/guarantees-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts ./scripts/dev-lifecycle.test.ts ./scripts/capacity-output-security.test.ts ./scripts/capacity-forensics.test.ts ./scripts/capacity-governance-confirmation.test.ts ./scripts/capacity-operator-parity.test.ts ./scripts/capacity-workday-provider.test.ts ./scripts/capacity-workday-agent-class.test.ts ./scripts/capacity-workday-summary.test.ts ./scripts/capacity-workday-treedx.test.ts ./scripts/operations-registry-options.test.ts",
+    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/guarantees-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts ./scripts/dev-lifecycle.test.ts ./scripts/capacity-output-security.test.ts ./scripts/capacity-forensics.test.ts ./scripts/capacity-governance-confirmation.test.ts ./scripts/capacity-checkpoint-integration.test.ts ./scripts/capacity-operator-parity.test.ts ./scripts/capacity-workday-provider.test.ts ./scripts/capacity-workday-agent-class.test.ts ./scripts/capacity-workday-summary.test.ts ./scripts/capacity-workday-treedx.test.ts ./scripts/operations-registry-options.test.ts",
     "build:dist": "node --import tsx ./scripts/build-dist.ts",
     "prepare": "node --import tsx ./scripts/prepare.ts",
     "prepack": "npm run build:dist",
@@ -45,9 +45,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#abe036010f73dcfa6135a0f840e588eb46ffdfb7",
-    "@treeseed/core": "github:treeseed-ai/core#15d576d9d9707a0284a6de35e992d3af8528cb71",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#e59fbd61debb66b49c18b37ae699c9b572b8bea6",
+    "@treeseed/agent": "github:treeseed-ai/agent#fbc56e4727841d7507682aa58b13031c8db0cc61",
+    "@treeseed/core": "github:treeseed-ai/core#f2c88f31606e69fe7b35d465cb84f4d60df0e6c3",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#5ae96e564f43944615d9a65e15855edbe8e56d4b",
     "ink": "^7.0.0",
     "react": "^19.2.5"
   },

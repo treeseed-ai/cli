@@ -334,8 +334,8 @@ export const handleReconcile: TreeseedCommandHandler = async (invocation, contex
 		const shouldStreamProgress = mode !== 'smoke';
 		const capacityAssignmentExecutor = environment === 'local' && providers.includes('local') && mode !== 'smoke'
 			? async (input: TreeseedCapacityAcceptanceExecutionInput) => {
-				const { executeDeterministicCapacityAcceptance } = await import('@treeseed/agent/provider-acceptance');
-				return executeDeterministicCapacityAcceptance({ ...input, cwd: context.cwd, env: resolvedEnv });
+				const { executeLiveCapacityAcceptance } = await import('@treeseed/agent/provider-acceptance');
+				return executeLiveCapacityAcceptance({ ...input, cwd: context.cwd, env: resolvedEnv });
 			}
 			: undefined;
 		const result = await runTreeseedLiveReconcileTests({

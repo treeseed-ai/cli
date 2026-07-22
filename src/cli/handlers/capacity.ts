@@ -5,6 +5,7 @@ import { CAPACITY_GOVERNANCE_ACTIONS, runCapacityGovernanceAction } from './capa
 import { CAPACITY_PROVIDER_GOVERNANCE_ACTIONS, runCapacityProviderGovernanceAction } from './capacity-provider-governance.js';
 import { CAPACITY_WORKDAY_ACTIONS, runCapacityWorkdayAction } from './capacity-workday.js';
 import { CAPACITY_ASSIGNMENT_ACTIONS, runCapacityAssignmentAction } from './capacity-assignments.js';
+import { CAPACITY_CHECKPOINT_INTEGRATION_ACTIONS, runCapacityCheckpointIntegration } from './capacity-checkpoint-integration.js';
 import { CAPACITY_OVERRUN_ACTIONS, runCapacityOverrunAction } from './capacity-overruns.js';
 import { CAPACITY_EVIDENCE_ACTIONS, runCapacityEvidenceAction } from './capacity-evidence.js';
 import { CAPACITY_AGENT_CLASS_ACTIONS, runCapacityAgentClassAction } from './capacity-agent-classes.js';
@@ -431,6 +432,10 @@ export const handleCapacity: TreeseedCommandHandler = async (invocation, context
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
+	if (CAPACITY_CHECKPOINT_INTEGRATION_ACTIONS.has(action)) {
+		try { return await runCapacityCheckpointIntegration(invocation, context); }
+		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
+	}
 	if (CAPACITY_OVERRUN_ACTIONS.has(action)) {
 		try { return await runCapacityOverrunAction(action, invocation, context); }
 		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
@@ -479,5 +484,5 @@ export const handleCapacity: TreeseedCommandHandler = async (invocation, context
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
-	return fail(`Unknown capacity action "${action}". Use registration-key operations, provider request/membership operations, grants, allocation operations, workday-create, workday-start, workday-pause, workday-resume, workday-tick, workday-complete, workday-cancel, workday-status, workday-summary, assignment-cancel, assignment-requeue, overrun-approve, overrun-reject, provider runtime lifecycle, or inspection actions.`);
+	return fail(`Unknown capacity action "${action}". Use registration-key operations, provider request/membership operations, grants, allocation operations, workday-create, workday-start, workday-pause, workday-resume, workday-tick, workday-complete, workday-cancel, workday-status, workday-summary, assignment-cancel, assignment-requeue, checkpoint-integrate, overrun-approve, overrun-reject, provider runtime lifecycle, or inspection actions.`);
 };
