@@ -1,5 +1,4 @@
-import { existsSync, readFileSync, writeSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,6 +18,15 @@ import { renderTreeseedHelp, renderUsage, suggestTreeseedCommands } from './oper
 import { renderTreeseedHelpInk, shouldUseInkHelp } from './help-ui.js';
 import { parseTreeseedInvocation, validateTreeseedInvocation } from './operations-parser.ts';
 import { findTreeseedOperation, TRESEED_OPERATION_SPECS } from './operations-registry.ts';
+import {
+	colorizeTreeseedCliOutput,
+	defaultSpawn,
+	defaultWrite,
+	resolveColorEnabled,
+	stripGlobalFlags,
+} from './runtime-output.js';
+
+export { colorizeTreeseedCliOutput } from './runtime-output.js';
 
 const require = createRequire(import.meta.url);
 
@@ -58,94 +66,6 @@ function resolveExplicitHelpTarget(args: string[]) {
 		}
 	}
 	return helpArgs[0] ?? null;
-}
-
-function isNoColorFlag(value: string | undefined) {
-	return value === '--no-color';
-}
-
-function stripGlobalFlags(argv: string[]) {
-	return argv.filter((value) => !isNoColorFlag(value));
-}
-
-function resolveColorEnabled(argv: string[], env: NodeJS.ProcessEnv, override?: boolean) {
-	if (typeof override === 'boolean') {
-		return override;
-	}
-	if (argv.some(isNoColorFlag)) {
-		return false;
-	}
-	if (env.NO_COLOR !== undefined || env.TREESEED_NO_COLOR === '1' || env.TREESEED_NO_COLOR === 'true') {
-		return false;
-	}
-	return true;
-}
-
-function colorCodeForBootstrapSystem(system: string) {
-	switch (system) {
-		case 'github':
-			return '35;1';
-		case 'data':
-			return '34;1';
-		case 'web':
-			return '36;1';
-		case 'api':
-			return '32;1';
-		case 'agents':
-			return '33;1';
-		case 'skip':
-			return '90;1';
-		default:
-			return '37;1';
-	}
-}
-
-export function colorizeTreeseedCliOutput(output: string, colorEnabled = true) {
-	if (!colorEnabled) {
-		return output;
-	}
-	return output.replace(/^((?:\[[^\]]+\]){2,4})(\s|$)/u, (match, prefix: string, suffix: string) => {
-		const segments = [...prefix.matchAll(/\[([^\]]+)\]/gu)].map((entry) => entry[1]);
-		if (segments.length === 2) {
-			const stage = segments[1] ?? '';
-			const code = /fail|error/iu.test(stage) ? '31;1' : /skip/iu.test(stage) ? '90;1' : '32;1';
-			return `\u001b[${code}m${prefix}\u001b[0m${suffix}`;
-		}
-		const system = segments[1] ?? '';
-		const stage = segments[segments.length - 1] ?? '';
-		const code = /fail|error/iu.test(stage) ? '31;1' : /skip/iu.test(stage) ? '90;1' : colorCodeForBootstrapSystem(system);
-		return `\u001b[${code}m${prefix}\u001b[0m${suffix}`;
-	});
-}
-
-function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
-	if (!output) return;
-	const fd = stream === 'stderr' ? process.stderr.fd : process.stdout.fd;
-	const buffer = Buffer.from(`${output}\n`);
-	let offset = 0;
-	const retryBuffer = new SharedArrayBuffer(4);
-	const retryView = new Int32Array(retryBuffer);
-	while (offset < buffer.length) {
-		try {
-			offset += writeSync(fd, buffer, offset, Math.min(buffer.length - offset, 16_384));
-		} catch (error) {
-			if (error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'EAGAIN') {
-				Atomics.wait(retryView, 0, 0, 10);
-				continue;
-			}
-			throw error;
-		}
-	}
-}
-
-function defaultSpawn(command: string, args: string[], options: {
-	cwd: string;
-	env: NodeJS.ProcessEnv;
-	stdio?: 'inherit' | 'pipe';
-	timeout?: number;
-	killSignal?: NodeJS.Signals;
-}) {
-	return spawnSync(command, args, options);
 }
 
 function resolveCoreAgentCliEntrypoint(cwd: string) {

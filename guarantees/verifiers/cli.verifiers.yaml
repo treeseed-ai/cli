@@ -4,10 +4,10 @@ verifiers:
   cli.capacity.assignment.forensic-reads-fail-visible:
     kind: nodeScript
     ownerPackage: "@treeseed/cli"
-    command: packages/cli/scripts/capacity-forensics.test.ts
+    command: packages/cli/tests/integration/capacity/forensics.test.ts
     description: "CLI forensic loaders preserve bounded assignment/mode-run evidence and propagate API failure instead of rendering an empty successful report."
   cli.capacity.assignment.reviewed-checkpoint-integration:
     kind: nodeScript
     ownerPackage: "@treeseed/cli"
-    command: packages/cli/scripts/capacity-checkpoint-integration.test.ts
+    command: packages/cli/tests/integration/capacity/checkpoint.test.ts
     description: "Checkpoint integration requires explicit scope and mode; the SDK operation proves selected-manifest lineage, repository identity, divergence and supersession rejection, exact tree integration, and replay."

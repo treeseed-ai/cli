@@ -30,8 +30,9 @@
     "setup": "npm install",
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
-    "lint": "npm run build:dist",
-    "test": "npm run build:dist && node --import tsx --test --test-concurrency=1 ./scripts/treeseed-help.test.ts ./scripts/scene-command.test.ts ./scripts/guarantees-command.test.ts ./scripts/seed.test.ts ./scripts/projects-deploy.test.ts ./scripts/wrapper-package.test.ts ./scripts/hosting-command.test.ts ./scripts/ready-command.test.ts ./scripts/operations-smoke.test.ts ./scripts/reconcile-command.test.ts ./scripts/runtime-cwd.test.ts ./scripts/stage-output.test.ts ./scripts/secrets-escrow.test.ts ./scripts/dev-lifecycle.test.ts ./scripts/capacity-output-security.test.ts ./scripts/capacity-forensics.test.ts ./scripts/capacity-governance-confirmation.test.ts ./scripts/capacity-checkpoint-integration.test.ts ./scripts/capacity-operator-parity.test.ts ./scripts/capacity-workday-provider.test.ts ./scripts/capacity-workday-agent-class.test.ts ./scripts/capacity-workday-summary.test.ts ./scripts/capacity-workday-treedx.test.ts ./scripts/operations-registry-options.test.ts",
+    "check:file-lengths": "node --import tsx ./scripts/check-file-lengths.ts",
+    "lint": "npm run check:file-lengths && npm run build:dist",
+    "test": "npm run build:dist && node --import tsx ./scripts/run-tests.ts",
     "build:dist": "node --import tsx ./scripts/build-dist.ts",
     "prepare": "node --import tsx ./scripts/prepare.ts",
     "prepack": "npm run build:dist",
@@ -45,9 +46,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#d661439b9899147c2b3603f67772caf31e08ee44",
-    "@treeseed/core": "github:treeseed-ai/core#4c289dc0fb2041925ead7c1dd92f44aae33cc25f",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#689ab4dee96c4b288589b3b60f5989e038fc7f8a",
+    "@treeseed/agent": "github:treeseed-ai/agent#917cafadc95efbee40a208ce6502a47442b29b6b",
+    "@treeseed/core": "github:treeseed-ai/core#2a00e061edbcf24c288aee73a43345d5f3db8005",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#2e95b2e65d3a8f224b79459c127875483883c7f8",
     "ink": "^7.0.0",
     "react": "^19.2.5",
     "yaml": "^2.8.1"
