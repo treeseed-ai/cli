@@ -30,7 +30,8 @@
     "setup": "npm install",
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
-    "check:file-lengths": "node --import tsx ./scripts/check-file-lengths.ts",
+    "check:file-lengths": "node --import tsx ./scripts/check-file-lengths.ts && npm run check:file-architecture",
+    "check:file-architecture": "node --import tsx ./scripts/check-file-architecture.ts",
     "lint": "npm run check:file-lengths && npm run build:dist",
     "test": "npm run build:dist && node --import tsx ./scripts/run-tests.ts",
     "build:dist": "node --import tsx ./scripts/build-dist.ts",
@@ -46,9 +47,9 @@
     "release:publish": "node --import tsx ./scripts/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#4e85ff2b27fe8dac00f3e2be861bc815e62db697",
-    "@treeseed/core": "github:treeseed-ai/core#0a123d60d9c423c1a59140eaa80efb86c23538b9",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#d7e2c296f3003327a5cca64f83a5950dedba4aac",
+    "@treeseed/agent": "github:treeseed-ai/agent#ba3280aebf76aac9a6200e63f70e8455dcac7659",
+    "@treeseed/core": "github:treeseed-ai/core#784c3b0f770a3f2252445d8da6006b884b2252b3",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#363356034d2717f401f4cdd0c54b22c16dffc60c",
     "ink": "^7.0.0",
     "react": "^19.2.5",
     "yaml": "^2.8.1"

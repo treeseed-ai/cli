@@ -5,26 +5,48 @@ import {
 import type { TreeseedOperationMetadata } from '@treeseed/sdk/operations';
 import type { TreeseedOperationSpec } from './operations-types.ts';
 import { mergeHelpSpec, type CommandOverlay } from './operations-registry-support.ts';
-import { CLI_COMMAND_OVERLAYS_1 } from './operations-registry-overlays-1.ts';
-import { CLI_COMMAND_OVERLAYS_2 } from './operations-registry-overlays-2.ts';
-import { CLI_COMMAND_OVERLAYS_3 } from './operations-registry-overlays-3.ts';
-import { CLI_COMMAND_OVERLAYS_4 } from './operations-registry-overlays-4.ts';
-import { CLI_ONLY_OPERATION_SPECS_1 } from './operations-registry-cli-1.ts';
-import { CLI_ONLY_OPERATION_SPECS_2 } from './operations-registry-cli-2.ts';
-import { CLI_ONLY_OPERATION_SPECS_3 } from './operations-registry-cli-3.ts';
-import { CLI_ONLY_OPERATION_SPECS_4 } from './operations-registry-cli-4.ts';
+import { taskLifecycleCommandOverlays } from './overlays-task-lifecycle.ts';
+import { stagingAndReleaseCommandOverlays } from './overlays-staging-and-release.ts';
+import { recoveryAndWorkspaceCommandOverlays } from './overlays-recovery-and-workspace.ts';
+import { authenticationAndSecretsCommandOverlays } from './overlays-authentication-and-secrets.ts';
+import { projectBootstrapCommandOverlays } from './overlays-project-bootstrap.ts';
+import { configurationCommandOverlays } from './overlays-configuration.ts';
+import { localDevelopmentCommandOverlays } from './overlays-local-development.ts';
+import { validationAndPassthroughCommandOverlays } from './overlays-validation-and-passthrough.ts';
+import { localDevelopmentOperationSpecs } from './operations-local-development.ts';
+import { scenesAndGuaranteesOperationSpecs } from './operations-scenes-and-guarantees.ts';
+import { seedAndDemoOperationSpecs } from './operations-seed-and-demo.ts';
+import { hostingAndReconciliationOperationSpecs } from './operations-hosting-and-reconciliation.ts';
+import { providerToolsOperationSpecs } from './operations-provider-tools.ts';
+import { marketProjectsOperationSpecs } from './operations-market-projects.ts';
+import { capacityOperationSpecs } from './operations-capacity.ts';
+import { operationsAndReadinessOperationSpecs } from './operations-operations-and-readiness.ts';
+import { packageAndWorkflowOperationSpecs } from './operations-package-and-workflow.ts';
+import { treedxAndPacksOperationSpecs } from './operations-treedx-and-packs.ts';
+import { agentRuntimeOperationSpecs } from './operations-agent-runtime.ts';
 
 const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
-	...CLI_COMMAND_OVERLAYS_1,
-	...CLI_COMMAND_OVERLAYS_2,
-	...CLI_COMMAND_OVERLAYS_3,
-	...CLI_COMMAND_OVERLAYS_4,
+	...taskLifecycleCommandOverlays,
+	...stagingAndReleaseCommandOverlays,
+	...recoveryAndWorkspaceCommandOverlays,
+	...authenticationAndSecretsCommandOverlays,
+	...projectBootstrapCommandOverlays,
+	...configurationCommandOverlays,
+	...localDevelopmentCommandOverlays,
+	...validationAndPassthroughCommandOverlays,
 ]);
 const CLI_ONLY_OPERATION_SPECS = [
-	...CLI_ONLY_OPERATION_SPECS_1,
-	...CLI_ONLY_OPERATION_SPECS_2,
-	...CLI_ONLY_OPERATION_SPECS_3,
-	...CLI_ONLY_OPERATION_SPECS_4,
+	...localDevelopmentOperationSpecs,
+	...scenesAndGuaranteesOperationSpecs,
+	...seedAndDemoOperationSpecs,
+	...hostingAndReconciliationOperationSpecs,
+	...providerToolsOperationSpecs,
+	...marketProjectsOperationSpecs,
+	...capacityOperationSpecs,
+	...operationsAndReadinessOperationSpecs,
+	...packageAndWorkflowOperationSpecs,
+	...treedxAndPacksOperationSpecs,
+	...agentRuntimeOperationSpecs,
 ];
 
 function mergeOperationSpec(metadata: TreeseedOperationMetadata): TreeseedOperationSpec {

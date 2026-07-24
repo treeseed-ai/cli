@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { listTreeseedOperationNames } from '@treeseed/sdk/operations';
@@ -157,17 +157,11 @@ test('capacity removes old helper-capacity actions', async () => {
 
 test('capacity inspection exposes read-only execution visibility summaries', () => {
 	const capacityHandler = readFileSync(resolve(cliPackageRoot, 'src/cli/handlers/capacity-inspection-projection.ts'), 'utf8');
-	const operationsRegistry = [
-		'operations-registry.ts',
-		'operations-registry-overlays-1.ts',
-		'operations-registry-overlays-2.ts',
-		'operations-registry-overlays-3.ts',
-		'operations-registry-overlays-4.ts',
-		'operations-registry-cli-1.ts',
-		'operations-registry-cli-2.ts',
-		'operations-registry-cli-3.ts',
-		'operations-registry-cli-4.ts',
-	].map((file) => readFileSync(resolve(cliPackageRoot, 'src/cli', file), 'utf8')).join('\n');
+	const registryRoot = resolve(cliPackageRoot, 'src/cli');
+	const operationsRegistry = readdirSync(registryRoot)
+		.filter((file) => /^(?:operations|overlays)-.+\.ts$/u.test(file) || file === 'operations-registry.ts')
+		.map((file) => readFileSync(resolve(registryRoot, file), 'utf8'))
+		.join('\n');
 
 	assert.match(capacityHandler, /decorateExecutionProviderVisibility/u);
 	assert.match(capacityHandler, /summarizeExecutionProviderVisibility/u);
@@ -194,4 +188,3 @@ test('cli command names are sourced from the sdk operation registry', () => {
 		assert.ok(cliCommandNames.includes(name), `${name} should be exposed by the CLI registry`);
 	}
 });
-
