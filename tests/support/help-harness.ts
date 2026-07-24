@@ -41,7 +41,7 @@ export function resolveSdkConfigRuntimePath() {
 		return workspaceCandidate;
 	}
 	const sdkOperationsEntry = require.resolve('@treeseed/sdk/operations');
-	const sdkDistRoot = resolve(dirname(sdkOperationsEntry), 'operations', 'services', 'configuration', 'config-runtime.js');
+	const sdkDistRoot = resolve(dirname(sdkOperationsEntry), 'services', 'configuration', 'config-runtime.js');
 	if (existsSync(sdkDistRoot)) {
 		return sdkDistRoot;
 	}
