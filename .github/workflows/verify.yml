@@ -12,6 +12,7 @@ jobs:
       CI: "true"
       TREESEED_STAGE_WAIT_MODE: skip
       TREESEED_AGENT_DISABLE_GIT: "true"
+      TREESEED_TOOL_CLOSURE_OUTPUT: artifacts
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,9 +32,6 @@ jobs:
 
       - name: Verify package
         run: npm run verify:direct
-
-      - name: Pack verified deployment tool closure
-        run: node --import tsx ./scripts/pack-ci-tool-closure.ts artifacts
 
       - uses: actions/upload-artifact@v4
         with:
