@@ -6,10 +6,10 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { promisify } from 'node:util';
 import { integrateAgentCheckpoint } from '@treeseed/sdk/operations';
-import type { TreeseedCommandContext, TreeseedParsedInvocation } from '../../../src/cli/types.ts';
-import { runCapacityCheckpointIntegration } from '../../../src/cli/handlers/capacity-checkpoint-integration.ts';
+import type { CommandContext, ParsedInvocation } from '../../../src/cli/types.ts';
+import { runCapacityCheckpointIntegration } from '../../../src/cli/handlers/capacity/capacity-core/capacity-checkpoint-integration.ts';
 
-function invocation(args: Record<string, unknown>): TreeseedParsedInvocation {
+function invocation(args: Record<string, unknown>): ParsedInvocation {
 	return {
 		commandName: 'capacity',
 		args: { action: 'checkpoint-integrate', ...args },
@@ -18,7 +18,7 @@ function invocation(args: Record<string, unknown>): TreeseedParsedInvocation {
 	};
 }
 
-const context: TreeseedCommandContext = {
+const context: CommandContext = {
 	cwd: process.cwd(),
 	env: {},
 	write: () => undefined,

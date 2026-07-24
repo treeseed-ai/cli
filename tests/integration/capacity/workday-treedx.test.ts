@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { treeDxRepositoryIdsFromReconcileResults } from '../../../src/cli/handlers/capacity-workday-treedx.ts';
+import { treeDxRepositoryIdsFromReconcileResults } from '../../../src/cli/handlers/capacity/workdays/configuration/capacity-workday-treedx.ts';
 
 describe('capacity workday TreeDX reconciliation evidence', () => {
 	it('reads repository ids from update state', () => {

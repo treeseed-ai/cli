@@ -4,11 +4,11 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { makeWorkspaceRoot } from '../../support/cli-test-fixtures.ts';
 
-const { runTreeseedCli } = await import('../../../dist/cli/main.js');
+const { runCommandLine } = await import('../../../dist/cli/main.js');
 
 async function runCli(args, cwd) {
 	const writes = [];
-	const exitCode = await runTreeseedCli(args, {
+	const exitCode = await runCommandLine(args, {
 		cwd,
 		env: { ...process.env, CI: undefined, GITHUB_ACTIONS: undefined },
 		interactiveUi: false,

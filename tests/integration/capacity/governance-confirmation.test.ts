@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { TreeseedCommandContext, TreeseedParsedInvocation } from '../../../src/cli/types.ts';
+import type { CommandContext, ParsedInvocation } from '../../../src/cli/types.ts';
 import {
 	MUTATING_CAPACITY_GOVERNANCE_ACTIONS,
 	runCapacityGovernanceAction,
-} from '../../../src/cli/handlers/capacity-governance.ts';
+} from '../../../src/cli/handlers/capacity/capacity-core/capacity-governance.ts';
 
-function invocation(action: string, yes = false): TreeseedParsedInvocation {
+function invocation(action: string, yes = false): ParsedInvocation {
 	return {
 		commandName: 'capacity',
 		args: {
@@ -20,7 +20,7 @@ function invocation(action: string, yes = false): TreeseedParsedInvocation {
 	};
 }
 
-function context(confirm?: TreeseedCommandContext['confirm']): TreeseedCommandContext {
+function context(confirm?: CommandContext['confirm']): CommandContext {
 	return {
 		cwd: process.cwd(),
 		env: {},

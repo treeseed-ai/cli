@@ -1,16 +1,16 @@
 import {
-	createDefaultTreeseedMachineConfig,
-	unlockTreeseedSecretSessionWithPassphrase,
-	writeTreeseedMachineConfig,
+	createDefaultMachineConfig,
+	unlockSecretSessionWithPassphrase,
+	writeMachineConfig,
 } from '@treeseed/sdk/workflow-support';
 import { setMarketSession } from '@treeseed/sdk/market-client';
 import { makeWorkspaceRoot } from './cli-test-fixtures.ts';
 
-export const { runTreeseedCli } = await import('../../dist/cli/main.js');
+export const { runCommandLine } = await import('../../dist/cli/main.js');
 export const {
 	buildCliClientEncryptedEscrowBody,
 	summarizeCliClientEncryptedEscrow,
-} = await import('../../dist/cli/secrets-escrow.js');
+} = await import('../../dist/cli/configuration/secrets-escrow.js');
 
 export function prepareMarketWorkspace({ withSession = true } = {}) {
 	const root = makeWorkspaceRoot();
@@ -21,12 +21,12 @@ export function prepareMarketWorkspace({ withSession = true } = {}) {
 	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
 	process.env.TREESEED_KEY_PASSPHRASE = 'test-passphrase';
 	try {
-		writeTreeseedMachineConfig(root, createDefaultTreeseedMachineConfig({
+		writeMachineConfig(root, createDefaultMachineConfig({
 			tenantRoot: root,
 			deployConfig: { name: 'Projects Deploy Test', slug: 'projects-deploy-test' },
 			tenantConfig: undefined,
 		}));
-		unlockTreeseedSecretSessionWithPassphrase(root, 'test-passphrase', {
+		unlockSecretSessionWithPassphrase(root, 'test-passphrase', {
 			createIfMissing: true,
 			allowMigration: false,
 		});
@@ -74,7 +74,7 @@ export async function runCli(args, options = {}) {
 	}
 	let exitCode;
 	try {
-		exitCode = await runTreeseedCli(args, {
+		exitCode = await runCommandLine(args, {
 			cwd: options.cwd ?? process.cwd(),
 			env,
 			interactiveUi: false,
@@ -240,4 +240,3 @@ export async function withFetch(handler, callback) {
 		globalThis.fetch = previousFetch;
 	}
 }
-

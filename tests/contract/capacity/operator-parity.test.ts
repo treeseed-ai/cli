@@ -4,17 +4,17 @@ import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CAPACITY_OPERATOR_CAPABILITIES } from '@treeseed/sdk/agent-capacity';
-import { CAPACITY_AGENT_CLASS_ACTIONS } from '../../../src/cli/handlers/capacity-agent-classes.ts';
-import { CAPACITY_ASSIGNMENT_ACTIONS } from '../../../src/cli/handlers/capacity-assignments.ts';
-import { CAPACITY_EVIDENCE_ACTIONS } from '../../../src/cli/handlers/capacity-evidence.ts';
-import { CAPACITY_GOVERNANCE_ACTIONS } from '../../../src/cli/handlers/capacity-governance.ts';
-import { CAPACITY_OVERRUN_ACTIONS } from '../../../src/cli/handlers/capacity-overruns.ts';
-import { CAPACITY_PROVIDER_GOVERNANCE_ACTIONS } from '../../../src/cli/handlers/capacity-provider-governance.ts';
+import { CAPACITY_AGENT_CLASS_ACTIONS } from '../../../src/cli/handlers/capacity/agents/capacity-agent-classes.ts';
+import { CAPACITY_ASSIGNMENT_ACTIONS } from '../../../src/cli/handlers/capacity/assignments/capacity-assignments.ts';
+import { CAPACITY_EVIDENCE_ACTIONS } from '../../../src/cli/handlers/capacity/observability/capacity-evidence.ts';
+import { CAPACITY_GOVERNANCE_ACTIONS } from '../../../src/cli/handlers/capacity/capacity-core/capacity-governance.ts';
+import { CAPACITY_OVERRUN_ACTIONS } from '../../../src/cli/handlers/capacity/accounting/capacity-overruns.ts';
+import { CAPACITY_PROVIDER_GOVERNANCE_ACTIONS } from '../../../src/cli/handlers/capacity/providers/capacity-provider-governance.ts';
 import {
 	MARKET_INSPECTION_ACTIONS,
 	PROVIDER_LIFECYCLE_ACTIONS,
-} from '../../../src/cli/handlers/capacity.ts';
-import { CAPACITY_WORKDAY_ACTIONS } from '../../../src/cli/handlers/capacity-workday.ts';
+} from '../../../src/cli/handlers/capacity/capacity-core/capacity.ts';
+import { CAPACITY_WORKDAY_ACTIONS } from '../../../src/cli/handlers/capacity/workdays/lifecycle/capacity-workday.ts';
 
 describe('capacity operator parity', () => {
 	it('has exactly one CLI handler owner for every canonical capability', () => {

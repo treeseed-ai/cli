@@ -3,11 +3,11 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-export const { runTreeseedCli } = await import('../../dist/cli/main.js');
+export const { runCommandLine } = await import('../../dist/cli/main.js');
 
 export async function runCli(args, cwd = process.cwd()) {
 	const writes = [];
-	const exitCode = await runTreeseedCli(args, {
+	const exitCode = await runCommandLine(args, {
 		cwd,
 		env: { ...process.env, GITHUB_ACTIONS: undefined, CI: undefined },
 		interactiveUi: false,

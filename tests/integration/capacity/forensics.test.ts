@@ -5,7 +5,7 @@ import {
 	fetchProjectModeRunsForAssignment,
 	fetchWorkdayAssignmentIdsForLog,
 	type CapacityForensicsClient,
-} from '../../../src/cli/handlers/capacity-forensics.ts';
+} from '../../../src/cli/handlers/capacity/observability/capacity-forensics.ts';
 
 describe('capacity forensic reads', () => {
 	it('preserves bounded assignment order and execution evidence', async () => {

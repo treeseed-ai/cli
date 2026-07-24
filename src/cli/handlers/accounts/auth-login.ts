@@ -1,0 +1,121 @@
+import type { CommandHandler } from '../../types.js';
+import {
+	setMarketSession,
+} from '@treeseed/sdk/market-client';
+import { KeyAgentError } from '@treeseed/sdk/workflow-support';
+import { guidedResult } from '../utilities/utils.js';
+import { createMarketClientForInvocation, marketAuthRoot } from '../content/market-utils.js';
+
+function sleep(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function localWebApprovalUrlFromApiUrl(value: string, profileId: string) {
+	const explicit = process.env.TREESEED_SITE_URL?.trim() || process.env.TREESEED_BETTER_AUTH_URL?.trim();
+	if (explicit && profileId === 'local') {
+		const url = new URL(value);
+		return new URL(`${url.pathname}${url.search}${url.hash}`, explicit.replace(/\/+$/u, '')).toString();
+	}
+	const url = new URL(value);
+	if (
+		profileId === 'local'
+		&& (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
+		&& url.port === '3000'
+	) {
+		url.port = '4321';
+		return url.toString();
+	}
+	return value;
+}
+
+function centralWebApprovalUrlFromApiUrl(value: string, profileId: string) {
+	if (profileId !== 'central') {
+		return value;
+	}
+	const explicit = process.env.TREESEED_CENTRAL_MARKET_WEB_URL?.trim();
+	const fallback = explicit || 'https://treeseed.dev';
+	const url = new URL(value);
+	if (
+		url.protocol === 'http:'
+		&& (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
+	) {
+		return new URL(`${url.pathname}${url.search}${url.hash}`, fallback.replace(/\/+$/u, '')).toString();
+	}
+	return value;
+}
+
+function approvalUrlForDisplay(value: string, profileId: string) {
+	try {
+		return centralWebApprovalUrlFromApiUrl(localWebApprovalUrlFromApiUrl(value, profileId), profileId);
+	} catch {
+		return value;
+	}
+}
+
+export const handleAuthLogin: CommandHandler = async (invocation, context) => {
+	try {
+		const tenantRoot = marketAuthRoot(context);
+		const { profile, client } = createMarketClientForInvocation(invocation, context);
+		const started = await client.startDeviceLogin({
+			clientName: 'treeseed-cli',
+			scopes: ['auth:me', 'market'],
+		});
+		const approvalUrl = approvalUrlForDisplay(started.verificationUriComplete, profile.id);
+
+		if (context.outputFormat !== 'json') {
+			context.write(`Open ${approvalUrl}`, 'stdout');
+			context.write(`User code: ${started.userCode}`, 'stdout');
+			context.write('Waiting for approval...', 'stdout');
+		}
+
+		const deadline = Date.parse(started.expiresAt);
+		while (Date.now() < deadline) {
+			const response = await client.pollDeviceLogin({ deviceCode: started.deviceCode });
+			if (response.ok && response.status === 'approved') {
+				setMarketSession(tenantRoot, {
+					marketId: profile.id,
+					accessToken: response.accessToken,
+					refreshToken: response.refreshToken,
+					expiresAt: response.expiresAt,
+					principal: response.principal,
+				});
+				return guidedResult({
+					command: 'auth:login',
+					summary: 'Treeseed API login completed successfully.',
+					facts: [
+						{ label: 'Market', value: profile.id },
+						{ label: 'URL', value: profile.baseUrl },
+						{ label: 'Principal', value: response.principal.displayName ?? response.principal.id },
+						{ label: 'Scopes', value: response.principal.scopes.join(', ') },
+					],
+					report: {
+						marketId: profile.id,
+						baseUrl: profile.baseUrl,
+						principal: response.principal,
+					},
+				});
+			}
+			if (!response.ok && response.status !== 'already_used') {
+				return {
+					exitCode: 1,
+					stderr: [response.error],
+				};
+			}
+			await sleep(started.intervalSeconds * 1000);
+		}
+
+		return {
+			exitCode: 1,
+			stderr: ['Treeseed API login expired before approval completed.'],
+		};
+	} catch (error) {
+		if (error instanceof KeyAgentError) {
+			return {
+				exitCode: 1,
+				stderr: [error.message],
+				report: { command: 'auth:login', ok: false, code: error.code, details: error.details ?? null },
+			};
+		}
+		throw error;
+	}
+};

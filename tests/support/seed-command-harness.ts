@@ -5,12 +5,12 @@ export { makeWorkspaceRoot } from './cli-test-fixtures.ts';
 import { makeWorkspaceRoot } from './cli-test-fixtures.ts';
 import { setMarketSession } from '@treeseed/sdk/market-client';
 import {
-	createDefaultTreeseedMachineConfig,
-	unlockTreeseedSecretSessionWithPassphrase,
-	writeTreeseedMachineConfig,
+	createDefaultMachineConfig,
+	unlockSecretSessionWithPassphrase,
+	writeMachineConfig,
 } from '@treeseed/sdk/workflow-support';
 
-export const { runTreeseedCli } = await import('../../dist/cli/main.js');
+export const { runCommandLine } = await import('../../dist/cli/main.js');
 
 export function tempD1Path() {
 	return mkdtempSync(resolve(tmpdir(), 'treeseed-seed-d1-'));
@@ -38,7 +38,7 @@ export async function runCli(args, options = {}) {
 	}
 	let exitCode;
 	try {
-		exitCode = await runTreeseedCli(args, {
+		exitCode = await runCommandLine(args, {
 		cwd: options.cwd ?? process.cwd(),
 		env,
 		interactiveUi: false,
@@ -144,7 +144,7 @@ export async function exportSeedFromCli(input) {
 
 export function seedWorkspace({ localService = true } = {}) {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'treeseed', CANONICAL_TREESEED_SEED);
+	writeSeed(root, 'treeseed', CANONICAL_SEED);
 	if (localService) {
 		writeLocalSeedService(root);
 	}
@@ -157,7 +157,7 @@ export function prepareMarketSessionStorage(root) {
 	process.env.HOME = root;
 	process.env.TREESEED_KEY_AGENT_TRANSPORT = 'inline';
 	try {
-		writeTreeseedMachineConfig(root, createDefaultTreeseedMachineConfig({
+		writeMachineConfig(root, createDefaultMachineConfig({
 			tenantRoot: root,
 			deployConfig: {
 				name: 'Help Test',
@@ -166,7 +166,7 @@ export function prepareMarketSessionStorage(root) {
 			},
 			tenantConfig: undefined,
 		}));
-		unlockTreeseedSecretSessionWithPassphrase(root, 'test-passphrase', {
+		unlockSecretSessionWithPassphrase(root, 'test-passphrase', {
 			createIfMissing: true,
 			allowMigration: false,
 		});
@@ -305,7 +305,7 @@ export function remoteSeedPayload({ mode = 'plan', environments = ['staging'], s
 	};
 }
 
-export const CANONICAL_TREESEED_SEED = `
+export const CANONICAL_SEED = `
 name: treeseed
 version: 1
 defaultEnvironments: [local]

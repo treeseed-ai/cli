@@ -5,7 +5,7 @@ import {
 	isUnfinishedCapacityWorkdayAssignment,
 	waitForCapacityWorkdayAssignments,
 	type CapacityWorkdayAssignmentClient,
-} from '../../../src/cli/handlers/capacity-workday-assignment-poller.ts';
+} from '../../../src/cli/handlers/capacity/workdays/execution/capacity-workday-assignment-poller.ts';
 
 describe('capacity workday assignment polling', () => {
 	it('uses the exact workday filter on every keyset page', async () => {

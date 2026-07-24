@@ -21,7 +21,7 @@
   "files": [
     "README.md",
     "dist",
-    "scripts/verify-driver.ts"
+    "scripts/support/verify-driver.ts"
   ],
   "publishConfig": {
     "access": "public"
@@ -30,26 +30,26 @@
     "setup": "npm install",
     "setup:ci": "npm ci",
     "build": "npm run build:dist",
-    "check:file-lengths": "node --import tsx ./scripts/check-file-lengths.ts && npm run check:file-architecture",
-    "check:file-architecture": "node --import tsx ./scripts/check-file-architecture.ts",
+    "check:file-lengths": "node --import tsx ./scripts/support/check-file-lengths.ts && npm run check:file-architecture",
+    "check:file-architecture": "node --import tsx ./scripts/support/check-file-architecture.ts",
     "lint": "npm run check:file-lengths && npm run build:dist",
-    "test": "npm run build:dist && node --import tsx ./scripts/run-tests.ts",
-    "build:dist": "node --import tsx ./scripts/build-dist.ts",
-    "prepare": "node --import tsx ./scripts/prepare.ts",
+    "test": "npm run build:dist && node --import tsx ./scripts/testing/run-tests.ts",
+    "build:dist": "node --import tsx ./scripts/build/build-dist.ts",
+    "prepare": "node --import tsx ./scripts/support/prepare.ts",
     "prepack": "npm run build:dist",
     "verify:direct": "npm run release:verify",
-    "verify:local": "TREESEED_VERIFY_DRIVER=direct TMPDIR=/tmp node --import tsx ./scripts/verify-driver.ts",
-    "verify:action": "TREESEED_VERIFY_DRIVER=act TMPDIR=/tmp node --import tsx ./scripts/verify-driver.ts",
-    "verify": "TMPDIR=/tmp node --import tsx ./scripts/verify-driver.ts",
+    "verify:local": "TREESEED_VERIFY_DRIVER=direct TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
+    "verify:action": "TREESEED_VERIFY_DRIVER=act TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
+    "verify": "TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
     "release:setup": "npm run setup:ci",
-    "release:check-tag": "node --import tsx ./scripts/assert-release-tag-version.ts",
-    "release:verify": "node --import tsx ./scripts/release-verify.ts",
-    "release:publish": "node --import tsx ./scripts/publish-package.ts"
+    "release:check-tag": "node --import tsx ./scripts/packages/assert-release-tag-version.ts",
+    "release:verify": "node --import tsx ./scripts/packages/release-verify.ts",
+    "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#ba3280aebf76aac9a6200e63f70e8455dcac7659",
-    "@treeseed/core": "github:treeseed-ai/core#784c3b0f770a3f2252445d8da6006b884b2252b3",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#363356034d2717f401f4cdd0c54b22c16dffc60c",
+    "@treeseed/agent": "github:treeseed-ai/agent#d16fd5b76cfc8167516b2a9a373510252fe391c1",
+    "@treeseed/core": "github:treeseed-ai/core#3c4750cbd95d27372ebaa4f0dfeac67bb5dfeeab",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#8f2e04cb4dac647d7aa63179dd67b5027d2e393f",
     "ink": "^7.0.0",
     "react": "^19.2.5",
     "yaml": "^2.8.1"

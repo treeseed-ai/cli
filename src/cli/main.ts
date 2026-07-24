@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 import { realpathSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { runTreeseedCli } from './runtime.js';
+import { fileURLToPath } from 'node:url';
+import { runCommandLine } from './runtime/runtime.js';
 
-export * from './runtime.js';
-export * from './help.js';
-export * from './parser.js';
-export * from './registry.js';
+export * from './runtime/runtime.js';
+export * from './support/help.js';
+export * from './support/parser.js';
+export * from './support/registry.js';
 export type * from './types.js';
 
 function resolveExecutablePath(path: string) {
@@ -23,6 +23,6 @@ const currentFile = resolveExecutablePath(fileURLToPath(import.meta.url));
 const entryFile = resolveExecutablePath(process.argv[1] ?? '');
 
 if (entryFile === currentFile) {
-	const exitCode = await runTreeseedCli(process.argv.slice(2));
+	const exitCode = await runCommandLine(process.argv.slice(2));
 	process.exit(exitCode);
 }

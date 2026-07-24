@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { parseCapacityWorkdaySummaryOptions } from '../../../src/cli/handlers/capacity-workday.ts';
+import { parseCapacityWorkdaySummaryOptions } from '../../../src/cli/handlers/capacity/workdays/lifecycle/capacity-workday.ts';
 
 describe('capacity workday summary options', () => {
 	it('passes one explicit bounded evidence continuation to the API client', () => {

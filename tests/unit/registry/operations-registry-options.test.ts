@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TRESEED_OPERATION_SPECS } from '../../../src/cli/operations-registry.ts';
+import { TRESEED_OPERATION_SPECS } from '../../../src/cli/operations/operations-registry.ts';
 
 test('every command exposes one canonical meaning per option name and long flag', () => {
 	for (const operation of TRESEED_OPERATION_SPECS) {

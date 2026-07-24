@@ -8,9 +8,9 @@ import * as cliExports from '../../../dist/cli/main.js';
 const packageRoot = process.cwd();
 
 test('cli package exposes its own runtime entrypoints', () => {
-	assert.equal(typeof cliExports.runTreeseedCli, 'function');
-	assert.equal(typeof cliExports.executeTreeseedCommand, 'function');
-	assert.equal(typeof cliExports.renderTreeseedHelp, 'function');
+	assert.equal(typeof cliExports.runCommandLine, 'function');
+	assert.equal(typeof cliExports.executeCommand, 'function');
+	assert.equal(typeof cliExports.renderHelp, 'function');
 	assert.equal(typeof cliExports.findCommandSpec, 'function');
 });
 
@@ -33,12 +33,12 @@ test('published dist contains the cli runtime surface', () => {
 
 	for (const requiredFile of [
 		'cli/main.js',
-		'cli/runtime.js',
-		'cli/help.js',
-		'cli/help-ui.js',
-		'cli/parser.js',
-		'cli/registry.js',
-		'cli/handlers/status.js',
+		'cli/runtime/runtime.js',
+		'cli/support/help.js',
+		'cli/support/help-ui.js',
+		'cli/support/parser.js',
+		'cli/support/registry.js',
+		'cli/handlers/diagnostics/status.js',
 		'index.js',
 	]) {
 		assert.ok(actualFiles.includes(requiredFile), `${requiredFile} should be published`);

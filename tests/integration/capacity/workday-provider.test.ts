@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import {
 	resolveCapacityWorkdayProviderId,
 	type CapacityWorkdayProviderClient,
-} from '../../../src/cli/handlers/capacity-workday-provider.ts';
+} from '../../../src/cli/handlers/capacity/workdays/configuration/capacity-workday-provider.ts';
 
 function client(input: { memberships?: unknown; sessions?: unknown }): CapacityWorkdayProviderClient {
 	return {

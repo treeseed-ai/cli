@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { redactCapacityOutputSecrets } from '../../../src/cli/handlers/capacity-output-security.ts';
-import { DEFAULT_PROVIDER_CAPABILITIES } from '../../../src/cli/handlers/capacity-provider-governance.ts';
+import { redactCapacityOutputSecrets } from '../../../src/cli/handlers/capacity/capacity-core/capacity-output-security.ts';
+import { DEFAULT_PROVIDER_CAPABILITIES } from '../../../src/cli/handlers/capacity/providers/capacity-provider-governance.ts';
 
 describe('capacity CLI output security', () => {
 	it('redacts issued secrets while retaining safe refs and forensic metadata', () => {
