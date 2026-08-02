@@ -50,7 +50,7 @@ export function resolveSdkConfigRuntimePath() {
 
 export let testTemplateCatalogPath;
 
-export function templateCatalogItemBase(id, displayName, summary, fulfillmentSource, launchRequirements) {
+export function templateCatalogItemBase(id, displayName, summary, fulfillmentSource) {
 	return {
 		id,
 		displayName,
@@ -77,133 +77,6 @@ export function templateCatalogItemBase(id, displayName, summary, fulfillmentSou
 		relatedBooks: [],
 		relatedKnowledge: [],
 		relatedObjectives: [],
-		launchRequirements,
-	};
-}
-
-export function starterLaunchRequirements() {
-	return {
-		version: 1,
-		hosts: [
-			{
-				kind: 'host',
-				key: 'sourceRepository',
-				type: 'repository',
-				required: true,
-				compatibleProviders: ['github'],
-				displayName: 'Source repository',
-				purpose: 'Create and push the generated research project repository.',
-				defaultSelection: 'team-default',
-				configWrites: [
-					{ target: 'treeseed.site.yaml', path: 'hosting.hostBindings.sourceRepository.provider', valueFrom: 'selectedHost.provider' },
-				],
-				environmentWrites: [
-					{ env: 'GITHUB_TOKEN', valueFrom: 'selectedHost.token', targets: ['github-secret'], scopes: ['staging', 'prod'], sensitivity: 'secret' },
-				],
-			},
-			{
-				kind: 'host',
-				key: 'publicWeb',
-				type: 'web',
-				required: true,
-				compatibleProviders: ['cloudflare'],
-				displayName: 'Public web host',
-				purpose: 'Deploy the research site and web runtime resources.',
-				defaultSelection: 'managed',
-				configWrites: [
-					{ target: 'treeseed.site.yaml', path: 'surfaces.web.provider', valueFrom: 'selectedHost.provider' },
-				],
-				environmentWrites: [
-					{ env: 'TREESEED_PUBLIC_WEB_PROVIDER', valueFrom: 'selectedHost.provider', targets: ['github-variable', 'cloudflare-var'], scopes: ['staging', 'prod'], sensitivity: 'plain' },
-				],
-			},
-			{
-				kind: 'host',
-				key: 'transactionalEmail',
-				type: 'email',
-				required: false,
-				compatibleProviders: ['smtp'],
-				displayName: 'Transactional email',
-				purpose: 'Send form and account email.',
-				defaultSelection: 'none',
-				configWrites: [
-					{ target: 'treeseed.site.yaml', path: 'services.email.provider', valueFrom: 'selectedHost.provider', writeWhen: 'host-selected' },
-				],
-				environmentWrites: [],
-			},
-		],
-	};
-}
-
-export function marketControlPlaneLaunchRequirements() {
-	return {
-		version: 1,
-		hosts: [
-			{
-				kind: 'host',
-				key: 'sourceRepository',
-				type: 'repository',
-				required: true,
-				compatibleProviders: ['github'],
-				displayName: 'Market repository',
-				purpose: 'Host Market source code.',
-				configWrites: [],
-			},
-			{
-				kind: 'host',
-				key: 'publicWeb',
-				type: 'web',
-				required: true,
-				compatibleProviders: ['cloudflare'],
-				displayName: 'Market web host',
-				purpose: 'Host Market web/API ingress.',
-				configWrites: [],
-			},
-		],
-		resources: [
-			{
-				kind: 'resource',
-				key: 'apiDatabase',
-				type: 'database',
-				required: true,
-				compatibleProviders: ['railway-postgres'],
-				displayName: 'Market database',
-				purpose: 'Store Market state.',
-				configWrites: [
-					{ target: 'treeseed.site.yaml', path: 'services.apiDatabase.provider', valueFrom: 'selectedResource.provider' },
-				],
-				environmentWrites: [
-					{ env: 'TREESEED_DATABASE_URL', valueFrom: 'selectedResource.connectionUrl', targets: ['railway-secret'], scopes: ['staging', 'prod'], sensitivity: 'secret' },
-				],
-			},
-			{
-				kind: 'resource',
-				key: 'api',
-				type: 'service',
-				required: true,
-				compatibleProviders: ['railway'],
-				displayName: 'API',
-				purpose: 'Run the API service.',
-				configWrites: [],
-			},
-			{
-				kind: 'resource',
-				key: 'operationsRunner',
-				type: 'service',
-				required: true,
-				compatibleProviders: ['railway'],
-				displayName: 'Treeseed operations runner',
-				purpose: 'Run Market operations.',
-				configWrites: [],
-				environmentWrites: [
-					{ env: 'TREESEED_PLATFORM_RUNNER_TOKEN', valueFrom: 'generated.runnerToken', targets: ['railway-secret'], scopes: ['staging', 'prod'], sensitivity: 'secret' },
-				],
-			},
-		],
-		secrets: [
-			{ kind: 'secret', key: 'apiDatabaseUrl', env: 'TREESEED_DATABASE_URL', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'selected-host' },
-			{ kind: 'secret', key: 'platformRunnerToken', env: 'TREESEED_PLATFORM_RUNNER_TOKEN', required: true, targets: ['railway-secret'], sensitivity: 'secret', source: 'generated' },
-		],
 	};
 }
 
@@ -221,14 +94,14 @@ export function resolveSdkCatalogFixturePath() {
 				directory: '.',
 				ref: 'staging',
 				integrity: 'cli-test',
-			}, starterLaunchRequirements()),
+			}),
 			templateCatalogItemBase('market-control-plane', 'TreeSeed Market Control Plane', 'Market control-plane template.', {
 				kind: 'git',
 				repoUrl: 'https://github.com/treeseed-ai/market.git',
 				directory: '.',
 				ref: 'staging',
 				integrity: 'cli-test',
-			}, marketControlPlaneLaunchRequirements()),
+			}),
 		],
 	}, null, 2)}\n`, 'utf8');
 	return testTemplateCatalogPath;

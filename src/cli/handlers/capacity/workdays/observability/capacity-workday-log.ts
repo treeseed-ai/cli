@@ -8,7 +8,7 @@ import {
   normalizeExecutionRunRecord, uniqueContentArtifacts, workdayRowRecord, workdaySummaryFacts,
 } from './capacity-workday-log-records.js';
 
-function compactDuration(value: unknown) {
+export function compactDuration(value: unknown) {
 	const numeric = Number(value);
 	if (!Number.isFinite(numeric)) return 'n/a';
 	if (numeric >= 60_000) return `${formatNumber(numeric / 60_000, 2)}m`;
@@ -23,7 +23,7 @@ function compactList(value: unknown, limit = 4) {
 	return entries.length > limit ? `${shown}, +${entries.length - limit} more` : shown;
 }
 
-function workdayHumanAssignmentLabel(row: Record<string, unknown>) {
+export function workdayHumanAssignmentLabel(row: Record<string, unknown>) {
 	const facts = workdaySummaryFacts(row);
 	const selectedInput = recordValue(workdayRowRecord(row, 'input'), 'selectedInput');
 	const cycle = recordValue(selectedInput, 'cycle');
@@ -184,6 +184,10 @@ export function workdayLogDetailLines(rows: Record<string, unknown>[], maxRecord
 				const message = recordValue(modeRunMetadata(messageRun), 'message');
 				const messageType = String((recordValue(message, 'type') ?? modeRunSource(messageRun)) || 'message');
 				lines.push(`    ${String(recordValue(messageRun, 'createdAt') ?? 'time?')} ${messageType} ${String(recordValue(message, 'status') ?? '')}`.trimEnd());
+				const payload = recordValue(message, 'payload');
+				const item = recordValue(payload, 'item');
+				const text = String(recordValue(item, 'text') ?? '').trim();
+				if (text) lines.push(`      ${text.replace(/\s+/gu, ' ').slice(0, 500)}`);
 			}
 		}
 		lines.push(`  Execution Timeline: ${modeRuns.length} telemetry event(s)`);
@@ -203,4 +207,3 @@ export function workdayLogDetailLines(rows: Record<string, unknown>[], maxRecord
 	}
 	return lines.length > 0 ? lines : ['No execution records returned.'];
 }
-

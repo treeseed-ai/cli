@@ -6,7 +6,8 @@ import { createCapacityMarketClient, resolveCapacityTeam } from '../../capacity-
 import { capacityCollectionItems as collectionItems, capacityMarketRequest as marketRequest, capacityQuery as queryFromFilters, capacityRecordValue as recordValue, isCapacityRecord as isRecord } from '../../capacity-core/capacity-values.js';
 import { redactCapacityOutputSecrets } from '../../capacity-core/capacity-output-security.js';
 import { contextPackSummaries, dedupeExecutionRunRecords, groupWorkdayExecutionRecords, normalizeExecutionRunRecord, workdaySummaryFacts } from './capacity-workday-log-records.js';
-import { enrichWorkdayLogRecordsWithModeRuns, executionRunsForAssignments, workdayAssignmentIdsForLog, workdayLogDetailLines, workdayTimelineBlock } from './capacity-workday-log.js';
+import { compactDuration, enrichWorkdayLogRecordsWithModeRuns, executionRunsForAssignments, workdayAssignmentIdsForLog, workdayHumanAssignmentLabel, workdayLogDetailLines, workdayTimelineBlock } from './capacity-workday-log.js';
+import { followWorkdayActivity } from './capacity-workday-follow.js';
 
 function yamlScalar(value: unknown) {
 	if (value === null || value === undefined) return 'null';
@@ -43,6 +44,24 @@ function toYaml(value: unknown, indent = 0): string {
 	return `${pad}${yamlScalar(value)}`;
 }
 
+export async function readCompleteTranscript(client: unknown, executionRunId: string) {
+	const entries: unknown[] = [];
+	let after: string | null = null;
+	let redactionStatus: unknown = null;
+	for (;;) {
+		const suffix = new URLSearchParams({ limit: '200', ...(after ? { after } : {}) });
+		const response = await marketRequest<Record<string, unknown>>(client,
+			`/v1/execution-runs/${encodeURIComponent(executionRunId)}/transcript?${suffix}`, { requireAuth: true });
+		const payload = isRecord(response.payload) ? response.payload : response;
+		if (redactionStatus === null) redactionStatus = payload.redactionStatus ?? null;
+		if (Array.isArray(payload.entries)) entries.push(...payload.entries);
+		const page = isRecord(payload.page) ? payload.page : {};
+		if (!page.hasMore || typeof page.nextAfter !== 'string' || !page.nextAfter) break;
+		after = page.nextAfter;
+	}
+	return { executionRunId, redactionStatus, entries, page: { limit: entries.length, hasMore: false, nextAfter: null } };
+}
+
 export async function runExecutionRunsInspection(invocation: ParsedInvocation, context: CommandContext, options: { action?: 'execution-runs' | 'workday-log' } = {}) {
 	const action = options.action ?? 'execution-runs';
 	const teamSelector = stringArg(invocation, 'team');
@@ -55,7 +74,8 @@ export async function runExecutionRunsInspection(invocation: ParsedInvocation, c
 	const mode = stringArg(invocation, 'mode');
 	const assignmentId = stringArg(invocation, 'assignment');
 	const workdayId = stringArg(invocation, 'workday');
-	if (action === 'workday-log' && !workdayId) {
+	const forensicRunId = stringArg(invocation, 'forensic');
+	if (action === 'workday-log' && !workdayId && !forensicRunId) {
 		return fail('Missing --workday. Use `trsd capacity workday-log --team <team-id-or-slug> --workday <workday-id> --json`.');
 	}
 	const executionProviderId = stringArg(invocation, 'execution-provider');
@@ -66,6 +86,18 @@ export async function runExecutionRunsInspection(invocation: ParsedInvocation, c
 	const { profile, client, authMode } = createCapacityMarketClient(invocation, context);
 	const team = await resolveCapacityTeam(client, teamSelector);
 	const teamId = team.teamId;
+	if (action === 'workday-log' && forensicRunId) {
+		const transcript = await readCompleteTranscript(client, forensicRunId);
+		return { exitCode: 0, stdout: [JSON.stringify(transcript, null, 2)], report: { action, ok: true, forensicRunId, transcript } };
+	}
+	if (action === 'workday-log' && boolArg(invocation, 'follow')) {
+		const followed = await followWorkdayActivity({
+			client, teamId, workdayId: workdayId!, context, jsonl: context.outputFormat === 'json',
+			agents: stringArg(invocation, 'agents'), agentClasses: stringArg(invocation, 'agentClasses'),
+			types: stringArg(invocation, 'types'), severity: stringArg(invocation, 'severity'),
+		});
+		return { exitCode: 0, stdout: [], suppressJsonResult: true, report: { action, ok: true, workdayId, ...followed } };
+	}
 	const assignmentScopedRows = action === 'workday-log' && workdayId && !assignmentId
 		? await executionRunsForAssignments(
 			client,
@@ -211,4 +243,3 @@ export async function runExecutionRunsInspection(invocation: ParsedInvocation, c
 		},
 	});
 }
-

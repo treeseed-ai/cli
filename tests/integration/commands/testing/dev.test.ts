@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import { listOperationNames } from '@treeseed/sdk/operations';
 import {
 	MACHINE_KEY_PASSPHRASE_ENV,
+	resolveLaunchEnvironment,
 	unlockSecretSessionFromEnv,
 } from '@treeseed/sdk/workflow-support';
 import { setMarketSession } from '@treeseed/sdk/market-client';
@@ -94,6 +95,42 @@ test('treeseed dev leaves live feedback disabled when feedback is off', async ()
 	});
 	assert.equal(result.exitCode, 0);
 	assert.equal(result.spawns.length, 0);
+});
+
+test('treeseed dev resolves configured local runtime values before reconciliation', () => {
+	const workspaceRoot = makeTenantWorkspace('feature/dev-config-environment');
+	mkdirSync(resolve(workspaceRoot, '.treeseed', 'config'), { recursive: true });
+	mkdirSync(resolve(workspaceRoot, 'src'), { recursive: true });
+	writeFileSync(resolve(workspaceRoot, 'src', 'env.yaml'), `entries:
+  TREESEED_API_BOOTSTRAP_ADMIN_ALLOWLIST:
+    label: API bootstrap admin allowlist
+    group: auth
+    description: Trusted root account emails.
+    howToGet: Configure the original platform administrator.
+    sensitivity: plain
+    targets: [local-runtime]
+    scopes: [local]
+    storage: scoped
+    requirement: optional
+    purposes: [dev, config]
+    validation: { kind: nonempty }
+    sourcePriority: [machine-config, process-env]
+`, 'utf8');
+	writeFileSync(resolve(workspaceRoot, '.treeseed', 'config', 'machine.yaml'), `version: 2
+shared:
+  values: {}
+  secrets: {}
+environments:
+  local:
+    values:
+      TREESEED_API_BOOTSTRAP_ADMIN_ALLOWLIST: original-admin@example.test
+    secrets: {}
+  staging: { values: {}, secrets: {} }
+  prod: { values: {}, secrets: {} }
+`, 'utf8');
+
+	const environment = resolveLaunchEnvironment({ tenantRoot: workspaceRoot, scope: 'local', baseEnv: {} });
+	assert.equal(environment.TREESEED_API_BOOTSTRAP_ADMIN_ALLOWLIST, 'original-admin@example.test');
 });
 
 test('treeseed dev forwards managed subcommands with dev subcommand syntax', async () => {
@@ -289,4 +326,3 @@ test('treeseed dev:manager and dev:watch are no longer public aliases', async ()
 	assert.equal(watch.spawns.length, 0);
 	assert.match(watch.stderr, /Unknown treeseed command: dev:watch/u);
 });
-

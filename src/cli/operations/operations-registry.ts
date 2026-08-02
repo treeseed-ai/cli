@@ -24,6 +24,10 @@ import { operationsAndReadinessOperationSpecs } from './operations-operations-an
 import { packageAndWorkflowOperationSpecs } from './operations-package-and-workflow.ts';
 import { treedxAndPacksOperationSpecs } from '../treedx/repositories/operations-treedx-and-packs.ts';
 import { agentRuntimeOperationSpecs } from './operations-agent-runtime.ts';
+import { serviceOperationSpecs } from '../services/operations-services.ts';
+import { contentOperationSpecs } from '../content/operations-content.ts';
+import { governanceOperationSpecs } from '../projects/governance/operations-governance.ts';
+import { knowledgeOperationSpecs } from '../projects/knowledge/operations-knowledge.ts';
 
 const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	...taskLifecycleCommandOverlays,
@@ -47,6 +51,10 @@ const CLI_ONLY_OPERATION_SPECS = [
 	...packageAndWorkflowOperationSpecs,
 	...treedxAndPacksOperationSpecs,
 	...agentRuntimeOperationSpecs,
+	...serviceOperationSpecs,
+	...contentOperationSpecs,
+	...governanceOperationSpecs,
+	...knowledgeOperationSpecs,
 ];
 
 function mergeOperationSpec(metadata: OperationMetadata): OperationSpec {

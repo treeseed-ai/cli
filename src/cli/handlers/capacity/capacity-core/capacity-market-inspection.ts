@@ -5,7 +5,7 @@ import { createCapacityMarketClient, resolveCapacityTeam } from './capacity-mark
 import { capacityMarketRequest, capacityQuery, isCapacityRecord } from './capacity-values.js';
 import { capacityInspectionLines, decorateCapacityInspectionRecords } from './capacity-inspection-projection.js';
 
-export const CAPACITY_MARKET_INSPECTION_ACTIONS = new Set(['availability-sessions', 'assignments', 'mode-runs', 'decision-planning', 'execution-inputs', 'capacity-plans', 'capacity-plan', 'workday', 'fallback-outputs', 'treedx-proxy-audit']);
+export const CAPACITY_MARKET_INSPECTION_ACTIONS = new Set(['availability-sessions', 'assignments', 'mode-runs', 'decision-planning', 'execution-inputs', 'capacity-plans', 'capacity-plan', 'workday', 'workday-runs', 'fallback-outputs', 'treedx-proxy-audit']);
 
 const stringArg = capacityStringArg;
 const positiveNumberArg = capacityPositiveNumberArg;
@@ -30,7 +30,7 @@ export async function runCapacityMarketInspection(action: string, invocation: Pa
 	const decisionId = stringArg(invocation, 'decision');
 	const capacityPlanId = stringArg(invocation, 'capacity-plan') ?? stringArg(invocation, 'plan');
 	const workdayId = stringArg(invocation, 'workday');
-	if ((action === 'availability-sessions' || action === 'assignments') && !teamId) {
+	if ((action === 'availability-sessions' || action === 'assignments' || action === 'workday-runs') && !teamId) {
 		return fail(`Missing --team. Use \`trsd capacity ${action} --team <team-id> --json\`.`);
 	}
 	if ((action === 'mode-runs' || action === 'fallback-outputs' || action === 'treedx-proxy-audit') && !projectId) {
@@ -66,6 +66,9 @@ export async function runCapacityMarketInspection(action: string, invocation: Pa
 			limit,
 			cursor,
 		})}`;
+		scopeLabel = `team ${resolvedTeamId}`;
+	} else if (action === 'workday-runs') {
+		path = `/v1/teams/${encodeURIComponent(resolvedTeamId!)}/workday-runs${queryFromFilters({ status, limit, cursor })}`;
 		scopeLabel = `team ${resolvedTeamId}`;
 	} else if (action === 'mode-runs') {
 		path = `/v1/projects/${encodeURIComponent(projectId!)}/agent-mode-runs${queryFromFilters({ mode, assignmentId, limit, cursor })}`;

@@ -1,22 +1,13 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { normalizeWorkdayAgentSelection, selectWorkdayAgents } from '@treeseed/sdk/agent-capacity';
 import type { CommandContext, CommandHandler, ParsedInvocation } from '../../../types.js';
 import { fail, guidedResult } from '../../utilities/utils.js';
-import { CAPACITY_GOVERNANCE_ACTIONS, runCapacityGovernanceAction } from './capacity-governance.js';
-import { CAPACITY_PROVIDER_GOVERNANCE_ACTIONS, runCapacityProviderGovernanceAction } from '../providers/capacity-provider-governance.js';
-import { CAPACITY_WORKDAY_ACTIONS, runCapacityWorkdayAction } from '../workdays/lifecycle/capacity-workday.js';
-import { CAPACITY_ASSIGNMENT_ACTIONS, runCapacityAssignmentAction } from '../assignments/capacity-assignments.js';
-import { CAPACITY_CHECKPOINT_INTEGRATION_ACTIONS, runCapacityCheckpointIntegration } from './capacity-checkpoint-integration.js';
-import { CAPACITY_OVERRUN_ACTIONS, runCapacityOverrunAction } from '../accounting/capacity-overruns.js';
-import { CAPACITY_EVIDENCE_ACTIONS, runCapacityEvidenceAction } from '../observability/capacity-evidence.js';
-import { CAPACITY_AGENT_CLASS_ACTIONS, runCapacityAgentClassAction } from '../agents/capacity-agent-classes.js';
 import { resolveCapacityWorkdayProviderId } from '../workdays/configuration/capacity-workday-provider.js';
 import { capacityBooleanArg as booleanArg, capacityCsvArg as csvArg, capacityFlagArg as boolArg, capacityPositiveNumberArg as positiveNumberArg, capacityProviderSelector as providerSelector, capacityStringArg as stringArg } from './capacity-command-arguments.js';
-import { PROVIDER_ENTRYPOINT_ACTIONS, PROVIDER_LIFECYCLE_ACTIONS, runCapacityLifecycleAction, runCapacityProviderEntrypoint } from './capacity-runtime.js';
+import { PROVIDER_ENTRYPOINT_ACTIONS, PROVIDER_LIFECYCLE_ACTIONS } from './capacity-runtime.js';
 import { capacityCollectionItems as collectionItems, capacityRecordValue as recordValue, isCapacityRecord as isRecord } from './capacity-values.js';
 import { createCapacityMarketClient as createCapacityWorkdayMarketClient, resolveCapacityTeam as resolveCapacityWorkdayTeam } from './capacity-market-context.js';
-import { CAPACITY_MARKET_INSPECTION_ACTIONS, runCapacityMarketInspection } from './capacity-market-inspection.js';
-import { runCapacityDiagnostics } from '../observability/capacity-diagnostics.js';
-import { runExecutionRunsInspection } from '../workdays/observability/capacity-workday-inspection.js';
+import { CAPACITY_MARKET_INSPECTION_ACTIONS } from './capacity-market-inspection.js';
 import { capacityWorkdayScore, holdWorkdayOpen, writeWorkdayRunReportFiles } from '../workdays/observability/capacity-workday-report.js';
 import { collectCapacityWorkdayResults } from '../workdays/observability/capacity-workday-results.js';
 import {
@@ -28,6 +19,7 @@ import {
 	type CapacityWorkdayAgentSpec,
 } from '../workdays/configuration/capacity-workday-projects.js';
 import { waitForCapacityWorkdayAssignments } from '../workdays/execution/capacity-workday-assignment-poller.js';
+import { routeCapacityAction } from './routing/capacity-action-router.js';
 
 export { PROVIDER_ENTRYPOINT_ACTIONS, PROVIDER_LIFECYCLE_ACTIONS } from './capacity-runtime.js';
 export const MARKET_INSPECTION_ACTIONS = new Set([...CAPACITY_MARKET_INSPECTION_ACTIONS, 'execution-runs', 'workday-log', 'workday-run']);
@@ -52,6 +44,14 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 	const settleSeconds = positiveNumberArg(invocation, 'waitSeconds', execute ? 30 : 0);
 	const actingEnabled = booleanArg(invocation, 'acting', false);
 	const abortOnDegradation = boolArg(invocation, 'abort');
+	const classSelectors = csvArg(invocation, 'agentClasses', []);
+	const agentSelection = normalizeWorkdayAgentSelection({
+		classIds: classSelectors.filter((value) => value.includes(':')),
+		classSlugs: classSelectors.filter((value) => !value.includes(':')),
+		agentSlugs: csvArg(invocation, 'agents', []),
+		mode: stringArg(invocation, 'selectionMode'),
+	});
+	const requiredAgentCount = positiveNumberArg(invocation, 'requireAgents', 0);
 	const parameters = {
 		purpose: stringArg(invocation, 'purpose') ?? stringArg(invocation, 'scenario') ?? 'portfolio planning',
 		seed: stringArg(invocation, 'seed') ?? 'treeseed',
@@ -68,6 +68,8 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 		abortOnDegradation,
 		mode: execute ? 'live' : 'plan',
 		reportDir: stringArg(invocation, 'reportDir') ?? '.treeseed/workday-reports',
+		agentSelection,
+		requiredAgentCount,
 	};
 	const projectsResponse = teamResolution.projects.length > 0
 		? { payload: teamResolution.projects }
@@ -177,18 +179,26 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 				contentAgentCount: plannedContentAgents?.length ?? 0,
 			}
 			: await ensureCapacityWorkdayAgentClasses(client, context, projectId, slug, agentClasses, agentClassSyncKey);
+		const selectedContentAgents = selectWorkdayAgents(preparedAgents.contentAgents, agentSelection);
+		const selectionBlockers = selectedContentAgents.length === 0
+			? ['workday agent selection resolved no eligible agents']
+			: requiredAgentCount > 0 && selectedContentAgents.length !== requiredAgentCount
+				? [`workday agent selection resolved ${selectedContentAgents.length} agents; expected ${requiredAgentCount}`]
+				: [];
 		projectStates.push({
 			projectId,
 			slug,
 			workdayId: safeWorkdayIdPart(`workday-pending-${slug}`),
 			agentClasses: preparedAgents.agentClasses,
-			contentAgents: preparedAgents.contentAgents,
-			contentAgentCount: preparedAgents.contentAgentCount,
+			contentAgents: selectedContentAgents,
+			contentAgentCount: selectedContentAgents.length,
 			assignmentIds: [],
 			assignmentCount: 0,
-			blockers: preparedAgents.contentAgentCount === 0 ? ['no enabled planning activity profiles were found'] : [],
+			blockers: preparedAgents.contentAgentCount === 0 ? ['no enabled planning activity profiles were found'] : selectionBlockers,
 		});
 	}
+	const selectionBlockers = projectStates.flatMap((state) => state.blockers.map((blocker) => `${state.slug}: ${blocker}`));
+	if (selectionBlockers.length > 0 && parameters.mode === 'live') return fail(selectionBlockers.join(' | '));
 	const repositoryIdsBySlug = Object.fromEntries(localTreeDxRepositoryIds);
 	if (parameters.mode === 'plan') {
 		return guidedResult({
@@ -200,8 +210,8 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 				{ label: 'Provider', value: providerId },
 				{ label: 'Projects', value: projectStates.length },
 			],
-			report: {
-				ok: projectStates.every((state) => state.contentAgentCount > 0),
+				report: {
+				ok: projectStates.every((state) => state.blockers.length === 0),
 				mode: 'plan',
 				parameters,
 				projects: projectStates.map((state) => ({
@@ -214,13 +224,32 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 			},
 		});
 	}
+	const resolvedAgentSelectionByProject = Object.fromEntries(projectStates.map((state) => {
+		const agents = state.contentAgents.map((agent) => {
+			const agentClass = state.agentClasses.find((candidate) => {
+				const id = String(candidate.id ?? '');
+				const slug = String(candidate.slug ?? '');
+				return id === agent.projectAgentClassId || id.endsWith(`:${agent.projectAgentClassId}`) || slug === agent.projectAgentClassSlug;
+			});
+			return {
+				agentSlug: agent.slug,
+				agentClassId: String(agentClass?.id ?? agent.projectAgentClassId),
+				agentClassSlug: String(agentClass?.slug ?? agent.projectAgentClassSlug),
+				contentPath: agent.contentPath.replace(`${context.cwd}/`, ''),
+				activityType: agent.activityType,
+				handler: agent.handler,
+			};
+		});
+		const revision = createHash('sha256').update(JSON.stringify(agents)).digest('hex');
+		return [state.projectId, { projectId: state.projectId, projectSlug: state.slug, revision, agents }];
+	}));
 	const runResponse = await client.createWorkdayRun(teamId, {
 		capacityProviderId: providerId,
 		scenarioId: parameters.purpose,
 		status: 'running',
 		environment: 'local',
 		startedAt: new Date().toISOString(),
-		parameters: { ...parameters, repositoryIdsBySlug },
+		parameters: { ...parameters, repositoryIdsBySlug, resolvedAgentSelectionByProject },
 		expected: {
 			projects: projectSlugs,
 			agentCountsByProject: Object.fromEntries(projectStates.map((state) => [state.slug, state.contentAgentCount])),
@@ -310,6 +339,17 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 	if (parameters.mode === 'live' && durationWindow) {
 		for (const projectState of projectStates) {
 			if (!projectState.workdayId || completedDurationWorkdayIds.has(projectState.workdayId)) continue;
+			if (waitTimedOutAssignmentIds.size > 0) {
+				await event({
+					eventType: 'workday.duration.settlement_deferred',
+					status: 'warning',
+					projectId: projectState.projectId,
+					workdayId: projectState.workdayId,
+					title: `Deferred terminalization for ${projectState.slug} while assignments settle`,
+					context: { assignmentIds: [...waitTimedOutAssignmentIds], deadlineAt: durationWindow.deadlineAt },
+				});
+				continue;
+			}
 			await client.completeWorkday(projectState.workdayId, `workday-close:${runId}:${projectState.workdayId}:duration`).catch((error) => {
 				projectState.blockers.push(`timed workday close failed: ${error instanceof Error ? error.message : String(error)}`);
 			});
@@ -349,33 +389,51 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 		actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
 		metrics,
 	});
-	await client.updateWorkdayRun(teamId, runId, {
-		status: metrics.status,
-		completedAt: new Date().toISOString(),
-		summary: {
-			score: metrics.score,
+	const settlementDeferred = waitTimedOutAssignmentIds.size > 0;
+	const latestRun = await client.workdayRun(teamId, runId);
+	const latestRunPayload = recordValue(latestRun, 'payload');
+	const latestRunRecord = recordValue(latestRunPayload, 'run');
+	const latestStatus = String(recordValue(latestRunRecord, 'status') ?? '');
+	if (!settlementDeferred && !['completed', 'cancelled', 'failed', 'degraded'].includes(latestStatus)) {
+		await client.updateWorkdayRun(teamId, runId, {
 			status: metrics.status,
-			projectCount: actualProjects.length,
-			blockerCount: metrics.blockers.length,
-		},
-		metrics,
-		actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
-		reportRefs,
-		error: metrics.status === 'failed' ? { blockers: metrics.blockers } : {},
-	});
+			completedAt: new Date().toISOString(),
+			summary: {
+				score: metrics.score,
+				status: metrics.status,
+				projectCount: actualProjects.length,
+				blockerCount: metrics.blockers.length,
+			},
+			metrics,
+			actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
+			reportRefs,
+			error: metrics.status === 'failed' ? { blockers: metrics.blockers } : {},
+		});
+	} else if (!settlementDeferred && latestStatus !== metrics.status) {
+		await event({
+			eventType: 'command.terminal_state_preserved',
+			status: 'warning',
+			title: `Preserved control-plane terminal status ${latestStatus}`,
+			context: { calculatedStatus: metrics.status, controlPlaneStatus: latestStatus },
+		});
+	}
 	const abortFailure = parameters.abortOnDegradation && metrics.status !== 'completed';
 	await event({
-		eventType: abortFailure ? 'command.aborted' : 'command.completed',
-		status: abortFailure ? 'failed' : metrics.status,
-		title: abortFailure ? 'Workday aborted after degradation' : 'Workday command completed',
+		eventType: abortFailure ? 'command.aborted' : settlementDeferred ? 'command.observation_completed' : 'command.completed',
+		status: abortFailure ? 'failed' : settlementDeferred ? 'warning' : metrics.status === 'failed' ? 'failed' : metrics.status === 'completed' ? 'completed' : 'warning',
+		title: abortFailure ? 'Workday aborted after degradation' : settlementDeferred ? 'Workday observation completed; durable settlement continues' : 'Workday command completed',
 		refs: reportRefs,
-		context: abortFailure ? { blockers: metrics.blockers, score: metrics.score } : {},
+		context: abortFailure
+			? { blockers: metrics.blockers, score: metrics.score }
+			: settlementDeferred ? { assignmentIds: [...waitTimedOutAssignmentIds], score: metrics.score } : {},
 	});
 	return guidedResult({
 		command: 'capacity workday-run',
 		summary: abortFailure
 			? `Workday ${runId} aborted after status ${metrics.status} and score ${metrics.score}.`
-			: `Workday ${runId} finished with status ${metrics.status} and score ${metrics.score}.`,
+			: settlementDeferred
+				? `Workday ${runId} observation finished with ${waitTimedOutAssignmentIds.size} assignment(s) still settling under control-plane custody.`
+				: `Workday ${runId} finished with status ${metrics.status} and score ${metrics.score}.`,
 		facts: [
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: teamId },
@@ -389,9 +447,10 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 			{ title: 'Checks', lines: metrics.checks.map((check) => `${check.name}: ${check.actual}/${check.expected} (${check.score})`) },
 			{ title: 'Blockers', lines: metrics.blockers.length ? metrics.blockers : ['none'] },
 		],
-		exitCode: abortFailure || metrics.status === 'failed' ? 1 : 0,
+		exitCode: abortFailure || (!settlementDeferred && metrics.status === 'failed') ? 1 : 0,
 		report: {
 			runId,
+			settlementDeferred,
 			parameters,
 			metrics,
 			actual: { projects: actualProjects, providerReady, auditEvents: eventCount },
@@ -404,85 +463,5 @@ async function runWorkdayRun(invocation: ParsedInvocation, context: CommandConte
 
 export const handleCapacity: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'doctor';
-	if (CAPACITY_PROVIDER_GOVERNANCE_ACTIONS.has(action)) {
-		try {
-			return await runCapacityProviderGovernanceAction(action, invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	if (CAPACITY_GOVERNANCE_ACTIONS.has(action)) {
-		try {
-			return await runCapacityGovernanceAction(action, invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	if (CAPACITY_WORKDAY_ACTIONS.has(action)) {
-		try {
-			return await runCapacityWorkdayAction(action, invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	if (CAPACITY_ASSIGNMENT_ACTIONS.has(action)) {
-		try {
-			return await runCapacityAssignmentAction(action, invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	if (CAPACITY_CHECKPOINT_INTEGRATION_ACTIONS.has(action)) {
-		try { return await runCapacityCheckpointIntegration(invocation, context); }
-		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
-	}
-	if (CAPACITY_OVERRUN_ACTIONS.has(action)) {
-		try { return await runCapacityOverrunAction(action, invocation, context); }
-		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
-	}
-	if (CAPACITY_EVIDENCE_ACTIONS.has(action)) {
-		try { return await runCapacityEvidenceAction(action, invocation, context); }
-		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
-	}
-	if (CAPACITY_AGENT_CLASS_ACTIONS.has(action)) {
-		try { return await runCapacityAgentClassAction(action, invocation, context); }
-		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
-	}
-	if (action === 'diagnostics') {
-		try {
-			return runCapacityDiagnostics(invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	if (action === 'workday-run') {
-		try { return await runWorkdayRun(invocation, context); }
-		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
-	}
-	if (action === 'execution-runs' || action === 'workday-log') {
-		try { return await runExecutionRunsInspection(invocation, context, action === 'workday-log' ? { action: 'workday-log' } : {}); }
-		catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
-	}
-	if (CAPACITY_MARKET_INSPECTION_ACTIONS.has(action)) {
-		try {
-			return await runCapacityMarketInspection(action, invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	if (PROVIDER_LIFECYCLE_ACTIONS.has(action)) {
-		try {
-			return await runCapacityLifecycleAction(action, invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	if (PROVIDER_ENTRYPOINT_ACTIONS.has(action)) {
-		try {
-			return await runCapacityProviderEntrypoint(action, invocation, context);
-		} catch (error) {
-			return fail(error instanceof Error ? error.message : String(error));
-		}
-	}
-	return fail(`Unknown capacity action "${action}". Use registration-key operations, provider request/membership operations, grants, allocation operations, workday-create, workday-start, workday-pause, workday-resume, workday-tick, workday-complete, workday-cancel, workday-status, workday-summary, assignment-cancel, assignment-requeue, checkpoint-integrate, overrun-approve, overrun-reject, provider runtime lifecycle, or inspection actions.`);
+	return routeCapacityAction(action, invocation, context, runWorkdayRun);
 };

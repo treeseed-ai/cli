@@ -32,7 +32,7 @@ export const hostingAndReconciliationOperationSpecs: OperationSpec[] = [
 					'It is read-only by default. Use `--repair` only when you explicitly want TreeSeed to reconcile provider resources.',
 				],
 				whenToUse: [
-					'Run this before saving managed hosts, launching a hub, or promoting a release that depends on hosted provider resources.',
+					'Run this before reconciling hosted services or promoting a release that depends on provider resources.',
 					'Use it after changing provider credentials or service topology to verify that the selected environment is complete.',
 				],
 				beforeYouRun: [
@@ -122,7 +122,6 @@ export const hostingAndReconciliationOperationSpecs: OperationSpec[] = [
 				'treeseed reconcile plan --environment staging --json',
 				'treeseed reconcile verify --environment staging --json',
 				'treeseed reconcile apply --environment staging --json',
-				'treeseed reconcile apply --environment staging --unit-id github-secret-binding:root:staging:TREESEED_CREDENTIAL_SESSION_SECRET --execute --json',
 				'treeseed reconcile apply --environment staging --execute --json',
 				'treeseed reconcile test-live --provider local --json',
 				'treeseed reconcile test-live --provider railway --environment staging --json',

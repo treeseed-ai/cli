@@ -274,45 +274,6 @@ async function topology(invocation: ParsedInvocation, context: Parameters<Comman
 	});
 }
 
-async function publish(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
-	const project = projectId(invocation);
-	if (!project) return fail('Missing --project. Use `trsd db publish --project <project-id>`.');
-	const environment = environmentArg(invocation);
-	if (environment === 'prod' && !boolArg(invocation, 'yes')) return fail('Production content publish requires --yes and was not queued.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
-	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
-		client,
-		`/v1/projects/${encodeURIComponent(project)}/deployments/web`,
-		{
-			method: 'POST',
-			body: {
-				environment,
-				action: 'publish_content',
-				source: 'cli',
-				reason: stringArg(invocation, 'reason') ?? 'TreeDX content publish',
-				confirmProduction: environment === 'prod',
-			},
-			requireAuth: true,
-		},
-	);
-	const json = jsonResult(invocation, context, { ok: true, market: profile.id, project, payload: response.payload });
-	if (json) return json;
-	const deployment = recordValue(response.payload, 'deployment') as Record<string, unknown> | undefined;
-	const operation = recordValue(response.payload, 'operation') as Record<string, unknown> | undefined;
-	return guidedResult({
-		command: 'db publish',
-		summary: 'TreeDX content publish queued.',
-		facts: [
-			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
-			{ label: 'Project', value: project },
-			{ label: 'Environment', value: environment },
-			{ label: 'Deployment', value: String(recordValue(deployment, 'id') ?? 'queued') },
-			{ label: 'Operation', value: String(recordValue(operation, 'id') ?? 'queued') },
-		],
-		report: { ok: true, market: profile.id, project, payload: response.payload },
-	});
-}
-
 async function image(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	return runPackageImageCommand(invocation, context, { packageId: 'treedx', commandName: 'db image' });
 }
@@ -327,9 +288,8 @@ export const handleTreeDx: CommandHandler = async (invocation, context) => {
 		if (action === 'shares') return shares(invocation, context);
 		if (action === 'library') return library(invocation, context);
 		if (action === 'topology') return topology(invocation, context);
-		if (action === 'publish') return publish(invocation, context);
 		if (action === 'image') return image(invocation, context);
-		return fail('Unknown db action. Use status, provision, connect, mirrors, shares, library, topology, publish, or image.');
+		return fail('Unknown db action. Use status, provision, connect, mirrors, shares, library, topology, or image.');
 	} catch (error) {
 		return fail(error instanceof Error ? error.message : String(error));
 	}

@@ -3,18 +3,20 @@ import type { CommandContext, ParsedInvocation } from '../../../types.js';
 import { createMarketClientForInvocation } from '../../content/market-utils.js';
 import { fail, guidedResult } from '../../utilities/utils.js';
 import { capacityStringArg as text } from '../capacity-core/capacity-command-arguments.js';
+import { resolveCapacityTeam } from '../capacity-core/capacity-market-context.js';
 
 export const CAPACITY_ASSIGNMENT_ACTIONS = new Set(['assignment-cancel', 'assignment-requeue']);
 
 export async function runCapacityAssignmentAction(action: string, invocation: ParsedInvocation, context: CommandContext) {
-	const teamId = text(invocation, 'team'); const assignmentId = text(invocation, 'assignment');
-	if (!teamId) return fail(`Missing --team for capacity ${action}.`);
+	const teamSelector = text(invocation, 'team'); const assignmentId = text(invocation, 'assignment');
+	if (!teamSelector) return fail(`Missing --team for capacity ${action}.`);
 	if (!assignmentId) return fail(`Missing --assignment for capacity ${action}.`);
 	const plan = invocation.args.plan === true; const execute = invocation.args.execute === true;
 	if (plan === execute) return fail(`Capacity ${action} is mutating. Choose exactly one of --plan or --execute.`);
 	const idempotencyKey = text(invocation, 'idempotencyKey') ?? `cli:${action}:${randomUUID()}`;
 	const body = { idempotencyKey, reason: text(invocation, 'reason') ?? undefined };
 	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
+	const { teamId } = await resolveCapacityTeam(client, teamSelector);
 	if (plan) return guidedResult({
 		command: `capacity ${action}`, summary: `Capacity ${action.replace('assignment-', '')} plan rendered without mutation.`,
 		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Team', value: teamId }, { label: 'Assignment', value: assignmentId }],

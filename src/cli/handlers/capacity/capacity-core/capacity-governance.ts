@@ -7,6 +7,7 @@ import { createMarketClientForInvocation } from '../../content/market-utils.js';
 import { fail, guidedResult } from '../../utilities/utils.js';
 import { capacityStringArg as argument } from './capacity-command-arguments.js';
 import { capacityAuthenticatedMarketRequest as request } from './capacity-values.js';
+import { resolveCapacityTeam } from './capacity-market-context.js';
 
 export const CAPACITY_GOVERNANCE_ACTIONS = new Set([
 	'registration-key',
@@ -146,8 +147,8 @@ function grantCreateBody(invocation: ParsedInvocation) {
 }
 
 export async function runCapacityGovernanceAction(action: string, invocation: ParsedInvocation, context: CommandContext) {
-	const teamId = argument(invocation, 'team');
-	if (!teamId) return fail(`Missing --team. Use \`trsd capacity ${action} --team <team-id> --json\`.`);
+	const teamSelector = argument(invocation, 'team');
+	if (!teamSelector) return fail(`Missing --team. Use \`trsd capacity ${action} --team <team-id> --json\`.`);
 	const mutation = MUTATING_CAPACITY_GOVERNANCE_ACTIONS.has(action);
 	const plan = invocation.args.plan === true;
 	const execute = invocation.args.execute === true;
@@ -168,6 +169,7 @@ export async function runCapacityGovernanceAction(action: string, invocation: Pa
 		}
 	}
 	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
+	const teamId = (await resolveCapacityTeam(client, teamSelector)).teamId;
 	const perform = <T>(path: string, options: { method?: string; body?: unknown; headers?: Record<string, string> } = {}) => {
 		if (mutation && plan && options.method && options.method !== 'GET') {
 			return Promise.resolve({

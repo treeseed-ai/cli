@@ -6,6 +6,7 @@ import {
 	fetchWorkdayAssignmentIdsForLog,
 	type CapacityForensicsClient,
 } from '../../../src/cli/handlers/capacity/observability/capacity-forensics.ts';
+import { readCompleteTranscript } from '../../../src/cli/handlers/capacity/workdays/observability/capacity-workday-inspection.ts';
 
 describe('capacity forensic reads', () => {
 	it('preserves bounded assignment order and execution evidence', async () => {
@@ -30,6 +31,7 @@ describe('capacity forensic reads', () => {
 		assert.deepEqual((await fetchExecutionRunsForAssignments(client, 'team-a', ['assignment-a', 'assignment-b'])).map((row) => row.id), ['run-a', 'run-b']);
 		assert.deepEqual((await fetchProjectModeRunsForAssignment(client, 'project-a', 'assignment-a')).map((row) => row.id), ['phase-a', 'phase-b']);
 		assert.ok(paths.every((path) => path.includes('limit=')));
+		assert.ok(paths.filter((path) => path.includes('/execution-runs')).every((path) => path.includes('projection=activity')));
 	});
 
 	it('propagates assignment, execution, and mode-run API failures', async () => {
@@ -41,5 +43,43 @@ describe('capacity forensic reads', () => {
 		await assert.rejects(fetchWorkdayAssignmentIdsForLog(client, 'team-a', 'workday-a', null), failure);
 		await assert.rejects(fetchExecutionRunsForAssignments(client, 'team-a', ['assignment-a']), failure);
 		await assert.rejects(fetchProjectModeRunsForAssignment(client, 'project-a', 'assignment-a'), failure);
+	});
+
+	it('accepts a coordinated workday run id as the workday-log selector', async () => {
+		const paths: string[] = [];
+		const client: CapacityForensicsClient = {
+			async request<T>(path: string): Promise<T> {
+				paths.push(path);
+				if (paths.length === 1) return { ok: true, payload: { items: [] } } as T;
+				return { ok: true, payload: { items: [{
+					id: 'assignment-run',
+					workDayId: 'workday-envelope',
+					metadata: { workdayRunId: 'run-a' },
+					assignedAt: '2026-08-02T10:00:00.000Z',
+				}] } } as T;
+			},
+		};
+		assert.deepEqual(await fetchWorkdayAssignmentIdsForLog(client, 'team-a', 'run-a', null), ['assignment-run']);
+		assert.equal(paths.length, 2);
+		assert.match(paths[0]!, /workdayId=run-a/u);
+		assert.doesNotMatch(paths[1]!, /workdayId=/u);
+	});
+
+	it('retrieves every forensic transcript page in durable cursor order', async () => {
+		const paths: string[] = [];
+		const client = {
+			async request<T>(path: string): Promise<T> {
+				paths.push(path);
+				return (paths.length === 1
+					? { payload: { redactionStatus: 'sanitized', entries: [{ sequence: 1 }], page: { hasMore: true, nextAfter: '1' } } }
+					: { payload: { redactionStatus: 'sanitized', entries: [{ sequence: 2 }], page: { hasMore: false, nextAfter: null } } }) as T;
+			},
+		};
+
+		const transcript = await readCompleteTranscript(client, 'execution-a');
+		assert.deepEqual(transcript.entries, [{ sequence: 1 }, { sequence: 2 }]);
+		assert.deepEqual(transcript.page, { limit: 2, hasMore: false, nextAfter: null });
+		assert.match(paths[0]!, /limit=200/u);
+		assert.match(paths[1]!, /after=1/u);
 	});
 });

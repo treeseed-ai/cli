@@ -1,6 +1,6 @@
 export interface CapacityForensicsClient {
 	request<T>(path: string, options?: { requireAuth?: boolean }): Promise<T>;
-	projectAgentModeRuns?(projectId: string, options?: { assignmentId?: string | null }): Promise<{ payload?: unknown }>;
+	projectAgentModeRuns?(projectId: string, options?: { assignmentId?: string | null; limit?: number; projection?: 'activity' | null }): Promise<{ payload?: unknown }>;
 }
 
 type Row = Record<string, unknown>;
@@ -43,7 +43,7 @@ export async function fetchExecutionRunsForAssignments(
 ): Promise<Row[]> {
 	const pages = await Promise.all(assignmentIds.map(async (assignmentId) => {
 		const response = await client.request<{ ok: true; payload: unknown }>(
-			`/v1/teams/${encodeURIComponent(teamId)}/capacity/execution-runs${query({ assignmentId, limit: 50 })}`,
+			`/v1/teams/${encodeURIComponent(teamId)}/capacity/execution-runs${query({ assignmentId, limit: 10, projection: 'activity' })}`,
 			{ requireAuth: true },
 		);
 		return items(response.payload);
@@ -61,8 +61,20 @@ export async function fetchWorkdayAssignmentIdsForLog(
 		`/v1/teams/${encodeURIComponent(teamId)}/capacity/assignments${query({ providerId, workdayId, limit: 200 })}`,
 		{ requireAuth: true },
 	);
-	return items(response.payload)
-		.filter((assignment) => String(value(assignment, 'workDayId', 'workdayId') ?? '') === workdayId)
+	let assignments = items(response.payload);
+	if (!assignments.some((assignment) => String(value(assignment, 'workDayId', 'workdayId') ?? '') === workdayId)) {
+		const fallback = await client.request<{ ok: true; payload: unknown }>(
+			`/v1/teams/${encodeURIComponent(teamId)}/capacity/assignments${query({ providerId, workdayId: null, limit: 200 })}`,
+			{ requireAuth: true },
+		);
+		assignments = items(fallback.payload);
+	}
+	return assignments
+		.filter((assignment) => {
+			const metadata = isRecord(assignment.metadata) ? assignment.metadata : {};
+			return String(value(assignment, 'workDayId', 'workdayId') ?? '') === workdayId
+				|| String(value(metadata, 'workdayRunId') ?? '') === workdayId;
+		})
 		.sort((a, b) => timestamp(value(a, 'assignedAt', 'createdAt')) - timestamp(value(b, 'assignedAt', 'createdAt')))
 		.map((assignment) => String(assignment.id ?? '').trim())
 		.filter(Boolean);
@@ -74,7 +86,7 @@ export async function fetchProjectModeRunsForAssignment(
 	assignmentId: string,
 ): Promise<Row[]> {
 	if (!client.projectAgentModeRuns) throw new Error('Project mode-run client operation is unavailable.');
-	const response = await client.projectAgentModeRuns(projectId, { assignmentId });
+	const response = await client.projectAgentModeRuns(projectId, { assignmentId, limit: 200, projection: 'activity' });
 	return items(response.payload).sort((a, b) =>
 		timestamp(value(a, 'createdAt')) - timestamp(value(b, 'createdAt')),
 	);

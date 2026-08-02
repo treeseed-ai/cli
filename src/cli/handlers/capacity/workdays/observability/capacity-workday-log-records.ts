@@ -1,5 +1,10 @@
 import { capacityRecordValue as recordValue, isCapacityRecord as isRecord } from '../../capacity-core/capacity-values.js';
 
+function timestampMs(value: unknown): number | null {
+	const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+	return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function modeRunContentArtifacts(modeRun: unknown) {
 	if (!modeRun || typeof modeRun !== 'object') return [];
 	const directRefs = recordValue(modeRun, 'contentArtifactRefs');

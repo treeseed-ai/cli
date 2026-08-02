@@ -10,6 +10,7 @@ import {
 	type ReconcileSelector,
 } from '@treeseed/sdk/reconcile';
 import { compileDesiredResourceGraph, compileDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
+import { resolveLaunchEnvironment } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler } from '../../types.js';
 import { resolveDevProcessAction } from './dev-lifecycle.js';
 import { workflowErrorResult } from '../operations/workflow.js';
@@ -50,6 +51,11 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 		const discoveredApps = discoverApplications(context.cwd);
 		const localContent = (stringOption(invocation.args, 'localContent') as 'auto' | 'none' | 'preview' | 'edit' | undefined) ?? 'auto';
 		const target = { kind: 'persistent' as const, scope: 'local' as const };
+		const launchEnv = resolveLaunchEnvironment({
+			tenantRoot: context.cwd,
+			scope: 'local',
+			baseEnv: context.env,
+		});
 		const desiredGraph = compileDesiredResourceGraph({
 			tenantRoot: context.cwd,
 			target,
@@ -144,7 +150,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 				surfaces: selectedSurfaces,
 				...localProcessOptions,
 				all: true,
-				env: context.env,
+				env: launchEnv,
 			});
 			return {
 				exitCode: result.ok ? 0 : 1,
@@ -178,6 +184,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			: [];
 		const includeTreeDxUnits = localContent !== 'none'
 			&& selectedSurfaces.split(',').map((surface) => surface.trim()).includes('web');
+		const declaredConnectorTunnel = desiredGraph.resources.some((resource) => resource.id === 'cloudflare-tunnel:local-connectors');
 		const selectedUnitIds = [
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
@@ -187,6 +194,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 				'local-treedx:team-primary',
 				'local-docker-compose:treedx',
 			] : []),
+			...(declaredConnectorTunnel && appId !== 'api' && appId !== 'web' ? ['cloudflare-tunnel:local-connectors'] : []),
 			...localContentUnitIds,
 		];
 		const selectedUnitIdSet = new Set(selectedUnitIds);
@@ -213,6 +221,15 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 								},
 							},
 						}
+					: unit.unitType === 'cloudflare-tunnel'
+						? {
+								...unit,
+								spec: {
+									...unit.spec,
+									connectorAction: effectiveSubcommand === 'stop' ? 'stop' : effectiveSubcommand === 'restart' ? 'restart' : 'start',
+									preserveRemoteOnStop: effectiveSubcommand === 'stop',
+								},
+							}
 					: unit.unitType === 'local-docker-compose' && invocation.args.reset === true
 						? {
 								...unit,
@@ -230,23 +247,24 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			? await collectReconcileStatus({
 					tenantRoot: context.cwd,
 					target,
-					env: context.env,
+					env: launchEnv,
 					units,
 					selector,
+					write: (line) => context.write(`[dev] ${line}`, 'stderr'),
 				})
 			: stopLike
 				? planOnly
 					? await planReconciliation({
 							tenantRoot: context.cwd,
 							target,
-							env: context.env,
+							env: launchEnv,
 							units,
 							selector,
 						})
 					: await destroyTargetUnits({
 							tenantRoot: context.cwd,
 							target,
-							env: context.env,
+							env: launchEnv,
 							units,
 							selector,
 							write: (line) => context.write(`[dev] ${line}`, 'stderr'),
@@ -255,14 +273,14 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 					? await planReconciliation({
 							tenantRoot: context.cwd,
 							target,
-							env: context.env,
+							env: launchEnv,
 							units,
 							selector,
 						})
 					: await reconcileTarget({
 							tenantRoot: context.cwd,
 							target,
-							env: context.env,
+							env: launchEnv,
 							units,
 							selector,
 							planOnly: false,

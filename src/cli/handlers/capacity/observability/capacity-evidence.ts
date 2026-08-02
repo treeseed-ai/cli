@@ -4,6 +4,7 @@ import type { CommandContext, ParsedInvocation } from '../../../types.js';
 import { createMarketClientForInvocation } from '../../content/market-utils.js';
 import { fail, guidedResult } from '../../utilities/utils.js';
 import { capacityStringArg as text } from '../capacity-core/capacity-command-arguments.js';
+import { resolveCapacityTeam } from '../capacity-core/capacity-market-context.js';
 import { capacityAuthenticatedMarketRequest as request } from '../capacity-core/capacity-values.js';
 
 export const CAPACITY_EVIDENCE_ACTIONS = new Set([
@@ -44,10 +45,15 @@ export async function runCapacityEvidenceAction(
 	invocation: ParsedInvocation,
 	context: CommandContext,
 ) {
-	const teamId = text(invocation, 'team');
-	if (!teamId) return fail(`Missing --team for capacity ${action}.`);
+	const teamSelector = text(invocation, 'team');
+	if (!teamSelector) return fail(`Missing --team for capacity ${action}.`);
 	const exportAction = action.endsWith('-export');
 	if (exportAction && !text(invocation, 'file')) return fail(`Capacity ${action} requires --file <path>.`);
+	const { profile, client } = createMarketClientForInvocation(invocation, context, {
+		requireAuth: true,
+		allowLocalAcceptanceAdmin: true,
+	});
+	const { teamId } = await resolveCapacityTeam(client, teamSelector);
 	const team = encodeURIComponent(teamId);
 	let path: string;
 	if (action === 'assignment' || action === 'assignment-explanation') {
@@ -64,10 +70,6 @@ export async function runCapacityEvidenceAction(
 		const collection = action.startsWith('reservation') ? 'reservations' : action.startsWith('usage') ? 'usage' : 'ledger';
 		path = `/v1/teams/${team}/capacity/${collection}?${parsed.query}`;
 	}
-	const { profile, client } = createMarketClientForInvocation(invocation, context, {
-		requireAuth: true,
-		allowLocalAcceptanceAdmin: true,
-	});
 	const response = await request<{ ok: boolean; payload: unknown }>(client, path);
 	const outputPath = exportAction ? await writeExport(invocation, context, response.payload) : null;
 	return guidedResult({

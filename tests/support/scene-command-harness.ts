@@ -27,7 +27,7 @@ export function makeWorkspace() {
 	mkdirSync(resolve(root, 'scenes'), { recursive: true });
 	writeFileSync(resolve(root, 'scenes', 'market-project-deploy-demo.yaml'), `schemaVersion: treeseed.scene/v1
 id: market-project-deploy-demo
-title: Market Project Deployment Demo
+title: Team Service Management Demo
 target:
   app: market
 workflow:

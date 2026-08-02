@@ -38,10 +38,9 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /CREATE project treeseed\/market/);
 	assert.doesNotMatch(result.stdout, /capacity provider|capacity grant/u);
 	assert.doesNotMatch(result.stdout, /work policy/u);
-	assert.match(result.stdout, /CREATE repository host github\/knowledge-coop/);
 	assert.match(result.stdout, /CREATE product template\/treeseed-market/);
 	assert.match(result.stdout, /CREATE catalog artifact treeseed\/market-template@1\.0\.0/);
-	assert.match(result.stdout, /  create: 5/);
+	assert.match(result.stdout, /  create: 4/);
 	assert.match(result.stdout, /  skipped: 0/);
 	assert.doesNotMatch(result.stdout, /CREATE lane /);
 	assert.doesNotMatch(result.stdout, /codex-production/);
@@ -58,7 +57,7 @@ test('seed local plan does not require a saved market session', async () => {
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 5);
+	assert.equal(payload.summary.create, 4);
 	assert.equal(payload.summary.skip, 0);
 });
 
@@ -101,7 +100,7 @@ test('seed json output includes canonical resources for agent review', async () 
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
 	assert.deepEqual(payload.environments, ['local']);
-	assert.equal(payload.summary.create, 5);
+	assert.equal(payload.summary.create, 4);
 	assert.equal(payload.summary.skip, 0);
 	assert.equal(payload.actions.filter((action) => action.action === 'skip').length, 0);
 	assert.equal(payload.actions[0].key, 'team:treeseed');
@@ -118,9 +117,9 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(first.exitCode, 0, first.stderr);
 	const firstPayload = JSON.parse(first.stdout);
 	assert.equal(firstPayload.ok, true);
-	assert.equal(firstPayload.summary.create, 5);
+	assert.equal(firstPayload.summary.create, 4);
 	assert.equal(firstPayload.summary.skip, 0);
-	assert.equal(firstPayload.result.actionCount, 5);
+	assert.equal(firstPayload.result.actionCount, 4);
 
 	const second = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply', '--json'], {
 		cwd: root,
@@ -129,7 +128,7 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(second.exitCode, 0, second.stderr);
 	const secondPayload = JSON.parse(second.stdout);
 	assert.equal(secondPayload.summary.create, 0);
-	assert.equal(secondPayload.summary.unchanged, 5);
+	assert.equal(secondPayload.summary.unchanged, 4);
 	assert.equal(secondPayload.summary.skip, 0);
 	assert.equal(secondPayload.result.actionCount, 0);
 	assert.equal(secondPayload.actions.find((action) => action.key === 'team:treeseed').action, 'unchanged');
@@ -145,8 +144,8 @@ test('seed local apply can bootstrap without a saved market session', async () =
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.ok, true);
 	assert.equal(payload.result.message, 'Local seed apply completed.');
-	assert.equal(payload.summary.create, 5);
-	assert.equal(payload.result.actionCount, 5);
+	assert.equal(payload.summary.create, 4);
+	assert.equal(payload.result.actionCount, 4);
 });
 
 test('seed export emits a productized manifest from local state', async () => {
@@ -165,7 +164,7 @@ test('seed export emits a productized manifest from local state', async () => {
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.ok, true);
 	assert.equal(payload.seed, 'treeseed');
-	assert.match(payload.yaml, /repositoryHosts:/);
+	assert.doesNotMatch(payload.yaml, /repositoryHosts:/);
 	assert.match(payload.yaml, /products:/);
 	assert.match(payload.yaml, /catalogArtifacts:/);
 	assert.doesNotMatch(payload.yaml, /encryptedPayload|BEGIN PRIVATE KEY|ghp_/);

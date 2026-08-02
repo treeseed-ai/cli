@@ -3,6 +3,7 @@ import { createMarketClientForInvocation } from '../../../content/market-utils.j
 import { fail, guidedResult } from '../../../utilities/utils.js';
 import { randomUUID } from 'node:crypto';
 import { capacityNumberArg as numberArg, capacityStringArg as stringArg } from '../../capacity-core/capacity-command-arguments.js';
+import { resolveCapacityTeam } from '../../capacity-core/capacity-market-context.js';
 
 export const CAPACITY_WORKDAY_ACTIONS = new Set([
 	'workday-create',
@@ -67,10 +68,11 @@ export async function runCapacityWorkdayAction(action: string, invocation: Parse
 	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const workdayId = stringArg(invocation, 'workday');
 	if (action === 'workday-tick') {
-		const teamId = stringArg(invocation, 'team');
-		if (!teamId) return fail('Missing --team for capacity workday-tick.');
+		const teamSelector = stringArg(invocation, 'team');
+		if (!teamSelector) return fail('Missing --team for capacity workday-tick.');
 		if (!workdayId) return fail('Missing --workday for capacity workday-tick.');
 		if (planRequested(invocation) === executeRequested(invocation)) return fail('Capacity workday-tick is mutating. Choose exactly one of --plan or --execute.');
+		const { teamId } = await resolveCapacityTeam(client, teamSelector);
 		const request = { teamId, workdayRunId: workdayId };
 		if (planRequested(invocation)) return planResult(action, profile, request);
 		const response = await client.tickWorkdayRun(teamId, workdayId, {

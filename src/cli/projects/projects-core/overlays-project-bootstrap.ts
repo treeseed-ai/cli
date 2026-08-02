@@ -57,11 +57,9 @@ export const projectBootstrapCommandOverlays: Array<[string, CommandOverlay]> = 
 				{ name: 'contactEmail', flags: '--contact-email <email>', description: 'Set the site contact address.', kind: 'string' },
 				{ name: 'repo', flags: '--repo <url>', description: 'Set the repository URL.', kind: 'string' },
 				{ name: 'discord', flags: '--discord <url>', description: 'Set the Discord/community URL.', kind: 'string' },
-				{ name: 'host', flags: '--host <requirement=provider:alias>', description: 'Bind a template launch requirement locally. Repeat for multiple requirements, or use requirement=none for optional hosts.', kind: 'string', repeatable: true },
 			],
 			examples: [
 				`treeseed init docs-site --template ${DEFAULT_STARTER_TEMPLATE_ID} --name "Docs Site" --site-url https://docs.example.com`,
-				`treeseed init docs-site --template ${DEFAULT_STARTER_TEMPLATE_ID} --host sourceRepository=github:acme --host publicWeb=cloudflare:managed`,
 			],
 			notes: ['Runs outside an existing repo or from any branch.'],
 			help: {
@@ -83,7 +81,6 @@ export const projectBootstrapCommandOverlays: Array<[string, CommandOverlay]> = 
 				],
 				examples: [
 					example(`treeseed init docs-site --template ${DEFAULT_STARTER_TEMPLATE_ID} --name "Docs Site" --site-url https://docs.example.com`, 'Create a starter site', 'Scaffold a new tenant using the default starter and explicit branding metadata.'),
-					example(`treeseed init docs-site --template ${DEFAULT_STARTER_TEMPLATE_ID} --host sourceRepository=github:acme --host publicWeb=cloudflare:managed`, 'Bind launch hosts locally', 'Apply host-derived starter config during scaffold without calling Market inventory APIs.'),
 					example('treeseed init workbench --slug workbench --contact-email ops@example.com', 'Control project identity fields', 'Initialize a tenant while overriding slug and contact metadata at creation time.'),
 					example('treeseed init docs-site --repo https://github.com/example/docs-site --discord https://discord.gg/example', 'Seed community and repository metadata', 'Attach repository and community URLs during project initialization.'),
 				],

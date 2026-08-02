@@ -131,7 +131,6 @@ export async function exportSeedFromCli(input) {
 			'name: ' + input.seedName,
 			'version: 1',
 			'resources:',
-			'  repositoryHosts: []',
 			'  products: []',
 			'  catalogArtifacts: []',
 			'',
@@ -343,17 +342,6 @@ resources:
           bucket: treeseed-content-local
           prefix: treeseed/market
           manifestPath: manifests/treeseed/market/latest.json
-  repositoryHosts:
-    - key: repository-host:treeseed/market-github
-      team: team:treeseed
-      provider: github
-      name: knowledge-coop
-      ownership: treeseed_managed
-      accountLabel: Knowledge Coop GitHub organization
-      organizationOrOwner: knowledge-coop
-      defaultVisibility: public
-      allowedProjectKinds: [market_app, package, knowledge_hub]
-      status: active
   hubRepositories: []
   products:
     - key: product:treeseed/market-template

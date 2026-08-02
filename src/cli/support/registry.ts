@@ -57,6 +57,10 @@ import { handleDemo } from '../handlers/content/demo.js';
 import { handleScene } from '../handlers/scenes/scene.js';
 import { handleGuarantees } from '../handlers/guarantees/guarantees.js';
 import { handleCleanup } from '../handlers/diagnostics/cleanup.js';
+import { handleServices } from '../handlers/services/services.js';
+import { handleContent } from '../handlers/content/content.js';
+import { handleGovernance } from '../handlers/projects/governance/governance.js';
+import { handleKnowledge } from '../handlers/projects/knowledge/knowledge.js';
 
 const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
 
@@ -117,6 +121,10 @@ export const COMMAND_HANDLERS = {
 	scene: handleScene,
 	guarantees: handleGuarantees,
 	cleanup: handleCleanup,
+	services: handleServices,
+	content: handleContent,
+	governance: handleGovernance,
+	knowledge: handleKnowledge,
 } as const;
 
 export const TRESEED_COMMAND_SPECS: CommandSpec[] = TRESEED_OPERATION_SPECS;

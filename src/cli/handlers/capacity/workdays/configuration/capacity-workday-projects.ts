@@ -37,15 +37,22 @@ export function optionalString(value: unknown) {
 	return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+async function listAgentContentPaths(directory: string): Promise<string[]> {
+	const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+	const paths = await Promise.all(entries.map(async (entry) => {
+		const path = resolve(directory, entry.name);
+		if (entry.isDirectory()) return listAgentContentPaths(path);
+		return entry.isFile() && /\.mdx?$/u.test(entry.name) ? [path] : [];
+	}));
+	return paths.flat().sort((left, right) => left.localeCompare(right));
+}
+
 export async function readCapacityWorkdayAgentSpecs(context: CommandContext, projectSlug: string): Promise<CapacityWorkdayAgentSpec[]> {
 	const agentDir = projectSlug === 'market'
 		? resolve(context.cwd, 'src/content/agents')
 		: resolve(context.cwd, 'packages', projectSlug, 'docs/src/content/agents');
-	const entries = await readdir(agentDir, { withFileTypes: true }).catch(() => []);
 	const specs: CapacityWorkdayAgentSpec[] = [];
-	for (const entry of entries) {
-		if (!entry.isFile() || !/\.mdx?$/u.test(entry.name)) continue;
-		const contentPath = resolve(agentDir, entry.name);
+	for (const contentPath of await listAgentContentPaths(agentDir)) {
 		const source = await readFile(contentPath, 'utf8').catch(() => '');
 		const frontmatter = objectArg(parseFrontmatterDocument(source).frontmatter);
 		if (frontmatter.enabled === false || frontmatter.runtimeStatus === 'dormant') continue;
@@ -59,6 +66,8 @@ export async function readCapacityWorkdayAgentSpecs(context: CommandContext, pro
 			const workday = objectArg(profile.workday ?? profile.planningIntent);
 			return [[activityType, {
 				handler,
+				branchPolicy: objectArg(profile.branchPolicy),
+				contentAccess: objectArg(profile.contentAccess),
 				purpose: optionalString(identity.purpose) ?? optionalString(frontmatter.description) ?? `Perform configured ${activityType} work.`,
 				promptTask: optionalString(prompt.task),
 				outputContract: objectArg(profile.outputs),
@@ -73,7 +82,7 @@ export async function readCapacityWorkdayAgentSpecs(context: CommandContext, pro
 		const planning = selectedActivity.profile;
 		const handler = optionalString(planning.handler);
 		if (!handler) continue;
-		const slug = optionalString(frontmatter.slug) ?? entry.name.replace(/\.mdx?$/u, '');
+		const slug = optionalString(frontmatter.slug) ?? contentPath.split('/').at(-1)!.replace(/\.mdx?$/u, '');
 		specs.push({
 			id: optionalString(frontmatter.id) ?? `agent:${slug}`,
 			slug,
@@ -108,6 +117,32 @@ export async function ensureCapacityWorkdayAgentClasses(
 	]).filter(([key]) => key.length > 0));
 	const created: Array<Record<string, unknown>> = [];
 	const specs = await readCapacityWorkdayAgentSpecs(context, projectSlug);
+	const enabledClassIds = new Set(specs.map((spec) => spec.projectAgentClassId));
+	for (const existing of existingClasses) {
+		const metadata = objectArg(existing.metadata);
+		const classId = optionalString(existing.id);
+		const classSlug = optionalString(existing.slug);
+		const sourceClassId = classId?.startsWith(`${projectId}:`) ? classId.slice(projectId.length + 1) : classSlug;
+		if (
+			metadata.source !== 'project_agent_content_sync'
+			|| !classId
+			|| !sourceClassId
+			|| enabledClassIds.has(sourceClassId)
+			|| existing.status === 'paused'
+		) continue;
+		const response = await client.updateProjectAgentClass(projectId, classId, {
+			...existing,
+			status: 'paused',
+			metadata: {
+				...metadata,
+				disabledBy: 'project_agent_content_sync',
+			},
+		}, `${operationKey}:${projectId}:${sourceClassId}:pause`);
+		if (response?.payload) {
+			existingByKey.set(classId, response.payload);
+			if (classSlug) existingByKey.set(classSlug, response.payload);
+		}
+	}
 	for (const classId of [...new Set(specs.map((spec) => spec.projectAgentClassId))]) {
 		const classSpecs = specs.filter((spec) => spec.projectAgentClassId === classId);
 		const first = classSpecs[0];
@@ -123,11 +158,13 @@ export async function ensureCapacityWorkdayAgentClasses(
 			handlerRefs: {
 				agents: classSpecs.map((spec) => ({
 					slug: spec.slug,
+					contentPath: spec.contentPath.replace(`${context.cwd}/`, ''),
 					activities: spec.activities,
 				})),
 			},
 			metadata: {
 				source: 'project_agent_content_sync',
+				disabledBy: null,
 				agentCount: classSpecs.length,
 				agentSlugs: classSpecs.map((spec) => spec.slug),
 				contentPaths: classSpecs.map((spec) => spec.contentPath.replace(`${context.cwd}/`, '')),
@@ -207,4 +244,3 @@ export async function ensureLocalTreeDxForCapacityWorkday(context: CommandContex
 		})) ?? [],
 	};
 }
-
