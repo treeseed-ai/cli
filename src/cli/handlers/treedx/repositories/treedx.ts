@@ -44,7 +44,7 @@ function jsonResult(invocation: ParsedInvocation, context: unknown, report: Reco
 async function status(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	const team = teamId(invocation);
 	if (!team) return fail('Missing --team. Use `trsd db status --team <team-id>`.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
 		client,
 		`/v1/teams/${encodeURIComponent(team)}/treedx`,
@@ -75,7 +75,7 @@ async function status(invocation: ParsedInvocation, context: Parameters<CommandH
 async function provision(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	const team = teamId(invocation);
 	if (!team) return fail('Missing --team. Use `trsd db provision --team <team-id>`.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const body = {
 		publicRead: boolArg(invocation, 'public'),
 		baseUrl: stringArg(invocation, 'url'),
@@ -104,7 +104,7 @@ async function connect(invocation: ParsedInvocation, context: Parameters<Command
 	const team = teamId(invocation);
 	const url = stringArg(invocation, 'url');
 	if (!team || !url) return fail('Missing --team or --url. Use `trsd db connect --team <team-id> --url <base-url>`.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
 		client,
 		`/v1/teams/${encodeURIComponent(team)}/treedx`,
@@ -138,7 +138,7 @@ async function connect(invocation: ParsedInvocation, context: Parameters<Command
 async function mirrors(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	const team = teamId(invocation);
 	if (!team) return fail('Missing --team. Use `trsd db mirrors --team <team-id>`.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const create = stringArg(invocation, 'name') || stringArg(invocation, 'targetUrl');
 	const response = await marketRequest<{ ok: true; payload: unknown }>(
 		client,
@@ -174,7 +174,7 @@ async function mirrors(invocation: ParsedInvocation, context: Parameters<Command
 async function shares(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	const team = teamId(invocation);
 	if (!team) return fail('Missing --team. Use `trsd db shares --team <team-id>`.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const create = stringArg(invocation, 'scope') || stringArg(invocation, 'library') || boolArg(invocation, 'public');
 	const response = await marketRequest<{ ok: true; payload: unknown }>(
 		client,
@@ -211,7 +211,7 @@ async function shares(invocation: ParsedInvocation, context: Parameters<CommandH
 async function library(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	const project = projectId(invocation);
 	if (!project) return fail('Missing --project. Use `trsd db library --project <project-id>`.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const bind = stringArg(invocation, 'library') || stringArg(invocation, 'instance');
 	const response = await marketRequest<{ ok: true; payload: unknown }>(
 		client,
@@ -246,7 +246,7 @@ async function library(invocation: ParsedInvocation, context: Parameters<Command
 async function topology(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	const project = projectId(invocation);
 	if (!project) return fail('Missing --project. Use `trsd db topology --project <project-id>`.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	const response = await marketRequest<{ ok: true; payload: Record<string, unknown> }>(
 		client,
 		`/v1/projects/${encodeURIComponent(project)}/repository-topology`,

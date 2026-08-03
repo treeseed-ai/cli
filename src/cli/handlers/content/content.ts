@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { applyContentSync, planContentSync, type ContentSyncPlan } from '@treeseed/sdk';
+import { MarketClientError } from '@treeseed/sdk/market-client';
 import type { CommandHandler, ParsedInvocation } from '../../types.js';
 import { createMarketClientForInvocation } from './market-utils.js';
 import { fail, guidedResult } from '../utilities/utils.js';
@@ -47,7 +48,11 @@ export const handleContent: CommandHandler = async (invocation, context) => {
 	if (!projectId) return fail('Content sync requires --project <project-id>.');
 	const branch = textArg(invocation, 'branch') ?? 'staging';
 	const repositoryRoot = resolve(context.cwd, textArg(invocation, 'path') ?? '.');
-	const { profile, client } = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+	const shouldPlan = invocation.args.plan === true;
+	const { profile, client } = createMarketClientForInvocation(invocation, context, {
+		requireAuth: true,
+		allowLocalAcceptanceAdmin: true,
+	});
 	const topologyResponse = await request<{ payload: Record<string, unknown> }>(
 		client, `/v1/projects/${encodeURIComponent(projectId)}/repository-topology`, { requireAuth: true },
 	);
@@ -57,16 +62,21 @@ export const handleContent: CommandHandler = async (invocation, context) => {
 	const projectResponse = await request<{ payload: Record<string, unknown> }>(
 		client, `/v1/projects/${encodeURIComponent(projectId)}`, { requireAuth: true },
 	);
-	const teamId = firstText(projectResponse.payload, [['teamId'], ['team', 'id']]);
+	const teamId = firstText(projectResponse.payload, [['teamId'], ['team', 'id'], ['project', 'teamId']]);
 	if (!teamId) return fail('The project does not resolve an owning team.');
 	const repositoryId = firstText(topologyResponse.payload, [
 		['contentRepository', 'treeDx', 'repositoryId'], ['contentRepository', 'repositoryId'],
 	]);
 	if (!repositoryId) return fail('The project does not have a TreeDX content repository binding.');
-	const observed = await request<{ payload?: unknown }>(
-		client, `/v1/dx/projects/${encodeURIComponent(projectId)}/repos/${encodeURIComponent(repositoryId)}/paths/list`,
-		{ method: 'POST', body: { ref: branch, paths: ['**'], limit: 1 }, requireAuth: true },
-	);
+	let observed: { payload?: unknown } | null = null;
+	try {
+		observed = await request<{ payload?: unknown }>(
+			client, `/v1/dx/projects/${encodeURIComponent(projectId)}/repos/${encodeURIComponent(repositoryId)}/paths/list`,
+			{ method: 'POST', body: { ref: branch, paths: ['**'], limit: 1 }, requireAuth: true },
+		);
+	} catch (error) {
+		if (!shouldPlan || !(error instanceof MarketClientError)) throw error;
+	}
 	const treeDxHead = firstText(observed, [
 		['payload', 'resolvedRef'], ['payload', 'commitSha'], ['payload', 'source', 'commitSha'],
 		['resolvedRef'], ['commitSha'],
@@ -79,7 +89,6 @@ export const handleContent: CommandHandler = async (invocation, context) => {
 	const plan = planContentSync({ repositoryRoot, branch, treeDxHead, publishedHead,
 		publicationRevision: publication?.revision ?? null, canonicalRemoteUrl: providerResponse.payload.cloneUrl ?? null,
 		providerHead: providerResponse.payload.observedHead ?? null, env: context.env });
-	const shouldPlan = invocation.args.plan === true;
 	const canApply = plan.status === 'fast-forward' || plan.status === 'verification-required';
 	const finalPlan = !shouldPlan && canApply ? applyContentSync(plan, context.env) : plan;
 	const applied = !shouldPlan && canApply;
