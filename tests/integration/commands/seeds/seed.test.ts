@@ -132,6 +132,14 @@ test('seed local apply creates resources and repeated apply reports unchanged', 
 	assert.equal(secondPayload.summary.skip, 0);
 	assert.equal(secondPayload.result.actionCount, 0);
 	assert.equal(secondPayload.actions.find((action) => action.key === 'team:treeseed').action, 'unchanged');
+
+	const human = await runCli(['seed', 'treeseed', '--environments', 'local', '--apply'], {
+		cwd: root,
+		env: { ...remoteSeedEnv(root), TREESEED_API_D1_LOCAL_PERSIST_TO: persistTo },
+	});
+	assert.equal(human.exitCode, 0, human.stderr);
+	assert.match(human.stdout, /UNCHANGED team TreeSeed/u);
+	assert.match(human.stdout, /unchanged: 4/u);
 });
 
 test('seed local apply can bootstrap without a saved market session', async () => {
