@@ -8,7 +8,7 @@ export const handleScene: CommandHandler = async (invocation, context) => {
 	if (executionResult) return executionResult;
 	const publicationResult = await handleScenePublication(action, invocation, context);
 	if (publicationResult) return publicationResult;
-	const message = `Unsupported scene action "${action}". Phase 11 supports status, validate, plan, run, inspect, resume, render, training, evidence, publish, publish-plan, export, and visual-audit.`;
+	const message = `Unsupported scene action "${action}". Phase 11 supports status, validate, plan, run, view, inspect, resume, render, training, evidence, publish, publish-plan, export, and visual-audit.`;
 	return {
 		exitCode: 1,
 		stdout: [],
@@ -18,7 +18,7 @@ export const handleScene: CommandHandler = async (invocation, context) => {
 			ok: false,
 			phase: 11,
 			error: message,
-			supportedActions: ['status', 'validate', 'plan', 'run', 'inspect', 'resume', 'render', 'training', 'evidence', 'publish', 'publish-plan', 'export', 'visual-audit'],
+			supportedActions: ['status', 'validate', 'plan', 'run', 'view', 'inspect', 'resume', 'render', 'training', 'evidence', 'publish', 'publish-plan', 'export', 'visual-audit'],
 		},
 	};
 };

@@ -75,7 +75,7 @@ export const handleGovernance: CommandHandler = async (invocation, context) => {
 				path = proposalPath;
 				if (action === 'proposal-update') { method = 'PATCH'; body = { ...body, title: text(invocation, 'title'), summary: text(invocation, 'summary'), body: text(invocation, 'body') }; }
 				if (action === 'proposal-open') { path += '/open'; body.reason = text(invocation, 'reason'); }
-				if (action === 'proposal-discuss') { path += '/discussion'; body = { ...body, kind: text(invocation, 'kind'), message: text(invocation, 'message'), automatedEvolutionTest: Boolean(provenance) }; }
+				if (action === 'proposal-discuss') { path += '/discussion'; body = { ...body, kind: text(invocation, 'kind'), message: text(invocation, 'message'), contentContributorRef: text(invocation, 'contributor'), automatedEvolutionTest: Boolean(provenance) }; }
 				if (action === 'proposal-start-voting') { path += '/start-voting'; body.reason = text(invocation, 'reason'); }
 				if (action === 'proposal-vote') { path += '/vote'; body = { ...body, vote: text(invocation, 'vote'), reason: text(invocation, 'reason') }; }
 				if (action === 'proposal-evaluate') path += '/evaluate';

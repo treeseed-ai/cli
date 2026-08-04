@@ -48,7 +48,7 @@ export function setupSummary(report: Awaited<ReturnType<typeof runScene>>) {
 	if (!setup) return 'not run';
 	const parts = [];
 	if (setup.environment?.dev.requested) parts.push(setup.environment.dev.reused ? 'dev reused' : setup.environment.dev.started ? 'dev started' : 'dev requested');
-	if (setup.seed?.requested) parts.push(setup.seed.mode === 'apply' ? 'seed applied' : 'seed planned');
+	if (setup.seed?.requested) parts.push(setup.seed.mode === 'apply' ? 'seeds applied' : 'seeds planned');
 	if (setup.auth?.required) parts.push(setup.auth.hasSession ? 'auth resolved' : 'auth missing');
 	return parts.length > 0 ? parts.join(', ') : 'checked';
 }
@@ -141,4 +141,3 @@ export function externalPublishTargets(value: unknown): SceneExternalPublishTarg
 	if (targets.some((target) => !allowed.has(target))) return null;
 	return targets as SceneExternalPublishTarget[];
 }
-

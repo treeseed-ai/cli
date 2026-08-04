@@ -1,7 +1,7 @@
 import type { CommandHandler } from '../../types.js';
 import { dirname, resolve } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, type SeedPlan } from '@treeseed/sdk/seeds';
+import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, reconcileLocalSeedRuntime, type SeedPlan } from '@treeseed/sdk/seeds';
 import { MarketClientError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketSelector } from '../content/market-utils.js';
 import { loadLocalSeedModule, requireLocalSeedSession } from '../accounts/seed-session.js';
@@ -22,6 +22,7 @@ function planFromRemotePayload(payload: Record<string, unknown>): SeedPlan {
 		environments: Array.isArray(payload.environments) ? payload.environments as SeedPlan['environments'] : [],
 		summary: payload.summary as SeedPlan['summary'],
 		actions: Array.isArray(payload.actions) ? payload.actions as SeedPlan['actions'] : [],
+		runtime: payload.runtime && typeof payload.runtime === 'object' ? payload.runtime as SeedPlan['runtime'] : { capacityProviders: [], agentLabServicePrincipals: [] },
 		recipes: Array.isArray(payload.recipes) ? payload.recipes as SeedPlan['recipes'] : [],
 		diagnostics: Array.isArray(payload.diagnostics) ? payload.diagnostics as SeedPlan['diagnostics'] : [],
 		manifestPath: '',
@@ -281,6 +282,12 @@ export const handleSeed: CommandHandler = async (invocation, context) => {
 			accessToken: localAuth?.session.accessToken,
 			env: context.env,
 		});
+		const runtime = await reconcileLocalSeedRuntime({
+			projectRoot: context.cwd,
+			plan: applied.plan?.runtime ? applied.plan : planned.plan,
+			accessToken: context.env.TREESEED_CAPACITY_ACCEPTANCE_ADMIN_TOKEN?.trim() || 'tsk_local_treeseed_acceptance_admin',
+			env: context.env,
+		});
 		const safeResult = applied.result;
 		const message = 'Local seed apply completed.';
 		return {
@@ -304,6 +311,7 @@ export const handleSeed: CommandHandler = async (invocation, context) => {
 				result: {
 					message,
 					...safeResult,
+					runtime,
 				},
 			},
 		};
@@ -339,4 +347,3 @@ export const handleSeed: CommandHandler = async (invocation, context) => {
 		},
 	};
 };
-

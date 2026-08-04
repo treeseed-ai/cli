@@ -22,6 +22,7 @@ export const governanceOperationSpecs: OperationSpec[] = [{
 		{ name: 'proposalType', flags: '--proposal-type <type>', description: 'Proposal classification.', kind: 'string' },
 		{ name: 'kind', flags: '--kind <question|concern|support|response>', description: 'Discussion contribution kind.', kind: 'enum', values: ['question', 'concern', 'support', 'response'] },
 		{ name: 'message', flags: '--message <text>', description: 'Discussion message.', kind: 'string' },
+		{ name: 'contributor', flags: '--contributor <content-ref>', description: 'Verified person or agent content reference required when asking a TreeDX-backed question.', kind: 'string' },
 		{ name: 'vote', flags: '--vote <support|object|abstain>', description: 'Governance vote.', kind: 'enum', values: ['support', 'object', 'abstain'] },
 		{ name: 'status', flags: '--status <status>', description: 'Status filter or administrative decision.', kind: 'string' },
 		{ name: 'reason', flags: '--reason <text>', description: 'Evidence-based reason for the action.', kind: 'string' },

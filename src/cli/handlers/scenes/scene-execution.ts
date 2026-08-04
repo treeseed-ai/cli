@@ -10,9 +10,12 @@ import {
 	publishSceneEvidence,
 	renderScene,
 	resumeScene,
+	resolveSceneRunRoot,
 	runSceneDeviceMatrix,
 	runSceneVisualAudit,
 	runScene,
+	AGENT_SIMULATOR_PORT,
+	startAgentLabReportViewer,
 	validateScene,
 	type SceneEvidenceBundlePolicy,
 	type SceneEvidenceTarget,
@@ -28,22 +31,49 @@ import {
 	type SceneVisualAuditRole,
 } from '@treeseed/sdk/scenes';
 import { runManagedDev } from '@treeseed/sdk';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CommandHandler } from '../../types.ts';
 
 import { humanSceneStatusLines, setupSummary, writeSceneJsonLine, renderMode, executionMode, sceneDevice, sceneDevices, sceneRoles, splitCommaOption, scenePathRoots, sceneReviewDetail, sceneMaxFindings, trainingFormats, evidenceTarget, evidenceBundlePolicy, publishTarget, externalPublishTargets } from './scene-options.js';
+import { openReport, resolveAgentLabSceneRun } from './agent-lab-cli.js';
 
 export async function handleSceneExecution(action: string, invocation: Parameters<CommandHandler>[0], context: Parameters<CommandHandler>[1]) {
 	if (action === 'status') {
 		const report = createScenePhase0Report();
+		const simulatorUrl = `http://127.0.0.1:${AGENT_SIMULATOR_PORT}/`;
+		let simulator: Record<string, unknown> = { active: false, url: simulatorUrl };
+		try {
+			const response = await fetch(`${simulatorUrl}status`, { signal: AbortSignal.timeout(750) });
+			if (response.ok) simulator = { ...await response.json() as Record<string, unknown>, url: simulatorUrl };
+		} catch { /* An unavailable loopback endpoint means no simulator is active. */ }
 		return {
 			exitCode: 0,
-			stdout: humanSceneStatusLines(report),
+			stdout: [...humanSceneStatusLines(report), `Agent Lab: ${simulator.active === true ? `active at ${simulatorUrl}` : `idle (${simulatorUrl})`}`],
 			stderr: [],
 			report: {
 				command: 'scene',
 				...report,
+				agentSimulator: simulator,
 			},
 		};
+	}
+
+	if (action === 'view') {
+		const run = invocation.positionals[1];
+		if (!run) return { exitCode: 1, stdout: [], stderr: ['Usage: treeseed scene view <run-id-or-path> [--open]'], report: { command: 'scene view', ok: false, error: 'Missing run id or path.' } };
+		const resolved = resolveSceneRunRoot(context.cwd, run);
+		const reportPath = resolved.runRoot ? join(resolved.runRoot, 'report.html') : '';
+		if (!reportPath || !existsSync(reportPath)) return { exitCode: 1, stdout: [], stderr: ['Agent simulation report not found.', ...formatSceneDiagnostics(resolved.diagnostics)], report: { command: 'scene view', ok: false, reportPath: reportPath || null } };
+		const server = await startAgentLabReportViewer(reportPath);
+		context.write(context.outputFormat === 'json' ? JSON.stringify({ command: 'scene view', kind: 'ready', ok: true, url: server.url, reportPath }) : `Agent simulation viewer: ${server.url}`, 'stdout');
+		if (invocation.args.open === true) openReport(server.url);
+		await new Promise<void>((resolve) => {
+			const stop = () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); resolve(); };
+			process.once('SIGINT', stop); process.once('SIGTERM', stop);
+		});
+		await server.close();
+		return { exitCode: 0, stdout: [], stderr: [], report: { command: 'scene view', ok: true, url: server.url, reportPath }, suppressJsonResult: context.outputFormat === 'json' };
 	}
 
 	if (action === 'validate') {
@@ -115,6 +145,7 @@ export async function handleSceneExecution(action: string, invocation: Parameter
 			};
 		}
 		const environment = typeof invocation.args.environment === 'string' ? invocation.args.environment as SceneEnvironment : undefined;
+		const agentLab = await resolveAgentLabSceneRun({ projectRoot: context.cwd, scene, invocation, env: context.env });
 		const mode = executionMode(invocation.args.mode);
 		const deviceArg = sceneDevice(invocation.args.device);
 		const requestedDevices = deviceArg === 'all' ? undefined : sceneDevices(invocation.args.device);
@@ -149,12 +180,14 @@ export async function handleSceneExecution(action: string, invocation: Parameter
 		const jsonl = context.outputFormat === 'json';
 		const report = await runScene({
 			projectRoot: context.cwd,
-			scene,
+			scene: agentLab.scene ?? scene,
 			environment,
 			device: deviceArg,
 			record: invocation.args.record === true,
 			artifactMode: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			mode,
+			agentLabExecutor: agentLab.agentLabExecutor,
+			onAgentLabReportReady: agentLab.onAgentLabReportReady,
 			interactive: context.interactiveUi,
 			pauseController: context.confirm
 				? async (pause) => {
@@ -189,6 +222,7 @@ export async function handleSceneExecution(action: string, invocation: Parameter
 					`Artifacts: ${report.artifacts?.runRoot ?? '(none)'}`,
 					`Trace: ${report.playwrightTracePath ?? '(none)'}`,
 					`Report: ${report.artifacts?.markdownReportPath ?? '(none)'}`,
+					...(report.artifacts?.htmlReportPath ? [`Live report: ${report.artifacts.htmlReportPath}`] : []),
 				]
 				: [
 					report.workflowStatus === 'blocked' ? 'Treeseed scene run blocked.' : 'Treeseed scene run failed.',

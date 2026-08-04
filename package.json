@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.feature-treeseed-guide-editorial-agents.20260802T174559Z",
+  "version": "0.12.59-dev.staging.20260804T171055Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -48,9 +48,9 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#fee1d3bfa51208b649428c945b97f01b9f0ad4b2",
-    "@treeseed/core": "github:treeseed-ai/core#02a2eb38f4ac2b07a299065b2791391d8d635386",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#68a10f87cdade0faca73a22d82d07973c8bc0658",
+    "@treeseed/agent": "github:treeseed-ai/agent#5e309c4d73e95870835333b4a00eb296ad93371a",
+    "@treeseed/core": "github:treeseed-ai/core#2d40bf1892052983ae61bab6c158d57a9949be34",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#33d84a8c44016021b07a1f40958c19ca7e5f6bda",
     "ink": "^7.0.0",
     "react": "^19.2.5",
     "yaml": "^2.8.1"
