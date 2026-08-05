@@ -29,9 +29,11 @@ export async function runCapacityWorkdayScheduleAction(action: string, invocatio
 		if (projectIds.length !== selectedProjects.length) return fail('One or more scheduled project selectors are unavailable to the team.');
 		const classSelectors = csv(invocation, 'agentClasses', []);
 		const provider = await resolveCapacityWorkdayProviderId(client, teamId, text(invocation, 'provider') ?? 'local');
+		const durationSeconds = positive(invocation, 'durationSeconds', 1800); const maxActiveAssignments = positive(invocation, 'maxActiveAssignments', 3); const planningOnly = flag(invocation, 'planningOnly');
 		const body = { purpose: text(invocation, 'purpose') ?? 'Recurring TreeSeed Guide editorial workday', projectIds, capacityProviderId: provider.providerId,
 			agentSelection: normalizeWorkdayAgentSelection({ classIds: classSelectors.filter((value) => value.includes(':')), classSlugs: classSelectors.filter((value) => !value.includes(':')), agentSlugs: csv(invocation, 'agents', []), mode: text(invocation, 'selectionMode') }),
-			cadenceSeconds: positive(invocation, 'cadenceSeconds', 3600), durationSeconds: positive(invocation, 'durationSeconds', 1800), maxActiveAssignments: positive(invocation, 'maxActiveAssignments', 3), availableCredits: positive(invocation, 'availableCredits', 100), planningOnly: flag(invocation, 'planningOnly'),
+			cadenceSeconds: positive(invocation, 'cadenceSeconds', 3600), durationSeconds, maxActiveAssignments, availableSeconds: positive(invocation, 'availableSeconds', durationSeconds * maxActiveAssignments), planningOnly,
+			timePolicy: { cooperativePlanningPercent: positive(invocation, 'planningPercent', planningOnly ? 90 : 25), governedExecutionPercent: planningOnly ? 0 : positive(invocation, 'executionPercent', 65), reservePercent: positive(invocation, 'reservePercent', 10) },
 			publicationPolicy: { bookIds: csv(invocation, 'bookIds', ['treeseed-guide']), target: text(invocation, 'target') === 'production' ? 'production' : 'staging', cohortMode: 'accepted', requireTechnicalReview: true, requireAudienceReview: true, requireGraphReviewWhenStructural: true, simulatedHumanApproval: flag(invocation, 'simulateHuman') },
 			nextRunAt: text(invocation, 'nextRunAt') ?? new Date().toISOString() };
 		if (action === 'workday-schedule-plan' || !execute) return report('workday-schedule-plan', { mode: 'plan', body });

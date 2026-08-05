@@ -105,14 +105,15 @@ export async function runCapacityWorkdayAction(action: string, invocation: Parse
 	if (action === 'workday-create') {
 		const projectId = stringArg(invocation, 'project');
 		if (!projectId) return fail('Missing --project for capacity workday-create.');
-		const availableCredits = numberArg(invocation, 'availableCredits');
-		if (availableCredits === null || availableCredits <= 0) return fail('A positive --available-credits value is required.');
+		const availableSeconds = numberArg(invocation, 'availableSeconds');
+		if (availableSeconds === null || availableSeconds <= 0) return fail('A positive --available-seconds value is required.');
 		const request = {
 			projectId,
 			id: workdayId ?? undefined,
 			environment: stringArg(invocation, 'environment') ?? 'local',
 			allocationSetId: stringArg(invocation, 'allocation') ?? undefined,
-			availableCredits,
+			availableSeconds,
+			timePolicy: { cooperativePlanningPercent: numberArg(invocation, 'planningPercent') ?? 25, governedExecutionPercent: numberArg(invocation, 'executionPercent') ?? 65, reservePercent: numberArg(invocation, 'reservePercent') ?? 10 },
 			status: 'draft',
 			metadata: { source: 'treeseed_cli' },
 		};
@@ -121,7 +122,7 @@ export async function runCapacityWorkdayAction(action: string, invocation: Parse
 		return guidedResult({
 			command: `capacity ${action}`,
 			summary: `Created capacity workday ${String(response.payload.id ?? '')}.`,
-			facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Project', value: projectId }, { label: 'Available credits', value: availableCredits }],
+			facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Project', value: projectId }, { label: 'Available agent time', value: `${availableSeconds} seconds` }],
 			report: { action, mode: 'live', payload: response.payload },
 		});
 	}
