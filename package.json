@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@treeseed/agent": "github:treeseed-ai/agent#8faee06736afb497c5da4444cb6c03682d32057f",
-    "@treeseed/core": "github:treeseed-ai/core#68273002ed5b87ab0d1b0cc74af1149adc05aa9d",
+    "@treeseed/core": "github:treeseed-ai/core#4c464b4cb35f39ac2bd5100695f7a98d2a3fbe0e",
     "@treeseed/sdk": "github:treeseed-ai/sdk#6f73e58d221f70f2067f52e3f35bfb6f7c19e2b5",
     "ink": "^7.0.0",
     "react": "^19.2.5",
