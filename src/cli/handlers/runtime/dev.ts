@@ -190,7 +190,6 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
 			...(foundationOnly ? [] : ['local-docker-compose:mailpit']),
-			...(!foundationOnly && selectedServiceIds.includes('api') ? ['capacity-provider:local', 'local-docker-compose:agent-capacity-provider'] : []),
 			...(includeTreeDxUnits ? [
 				'local-treedx:team-primary',
 				'local-docker-compose:treedx',
