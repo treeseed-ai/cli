@@ -29,7 +29,6 @@ function expandWorkdays(scene: SceneManifest, invocation: ParsedInvocation) {
 	const count = capacityPositiveNumberArg(invocation, 'workdays', 1);
 	if (!Number.isInteger(count)) throw new Error('--workdays must be a positive integer.');
 	const durationSeconds = capacityPositiveNumberArg(invocation, 'durationSeconds', 1800);
-	const availableCredits = capacityPositiveNumberArg(invocation, 'availableCredits', 64);
 	const maxActiveAssignments = capacityPositiveNumberArg(invocation, 'maxActiveAssignments', 4);
 	const source = scene.agentLab!.workdays[0]!;
 	scene.agentLab!.workdays = Array.from({ length: count }, (_, index) => ({
@@ -37,7 +36,6 @@ function expandWorkdays(scene: SceneManifest, invocation: ParsedInvocation) {
 		id: count === 1 ? source.id : `${source.id}-${index + 1}`,
 		title: count === 1 ? source.title : `${source.title ?? source.id} · Workday ${index + 1}`,
 		durationSeconds,
-		availableCredits,
 		maxActiveAssignments,
 	}));
 	return scene;

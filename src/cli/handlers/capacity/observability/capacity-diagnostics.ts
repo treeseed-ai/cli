@@ -4,16 +4,16 @@ import { fail, guidedResult } from '../../utilities/utils.js';
 import { capacityEnvironmentSelector, capacityStringArg } from '../capacity-core/capacity-command-arguments.js';
 import { capacityMarketRequest, capacityRecordValue, formatCapacityNumber } from '../capacity-core/capacity-values.js';
 
-function derivedCapacityLines(plan: Record<string, unknown>) {
-	const entries = capacityRecordValue(capacityRecordValue(plan, 'derivedCapacity'), 'entries');
-	if (!Array.isArray(entries) || entries.length === 0) return ['No derived native capacity entries are available yet.'];
-	return entries.map((entry) => [`${capacityRecordValue(entry, 'executionProviderKind') ?? 'provider'}:${capacityRecordValue(entry, 'nativeUnit') ?? 'native'}`, `limit ${formatCapacityNumber(capacityRecordValue(entry, 'configuredNativeLimit'))}`, `observed ${formatCapacityNumber(capacityRecordValue(entry, 'observedNativeRemaining'))}`, `reserved ${formatCapacityNumber(capacityRecordValue(entry, 'activeReservedNativeAmount'))}`, `reserve ${formatCapacityNumber(capacityRecordValue(entry, 'reserveBufferPercent'))}%`, `conversion ${formatCapacityNumber(capacityRecordValue(entry, 'nativeUnitsPerCredit'))} native/credit`, `derived ${formatCapacityNumber(capacityRecordValue(entry, 'derivedAvailableCredits'))} credits`, `confidence ${capacityRecordValue(entry, 'confidence') ?? 'unknown'}`].join(' | '));
+function nativeCapacityLines(plan: Record<string, unknown>) {
+	const entries = capacityRecordValue(capacityRecordValue(plan, 'nativeCapacity'), 'entries');
+	if (!Array.isArray(entries) || entries.length === 0) return ['No provider-native capacity observations are available yet.'];
+	return entries.map((entry) => [`${capacityRecordValue(entry, 'executionProviderKind') ?? 'provider'}:${capacityRecordValue(entry, 'nativeUnit') ?? 'native'}`, `limit ${formatCapacityNumber(capacityRecordValue(entry, 'configuredNativeLimit'))}`, `observed ${formatCapacityNumber(capacityRecordValue(entry, 'observedNativeRemaining'))}`, `reserved ${formatCapacityNumber(capacityRecordValue(entry, 'activeReservedNativeAmount'))}`, `consumed ${formatCapacityNumber(capacityRecordValue(entry, 'activeConsumedNativeAmount'))}`, `available ${formatCapacityNumber(capacityRecordValue(entry, 'availableNativeAmount'))}`, `reserve ${formatCapacityNumber(capacityRecordValue(entry, 'reserveBufferPercent'))}%`, `confidence ${capacityRecordValue(entry, 'confidence') ?? 'unknown'}`].join(' | '));
 }
 
 function grantAllocationLines(plan: Record<string, unknown>) {
 	const grants = capacityRecordValue(plan, 'grants');
 	if (!Array.isArray(grants) || grants.length === 0) return [];
-	return grants.map((grant) => [`${capacityRecordValue(grant, 'grantScope') ?? 'grant'} ${capacityRecordValue(grant, 'environment') ?? 'all'}`, `allocation ${formatCapacityNumber(capacityRecordValue(grant, 'portfolioAllocationPercent'))}%`, `reserve pool ${formatCapacityNumber(capacityRecordValue(grant, 'reservePoolPercent'))}%`, `max daily project credits ${formatCapacityNumber(capacityRecordValue(grant, 'maxDailyProjectCredits'))}`, `overflow ${capacityRecordValue(grant, 'overflowPolicy') ?? 'soft_grant'}`, `emergency ${capacityRecordValue(grant, 'emergencyOverride') === true ? 'on' : 'off'}`].join(' | '));
+	return grants.map((grant) => [`${capacityRecordValue(grant, 'projectId') ?? 'portfolio'} ${capacityRecordValue(grant, 'environment') ?? 'all'}`, `daily ${formatCapacityNumber(capacityRecordValue(grant, 'dailyAgentSecondsLimit'))} agent-seconds`, `monthly ${formatCapacityNumber(capacityRecordValue(grant, 'monthlyAgentSecondsLimit'))} agent-seconds`, `concurrency ${formatCapacityNumber(capacityRecordValue(grant, 'maxConcurrentAssignments'))}`, `unmetered ${capacityRecordValue(grant, 'unmetered') === true ? 'yes' : 'no'}`].join(' | '));
 }
 
 export async function runCapacityDiagnostics(invocation: ParsedInvocation, context: CommandContext) {
@@ -25,8 +25,8 @@ export async function runCapacityDiagnostics(invocation: ParsedInvocation, conte
 	const plan = response.payload;
 	return guidedResult({
 		command: 'capacity diagnostics', summary: `Capacity diagnostics for project ${projectId} in ${environment}.`,
-		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Project', value: projectId }, { label: 'Environment', value: environment }, { label: 'Derived credits', value: formatCapacityNumber(capacityRecordValue(capacityRecordValue(plan, 'derivedCapacity'), 'totalDerivedAvailableCredits')) }],
-		sections: [{ title: 'Native projection', lines: derivedCapacityLines(plan) }, { title: 'Allocation grants', lines: grantAllocationLines(plan) }],
+		facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Project', value: projectId }, { label: 'Environment', value: environment }, { label: 'Daily agent time remaining', value: formatCapacityNumber(capacityRecordValue(capacityRecordValue(plan, 'remaining'), 'dailyAgentSeconds')) }],
+		sections: [{ title: 'Provider-native capacity', lines: nativeCapacityLines(plan) }, { title: 'Agent-time grants', lines: grantAllocationLines(plan) }],
 		report: { action: 'diagnostics', projectId, environment, market: { id: profile.id, baseUrl: profile.baseUrl }, plan },
 	});
 }
