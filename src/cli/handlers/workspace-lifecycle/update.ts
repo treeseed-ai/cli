@@ -9,6 +9,7 @@ export const handleUpdate: CommandHandler = async (invocation, context) => {
 			strategy: typeof invocation.args.strategy === 'string' ? invocation.args.strategy as 'merge' | 'ff-only' : undefined,
 			push: invocation.args.noPush === true ? false : undefined,
 			workspaceLinks: typeof invocation.args.workspaceLinks === 'string' ? invocation.args.workspaceLinks as 'auto' | 'off' : undefined,
+			tracking: invocation.args.tracking === true,
 			plan: invocation.args.plan === true,
 		});
 		const payload = result.payload as {

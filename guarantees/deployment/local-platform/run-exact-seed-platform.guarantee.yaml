@@ -1,0 +1,21 @@
+schemaVersion: treeseed.guarantee/v1
+id: guarantee.deployment.local-platform.run-exact-seed-platform.742
+journeyIndex: 742
+type: deployment
+subtype: local-platform
+journey: Run an exact seed platform
+ownerPackage: "@treeseed/cli"
+surface: cli
+summary: Configure when required, reconcile one exact seed graph, verify readiness, detach, and preserve reboot supervision.
+status: planned
+dependencies: { journeys: [], guarantees: [] }
+actors: { allowed: [platform_admin], forbidden: [unauthorized_user] }
+devices: { required: [desktop_chromium], optional: [] }
+gates: [future]
+preconditions: { fixtures: [integrated_treeseed_project], notes: [] }
+api: { required: false, verifierRefs: [] }
+content: { required: false, verifierRefs: [] }
+audit: { required: true, verifierRefs: [] }
+negativeCases: [{ id: destructive-removal-without-confirmation, actor: platform_admin, verifierRefs: [] }]
+evidence: { required: [guarantee_report] }
+notes: ["Activate after detached supervisor and reboot acceptance evidence are repeatable."]

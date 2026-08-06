@@ -1,18 +1,21 @@
 import {
 	applyConfigValues,
 	applySafeRepairs,
+	captureMachineConfiguration,
 	collectConfigContext,
 	ensureActVerificationTooling,
 	ensureSecretSessionForConfig,
 	findNearestRoot,
 	formatDependencyFailureDetails,
 	installDependencies,
+	restoreMachineConfiguration,
 } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler } from '../../types.js';
 import { fail, guidedResult } from '../utilities/utils.js';
 import { buildCliConfigPages, runCliConfigEditor } from './config-ui.js';
 import { promptForNewPassphrase, promptHidden } from './secret-prompts.js';
 import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from '../operations/workflow.js';
+import { waitForPlatformGeneration } from '../runtime/platform-supervisor-state.js';
 
 function normalizeConfigScopes(value: unknown) {
 	const requested = Array.isArray(value)
@@ -24,16 +27,6 @@ function normalizeConfigScopes(value: unknown) {
 		return ['local', 'staging', 'prod'] as Array<'local' | 'staging' | 'prod'>;
 	}
 	return ['local', 'staging', 'prod'].filter((scope) => requested.includes(scope)) as Array<'local' | 'staging' | 'prod'>;
-}
-
-function normalizeBootstrapSystems(system: unknown, systems: unknown) {
-	const values = [
-		...(Array.isArray(system) ? system.map(String) : typeof system === 'string' ? [system] : []),
-		...(typeof systems === 'string' ? systems.split(',') : Array.isArray(systems) ? systems.flatMap((value) => String(value).split(',')) : []),
-	]
-		.map((value) => value.trim())
-		.filter(Boolean);
-	return values.length > 0 ? values : undefined;
 }
 
 function formatPrintEnvReports(payload: Record<string, any>) {
@@ -219,27 +212,28 @@ function renderConfigResult(commandName: string, result: any) {
 }
 
 export const handleConfig: CommandHandler = async (invocation, context) => {
+	let rollback: ReturnType<typeof captureMachineConfiguration> | null = null;
 	try {
 		const workflow = createWorkflowSdk(context, {
 			write: context.outputFormat === 'json' ? (() => {}) : context.write,
 		});
 		const scopes = normalizeConfigScopes(invocation.args.environment);
 		const sync = invocation.args.sync as never;
-		const systems = normalizeBootstrapSystems(invocation.args.system, invocation.args.systems);
 		const interactive = context.outputFormat !== 'json'
 			&& context.interactiveUi !== false
 			&& process.stdin.isTTY
 			&& process.stdout.isTTY;
 		const nonInteractive = invocation.args.nonInteractive === true || context.outputFormat === 'json';
-		const operationalMode = invocation.args.printEnvOnly === true || invocation.args.rotateMachineKey === true || invocation.args.bootstrap === true;
+		const operationalMode = invocation.args.printEnvOnly === true || invocation.args.rotateMachineKey === true;
 		if (!interactive && !nonInteractive && !operationalMode) {
-			return fail('Treeseed config requires a TTY for the interactive editor. Re-run in a terminal, or use --non-interactive, --json, --bootstrap, --print-env-only, or --rotate-machine-key.');
+			return fail('Treeseed config requires a TTY for the interactive editor. Re-run in a terminal, or use --non-interactive, --json, --print-env-only, or --rotate-machine-key.');
 		}
 		if (interactive && !nonInteractive && !operationalMode) {
 			const tenantRoot = findNearestRoot(context.cwd) ?? context.cwd;
 			if (!tenantRoot) {
 				return fail('Treeseed config requires a Treeseed project. Run the command from inside a tenant or initialize one first.');
 			}
+			rollback = captureMachineConfiguration(tenantRoot);
 			const dependencyInstall = await installDependencies({
 				tenantRoot,
 				force: invocation.args.installMissingTooling === true,
@@ -300,6 +294,7 @@ export const handleConfig: CommandHandler = async (invocation, context) => {
 				},
 			});
 			if (editorResult === null) {
+				restoreMachineConfiguration(rollback);
 				return fail('Treeseed config canceled.');
 			}
 			const refreshedContext = collectConfigContext({
@@ -316,7 +311,7 @@ export const handleConfig: CommandHandler = async (invocation, context) => {
 				value: page.finalValue,
 				reused: !(page.key in editorResult.overrides),
 			}));
-			const effectiveSync = sync ?? 'all';
+			const effectiveSync = sync ?? 'none';
 			context.write(
 				effectiveSync !== 'none'
 					? 'Applying config updates, validating environments, and syncing selected managed providers...'
@@ -325,27 +320,22 @@ export const handleConfig: CommandHandler = async (invocation, context) => {
 			);
 			const result = await workflow.config({
 				environment: scopes as never,
-				systems: systems as never,
-				skipUnavailable: invocation.args.skipUnavailable === true ? true : undefined,
-				bootstrapExecution: invocation.args.bootstrapSequential === true ? 'sequential' : 'parallel',
-				sync,
+					sync: effectiveSync,
 				printEnv: invocation.args.printEnv === true,
 				showSecrets: invocation.args.showSecrets === true,
 				installMissingTooling: invocation.args.installMissingTooling === true,
 				nonInteractive: true,
 				updates,
 			});
+			const generation = (result.payload as Record<string, any>).generation;
+			if (generation?.id) (result.payload as Record<string, any>).runtimeConvergence = await waitForPlatformGeneration(tenantRoot, generation.id);
+			rollback = null;
 			return renderConfigResult(invocation.commandName || 'config', result);
 		}
 
 		const result = await workflow.config({
 			environment: invocation.args.environment as never,
-			systems: systems as never,
-			skipUnavailable: invocation.args.skipUnavailable === true ? true : undefined,
-			bootstrapExecution: invocation.args.bootstrapSequential === true ? 'sequential' : 'parallel',
 			sync,
-			bootstrap: invocation.args.bootstrap === true,
-			preflight: invocation.args.preflight === true,
 			printEnv: invocation.args.printEnv === true,
 			printEnvOnly: invocation.args.printEnvOnly === true,
 			showSecrets: invocation.args.showSecrets === true,
@@ -364,8 +354,11 @@ export const handleConfig: CommandHandler = async (invocation, context) => {
 				},
 			};
 		}
+		const generation = (result.payload as Record<string, any>).generation;
+		if (generation?.id) (result.payload as Record<string, any>).runtimeConvergence = await waitForPlatformGeneration(findNearestRoot(context.cwd) ?? context.cwd, generation.id);
 		return renderConfigResult(invocation.commandName || 'config', result);
 	} catch (error) {
+		if (rollback) restoreMachineConfiguration(rollback);
 		return workflowErrorResult(error);
 	}
 };
