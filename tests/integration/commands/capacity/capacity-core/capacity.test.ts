@@ -75,7 +75,7 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 	}
 });
 
-test('capacity diagnostics reads Market derived capacity projection', async () => {
+test('capacity diagnostics reads Market native capacity and agent-time grants', async () => {
 	const root = makeWorkspaceRoot();
 	const previousHome = process.env.HOME;
 	const previousPassphrase = process.env[MACHINE_KEY_PASSPHRASE_ENV];
@@ -95,28 +95,28 @@ test('capacity diagnostics reads Market derived capacity projection', async () =
 			payload: {
 				projectId: 'project_123',
 				environment: 'local',
-				derivedCapacity: {
-					totalDerivedAvailableCredits: 42,
+				nativeCapacity: {
 					entries: [{
 						executionProviderKind: 'codex',
 						nativeUnit: 'wall_minute',
 						configuredNativeLimit: 480,
 						observedNativeRemaining: 300,
 						activeReservedNativeAmount: 60,
+						activeConsumedNativeAmount: 12,
 						reserveBufferPercent: 20,
-						nativeUnitsPerCredit: 10,
-						derivedAvailableCredits: 24,
+						availableNativeAmount: 168,
 						confidence: 'high',
 					}],
 				},
 				grants: [{
-					grantScope: 'project',
+					projectId: 'project_123',
 					environment: 'local',
-					portfolioAllocationPercent: 100,
-					reservePoolPercent: 10,
-					maxDailyProjectCredits: 5000,
-					overflowPolicy: 'soft_grant',
+					dailyAgentSecondsLimit: 18000,
+					monthlyAgentSecondsLimit: 360000,
+					maxConcurrentAssignments: 4,
+					unmetered: false,
 				}],
+				remaining: { dailyAgentSeconds: 14400, monthlyAgentSeconds: 356400 },
 			},
 		}), { status: 200, headers: { 'content-type': 'application/json' } });
 	};
@@ -129,10 +129,10 @@ test('capacity diagnostics reads Market derived capacity projection', async () =
 		const result = await runCli(['capacity', 'diagnostics', '--market', 'local', '--project', 'project_123', '--environment', 'local'], { cwd: root, env: { HOME: root } });
 		assert.equal(result.exitCode, 0, result.stderr);
 		assert.equal(calls.length, 1);
-		assert.match(result.output, /Native projection/u);
+		assert.match(result.output, /Provider-native capacity/u);
 		assert.match(result.output, /codex:wall_minute/u);
-		assert.match(result.output, /derived 24 credits/u);
-		assert.match(result.output, /allocation 100%/u);
+		assert.match(result.output, /available 168/u);
+		assert.match(result.output, /daily 18,000 agent-seconds/u);
 	} finally {
 		globalThis.fetch = previousFetch;
 		if (previousHome === undefined) delete process.env.HOME;
