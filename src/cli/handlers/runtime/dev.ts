@@ -43,6 +43,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 		const apiMode = stringOption(invocation.args, 'api') ?? 'auto';
 		const subcommand = typeof invocation.positionals[0] === 'string' ? invocation.positionals[0] : '';
 		const effectiveSubcommand = subcommand || 'start';
+		const foundationOnly = invocation.args.foundationOnly === true;
 		const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
 		if (subcommand && !managedSubcommands.has(subcommand)) {
 			return fail(`Unknown dev subcommand "${subcommand}". Use start, status, logs, stop, or restart.`);
@@ -68,7 +69,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			}).map((unit) => typeof unit.metadata.serviceId === 'string' ? unit.metadata.serviceId : null),
 		);
 		const hasLocalApi = localProcessServiceIds.has('api') || localProcessServiceIds.has('operations-runner');
-		const selectedSurfaces = appId === 'api'
+		const selectedSurfaces = foundationOnly ? 'api' : appId === 'api'
 			? 'api'
 			: appId === 'web' || apiMode === 'remote'
 				? 'web'
@@ -176,20 +177,20 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			.split(',')
 			.map((surface) => surface.trim())
 			.filter(Boolean)
-			.flatMap((surface) => (surface === 'web' ? ['market-web'] : surface === 'api' ? ['api', 'operations-runner'] : [surface]));
+			.flatMap((surface) => (surface === 'web' ? ['market-web'] : surface === 'api' ? foundationOnly ? ['api'] : ['api', 'operations-runner'] : [surface]));
 		const localContentUnitIds = localContent === 'preview' || localContent === 'edit'
 			? desiredGraph.resources
 					.filter((resource) => resource.kind === 'local-content-materialization' && resource.spec.executeRequested === true)
 					.map((resource) => resource.id)
 			: [];
-		const includeTreeDxUnits = localContent !== 'none'
+		const includeTreeDxUnits = foundationOnly || localContent !== 'none'
 			&& selectedSurfaces.split(',').map((surface) => surface.trim()).includes('web');
 		const declaredConnectorTunnel = desiredGraph.resources.some((resource) => resource.id === 'cloudflare-tunnel:local-connectors');
 		const selectedUnitIds = [
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
-			'local-docker-compose:mailpit',
-			...(selectedServiceIds.includes('api') ? ['local-seed-bootstrap:treeseed'] : []),
+			...(foundationOnly ? [] : ['local-docker-compose:mailpit']),
+			...(!foundationOnly && selectedServiceIds.includes('api') ? ['capacity-provider:local', 'local-docker-compose:agent-capacity-provider'] : []),
 			...(includeTreeDxUnits ? [
 				'local-treedx:team-primary',
 				'local-docker-compose:treedx',

@@ -61,12 +61,15 @@ import { handleServices } from '../handlers/services/services.js';
 import { handleContent } from '../handlers/content/content.js';
 import { handleGovernance } from '../handlers/projects/governance/governance.js';
 import { handleKnowledge } from '../handlers/projects/knowledge/knowledge.js';
+import { handlePlatform, handleRun } from '../handlers/runtime/run.js';
 
 const workspaceCommand = (name: 'status' | 'link' | 'unlink') => `workspace${':'}${name}`;
 
 export const COMMAND_HANDLERS = {
 	init: handleInit,
 	config: handleConfig,
+	run: handleRun,
+	platform: handlePlatform,
 	close: handleClose,
 	save: handleSave,
 	update: handleUpdate,
