@@ -368,6 +368,11 @@ test('config defaults to all environments and supports explicit all', async () =
 	assert.equal(stagingEntryIds.has('TREESEED_CLOUDFLARE_API_TOKEN'), true);
 	assert.equal(stagingEntryIds.has('TREESEED_RAILWAY_API_TOKEN'), false);
 	assert.equal(stagingEntryIds.has('TREESEED_CLOUDFLARE_ACCOUNT_ID'), true);
+	for (const entry of defaultPayload.context.entriesByScope.local.filter((candidate) => candidate.sensitivity === 'secret')) {
+		assert.equal(entry.currentValue, '<redacted>');
+		assert.equal(entry.suggestedValue, '<redacted>');
+		assert.equal(entry.effectiveValue, '<redacted>');
+	}
 });
 
 test('config rejects non-tty execution without explicit automation mode', async () => {
@@ -450,4 +455,3 @@ test('export accepts an explicit directory positional', async () => {
 	assert.equal(payload.directory, nestedDir);
 	assert.equal(readFileSync(payload.outputPath, 'utf8').includes('File: entry.ts'), true);
 });
-

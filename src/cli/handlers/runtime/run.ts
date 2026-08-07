@@ -67,13 +67,13 @@ async function convergeSupervisor(invocation: ParsedInvocation, context: Paramet
 	const generation = readConfigurationGeneration(context.cwd);
 	try {
 		const desired = readState(context.cwd);
-		const foundation = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', foundationOnly: true, json: true }), context);
+		const foundation = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', foundationOnly: true, seeds: desired?.seeds.join(','), json: true }), context);
 		if ((foundation.exitCode ?? 0) !== 0) throw new Error(foundation.stderr?.join('\n') ?? 'Local platform foundation reconciliation failed.');
 		for (const seed of desired?.seeds ?? []) {
 			const applied = await handleSeed(invocationFor('seed', invocation, [seed], { apply: true, environments: 'local', yes: true, json: true }), context);
 			if ((applied.exitCode ?? 0) !== 0) throw new Error(applied.stderr?.join('\n') ?? `Seed ${seed} reconciliation failed.`);
 		}
-		const runtime = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', json: true }), context);
+		const runtime = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', seeds: desired?.seeds.join(','), json: true }), context);
 		if ((runtime.exitCode ?? 0) !== 0) throw new Error(runtime.stderr?.join('\n') ?? 'Local runtime reconciliation failed.');
 		state.lastConvergedAt = new Date().toISOString(); state.lastError = undefined;
 		if (generation?.status === 'pending') { settleConfigurationGeneration(context.cwd, generation.id, 'applied', { runtimeReady: true }); state.generationId = generation.id; }
@@ -111,11 +111,16 @@ async function supervise(invocation: ParsedInvocation, context: Parameters<Comma
 }
 
 function systemdQuote(value: string) { return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`; }
+export function renderPlatformUserService(input: { root: string; executable: string; entrypoint: string; pathValue?: string }) {
+	const pathEntries = [dirname(input.executable), ...(input.pathValue ?? '').split(':')].filter(Boolean);
+	const runtimePath = [...new Set(pathEntries)].join(':');
+	return `[Unit]\nDescription=TreeSeed local platform (${input.root})\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nWorkingDirectory=${input.root}\nEnvironment=${systemdQuote(`PATH=${runtimePath}`)}\nExecStart=${systemdQuote(input.executable)} ${systemdQuote(input.entrypoint)} platform supervise --json\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=default.target\n`;
+}
 function reconcileUserService(root: string) {
 	if (process.platform !== 'linux' || !process.argv[1]) return { supported: false, installed: false };
 	const scope = Buffer.from(root).toString('base64url').slice(0, 20).toLowerCase();
 	const directory = resolve(homedir(), '.config', 'systemd', 'user'); const path = resolve(directory, `treeseed-platform-${scope}.service`);
-	const content = `[Unit]\nDescription=TreeSeed local platform (${root})\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nWorkingDirectory=${root}\nExecStart=${systemdQuote(process.execPath)} ${systemdQuote(resolve(process.argv[1]))} platform supervise --json\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=default.target\n`;
+	const content = renderPlatformUserService({ root, executable: process.execPath, entrypoint: resolve(process.argv[1]), pathValue: process.env.PATH });
 	mkdirSync(directory, { recursive: true }); if (!existsSync(path) || readFileSync(path, 'utf8') !== content) writeFileSync(path, content, 'utf8');
 	const unit = `treeseed-platform-${scope}.service`;
 	const existing = readPlatformSupervisor(root);
@@ -142,7 +147,11 @@ function startSupervisor(root: string) {
 }
 
 function seedDigest(plan: NonNullable<ReturnType<typeof loadAndPlanSeed>['plan']>) {
-	return plan.actions.map((entry) => `${entry.kind}:${entry.key}:${JSON.stringify(entry.payload ?? {})}`).sort().join('|');
+	return [
+		...plan.actions.map((entry) => `${entry.kind}:${entry.key}:${JSON.stringify(entry.payload ?? {})}`),
+		...plan.runtime.capacityProviders.map((entry) => `capacityProvider:${entry.key}:${JSON.stringify(entry)}`),
+		...plan.runtime.agentLabServicePrincipals.map((entry) => `servicePrincipal:${entry.key}:${JSON.stringify(entry)}`),
+	].sort().join('|');
 }
 
 function compileSeedSet(root: string, seeds: string[]) {
@@ -179,7 +188,15 @@ export const handleRun: CommandHandler = async (invocation, context) => {
 	const removedSeeds = (prior?.seeds ?? []).filter((seed) => !requested.includes(seed));
 	if (removedSeeds.length && invocation.args.yes !== true && invocation.args.plan !== true) return fail(`Removing active seeds requires --yes: ${removedSeeds.join(', ')}.`);
 	const seedDigests = Object.fromEntries(compiled.plans!.map(({ seed, plan }) => [seed, seedDigest(plan)]));
-	if (invocation.args.plan === true) return { exitCode: 0, report: { command: 'run', ok: true, executionMode: 'plan', requestedSeeds: requested, removedSeeds, seedDigests, plans: compiled.plans!.map(({ seed, plan }) => ({ seed, summary: plan.summary, actions: plan.actions })) } };
+	if (invocation.args.plan === true) {
+		const platform = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', seeds: requested.join(','), plan: true, json: true }), context);
+		if ((platform.exitCode ?? 0) !== 0) return { ...platform, report: { ...(platform.report ?? {}), command: 'run', executionMode: 'plan', requestedSeeds: requested } };
+		return { exitCode: 0, report: {
+			command: 'run', ok: true, executionMode: 'plan', requestedSeeds: requested, removedSeeds, seedDigests,
+			plans: compiled.plans!.map(({ seed, plan }) => ({ seed, summary: plan.summary, actions: plan.actions })),
+			platform: platform.report ?? null,
+		} };
+	}
 
 	const { configPath } = getMachineConfigPaths(context.cwd);
 	if (!existsSync(configPath)) {
@@ -196,7 +213,7 @@ export const handleRun: CommandHandler = async (invocation, context) => {
 		if ((result.exitCode ?? 0) !== 0) return { ...result, report: { ...(result.report ?? {}), command: 'run', failedSeed: seed, platformStarted: true } };
 		applied.push({ seed, report: result.report ?? null });
 	}
-	const started = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', json: invocation.args.json }), context);
+	const started = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', seeds: requested.join(','), json: invocation.args.json }), context);
 	if ((started.exitCode ?? 0) !== 0) return started;
 	const generation = readConfigurationGeneration(context.cwd);
 	persistState(context.cwd, { schemaVersion: 1, seeds: requested, seedDigests, trackedBranch: trackedBranch(context.cwd), configurationGenerationId: generation?.id ?? null, desiredGraphDigest: desiredGraphDigest(seedDigests), lastSuccessfulRuntimeGeneration: generation?.status === 'applied' ? generation.id : null, updatedAt: new Date().toISOString() });

@@ -30,11 +30,11 @@ function numberOption(args: Record<string, unknown>, name: string) {
 export const handleDev: CommandHandler = async (invocation, context) => {
 	try {
 		if (invocation.commandName !== 'dev') {
-			return fail('`trsd dev` starts the Market web/API/dev-runner runtime. Use `trsd capacity ...` for capacity provider lifecycle commands.');
+			return fail('`trsd dev` starts the Market web/API runtime and its declared capacity providers. Use `trsd capacity ...` for standalone provider lifecycle commands.');
 		}
 		const removedOptions = ['surface', 'surfaces', 'withWorker'].filter((name) => invocation.args[name] !== undefined);
 		if (removedOptions.length > 0) {
-			return fail(`\`trsd dev\` no longer accepts ${removedOptions.map((name) => `--${name.replace(/[A-Z]/gu, (char) => `-${char.toLowerCase()}`)}`).join(', ')}. It always starts fixed Market web/API/dev-runner surfaces; use \`trsd capacity ...\` for providers.`);
+			return fail(`\`trsd dev\` no longer accepts ${removedOptions.map((name) => `--${name.replace(/[A-Z]/gu, (char) => `-${char.toLowerCase()}`)}`).join(', ')}. It starts the fixed Market web/API surfaces and every declared local capacity provider; use \`trsd capacity ...\` for standalone providers.`);
 		}
 
 		const feedback = typeof invocation.args.feedback === 'string' ? invocation.args.feedback : undefined;
@@ -51,6 +51,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 
 		const discoveredApps = discoverApplications(context.cwd);
 		const localContent = (stringOption(invocation.args, 'localContent') as 'auto' | 'none' | 'preview' | 'edit' | undefined) ?? 'auto';
+		const seedNames = stringOption(invocation.args, 'seeds')?.split(',').map((entry) => entry.trim()).filter(Boolean);
 		const target = { kind: 'persistent' as const, scope: 'local' as const };
 		const launchEnv = resolveLaunchEnvironment({
 			tenantRoot: context.cwd,
@@ -61,6 +62,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			tenantRoot: context.cwd,
 			target,
 			localContent,
+			seedNames,
 		});
 		const localProcessServiceIds = new Set(
 			compileDesiredUnitsFromGraph(desiredGraph, {
@@ -68,7 +70,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 				resourceKind: ['local-process'],
 			}).map((unit) => typeof unit.metadata.serviceId === 'string' ? unit.metadata.serviceId : null),
 		);
-		const hasLocalApi = localProcessServiceIds.has('api') || localProcessServiceIds.has('operations-runner');
+		const hasLocalApi = localProcessServiceIds.has('api');
 		const selectedSurfaces = foundationOnly ? 'api' : appId === 'api'
 			? 'api'
 			: appId === 'web' || apiMode === 'remote'
@@ -177,7 +179,12 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			.split(',')
 			.map((surface) => surface.trim())
 			.filter(Boolean)
-			.flatMap((surface) => (surface === 'web' ? ['market-web'] : surface === 'api' ? foundationOnly ? ['api'] : ['api', 'operations-runner'] : [surface]));
+			.flatMap((surface) => (surface === 'web' ? ['market-web'] : surface === 'api' ? ['api'] : [surface]));
+		const capacityProviderUnitIds = foundationOnly
+			? []
+			: desiredGraph.resources
+				.filter((resource) => resource.kind === 'capacity-provider')
+				.flatMap((resource) => [resource.id, ...resource.dependencies]);
 		const localContentUnitIds = localContent === 'preview' || localContent === 'edit'
 			? desiredGraph.resources
 					.filter((resource) => resource.kind === 'local-content-materialization' && resource.spec.executeRequested === true)
@@ -190,6 +197,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
 			...(foundationOnly ? [] : ['local-docker-compose:mailpit']),
+			...(!foundationOnly && selectedServiceIds.includes('api') ? capacityProviderUnitIds : []),
 			...(includeTreeDxUnits ? [
 				'local-treedx:team-primary',
 				'local-docker-compose:treedx',
@@ -217,7 +225,6 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 								options: {
 									...(unit.spec.options as Record<string, unknown> | undefined),
 									...localProcessOptions,
-									...(unit.metadata.serviceId === 'operations-runner' ? { reset: false } : {}),
 								},
 							},
 						}

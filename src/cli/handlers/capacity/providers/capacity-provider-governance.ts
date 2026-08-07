@@ -63,8 +63,12 @@ function manifestPath(invocation: ParsedInvocation, context: CommandContext) {
 	return resolve(context.cwd, argument(invocation, 'config') ?? 'treeseed.capacity-provider.yaml');
 }
 
-function dataDirectory(invocation: ParsedInvocation, context: CommandContext) {
-	return resolve(context.cwd, argument(invocation, 'dataDir') ?? '.treeseed/local-capacity-provider/data');
+function selectedProviderClass(invocation: ParsedInvocation): 'agent' | 'platform-operation' {
+	return argument(invocation, 'providerClass') === 'platform-operation' ? 'platform-operation' : 'agent';
+}
+
+function dataDirectory(invocation: ParsedInvocation, context: CommandContext, providerClass = selectedProviderClass(invocation)) {
+	return resolve(context.cwd, argument(invocation, 'dataDir') ?? `.treeseed/local-capacity-providers/${providerClass}-standalone`);
 }
 
 function connectionId(invocation: ParsedInvocation) {
@@ -108,24 +112,29 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 	}
 	const configPath = manifestPath(invocation, context);
 	if (action === 'provider-manifest-init') {
+		const providerClass = selectedProviderClass(invocation);
+		const ownerTeamId = argument(invocation, 'team');
 		const connection = connectionId(invocation) ?? 'primary-team';
 		const configuredMarketUrl = argument(invocation, 'providerMarketUrl');
 		const configuredMarketProfile = argument(invocation, 'providerMarketProfile') ?? (configuredMarketUrl ? null : 'local');
 		const manifest = {
 			schemaVersion: 2 as const,
-			providerClass: 'agent' as const,
-			ownership: { type: 'external' as const },
-			configuration: { generation: 'initial' },
-			supplyCeilings: { maxConcurrentAssignments: 1 },
+			providerClass,
+			ownership: ownerTeamId ? { type: 'team' as const, teamId: ownerTeamId } : { type: 'external' as const },
+			configuration: { generation: 'generation-1' },
 			identity: {
 				privateKeyRef: argument(invocation, 'identityKeyRef') ?? 'data://identity.json',
-				displayName: argument(invocation, 'displayName') ?? 'Treeseed capacity provider',
+				displayName: argument(invocation, 'displayName') ?? (providerClass === 'platform-operation' ? 'Treeseed platform operations provider' : 'Treeseed agent capacity provider'),
 			},
+			supplyCeilings: { maxConcurrentAssignments: 1 },
+			credentialBindings: [],
 			executionProviders: [{
-				id: 'codex',
-				adapter: 'codex',
+				id: providerClass === 'platform-operation' ? 'platform-operation' : 'codex',
+				adapter: providerClass === 'platform-operation' ? 'platform-operation' : 'codex',
 				nativeLimits: { maxConcurrentRunners: 1 },
-				capabilities: [...DEFAULT_PROVIDER_CAPABILITIES],
+				capabilities: providerClass === 'platform-operation'
+					? ['platform_operation', 'infrastructure_reconciliation', 'repository_reconciliation', 'treedx_reconciliation']
+					: [...DEFAULT_PROVIDER_CAPABILITIES],
 			}],
 			connections: [],
 		};
@@ -174,7 +183,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 		}
 		if (!validation.ok) return fail(`Provider offer is invalid: ${validation.diagnostics.map((entry) => `${entry.path}: ${entry.message}`).join('; ')}`);
 		await writeProviderManifest(loaded, candidate);
-		const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context), {
+		const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context, loaded.manifest.providerClass), {
 			env: providerCoordinatorEnvironment(loaded, context),
 		});
 		const payload = await coordinator.reconcileConnection(connections[connectionIndex]!);
@@ -194,7 +203,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 	let payload: unknown;
 	if (action === 'provider-identity-init' || action === 'provider-identity-show') {
 		if (!identityRef.startsWith('file://') && !identityRef.startsWith('data://')) return fail('Provider identity generation requires identity.privateKeyRef to use a file:// or data:// secret reference.');
-		const providerDataDirectory = dataDirectory(invocation, context);
+		const providerDataDirectory = dataDirectory(invocation, context, loaded.manifest.providerClass);
 		const path = providerSecretPath(identityRef, loaded.directory, providerDataDirectory);
 		const exists = await access(path).then(() => true).catch(() => false);
 		if (action === 'provider-identity-init' && exists) return fail(`Provider identity already exists at ${path}; use provider-identity-show or the explicit provider-identity-rotate action.`);
@@ -211,7 +220,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 		if (action === 'provider-connections') {
 			payload = await Promise.all(loaded.manifest.connections.map(async (connection) => ({
 				connection,
-				state: await readProviderConnectionState(dataDirectory(invocation, context), connection.id),
+				state: await readProviderConnectionState(dataDirectory(invocation, context, loaded.manifest.providerClass), connection.id),
 			})));
 		} else if (action === 'provider-connection') {
 			if (!selected) return fail('provider-connection requires --connection <connection-id>.');
@@ -219,7 +228,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 			if (!connection) return fail(`Unknown approved provider connection ${selected}.`);
 			payload = {
 				connection,
-				state: await readProviderConnectionState(dataDirectory(invocation, context), selected),
+				state: await readProviderConnectionState(dataDirectory(invocation, context, loaded.manifest.providerClass), selected),
 			};
 		} else {
 			if (!selected) return fail(`${action} requires --connection <connection-id>.`);
@@ -229,7 +238,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 				if (!registrationKeyRef) return fail('provider-join requires --registration-key-ref <secret-ref>; the reference is used only for this one-time join and is never persisted in the provider manifest.');
 				const marketUrl = argument(invocation, 'providerMarketUrl');
 				const marketProfile = argument(invocation, 'providerMarketProfile') ?? (marketUrl ? null : 'local');
-				const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context), { env: providerCoordinatorEnvironment(loaded, context, marketProfile ? [marketProfile] : []) });
+				const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context, loaded.manifest.providerClass), { env: providerCoordinatorEnvironment(loaded, context, marketProfile ? [marketProfile] : []) });
 				payload = await coordinator.beginJoin({
 					id: selected,
 					...(marketUrl ? { marketUrl } : {}),
@@ -238,9 +247,9 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 					offer: { weight: 1, maxConcurrentRunners: 1, capabilities: [...DEFAULT_PROVIDER_CAPABILITIES] },
 				});
 			} else if (action === 'provider-registration-status' || action === 'provider-credential-exchange') {
-				const state = await readProviderConnectionState(dataDirectory(invocation, context), selected);
+				const state = await readProviderConnectionState(dataDirectory(invocation, context, loaded.manifest.providerClass), selected);
 				const pendingProfiles = state?.marketProfile ? [state.marketProfile] : [];
-				const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context), {
+				const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context, loaded.manifest.providerClass), {
 					env: providerCoordinatorEnvironment(loaded, context, pendingProfiles),
 				});
 				payload = action === 'provider-registration-status'
@@ -248,7 +257,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 					: await coordinator.exchangeRegistrationCredential(selected);
 			} else {
 				if (!manifestConnection) return fail(`Unknown approved provider connection ${selected}.`);
-				const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context), { env: providerCoordinatorEnvironment(loaded, context) });
+				const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context, loaded.manifest.providerClass), { env: providerCoordinatorEnvironment(loaded, context) });
 				payload = action === 'provider-identity-rotate'
 					? await coordinator.rotateIdentity(selected)
 					: action === 'provider-credential-rotate'

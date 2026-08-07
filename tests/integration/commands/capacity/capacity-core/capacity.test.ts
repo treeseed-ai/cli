@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { listOperationNames } from '@treeseed/sdk/operations';
+import { validateCapacityProviderManifestV2 } from '@treeseed/sdk/capacity-provider';
 import {
 	MACHINE_KEY_PASSPHRASE_ENV,
 	unlockSecretSessionFromEnv,
@@ -75,7 +76,26 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 	}
 });
 
-test('capacity diagnostics reads Market native capacity and agent-time grants', async () => {
+test('capacity manifest plans create complete isolated agent and platform-operation contracts', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	try {
+		for (const providerClass of ['agent', 'platform-operation']) {
+			const result = await runCli(['capacity', 'provider-manifest-init', '--provider-class', providerClass, '--plan', '--json'], { cwd: workspaceRoot });
+			assert.equal(result.exitCode, 0, result.stderr);
+			const manifest = JSON.parse(result.output).payload;
+			assert.equal(manifest.providerClass, providerClass);
+			assert.equal(manifest.configuration.generation, 'generation-1');
+			assert.equal(manifest.supplyCeilings.maxConcurrentAssignments, 1);
+			assert.equal(manifest.ownership.type, 'external');
+			assert.equal(manifest.executionProviders[0].adapter, providerClass === 'agent' ? 'codex' : 'platform-operation');
+			assert.deepEqual(validateCapacityProviderManifestV2(manifest).diagnostics, []);
+		}
+	} finally {
+		rmSync(workspaceRoot, { recursive: true, force: true });
+	}
+});
+
+test('capacity diagnostics reads Market derived capacity projection', async () => {
 	const root = makeWorkspaceRoot();
 	const previousHome = process.env.HOME;
 	const previousPassphrase = process.env[MACHINE_KEY_PASSPHRASE_ENV];
@@ -102,18 +122,18 @@ test('capacity diagnostics reads Market native capacity and agent-time grants', 
 						configuredNativeLimit: 480,
 						observedNativeRemaining: 300,
 						activeReservedNativeAmount: 60,
-						activeConsumedNativeAmount: 12,
+						activeConsumedNativeAmount: 20,
+						availableNativeAmount: 240,
 						reserveBufferPercent: 20,
-						availableNativeAmount: 168,
 						confidence: 'high',
 					}],
 				},
 				grants: [{
 					projectId: 'project_123',
 					environment: 'local',
-					dailyAgentSecondsLimit: 18000,
-					monthlyAgentSecondsLimit: 360000,
-					maxConcurrentAssignments: 4,
+					dailyAgentSecondsLimit: 5000,
+					monthlyAgentSecondsLimit: 20000,
+					maxConcurrentAssignments: 2,
 					unmetered: false,
 				}],
 				remaining: { dailyAgentSeconds: 14400, monthlyAgentSeconds: 356400 },
@@ -131,8 +151,8 @@ test('capacity diagnostics reads Market native capacity and agent-time grants', 
 		assert.equal(calls.length, 1);
 		assert.match(result.output, /Provider-native capacity/u);
 		assert.match(result.output, /codex:wall_minute/u);
-		assert.match(result.output, /available 168/u);
-		assert.match(result.output, /daily 18,000 agent-seconds/u);
+		assert.match(result.output, /available 240/u);
+		assert.match(result.output, /daily 5,000 agent-seconds/u);
 	} finally {
 		globalThis.fetch = previousFetch;
 		if (previousHome === undefined) delete process.env.HOME;

@@ -74,7 +74,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(result.exitCode, 0);
+	assert.equal(result.exitCode, 0, result.output);
 	assert.equal(result.spawns.length, 0);
 	const payload = JSON.parse(result.stdout || result.output);
 	assert.equal(payload.command, 'dev');
@@ -189,19 +189,64 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	assert.doesNotMatch(stopAll.output, /"reconcile"/u);
 });
 
-test('treeseed dev api-only plans avoid local treedx reconciliation units', async () => {
+test('treeseed dev api-only plans include provider-isolated TreeDX dependencies', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-api-only');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
+	mkdirSync(resolve(workspaceRoot, 'seeds'), { recursive: true });
+	writeFileSync(resolve(workspaceRoot, 'seeds', 'treeseed.yaml'), `runtime:
+  capacityProviders:
+    - key: capacity-provider:test/local
+      environments: [local]
+      manifest: treeseed.capacity-provider.yaml
+`, 'utf8');
+	writeFileSync(resolve(workspaceRoot, 'treeseed.capacity-provider.yaml'), `schemaVersion: 2
+providerClass: agent
+ownership:
+  type: external
+configuration:
+  generation: test-v1
+supplyCeilings:
+  maxConcurrentAssignments: 1
+identity:
+  privateKeyRef: data://identity.json
+  displayName: Test provider
+executionProviders:
+  - id: codex
+    adapter: codex
+    nativeLimits:
+      maxConcurrentRunners: 1
+    capabilities: [engineering]
+connections: []
+`, 'utf8');
+	const agentRoot = resolve(workspaceRoot, 'packages', 'agent');
+	mkdirSync(agentRoot, { recursive: true });
+	writeFileSync(resolve(agentRoot, 'package.json'), `${JSON.stringify({
+		name: '@treeseed/agent',
+		version: '0.0.0',
+		type: 'module',
+	}, null, 2)}\n`, 'utf8');
+	writeFileSync(resolve(agentRoot, 'treeseed.package.yaml'), `id: "@treeseed/agent"
+name: Test Agent
+kind: node-typescript
+type: runtime-provider
+repository: test/agent
+artifacts:
+  - provider: docker
+    name: treeseed/agent-manager
+    dockerfile: Dockerfile
+    target: agent-manager
+  - provider: docker
+    name: treeseed/agent-runner
+    dockerfile: Dockerfile
+    target: agent-runner
+`, 'utf8');
 	const apiRoot = resolve(workspaceRoot, 'packages', 'api');
 	mkdirSync(apiRoot, { recursive: true });
 	writeFileSync(resolve(apiRoot, 'package.json'), `${JSON.stringify({
 		name: '@treeseed/api',
 		version: '0.0.0',
 		type: 'module',
-		scripts: {
-			dev: 'node ./dev.js',
-			'dev:operations-runner': 'node ./runner.js',
-		},
+			scripts: { dev: 'node ./dev.js' },
 	}, null, 2)}\n`, 'utf8');
 
 	const result = await runCli(['dev', 'restart', '--app', 'api', '--web-runtime', 'local', '--force', '--plan', '--json'], {
@@ -211,7 +256,7 @@ test('treeseed dev api-only plans avoid local treedx reconciliation units', asyn
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(result.exitCode, 0);
+	assert.equal(result.exitCode, 0, result.output);
 	assert.equal(result.spawns.length, 0);
 	const payload = JSON.parse(result.stdout || result.output);
 	const serialized = JSON.stringify({
@@ -224,9 +269,10 @@ test('treeseed dev api-only plans avoid local treedx reconciliation units', asyn
 	assert.equal(payload.ok, true);
 	assert.equal(payload.selectedSurfaces, 'api');
 	assert.match(serialized, /local-process:api/u);
-	assert.match(serialized, /local-process:operations-runner/u);
+	assert.doesNotMatch(serialized, /local-process:operations-runner/u);
+	assert.match(serialized, /capacity-provider:agent-/u);
 	assert.doesNotMatch(serialized, /local-treedx:team-primary/u);
-	assert.doesNotMatch(serialized, /local-docker-compose:treedx/u);
+	assert.match(serialized, /local-docker-compose:treedx/u);
 });
 
 test('treeseed dev web-only restart retains runtime dependencies without selecting treedx content sync', async () => {
@@ -238,10 +284,7 @@ test('treeseed dev web-only restart retains runtime dependencies without selecti
 		name: '@treeseed/api',
 		version: '0.0.0',
 		type: 'module',
-		scripts: {
-			dev: 'node ./dev.js',
-			'dev:operations-runner': 'node ./runner.js',
-		},
+			scripts: { dev: 'node ./dev.js' },
 	}, null, 2)}\n`, 'utf8');
 
 	const result = await runCli(['dev', 'restart', '--app', 'web', '--web-runtime', 'local', '--local-content', 'none', '--plan', '--json'], {

@@ -8,16 +8,30 @@ import { capacityFlagArg, capacityProviderSelector, capacityStringArg } from './
 
 export const PROVIDER_LIFECYCLE_ACTIONS = new Set(['build', 'up', 'down', 'restart', 'logs', 'status', 'test-local']);
 export const PROVIDER_ENTRYPOINT_ACTIONS = new Set(['doctor', 'register', 'plan']);
-const CAPACITY_PROVIDER_UNIT_IDS = ['capacity-provider:local', 'local-docker-compose:agent-capacity-provider'];
-const CAPACITY_PROVIDER_UNIT_ID_SET = new Set(CAPACITY_PROVIDER_UNIT_IDS);
-
-function capacityProviderUnits<T extends { unitId?: unknown; dependencies?: string[] }>(units: T[]) {
+function capacityProviderUnits<T extends { unitId?: unknown; dependencies?: string[] }>(units: T[], unitIds: Set<string>) {
 	return units
-		.filter((unit) => CAPACITY_PROVIDER_UNIT_ID_SET.has(String(unit.unitId ?? '')))
+		.filter((unit) => unitIds.has(String(unit.unitId ?? '')))
 		.map((unit) => ({
 			...unit,
-			dependencies: (unit.dependencies ?? []).filter((dependencyId) => CAPACITY_PROVIDER_UNIT_ID_SET.has(dependencyId)),
+			dependencies: (unit.dependencies ?? []).filter((dependencyId) => unitIds.has(dependencyId)),
 		}));
+}
+
+function selectedProviderUnitIds(desiredGraph: ReturnType<typeof compileDesiredResourceGraph>, invocation: ParsedInvocation) {
+	const providerClass = stringArg(invocation, 'providerClass');
+	const selector = providerSelector(invocation);
+	const providers = desiredGraph.resources.filter((resource) => resource.kind === 'capacity-provider' && (
+		(!providerClass || resource.spec.providerClass === providerClass)
+		&& (selector === 'local' || selector === 'all' || resource.id === selector || resource.id.endsWith(`-${selector}`))
+	));
+	const directIds = new Set(providers.flatMap((provider) => [provider.id, ...provider.dependencies]));
+	for (const resource of desiredGraph.resources) {
+		if (resource.kind !== 'local-docker-compose' || !directIds.has(resource.id)) continue;
+		for (const dependencyId of resource.dependencies) {
+			if (desiredGraph.resources.some((candidate) => candidate.id === dependencyId && candidate.kind === 'docker-image-build')) directIds.add(dependencyId);
+		}
+	}
+	return directIds;
 }
 
 function resolveMarket(invocation: ParsedInvocation) {
@@ -48,9 +62,10 @@ export async function runCapacityLifecycleAction(action: string, invocation: Par
 	const capacityConfigPath = resolveCapacityLaunchConfigPath(invocation, context);
 	let desiredGraph: ReturnType<typeof compileDesiredResourceGraph>;
 	try {
-		desiredGraph = compileDesiredResourceGraph({
+		 desiredGraph = compileDesiredResourceGraph({
 			tenantRoot: context.cwd,
 			target,
+			...(stringArg(invocation, 'seed') ? { seedNames: stringArg(invocation, 'seed')!.split(',').map((entry) => entry.trim()).filter(Boolean) } : {}),
 			...(capacityConfigPath ? { capacityConfigPath } : {}),
 		});
 	} catch (error) {
@@ -78,6 +93,7 @@ export async function runCapacityLifecycleAction(action: string, invocation: Par
 			},
 		});
 	}
+	const providerUnitIds = selectedProviderUnitIds(desiredGraph, invocation);
 	const selector: ReconcileSelector =
 		action === 'build'
 			? {
@@ -87,9 +103,9 @@ export async function runCapacityLifecycleAction(action: string, invocation: Par
 				}
 			: {
 					environment,
-					unitId: CAPACITY_PROVIDER_UNIT_IDS,
+					unitId: [...providerUnitIds],
 				};
-	const units = action === 'build' ? compileDesiredUnitsFromGraph(desiredGraph, selector) : capacityProviderUnits(compileDesiredUnitsFromGraph(desiredGraph, selector));
+	const units = action === 'build' ? compileDesiredUnitsFromGraph(desiredGraph, selector) : capacityProviderUnits(compileDesiredUnitsFromGraph(desiredGraph, selector), providerUnitIds);
 	const execute = boolArg(invocation, 'execute');
 	if (action === 'status' || action === 'logs') {
 		const status = await collectReconcileStatus({
@@ -205,6 +221,7 @@ export async function runCapacityProviderEntrypoint(action: string, invocation: 
 		desiredGraph = compileDesiredResourceGraph({
 			tenantRoot: context.cwd,
 			target,
+			...(stringArg(invocation, 'seed') ? { seedNames: stringArg(invocation, 'seed')!.split(',').map((entry) => entry.trim()).filter(Boolean) } : {}),
 		});
 	} catch (error) {
 		if (!agentPackageRoot || !isNonGitWorkspaceError(error)) throw error;
@@ -233,11 +250,12 @@ export async function runCapacityProviderEntrypoint(action: string, invocation: 
 			},
 		});
 	}
+	const providerUnitIds = selectedProviderUnitIds(desiredGraph, invocation);
 	const selector: ReconcileSelector = {
 		environment: 'local',
-		unitId: CAPACITY_PROVIDER_UNIT_IDS,
+		unitId: [...providerUnitIds],
 	};
-	const units = capacityProviderUnits(compileDesiredUnitsFromGraph(desiredGraph, selector));
+	const units = capacityProviderUnits(compileDesiredUnitsFromGraph(desiredGraph, selector), providerUnitIds);
 	const status = await collectReconcileStatus({
 		tenantRoot: context.cwd,
 		target,
@@ -270,4 +288,3 @@ export async function runCapacityProviderEntrypoint(action: string, invocation: 
 		},
 	});
 }
-

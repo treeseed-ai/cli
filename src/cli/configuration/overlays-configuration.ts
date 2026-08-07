@@ -16,11 +16,10 @@ export const configurationCommandOverlays: Array<[string, CommandOverlay]> = [
 				{ name: 'installMissingTooling', flags: '--install-missing-tooling', description: 'Install missing config verification tooling such as `gh-act` during the run instead of only reporting it.', kind: 'boolean' },
 				{ name: 'printEnv', flags: '--print-env', description: 'Print resolved environment values before remote initialization.', kind: 'boolean' },
 				{ name: 'printEnvOnly', flags: '--print-env-only', description: 'Print resolved environment values, check provider connections, and exit without prompting or initializing remote resources.', kind: 'boolean' },
-				{ name: 'showSecrets', flags: '--show-secrets', description: 'Print full secret values in environment reports instead of masking them.', kind: 'boolean' },
 				{ name: 'rotateMachineKey', flags: '--rotate-machine-key', description: 'Regenerate the local home machine key and re-encrypt stored Treeseed secrets and remote auth sessions.', kind: 'boolean' },
 				{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 			],
-			examples: ['treeseed config', 'treeseed config --full --mouse', 'treeseed config --environment all', 'treeseed config --environment local --sync none', 'treeseed config --environment local --sync none --non-interactive', 'treeseed config --environment staging --print-env-only --show-secrets', 'treeseed config --rotate-machine-key'],
+				examples: ['treeseed config', 'treeseed config --full --mouse', 'treeseed config --environment all', 'treeseed config --environment local --sync none', 'treeseed config --environment local --sync none --non-interactive', 'treeseed config --environment staging --print-env-only', 'treeseed config --rotate-machine-key'],
 			notes: ['Does not create branch preview deployments. Use `treeseed switch <branch> --preview` for that.'],
 			help: {
 				workflowPosition: 'configure runtime',
@@ -48,7 +47,7 @@ export const configurationCommandOverlays: Array<[string, CommandOverlay]> = [
 					example('treeseed config --full --mouse', 'Opt into mouse capture for the editor', 'Keep the keyboard-first defaults unless you explicitly want click and wheel interaction inside the config UI.'),
 					example('treeseed config --environment local --sync none', 'Edit local values without provider sync', 'Limit the session to local values and avoid hosted synchronization while iterating locally.'),
 					example('treeseed config --environment local --sync none --non-interactive', 'Apply deterministic local config in automation', 'Use the resolved current and suggested values without opening the interactive UI.'),
-					example('treeseed config --environment staging --print-env-only --show-secrets', 'Inspect a resolved environment report', 'Print the resolved staging environment with full secret visibility and exit.'),
+						example('treeseed config --environment staging --print-env-only', 'Inspect a resolved environment report', 'Print the resolved staging environment with secret values redacted and exit.'),
 					example('treeseed config --rotate-machine-key', 'Rotate the local secret encryption key', 'Regenerate the machine key and re-encrypt locally stored Treeseed secrets.'),
 				],
 				optionDetails: [
@@ -70,7 +69,7 @@ export const configurationCommandOverlays: Array<[string, CommandOverlay]> = [
 				],
 				warnings: [
 					'This command does not create branch preview deployments. Use `switch --preview` for task-preview lifecycle work.',
-					'When `--show-secrets` is enabled, output is intentionally unmasked. Avoid using it in logs or shared terminals unless that disclosure is acceptable.',
+						'Secret values are always redacted. Reveal individual credentials only through their audited Service Vault ceremony.',
 				],
 				relatedDetails: [
 					related('doctor', 'Use `doctor` when the problem is diagnostic uncertainty rather than direct environment editing.'),
