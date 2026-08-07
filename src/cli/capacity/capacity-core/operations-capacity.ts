@@ -20,6 +20,7 @@ export const capacityOperationSpecs: OperationSpec[] = [
 			options: [
 				{ name: 'market', flags: '--market <id-or-url>', description: 'Select a configured market id or direct API URL.', kind: 'string' },
 				{ name: 'provider', flags: '--provider <provider-id>', description: 'Provider id or local provider selector for diagnostics.', kind: 'string' },
+				{ name: 'providerClass', flags: '--provider-class <agent|platform-operation>', description: 'Runtime isolation class for a provider manifest.', kind: 'enum', values: ['agent', 'platform-operation'] },
 				{ name: 'connection', flags: '--connection <connection-id>', description: 'Connection id from the capacity provider manifest.', kind: 'string' },
 				{ name: 'displayName', flags: '--display-name <name>', description: 'Provider identity display name used when initializing a manifest.', kind: 'string' },
 				{ name: 'providerMarketUrl', flags: '--provider-market-url <url>', description: 'Market API URL written into a new provider connection.', kind: 'string' },

@@ -8,7 +8,7 @@ import {
 const DEV_MANAGED_OPERATION_SPECS: OperationSpec[] = [
 	devManagedHelpCommand('start', {
 		summary: 'Start a detached worktree-scoped dev instance.',
-		description: 'Start launches the same Market web/API/runner runtime as foreground `dev`, but detaches it, writes worktree-local instance state, captures logs, waits for readiness, and returns a summary.',
+		description: 'Start launches the same Market web/API and declared capacity-provider runtime as foreground `dev`, but detaches it, writes worktree-local instance state, captures logs, waits for readiness, and returns a summary.',
 		usage: 'treeseed dev start [--web-runtime local|provider|auto] [--port <port>] [--api-port <port>] [--force] [--force-conflicts] [--json]',
 		options: DEV_START_OPTIONS,
 		whenToUse: [

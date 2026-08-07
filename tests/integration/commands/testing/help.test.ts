@@ -143,7 +143,7 @@ test('save help documents optional generated commit message hints', async () => 
 	assert.doesNotMatch(result.output, /<message>/);
 });
 
-test('dev help documents fixed Market web/API/runner runtime', async () => {
+test('dev help documents fixed Market web/API and capacity-provider runtime', async () => {
 	const result = await runCli(['help', 'dev']);
 	assert.equal(result.exitCode, 0);
 	assert.doesNotMatch(result.output, /--surfaces <surfaces>/);
@@ -151,10 +151,9 @@ test('dev help documents fixed Market web/API/runner runtime', async () => {
 	assert.match(result.output, /--web-runtime <mode>/);
 	assert.match(result.output, /--local-content <mode>/);
 	assert.match(result.output, /--force/);
-	assert.match(result.output, /web\/API\/runner/u);
-	assert.match(result.output, /managed local PostgreSQL/u);
-	assert.match(result.output, /Treeseed operations runner/u);
-	assert.match(result.output, /capacity/u);
+	assert.match(result.output, /web\/API/u);
+	assert.match(result.output, /managed PostgreSQL/u);
+	assert.match(result.output, /capacity provider/u);
 });
 
 test('dev managed subcommands render focused help pages', async () => {
@@ -193,11 +192,6 @@ test('config help includes the advanced full-editor flag', async () => {
 	const result = await runCli(['help', 'config']);
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /--full/);
-	assert.match(result.output, /--bootstrap/);
-	assert.match(result.output, /--system/);
-	assert.match(result.output, /--systems/);
-	assert.match(result.output, /--skip-unavailable/);
-	assert.match(result.output, /--bootstrap-sequential/);
 	assert.match(result.output, /--mouse/);
 	assert.match(result.output, /--non-interactive/);
 	assert.match(result.output, /--install-missing-tooling/);

@@ -93,6 +93,11 @@ function remoteSeedError(error: unknown, command: string) {
 		const auth = error.status === 401 || error.status === 403;
 		return remoteSeedResult(payload, command, blocked ? 2 : auth ? 4 : 3);
 	}
+	if (error instanceof Error && 'payload' in error && error.payload && typeof error.payload === 'object') {
+		const status = 'status' in error && typeof error.status === 'number' ? error.status : 500;
+		const payload = error.payload as Record<string, unknown>;
+		return remoteSeedResult(payload, command, status === 409 ? 2 : status === 401 || status === 403 ? 4 : 3);
+	}
 	if (error instanceof Error && /not logged in|authentication|permission denied/iu.test(error.message)) {
 		return {
 			exitCode: 4,
@@ -260,6 +265,27 @@ export const handleSeed: CommandHandler = async (invocation, context) => {
 			} catch (error) {
 				return remoteSeedError(error, 'seed');
 			}
+		}
+		if (planned.plan.actions.length === 0 && (
+			planned.plan.runtime.capacityProviders.length > 0
+			|| planned.plan.runtime.agentLabServicePrincipals.length > 0
+		)) {
+			const runtime = await reconcileLocalSeedRuntime({
+				projectRoot: context.cwd,
+				plan: planned.plan,
+				accessToken: context.env.TREESEED_CAPACITY_ACCEPTANCE_ADMIN_TOKEN?.trim() || 'tsk_local_treeseed_acceptance_admin',
+				env: context.env,
+			});
+			return {
+				exitCode: 0,
+				stdout: context.outputFormat === 'json' ? [] : [...formatSeedPlanWithProjectArchitecture(planned.plan), '', 'Runtime prerequisites reconciled.'],
+				report: {
+					...planned.plan,
+					ok: true,
+					command: 'seed',
+					result: { message: 'Local runtime-only seed apply completed.', runtime },
+				},
+			};
 		}
 		let localAuth: Awaited<ReturnType<typeof requireLocalSeedSession>>;
 		try {

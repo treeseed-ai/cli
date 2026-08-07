@@ -75,6 +75,24 @@ test('capacity lifecycle commands route through package-owned scripts and Compos
 	}
 });
 
+test('capacity manifest plans create complete isolated agent and platform-operation contracts', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	try {
+		for (const providerClass of ['agent', 'platform-operation']) {
+			const result = await runCli(['capacity', 'provider-manifest-init', '--provider-class', providerClass, '--plan', '--json'], { cwd: workspaceRoot });
+			assert.equal(result.exitCode, 0, result.stderr);
+			const manifest = JSON.parse(result.output).payload;
+			assert.equal(manifest.providerClass, providerClass);
+			assert.equal(manifest.configuration.generation, 'generation-1');
+			assert.equal(manifest.supplyCeilings.maxConcurrentAssignments, 1);
+			assert.equal(manifest.ownership.type, 'external');
+			assert.equal(manifest.executionProviders[0].adapter, providerClass === 'agent' ? 'codex' : 'platform-operation');
+		}
+	} finally {
+		rmSync(workspaceRoot, { recursive: true, force: true });
+	}
+});
+
 test('capacity diagnostics reads Market derived capacity projection', async () => {
 	const root = makeWorkspaceRoot();
 	const previousHome = process.env.HOME;
@@ -95,27 +113,26 @@ test('capacity diagnostics reads Market derived capacity projection', async () =
 			payload: {
 				projectId: 'project_123',
 				environment: 'local',
-				derivedCapacity: {
-					totalDerivedAvailableCredits: 42,
+				nativeCapacity: {
 					entries: [{
 						executionProviderKind: 'codex',
 						nativeUnit: 'wall_minute',
 						configuredNativeLimit: 480,
 						observedNativeRemaining: 300,
 						activeReservedNativeAmount: 60,
+						activeConsumedNativeAmount: 20,
+						availableNativeAmount: 240,
 						reserveBufferPercent: 20,
-						nativeUnitsPerCredit: 10,
-						derivedAvailableCredits: 24,
 						confidence: 'high',
 					}],
 				},
 				grants: [{
 					grantScope: 'project',
 					environment: 'local',
-					portfolioAllocationPercent: 100,
-					reservePoolPercent: 10,
-					maxDailyProjectCredits: 5000,
-					overflowPolicy: 'soft_grant',
+					dailyAgentSecondsLimit: 5000,
+					monthlyAgentSecondsLimit: 20000,
+					maxConcurrentAssignments: 2,
+					unmetered: false,
 				}],
 			},
 		}), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -129,10 +146,10 @@ test('capacity diagnostics reads Market derived capacity projection', async () =
 		const result = await runCli(['capacity', 'diagnostics', '--market', 'local', '--project', 'project_123', '--environment', 'local'], { cwd: root, env: { HOME: root } });
 		assert.equal(result.exitCode, 0, result.stderr);
 		assert.equal(calls.length, 1);
-		assert.match(result.output, /Native projection/u);
+		assert.match(result.output, /Provider-native capacity/u);
 		assert.match(result.output, /codex:wall_minute/u);
-		assert.match(result.output, /derived 24 credits/u);
-		assert.match(result.output, /allocation 100%/u);
+		assert.match(result.output, /available 240/u);
+		assert.match(result.output, /daily 5,000 agent-seconds/u);
 	} finally {
 		globalThis.fetch = previousFetch;
 		if (previousHome === undefined) delete process.env.HOME;

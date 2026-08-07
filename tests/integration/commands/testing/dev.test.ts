@@ -189,7 +189,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	assert.doesNotMatch(stopAll.output, /"reconcile"/u);
 });
 
-test('treeseed dev api-only plans avoid local treedx reconciliation units', async () => {
+test('treeseed dev api-only plans include provider-isolated TreeDX dependencies', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-api-only');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 	const apiRoot = resolve(workspaceRoot, 'packages', 'api');
@@ -198,10 +198,7 @@ test('treeseed dev api-only plans avoid local treedx reconciliation units', asyn
 		name: '@treeseed/api',
 		version: '0.0.0',
 		type: 'module',
-		scripts: {
-			dev: 'node ./dev.js',
-			'dev:operations-runner': 'node ./runner.js',
-		},
+			scripts: { dev: 'node ./dev.js' },
 	}, null, 2)}\n`, 'utf8');
 
 	const result = await runCli(['dev', 'restart', '--app', 'api', '--web-runtime', 'local', '--force', '--plan', '--json'], {
@@ -224,9 +221,10 @@ test('treeseed dev api-only plans avoid local treedx reconciliation units', asyn
 	assert.equal(payload.ok, true);
 	assert.equal(payload.selectedSurfaces, 'api');
 	assert.match(serialized, /local-process:api/u);
-	assert.match(serialized, /local-process:operations-runner/u);
+	assert.doesNotMatch(serialized, /local-process:operations-runner/u);
+	assert.match(serialized, /capacity-provider:agent-/u);
 	assert.doesNotMatch(serialized, /local-treedx:team-primary/u);
-	assert.doesNotMatch(serialized, /local-docker-compose:treedx/u);
+	assert.match(serialized, /local-docker-compose:treedx/u);
 });
 
 test('treeseed dev web-only restart retains runtime dependencies without selecting treedx content sync', async () => {
@@ -238,10 +236,7 @@ test('treeseed dev web-only restart retains runtime dependencies without selecti
 		name: '@treeseed/api',
 		version: '0.0.0',
 		type: 'module',
-		scripts: {
-			dev: 'node ./dev.js',
-			'dev:operations-runner': 'node ./runner.js',
-		},
+			scripts: { dev: 'node ./dev.js' },
 	}, null, 2)}\n`, 'utf8');
 
 	const result = await runCli(['dev', 'restart', '--app', 'web', '--web-runtime', 'local', '--local-content', 'none', '--plan', '--json'], {
