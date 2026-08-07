@@ -1,4 +1,4 @@
-import { buildPackageArtifact, hydratePackageArtifacts, syncPackageWorkflows, validatePackageManifests, verifyPackageArtifact } from '@treeseed/sdk/workflow-support';
+import { buildPackageArtifact, hydratePackageArtifacts, initializePackage, syncPackageWorkflows, validatePackageManifests, verifyPackageArtifact } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler } from '../../types.js';
 import { runPackageImageCommand } from './package-image.js';
 import { fail, guidedResult } from '../utilities/utils.js';
@@ -6,6 +6,26 @@ import { fail, guidedResult } from '../utilities/utils.js';
 export const handlePackage: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'status';
 	try {
+		if (action === 'init') {
+			const required = (name: string) => {
+				const value = invocation.args[name];
+				if (typeof value !== 'string' || !value.trim()) throw new Error(`package init requires --${name === 'defaultBranch' ? 'default-branch' : name} <value>.`);
+				return value.trim();
+			};
+			const execute = invocation.args.yes === true;
+			if (execute && invocation.args.plan === true) throw new Error('package init accepts either --plan or --yes, not both.');
+			if (!execute && invocation.args.plan !== true) throw new Error('package init requires --plan for preview or --yes for live initialization.');
+			const result = initializePackage({
+				workspaceRoot: context.cwd, packageId: required('id'), name: required('name'), repository: required('repository'),
+				path: required('path'), kind: required('kind') as 'node-typescript', type: required('type'), license: required('license') as 'Apache-2.0',
+				template: required('template') as 'metadata', defaultBranch: required('defaultBranch') as 'main', execute,
+			});
+			return guidedResult({
+				command: 'package init', summary: execute ? `Initialized ${result.packageId} at ${result.commitSha}.` : `Planned initialization of ${result.packageId}.`,
+				facts: [{ label: 'Mode', value: result.mode }, { label: 'Repository', value: result.repository }, { label: 'Path', value: result.path }, { label: 'Branch', value: result.branch }, { label: 'Commit', value: result.commitSha }],
+				sections: [{ title: 'Actions', lines: result.actions.map((entry) => `${entry.kind}: ${entry.target}`) }], report: { result },
+			});
+		}
 		if (action === 'image') return runPackageImageCommand(invocation, context, { commandName: 'package image' });
 		if (action === 'artifact') {
 			const artifactAction = invocation.positionals[1] ?? 'build';
@@ -105,7 +125,7 @@ export const handlePackage: CommandHandler = async (invocation, context) => {
 				exitCode: failed.length === 0 ? 0 : 1,
 			});
 		}
-		return fail('Unknown package action. Use artifact, image, workflow, or validate.');
+		return fail('Unknown package action. Use init, artifact, image, workflow, or validate.');
 	} catch (error) {
 		return fail(error instanceof Error ? error.message : String(error));
 	}

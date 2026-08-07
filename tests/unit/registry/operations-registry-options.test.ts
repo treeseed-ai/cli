@@ -31,3 +31,16 @@ test('capacity exposes bounded pagination without removed native-limit migration
 		assert.equal(flags.some((flag) => flag.startsWith(removed)), false, `capacity still exposes unused ${removed}`);
 	}
 });
+
+test('package exposes the plan-or-confirm initialization contract', () => {
+	const operation = TRESEED_OPERATION_SPECS.find((entry) => entry.name === 'package');
+	assert.ok(operation);
+	const options = new Map(operation.options?.map((option) => [option.name, option]));
+	for (const name of ['id', 'name', 'repository', 'path', 'kind', 'type', 'license', 'template', 'defaultBranch', 'plan', 'yes', 'json']) {
+		assert.ok(options.has(name), `package init is missing --${name}`);
+	}
+	assert.deepEqual(options.get('kind')?.values, ['node-typescript']);
+	assert.deepEqual(options.get('license')?.values, ['Apache-2.0']);
+	assert.deepEqual(options.get('template')?.values, ['metadata']);
+	assert.deepEqual(options.get('defaultBranch')?.values, ['main']);
+});

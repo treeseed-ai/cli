@@ -54,9 +54,19 @@ export const packageAndWorkflowOperationSpecs: OperationSpec[] = [
 			description: 'Validate package manifests and plan deployment source/image behavior declared by treeseed.package.yaml.',
 			provider: 'default',
 			related: ['config', 'hosting', 'db'],
-			usage: 'treeseed package [validate|artifact build|artifact verify|artifact hydrate|image|workflow sync] [--package <package-id>]',
+		usage: 'treeseed package [init|validate|artifact build|artifact verify|artifact hydrate|image|workflow sync] [options]',
 			arguments: [{ name: 'action', description: 'Package workflow action.', required: false }],
-			options: [
+		options: [
+			{ name: 'id', flags: '--id <package-id>', description: 'Canonical package id for initialization.', kind: 'string' },
+			{ name: 'name', flags: '--name <name>', description: 'Human-readable package name for initialization.', kind: 'string' },
+			{ name: 'repository', flags: '--repository <owner/name>', description: 'Empty GitHub repository to initialize.', kind: 'string' },
+			{ name: 'path', flags: '--path <packages/name>', description: 'Direct workspace package path to register.', kind: 'string' },
+			{ name: 'kind', flags: '--kind <kind>', description: 'Package implementation kind.', kind: 'enum', values: ['node-typescript'] },
+			{ name: 'type', flags: '--type <type>', description: 'Package responsibility type.', kind: 'string' },
+			{ name: 'license', flags: '--license <license>', description: 'Package license.', kind: 'enum', values: ['Apache-2.0'] },
+			{ name: 'template', flags: '--template <template>', description: 'Initialization template.', kind: 'enum', values: ['metadata'] },
+			{ name: 'defaultBranch', flags: '--default-branch <branch>', description: 'Initial repository branch.', kind: 'enum', values: ['main'] },
+			{ name: 'yes', flags: '--yes', description: 'Authorize live initialization and remote push.', kind: 'boolean' },
 				{ name: 'package', flags: '--package <package-id>', description: 'Discovered package id from treeseed.package.yaml, such as treedx.', kind: 'string' },
 				{ name: 'packageRoot', flags: '--package-root <path>', description: 'Package checkout used to build an immutable artifact.', kind: 'string' },
 				{ name: 'output', flags: '--output <path>', description: 'Directory for package tarball and integrity manifest output.', kind: 'string' },
@@ -71,7 +81,8 @@ export const packageAndWorkflowOperationSpecs: OperationSpec[] = [
 				{ name: 'execute', flags: '--execute', description: 'Dispatch a production image workflow when the package policy allows image publication.', kind: 'boolean' },
 				{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 			],
-			examples: [
+		examples: [
+			'treeseed package init --id @treeseed/ai --name "TreeSeed AI" --repository treeseed-ai/ai --path packages/ai --kind node-typescript --type runtime-appliance --license Apache-2.0 --template metadata --default-branch main --plan --json',
 				'treeseed package validate --json',
 				'treeseed package artifact build --output .treeseed/artifacts/package --json',
 				'treeseed package artifact verify --manifest .treeseed/artifacts/package/manifest.json --json',
@@ -81,7 +92,7 @@ export const packageAndWorkflowOperationSpecs: OperationSpec[] = [
 				'treeseed package image --package treedx --branch main --plan --json',
 			],
 			help: {
-				longSummary: ['Package workflows are driven by package-local metadata instead of bespoke CLI logic. A checked-out package can declare its repository, production image workflow, hosting source mode, and credential requirements in treeseed.package.yaml.'],
+			longSummary: ['Package workflows are driven by package-local metadata instead of bespoke CLI logic. Package init safely creates a first package commit in an empty remote and registers its verified checkout as a submodule.'],
 				whenToUse: ['Use this to validate source-build staging behavior or production semantic image publication for packages such as TreeDX.'],
 				beforeYouRun: ['Run `trsd config` to configure repository-scoped GitHub credentials and provider secrets. Do not pass package repository tokens or Docker Hub secrets on the command line.'],
 				automationNotes: ['Use `--json` to capture selected package metadata, repository credential routing, source-build readiness, Docker Hub readiness for production, and the hosting override command.'],
