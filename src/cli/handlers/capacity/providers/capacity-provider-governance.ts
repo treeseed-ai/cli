@@ -113,6 +113,10 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 		const configuredMarketProfile = argument(invocation, 'providerMarketProfile') ?? (configuredMarketUrl ? null : 'local');
 		const manifest = {
 			schemaVersion: 2 as const,
+			providerClass: 'agent' as const,
+			ownership: { type: 'external' as const },
+			configuration: { generation: 'initial' },
+			supplyCeilings: { maxConcurrentAssignments: 1 },
 			identity: {
 				privateKeyRef: argument(invocation, 'identityKeyRef') ?? 'data://identity.json',
 				displayName: argument(invocation, 'displayName') ?? 'Treeseed capacity provider',
