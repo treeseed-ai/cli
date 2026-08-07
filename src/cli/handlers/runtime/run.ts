@@ -235,6 +235,6 @@ export const handlePlatform: CommandHandler = async (invocation, context) => {
 	if (!['status', 'logs', 'stop'].includes(action)) return fail('Usage: trsd platform status|logs|stop');
 	const result = await handleDev(invocationFor('dev', invocation, [action], { ...invocation.args, json: invocation.args.json }), context);
 	const supervisor = readPlatformSupervisor(context.cwd);
-	if (action === 'stop' && supervisor && processIsAlive(supervisor.pid)) process.kill(supervisor.pid, 'SIGTERM');
+	if (action === 'stop' && invocation.args.plan !== true && supervisor && processIsAlive(supervisor.pid)) process.kill(supervisor.pid, 'SIGTERM');
 	return { ...result, report: { ...(result.report ?? {}), supervisor: supervisor ? { ...supervisor, running: processIsAlive(supervisor.pid), logPath: platformSupervisorPaths(context.cwd).log } : null } };
 };

@@ -56,7 +56,7 @@ import { handleSeed } from '../handlers/seeds/seed.js';
 import { handleDemo } from '../handlers/content/demo.js';
 import { handleScene } from '../handlers/scenes/scene.js';
 import { handleGuarantees } from '../handlers/guarantees/guarantees.js';
-import { handleCleanup } from '../handlers/diagnostics/cleanup.js';
+import { handleClean } from '../handlers/diagnostics/cleanup.js';
 import { handleServices } from '../handlers/services/services.js';
 import { handleContent } from '../handlers/content/content.js';
 import { handleGovernance } from '../handlers/projects/governance/governance.js';
@@ -123,7 +123,7 @@ export const COMMAND_HANDLERS = {
 	demo: handleDemo,
 	scene: handleScene,
 	guarantees: handleGuarantees,
-	cleanup: handleCleanup,
+	clean: handleClean,
 	services: handleServices,
 	content: handleContent,
 	governance: handleGovernance,
