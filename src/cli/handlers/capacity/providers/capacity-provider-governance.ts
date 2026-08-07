@@ -116,7 +116,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 		const ownerTeamId = argument(invocation, 'team');
 		const connection = connectionId(invocation) ?? 'primary-team';
 		const configuredMarketUrl = argument(invocation, 'providerMarketUrl');
-		const configuredMarketProfile = argument(invocation, 'providerMarketProfile') ?? (configuredMarketUrl ? null : 'local');
+		const configuredMarketProfile = argument(invocation, 'providerMarketProfile') ?? (configuredMarketUrl ? null : 'central');
 		const manifest = {
 			schemaVersion: 2 as const,
 			providerClass,
@@ -157,6 +157,18 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 	}
 	const loaded = await loadProviderManifest(manifestPath(invocation, context));
 	const identityRef = loaded.manifest.identity.privateKeyRef;
+	if (plan && action === 'provider-join') {
+		const selected = connectionId(invocation);
+		if (!selected) return fail('provider-join requires --connection <connection-id>.');
+		const marketUrl = argument(invocation, 'providerMarketUrl');
+		const marketProfile = argument(invocation, 'providerMarketProfile') ?? (marketUrl ? null : 'central');
+		return guidedResult({
+			command: 'capacity provider-join',
+			summary: 'Capacity provider join plan rendered without mutation.',
+			facts: [{ label: 'Connection', value: selected }, { label: 'Market', value: marketUrl ?? marketProfile ?? 'central' }],
+			report: { action, mode: 'plan', manifest: loaded.path, connection: selected, marketUrl, marketProfile, defaultedToCanonicalMarket: !marketUrl && !argument(invocation, 'providerMarketProfile') },
+		});
+	}
 	if (action.startsWith('provider-offer-')) {
 		const selected = connectionId(invocation);
 		if (!selected) return fail(`${action} requires --connection <connection-id>.`);
@@ -237,7 +249,7 @@ export async function runCapacityProviderGovernanceAction(action: string, invoca
 				const registrationKeyRef = argument(invocation, 'registrationKeyRef');
 				if (!registrationKeyRef) return fail('provider-join requires --registration-key-ref <secret-ref>; the reference is used only for this one-time join and is never persisted in the provider manifest.');
 				const marketUrl = argument(invocation, 'providerMarketUrl');
-				const marketProfile = argument(invocation, 'providerMarketProfile') ?? (marketUrl ? null : 'local');
+				const marketProfile = argument(invocation, 'providerMarketProfile') ?? (marketUrl ? null : 'central');
 				const coordinator = new CapacityProviderCoordinator(loaded, dataDirectory(invocation, context, loaded.manifest.providerClass), { env: providerCoordinatorEnvironment(loaded, context, marketProfile ? [marketProfile] : []) });
 				payload = await coordinator.beginJoin({
 					id: selected,

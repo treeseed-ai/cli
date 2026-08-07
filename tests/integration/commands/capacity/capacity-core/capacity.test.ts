@@ -93,6 +93,21 @@ test('capacity manifest plans create complete isolated agent and platform-operat
 	}
 });
 
+test('capacity provider join defaults to the canonical central Market', async () => {
+	const workspaceRoot = makeWorkspaceRoot();
+	try {
+		const initialized = await runCli(['capacity', 'provider-manifest-init', '--execute', '--json'], { cwd: workspaceRoot });
+		assert.equal(initialized.exitCode, 0, initialized.stderr);
+		const planned = await runCli(['capacity', 'provider-join', '--connection', 'primary-team', '--plan', '--json'], { cwd: workspaceRoot });
+		assert.equal(planned.exitCode, 0, planned.stderr);
+		const report = JSON.parse(planned.output);
+		assert.equal(report.marketProfile, 'central');
+		assert.equal(report.defaultedToCanonicalMarket, true);
+	} finally {
+		rmSync(workspaceRoot, { recursive: true, force: true });
+	}
+});
+
 test('capacity diagnostics reads Market derived capacity projection', async () => {
 	const root = makeWorkspaceRoot();
 	const previousHome = process.env.HOME;
