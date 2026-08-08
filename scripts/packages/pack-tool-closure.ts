@@ -43,6 +43,8 @@ export function stagePackageForToolClosure(
 			const relative = entry.slice(source.length).replace(/^\//, '');
 			return relative !== 'node_modules'
 				&& !relative.startsWith('node_modules/')
+				&& relative !== '.treeseed'
+				&& !relative.startsWith('.treeseed/')
 				&& relative !== '.git'
 				&& !relative.startsWith('.git/')
 				&& relative !== 'artifacts'

@@ -38,7 +38,7 @@ test('scene rejects unsupported Phase 11 actions', async () => {
 	const payload = parseJsonOutput(result.output);
 	assert.equal(payload.command, 'scene');
 	assert.equal(payload.ok, false);
-	assert.match(payload.error, /Phase 11 supports status, validate, plan, run, inspect, resume, render, training, evidence, publish, publish-plan, export, and visual-audit/u);
+	assert.match(payload.error, /Phase 11 supports status, validate, plan, run, view, inspect, resume, render, training, evidence, publish, publish-plan, export, and visual-audit/u);
 });
 
 test('scene help describes the command surface', async () => {
@@ -214,4 +214,3 @@ test('scene visual-audit validates arguments and dispatches through scene comman
 	assert.equal(payload.clientErrorCount, 0);
 	assert.ok(payload.diagnostics.some((entry) => entry.code === 'scene.local_dev_not_running'));
 });
-

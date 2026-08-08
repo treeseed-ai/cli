@@ -14,6 +14,27 @@ export const platformRunOperationSpecs: OperationSpec[] = [
 			{ name: 'json', flags: '--json', description: 'Emit structured results.', kind: 'boolean' },
 		],
 		examples: ['trsd run treeseed', 'trsd run treeseed another-seed --plan --json'],
+		help: {
+			workflowPosition: 'reconcile local platform',
+			longSummary: [
+				'Run owns exact-seed convergence for the persistent local platform. It validates the desired seed set, reconciles platform infrastructure, applies seed content, and verifies readiness before persisting the selection.',
+			],
+			whenToUse: [
+				'Use this when starting or changing the durable local platform and its exact seed set. Use `dev` for the foreground hot-reloading application runtime.',
+			],
+			beforeYouRun: [
+				'Run from the integrated Treeseed workspace and inspect `--plan` before removing an active seed or changing persistent local resources.',
+			],
+			outcomes: [
+				'Reconciles the local platform to the requested seed set and records the verified selection for later runs.',
+			],
+			automationNotes: [
+				'Use `--plan --json` for a non-mutating preview. Live destructive seed removals require explicit `--yes` confirmation.',
+			],
+			warnings: [
+				'The requested seeds are exact desired state; omitting a currently active seed may remove its managed resources or content.',
+			],
+		},
 		helpVisible: true, helpFeatured: true, executionMode: 'handler', handlerName: 'run',
 	},
 	{
@@ -21,6 +42,27 @@ export const platformRunOperationSpecs: OperationSpec[] = [
 		summary: 'Inspect or stop the persistent local TreeSeed platform.', description: 'Expose status, logs, and stop diagnostics for the platform managed by trsd run.',
 		usage: 'trsd platform status|logs|stop [--json]', arguments: [{ name: 'action', description: 'status, logs, or stop', required: true }],
 		options: [{ name: 'json', flags: '--json', description: 'Emit structured results.', kind: 'boolean' }], examples: ['trsd platform status --json'],
+		help: {
+			workflowPosition: 'inspect local platform',
+			longSummary: [
+				'Platform exposes status, logs, and stop controls for the persistent local platform supervised by `trsd run`.',
+			],
+			whenToUse: [
+				'Use this to inspect or stop a previously reconciled local platform without changing its exact persisted seed selection.',
+			],
+			beforeYouRun: [
+				'Run from the workspace that owns the local platform state and choose one action: status, logs, or stop.',
+			],
+			outcomes: [
+				'Returns supervisor state or stops the persistent local platform while preserving the desired seed record.',
+			],
+			automationNotes: [
+				'Use `--json` for stable supervisor records in scripts and diagnostics.',
+			],
+			warnings: [
+				'`platform stop` stops local runtime processes; it does not destroy reconciled resources or clear the selected seeds.',
+			],
+		},
 		helpVisible: true, helpFeatured: false, executionMode: 'handler', handlerName: 'platform',
 	},
 ];
