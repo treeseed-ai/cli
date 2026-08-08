@@ -5,6 +5,7 @@ import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, reconcileLocalS
 import { MarketClientError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketSelector } from '../content/market-utils.js';
 import { loadLocalSeedModule, requireLocalSeedSession } from '../accounts/seed-session.js';
+import { handleSeedRepositories } from './seed-repositories.js';
 
 function seedRequestBody(invocation: Parameters<CommandHandler>[0]) {
 	return {
@@ -186,6 +187,9 @@ async function handleSeedExport(invocation: Parameters<CommandHandler>[0], conte
 }
 
 export const handleSeed: CommandHandler = async (invocation, context) => {
+	if (invocation.positionals[0] === 'repositories') {
+		return handleSeedRepositories(invocation, context);
+	}
 	if (invocation.positionals[0] === 'export') {
 		return handleSeedExport(invocation, context);
 	}

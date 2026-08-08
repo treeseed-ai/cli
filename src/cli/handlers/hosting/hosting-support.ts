@@ -1,5 +1,6 @@
 import {
 	compileHostingGraph,
+	findApplication,
 	serializeHostingUnit,
 	type HostingEnvironment,
 } from '@treeseed/sdk/hosting';
@@ -45,6 +46,13 @@ export function targetFor(environment: HostingEnvironment): ReconcileTarget {
 	return { kind: 'persistent', scope: environment };
 }
 
+export function reconciliationRoot(workspaceRoot: string, appId?: string) {
+	if (!appId) return workspaceRoot;
+	const application = findApplication(workspaceRoot, appId);
+	if (!application) throw new Error(`Unknown Treeseed application: ${appId}.`);
+	return application.root;
+}
+
 export function readPackageVersion(packageJsonPath: string) {
 	if (!existsSync(packageJsonPath)) return null;
 	try {
@@ -86,26 +94,18 @@ export function productionImageRefDefaults(root: string, environment: HostingEnv
 
 export function selectorFromHostingGraph(graph: ReturnType<typeof compileHostingGraph>): ReconcileSelector {
 	const includesApi = graph.units.some((unit) => unit.id === 'api' || unit.config.serviceName === 'treeseed-api');
-	const exactServiceIds = [...new Set(graph.units.flatMap((unit) => [
-		unit.id,
-		typeof unit.config.poolKey === 'string' ? unit.config.poolKey : null,
-		typeof unit.config.serviceName === 'string' ? unit.config.serviceName : null,
-		!['api', 'operationsRunner', 'capacityProviderApi', 'capacityProviderManager', 'capacityProviderRunner'].includes(unit.id)
-			? unit.id
-			: null,
-	]).filter((value): value is string => Boolean(value)))];
 	return {
 		host: [...new Set([
 			...graph.units.map((unit) => unit.host.id),
 			...(includesApi ? ['cloudflare-dns'] : []),
 		].filter((hostId) => hostId !== 'smtp' && hostId !== 'local-process' && hostId !== 'local-docker'))],
-		serviceId: exactServiceIds,
 		serviceType: [...new Set(graph.units.flatMap((unit) => {
 			if (unit.id === 'api') return ['api-runtime', 'railway-service:api', 'custom-domain:api', 'dns-record'];
 			if (unit.id === 'operationsRunner' || unit.config.poolKey === 'operationsRunner') return ['operations-runner-runtime', 'railway-service:operations-runner'];
 			if (unit.id.startsWith('public-treedx-node-') || unit.serviceType.id === 'treedx-node') return ['api-runtime', 'railway-service:api'];
 			if (unit.placement === 'runner-capacity') return ['api-runtime', 'operations-runner-runtime', 'railway-service:api', 'railway-service:operations-runner'];
-			if (unit.host.id === 'cloudflare') return ['web-ui', 'edge-worker', 'content-store', 'queue', 'database', 'kv-form-guard', 'turnstile-widget', 'pages-project', 'custom-domain:web', 'dns-record'];
+			if (unit.host.id === 'cloudflare' && unit.serviceType.id === 'object-store') return ['content-store'];
+			if (unit.host.id === 'cloudflare') return ['web-ui', 'edge-worker', 'queue', 'database', 'kv-form-guard', 'turnstile-widget', 'pages-project', 'custom-domain:web', 'dns-record'];
 			return [];
 		}))],
 	};

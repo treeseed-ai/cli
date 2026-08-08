@@ -24,6 +24,7 @@ import {
 	reconcilePlanFailures,
 	renderReconcilePlanLine,
 	renderUnitLine,
+	reconciliationRoot,
 	selectedSeedEnv,
 	selectorFromHostingGraph,
 	serializeReconcilePlan,
@@ -42,6 +43,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 			const appId = typeof invocation.args.app === 'string' && invocation.args.app.trim()
 				? invocation.args.app.trim()
 				: undefined;
+			const reconcileRoot = reconciliationRoot(context.cwd, appId);
 			const replacePendingVolumes = invocation.args.replacePendingVolumes === true;
 			if (replacePendingVolumes && subcommand !== 'apply') {
 				throw new Error('--replace-pending-volumes is available only with `hosting apply`.');
@@ -112,7 +114,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 				const graph = compileHostingGraph({ tenantRoot: context.cwd, environment, appId, env, ...filterInput });
 			const selector = selectorFromHostingGraph(graph);
 			const result = await destroyTargetUnits({
-					tenantRoot: context.cwd,
+					tenantRoot: reconcileRoot,
 					target: targetFor(environment),
 						env,
 					selector,
@@ -176,7 +178,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 				const selector = selectorFromHostingGraph(graph);
 				const reconcilePlan = subcommand === 'plan' && invocation.args.placementOnly !== true
 					? await reconcileTarget({
-						tenantRoot: context.cwd,
+						tenantRoot: reconcileRoot,
 						target: targetFor(environment),
 						env,
 						selector,
@@ -186,7 +188,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 					: null;
 				const liveStatus = subcommand === 'verify' && invocation.args.live === true && environment !== 'local'
 					? await collectReconcileStatus({
-						tenantRoot: context.cwd,
+						tenantRoot: reconcileRoot,
 						target: targetFor(environment),
 						env,
 						selector,
@@ -260,7 +262,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 			const planReport = serializeHostingPlan(plan);
 		const selector = selectorFromHostingGraph(graph);
 		const reconcileResult = await reconcileTarget({
-					tenantRoot: context.cwd,
+					tenantRoot: reconcileRoot,
 					target: targetFor(environment),
 					env,
 					selector,
@@ -268,7 +270,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 					write: (line) => context.write(`[reconcile] ${line}`, 'stderr'),
 				});
 		let status = await collectReconcileStatus({
-					tenantRoot: context.cwd,
+					tenantRoot: reconcileRoot,
 					target: targetFor(environment),
 					env,
 					selector,
@@ -279,10 +281,10 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 			.filter((value): value is string => Boolean(value)));
 		const selectedRailwayServices = environment === 'local'
 			? []
-			: configuredRailwayServices(context.cwd, environment, env)
+			: configuredRailwayServices(reconcileRoot, environment, env)
 				.filter((service) => selectedRailwayServiceNames.has(service.serviceName));
 		const deployments = selectedRailwayServices.length > 0
-			? await waitForRailwayManagedDeploymentsSettled(context.cwd, environment, {
+			? await waitForRailwayManagedDeploymentsSettled(reconcileRoot, environment, {
 				services: selectedRailwayServices,
 				env,
 				timeoutMs: 600_000,
@@ -311,7 +313,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 		};
 		const liveHostedServices = environment !== 'local'
 				? await collectLiveChecks({
-					tenantRoot: context.cwd,
+					tenantRoot: reconcileRoot,
 					target: environment,
 					appId,
 					serviceKeys: filter.serviceIds,
@@ -330,7 +332,7 @@ export const handleHosting: CommandHandler = async (invocation, context) => {
 			: [];
 			if (status?.ready === false && liveHostedServices && liveFailures.length === 0) {
 				status = await collectReconcileStatus({
-					tenantRoot: context.cwd,
+					tenantRoot: reconcileRoot,
 					target: targetFor(environment),
 					env,
 					selector,

@@ -25,6 +25,18 @@ test('seed validates the canonical treeseed manifest', async () => {
 	assert.match(result.stdout, /Seed treeseed is valid/);
 });
 
+test('seed repository live reconciliation requires confirmation and keeps production hosted-only', async () => {
+	const root = seedWorkspace({ localService: false });
+	const unconfirmed = await runCli(['seed', 'repositories', 'treeseed', '--environments', 'staging', '--apply', '--json'], { cwd: root });
+	assert.equal(unconfirmed.exitCode, 1);
+	assert.match(unconfirmed.stderr, /--apply --yes/u);
+
+	const production = await runCli(['seed', 'repositories', 'treeseed', '--environments', 'prod', '--apply', '--yes', '--json'], { cwd: root });
+	assert.equal(production.exitCode, 2);
+	const payload = JSON.parse(production.stderr);
+	assert.equal(payload.blocker, 'hosted-production-authority');
+});
+
 test('seed local plan prints deterministic human output', async () => {
 	const root = seedWorkspace();
 	const result = await runCli(['seed', 'treeseed', '--environments', 'local', '--plan'], {

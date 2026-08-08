@@ -15,7 +15,7 @@ export const seedAndDemoOperationSpecs: OperationSpec[] = [
 			description: 'Load a seed manifest from seeds/<name>.yaml, validate references and environment targeting, produce a deterministic plan, apply governed seeds through the market store/API, or export a team portfolio to YAML.',
 			provider: 'default',
 			related: ['status', 'config', 'capacity', 'projects'],
-			usage: 'treeseed seed <name> [--environments local,staging,prod] [--plan|--validate|--apply] [--json]\n       treeseed seed export <name> --team <team> [--output <path>] [--json]',
+			usage: 'treeseed seed <name> [--environments local,staging,prod] [--plan|--validate|--apply] [--json]\n       treeseed seed repositories <name> --environments <environment> [--plan|--apply --yes] [--json]\n       treeseed seed export <name> --team <team> [--output <path>] [--json]',
 			arguments: [{ name: 'name', description: 'Seed manifest name under the project seeds directory, or `export <name>` for portfolio export.', required: true }],
 			options: [
 				{ name: 'environments', flags: '--environments <list>', description: 'Comma-separated environments to select from the manifest.', kind: 'string' },
@@ -37,6 +37,7 @@ export const seedAndDemoOperationSpecs: OperationSpec[] = [
 				'treeseed seed treeseed --validate',
 				'treeseed seed treeseed --environments local --plan',
 				'trsd seed treeseed --environments prod --plan --json',
+				'trsd seed repositories treeseed --environments staging --plan --json',
 				'trsd seed export treeseed --team treeseed --include-artifacts --json',
 			],
 			help: {
