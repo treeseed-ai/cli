@@ -188,13 +188,18 @@ test('major workflow commands have usage, options, and examples in help', async 
 	}
 });
 
-test('config help includes the advanced full-editor flag', async () => {
+test('config help keeps configuration editing separate from platform reconciliation', async () => {
 	const result = await runCli(['help', 'config']);
 	assert.equal(result.exitCode, 0);
 	assert.match(result.output, /--full/);
 	assert.match(result.output, /--mouse/);
 	assert.match(result.output, /--non-interactive/);
 	assert.match(result.output, /--install-missing-tooling/);
+	assert.match(result.output, /Use `run` to reconcile the local platform/u);
+	assert.doesNotMatch(result.output, /--bootstrap/u);
+	assert.doesNotMatch(result.output, /--systems?/u);
+	assert.doesNotMatch(result.output, /--skip-unavailable/u);
+	assert.doesNotMatch(result.output, /--preflight/u);
 });
 
 test('global color controls are accepted and documented', async () => {

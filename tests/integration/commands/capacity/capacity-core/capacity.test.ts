@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { listOperationNames } from '@treeseed/sdk/operations';
+import { validateCapacityProviderManifestV2 } from '@treeseed/sdk/capacity-provider';
 import {
 	MACHINE_KEY_PASSPHRASE_ENV,
 	unlockSecretSessionFromEnv,
@@ -87,6 +88,7 @@ test('capacity manifest plans create complete isolated agent and platform-operat
 			assert.equal(manifest.supplyCeilings.maxConcurrentAssignments, 1);
 			assert.equal(manifest.ownership.type, 'external');
 			assert.equal(manifest.executionProviders[0].adapter, providerClass === 'agent' ? 'codex' : 'platform-operation');
+			assert.deepEqual(validateCapacityProviderManifestV2(manifest).diagnostics, []);
 		}
 	} finally {
 		rmSync(workspaceRoot, { recursive: true, force: true });
@@ -127,13 +129,14 @@ test('capacity diagnostics reads Market derived capacity projection', async () =
 					}],
 				},
 				grants: [{
-					grantScope: 'project',
+					projectId: 'project_123',
 					environment: 'local',
 					dailyAgentSecondsLimit: 5000,
 					monthlyAgentSecondsLimit: 20000,
 					maxConcurrentAssignments: 2,
 					unmetered: false,
 				}],
+				remaining: { dailyAgentSeconds: 14400, monthlyAgentSeconds: 356400 },
 			},
 		}), { status: 200, headers: { 'content-type': 'application/json' } });
 	};

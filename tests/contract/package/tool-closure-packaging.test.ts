@@ -24,6 +24,9 @@ test('tool closure staging does not mutate workspace-linked source manifests', (
 				'@treeseed/sdk': 'github:treeseed-ai/sdk#exact-commit',
 			},
 		});
+		writeJson(resolve(source, '.treeseed/docker/runtime/manager/node_modules/generated/package.json'), {
+			name: 'generated-runtime-cache',
+		});
 		mkdirSync(dirname(installed), { recursive: true });
 		symlinkSync(source, installed, 'dir');
 		const originalManifest = readFileSync(sourceManifestPath, 'utf8');
@@ -34,6 +37,7 @@ test('tool closure staging does not mutate workspace-linked source manifests', (
 
 		assert.equal(lstatSync(destination).isSymbolicLink(), false);
 		assert.equal(existsSync(resolve(destination, 'package.json')), true);
+		assert.equal(existsSync(resolve(destination, '.treeseed')), false);
 		assert.equal(readFileSync(sourceManifestPath, 'utf8'), originalManifest);
 		assert.deepEqual(JSON.parse(readFileSync(resolve(destination, 'package.json'), 'utf8')), {
 			name: '@treeseed/core',

@@ -74,7 +74,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(result.exitCode, 0);
+	assert.equal(result.exitCode, 0, result.output);
 	assert.equal(result.spawns.length, 0);
 	const payload = JSON.parse(result.stdout || result.output);
 	assert.equal(payload.command, 'dev');
@@ -192,6 +192,54 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 test('treeseed dev api-only plans include provider-isolated TreeDX dependencies', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-api-only');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
+	mkdirSync(resolve(workspaceRoot, 'seeds'), { recursive: true });
+	writeFileSync(resolve(workspaceRoot, 'seeds', 'treeseed.yaml'), `runtime:
+  capacityProviders:
+    - key: capacity-provider:test/local
+      environments: [local]
+      manifest: treeseed.capacity-provider.yaml
+`, 'utf8');
+	writeFileSync(resolve(workspaceRoot, 'treeseed.capacity-provider.yaml'), `schemaVersion: 2
+providerClass: agent
+ownership:
+  type: external
+configuration:
+  generation: test-v1
+supplyCeilings:
+  maxConcurrentAssignments: 1
+identity:
+  privateKeyRef: data://identity.json
+  displayName: Test provider
+executionProviders:
+  - id: codex
+    adapter: codex
+    nativeLimits:
+      maxConcurrentRunners: 1
+    capabilities: [engineering]
+connections: []
+`, 'utf8');
+	const agentRoot = resolve(workspaceRoot, 'packages', 'agent');
+	mkdirSync(agentRoot, { recursive: true });
+	writeFileSync(resolve(agentRoot, 'package.json'), `${JSON.stringify({
+		name: '@treeseed/agent',
+		version: '0.0.0',
+		type: 'module',
+	}, null, 2)}\n`, 'utf8');
+	writeFileSync(resolve(agentRoot, 'treeseed.package.yaml'), `id: "@treeseed/agent"
+name: Test Agent
+kind: node-typescript
+type: runtime-provider
+repository: test/agent
+artifacts:
+  - provider: docker
+    name: treeseed/agent-manager
+    dockerfile: Dockerfile
+    target: agent-manager
+  - provider: docker
+    name: treeseed/agent-runner
+    dockerfile: Dockerfile
+    target: agent-runner
+`, 'utf8');
 	const apiRoot = resolve(workspaceRoot, 'packages', 'api');
 	mkdirSync(apiRoot, { recursive: true });
 	writeFileSync(resolve(apiRoot, 'package.json'), `${JSON.stringify({
@@ -208,7 +256,7 @@ test('treeseed dev api-only plans include provider-isolated TreeDX dependencies'
 			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
 		},
 	});
-	assert.equal(result.exitCode, 0);
+	assert.equal(result.exitCode, 0, result.output);
 	assert.equal(result.spawns.length, 0);
 	const payload = JSON.parse(result.stdout || result.output);
 	const serialized = JSON.stringify({
