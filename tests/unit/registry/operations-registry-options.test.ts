@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TRESEED_OPERATION_SPECS } from '../../../src/cli/operations/operations-registry.ts';
+import { findOperation, TRESEED_OPERATION_SPECS } from '../../../src/cli/operations/operations-registry.ts';
 
 test('every command exposes one canonical meaning per option name and long flag', () => {
 	for (const operation of TRESEED_OPERATION_SPECS) {
@@ -43,4 +43,16 @@ test('package exposes the plan-or-confirm initialization contract', () => {
 	assert.deepEqual(options.get('license')?.values, ['Apache-2.0']);
 	assert.deepEqual(options.get('template')?.values, ['metadata']);
 	assert.deepEqual(options.get('defaultBranch')?.values, ['main']);
+});
+
+test('clean is the unified project command and cleanup resolves to the same operation', () => {
+	const cleanup = findOperation('cleanup');
+	const clean = findOperation('clean');
+	assert.ok(clean);
+	assert.equal(cleanup, clean);
+	assert.equal(clean.handlerName, 'clean');
+	assert.deepEqual(clean.aliases, ['cleanup']);
+	const flags = (clean.options ?? []).map((option) => option.flags);
+	assert.equal(flags.includes('--plan'), true);
+	assert.equal(flags.includes('--yes'), true);
 });
