@@ -1,4 +1,4 @@
-import { runWorkspaceCleanup, type LocalCleanupMode } from '@treeseed/sdk/workflow-support';
+import { planProjectCleanup,runProjectCleanup,type LocalCleanupMode } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler } from '../../types.js';
 
 function cleanupMode(value: unknown): LocalCleanupMode {
@@ -23,21 +23,29 @@ export const handleCleanup: CommandHandler = async (invocation, context) => {
 		};
 	}
 	const mode = cleanupMode(invocation.args.mode);
-	const report = runWorkspaceCleanup({
-		root: context.cwd,
-		mode,
-		docker: invocation.args.noDocker !== true && mode === 'aggressive',
-		npmCache: invocation.args.noNpmCache === true ? false : undefined,
-	});
+	const plan = invocation.args.plan === true;
+	if (!plan && invocation.args.yes !== true) {
+		return {
+			exitCode: 1,
+			stdout: [],
+			stderr: ['Local cleanup deletes generated project data. Inspect --plan, then re-run with --yes.'],
+			report: { command: 'cleanup local', ok: false, error: 'Confirmation required.' },
+		};
+	}
+	const report = plan
+		? planProjectCleanup({ root: context.cwd, mode })
+		: runProjectCleanup({ root: context.cwd, mode });
 	return {
 		exitCode: report.ok ? 0 : 1,
 		stdout: [
-			report.ok ? 'Treeseed local cleanup completed.' : 'Treeseed local cleanup completed with failures.',
+			report.ok
+				? `Treeseed local cleanup ${plan ? 'plan ready' : 'completed'}.`
+				: `Treeseed local cleanup ${plan ? 'plan' : 'execution'} is blocked.`,
 			`Mode: ${report.mode}`,
-			`Reclaimed: ${formatBytes(report.reclaimedBytes)}`,
-			`Actions: ${report.actions.filter((entry) => entry.status === 'removed').length} removed, ${report.actions.filter((entry) => entry.status === 'skipped').length} skipped, ${report.actions.filter((entry) => entry.status === 'failed').length} failed`,
+			`${plan ? 'Reclaimable' : 'Reclaimed'}: ${formatBytes(plan ? report.beforeBytes : report.reclaimedBytes)}`,
+			`Actions: ${report.actions.filter((entry) => entry.status === 'planned').length} planned, ${report.actions.filter((entry) => entry.status === 'removed').length} removed, ${report.actions.filter((entry) => entry.status === 'skipped').length} skipped, ${report.actions.filter((entry) => entry.status === 'blocked').length} blocked, ${report.actions.filter((entry) => entry.status === 'failed').length} failed`,
 		],
-		stderr: report.actions.filter((entry) => entry.status === 'failed').map((entry) => `${entry.id}: ${entry.error ?? 'failed'}`),
+		stderr: report.actions.filter((entry) => entry.status === 'failed' || entry.status === 'blocked').map((entry) => `${entry.id}: ${entry.error ?? entry.status}`),
 		report: { command: 'cleanup local', ...report },
 	};
 };
