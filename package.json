@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.fix-ai-staging-verification.20260810T012450Z",
+  "version": "0.12.59-dev.fix-local-treedx-project-closure.20260810T055522Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -48,9 +48,9 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#3c40409ed09e1a3c0e58528e0c3a20f475883039",
-    "@treeseed/core": "github:treeseed-ai/core#7f2f9f0ba65362adfe22bfa01161af40b4088e7c",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#f4dbe00f22ef5225559136a4fef699917aaedddc",
+    "@treeseed/agent": "github:treeseed-ai/agent#51ceb30827e94d3c78c6f34032e638396d6a8091",
+    "@treeseed/core": "github:treeseed-ai/core#1a3074c1298fb339719fdb3dd8e4b4085422dba0",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#84cddd5331fbcf6994a80198dc281a3c7bf1d42d",
     "ink": "^7.0.0",
     "react": "^19.2.5",
     "yaml": "^2.8.1"

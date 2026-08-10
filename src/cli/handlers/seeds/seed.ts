@@ -30,6 +30,10 @@ function planFromRemotePayload(payload: Record<string, unknown>): SeedPlan {
 	};
 }
 
+export function localRuntimePlan(planned: SeedPlan, applied: SeedPlan): SeedPlan {
+	return { ...applied, runtime: planned.runtime };
+}
+
 function remoteSeedResult(payload: Record<string, unknown>, command: string, exitCode = 0) {
 	const plan = planFromRemotePayload(payload);
 	const result = payload.result && typeof payload.result === 'object' ? payload.result as Record<string, unknown> : null;
@@ -314,7 +318,7 @@ export const handleSeed: CommandHandler = async (invocation, context) => {
 		});
 		const runtime = await reconcileLocalSeedRuntime({
 			projectRoot: context.cwd,
-			plan: applied.plan?.runtime ? applied.plan : planned.plan,
+			plan: localRuntimePlan(planned.plan, applied.plan),
 			accessToken: context.env.TREESEED_CAPACITY_ACCEPTANCE_ADMIN_TOKEN?.trim() || 'tsk_local_treeseed_acceptance_admin',
 			env: context.env,
 		});

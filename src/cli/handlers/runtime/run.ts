@@ -154,18 +154,25 @@ function seedDigest(plan: NonNullable<ReturnType<typeof loadAndPlanSeed>['plan']
 	].sort().join('|');
 }
 
-function compileSeedSet(root: string, seeds: string[]) {
+export function compileSeedSet(root: string, seeds: string[]) {
 	const selected = seeds.map((seed) => ({ seed, loaded: loadAndPlanSeed({ projectRoot: root, seedName: seed, environments: 'local', mode: 'plan' }) }));
 	const diagnostics = selected.flatMap(({ seed, loaded }) => loaded.diagnostics.map((entry) => ({ ...entry, seed })));
 	const missing = selected.filter(({ loaded }) => !loaded.plan).map(({ seed }) => seed);
 	if (missing.length || diagnostics.some((entry) => entry.severity === 'error')) return { ok: false as const, diagnostics, missing };
 	const ownership = new Map<string, { seed: string; payload: string }>();
-	for (const { seed, loaded } of selected) for (const action of loaded.plan!.actions) {
-		const identity = `${action.kind}:${action.key}`;
-		const payload = JSON.stringify(action.payload ?? {});
+	const registerOwnership = (seed: string, identity: string, value: unknown) => {
+		const payload = JSON.stringify(value ?? {});
 		const prior = ownership.get(identity);
 		if (prior && prior.payload !== payload) diagnostics.push({ seed, severity: 'error', code: 'seed.desired_identity_conflict', message: `${identity} conflicts with seed ${prior.seed}.`, path: identity });
 		else ownership.set(identity, { seed, payload });
+	};
+	for (const { seed, loaded } of selected) {
+		for (const action of loaded.plan!.actions) {
+			const identity = `${action.kind}:${action.key}`;
+			registerOwnership(seed, identity, action.payload);
+		}
+		for (const provider of loaded.plan!.runtime.capacityProviders) registerOwnership(seed, `capacityProvider:${provider.key}`, provider);
+		for (const principal of loaded.plan!.runtime.agentLabServicePrincipals) registerOwnership(seed, `servicePrincipal:${principal.key}`, principal);
 	}
 	return {
 		ok: !diagnostics.some((entry) => entry.severity === 'error'),
