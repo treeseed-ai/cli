@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.ai.20260807T070846Z",
+  "version": "0.12.59-dev.fix-ai-staging-verification.20260810T012450Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "AGPL-3.0-only",
   "repository": {

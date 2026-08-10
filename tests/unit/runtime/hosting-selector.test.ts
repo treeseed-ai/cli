@@ -1,7 +1,8 @@
+import assert from 'node:assert/strict';
 import { mkdirSync,mkdtempSync,rmSync,writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { afterEach,describe,expect,it } from 'vitest';
+import { afterEach,describe,it } from 'node:test';
 import { reconciliationRoot,selectorFromHostingGraph } from '../../../src/cli/handlers/hosting/hosting-support.ts';
 
 const temporaryRoots: string[] = [];
@@ -19,9 +20,9 @@ describe('hosting reconciliation selector', () => {
 			}],
 		} as never;
 		const selector = selectorFromHostingGraph(graph);
-		expect(selector.serviceId).toBeUndefined();
-		expect(selector.serviceType).toEqual(['content-store']);
-		expect(selector.host).toEqual(['cloudflare']);
+		assert.equal(selector.serviceId, undefined);
+		assert.deepEqual(selector.serviceType, ['content-store']);
+		assert.deepEqual(selector.host, ['cloudflare']);
 	});
 
 	it('scopes reconciliation to the selected application repository', () => {
@@ -44,7 +45,7 @@ describe('hosting reconciliation selector', () => {
 			'    provider: cloudflare',
 		].join('\n'));
 
-		expect(reconciliationRoot(workspaceRoot, 'admin')).toBe(adminRoot);
-		expect(() => reconciliationRoot(workspaceRoot, 'missing')).toThrow('Unknown Treeseed application');
+		assert.equal(reconciliationRoot(workspaceRoot, 'admin'), adminRoot);
+		assert.throws(() => reconciliationRoot(workspaceRoot, 'missing'), /Unknown Treeseed application/u);
 	});
 });
