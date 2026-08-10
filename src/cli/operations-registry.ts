@@ -2150,7 +2150,7 @@ const CLI_ONLY_OPERATION_SPECS: TreeseedOperationSpec[] = [
 		examples: [
 			'treeseed projects list',
 			'treeseed projects import treeseed-ai/sdk --team treeseed --plan --json',
-			'treeseed projects import knowledge-coop/market --team treeseed --site-path . --visibility private --execute --json',
+			'treeseed projects import treeseed-ai/market --team treeseed --site-path . --visibility private --execute --json',
 			'treeseed projects access project_123',
 			'treeseed projects hosts project_123',
 			'treeseed projects hosts audit project_123',

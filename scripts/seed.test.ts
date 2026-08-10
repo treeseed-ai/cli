@@ -348,9 +348,9 @@ resources:
       repository:
         role: primary
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         name: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
         defaultBranch: main
         checkoutPath: .
       architecture:
@@ -458,10 +458,10 @@ resources:
     - key: repository-host:treeseed/market-github
       team: team:treeseed
       provider: github
-      name: knowledge-coop
+      name: treeseed-ai
       ownership: treeseed_managed
       accountLabel: Knowledge Coop GitHub organization
-      organizationOrOwner: knowledge-coop
+      organizationOrOwner: treeseed-ai
       defaultVisibility: public
       allowedProjectKinds: [market_app, package, knowledge_hub]
       status: active
@@ -481,9 +481,9 @@ resources:
       searchText: TreeSeed market control plane starter template
       metadata:
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         repository: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
   catalogArtifacts:
     - key: catalog-artifact:treeseed/market-template/1.0.0
       product: product:treeseed/market-template
@@ -493,9 +493,9 @@ resources:
       manifestKey: seeds/treeseed.yaml
       metadata:
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         repository: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
   agentPools: []
 `;
 
@@ -517,9 +517,9 @@ resources:
       repository:
         role: primary
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         name: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
         defaultBranch: main
       architecture:
         topology: single_repository_site
@@ -556,7 +556,7 @@ test('seed local plan prints deterministic human output', async () => {
 	assert.match(result.stdout, /CREATE capacity provider treeseed-local-dev/);
 	assert.match(result.stdout, /CREATE grant treeseed\/local-dev -> treeseed\/market/);
 	assert.match(result.stdout, /CREATE work policy market\/local/);
-	assert.match(result.stdout, /CREATE repository host github\/knowledge-coop/);
+	assert.match(result.stdout, /CREATE repository host github\/treeseed-ai/);
 	assert.match(result.stdout, /CREATE product template\/treeseed-market/);
 	assert.match(result.stdout, /CREATE catalog artifact treeseed\/market-template@1\.0\.0/);
 	assert.match(result.stdout, /  create: 8/);
@@ -780,7 +780,7 @@ test('seed validation rejects duplicate keys', async () => {
 
 test('seed validation rejects missing remote git url', async () => {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('        gitUrl: https://github.com/knowledge-coop/market.git\n', ''));
+	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('        gitUrl: https://github.com/treeseed-ai/market.git\n', ''));
 	const result = await runCli(['seed', 'demo', '--validate'], { cwd: root });
 	assert.equal(result.exitCode, 1);
 	assert.match(result.stderr, /repository\.gitUrl/);
@@ -788,7 +788,7 @@ test('seed validation rejects missing remote git url', async () => {
 
 test('seed validation rejects repository owner and url mismatch', async () => {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('https://github.com/knowledge-coop/market.git', 'https://github.com/example/market.git'));
+	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('https://github.com/treeseed-ai/market.git', 'https://github.com/example/market.git'));
 	const result = await runCli(['seed', 'demo', '--validate'], { cwd: root });
 	assert.equal(result.exitCode, 1);
 	assert.match(result.stderr, /seed\.repository_metadata_mismatch/);
