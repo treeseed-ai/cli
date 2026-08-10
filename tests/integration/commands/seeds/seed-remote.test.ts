@@ -98,7 +98,7 @@ test('seed validation rejects duplicate keys', async () => {
 
 test('seed validation rejects missing remote git url', async () => {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('        gitUrl: https://github.com/knowledge-coop/market.git\n', ''));
+	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('        gitUrl: https://github.com/treeseed-ai/market.git\n', ''));
 	const result = await runCli(['seed', 'demo', '--validate'], { cwd: root });
 	assert.equal(result.exitCode, 1);
 	assert.match(result.stderr, /repository\.gitUrl/);
@@ -106,7 +106,7 @@ test('seed validation rejects missing remote git url', async () => {
 
 test('seed validation rejects repository owner and url mismatch', async () => {
 	const root = makeWorkspaceRoot();
-	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('https://github.com/knowledge-coop/market.git', 'https://github.com/example/market.git'));
+	writeSeed(root, 'demo', VALID_MINIMAL_SEED.replace('https://github.com/treeseed-ai/market.git', 'https://github.com/example/market.git'));
 	const result = await runCli(['seed', 'demo', '--validate'], { cwd: root });
 	assert.equal(result.exitCode, 1);
 	assert.match(result.stderr, /seed\.repository_metadata_mismatch/);
