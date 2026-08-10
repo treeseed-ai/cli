@@ -12,6 +12,7 @@ import { handleDev } from './dev.js';
 import { handleUpdate } from '../workspace-lifecycle/update.js';
 import { fail } from '../utilities/utils.js';
 import { platformSupervisorPaths, processIsAlive, readPlatformSupervisor, type PlatformSupervisorState } from './platform-supervisor-state.js';
+import { runPlatformMutationWhenAvailable } from './platform-supervisor-workflows.js';
 
 type RunState = {
 	schemaVersion: 1;
@@ -87,15 +88,27 @@ async function convergeSupervisor(invocation: ParsedInvocation, context: Paramet
 
 async function pollRemote(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1], state: PlatformSupervisorState) {
 	state.lastRemotePollAt = new Date().toISOString();
-	const result = await handleUpdate(invocationFor('update', invocation, [], { strategy: 'ff-only', noPush: true, tracking: true, workspaceLinks: 'auto' }), context);
-	if ((result.exitCode ?? 0) !== 0) state.lastError = result.stderr?.join('\n') ?? 'Remote tracking branch reconciliation is blocked.';
-	else await convergeSupervisor(invocation, context, state);
+	let result: Awaited<ReturnType<typeof handleUpdate>> | null = null;
+	const updated = await runPlatformMutationWhenAvailable(context.cwd, state, async () => {
+		result = await handleUpdate(invocationFor('update', invocation, [], { strategy: 'ff-only', noPush: true, tracking: true, workspaceLinks: 'auto' }), context);
+	});
+	if (!updated) {
+		persistSupervisor(context.cwd, state);
+		return;
+	}
+	if ((result!.exitCode ?? 0) !== 0) state.lastError = result!.stderr?.join('\n') ?? 'Remote tracking branch reconciliation is blocked.';
+	else {
+		state.lastError = undefined;
+		await runPlatformMutationWhenAvailable(context.cwd, state, async () => convergeSupervisor(invocation, context, state));
+	}
 	persistSupervisor(context.cwd, state);
 }
 
 async function supervise(invocation: ParsedInvocation, context: Parameters<CommandHandler>[1]) {
 	const state: PlatformSupervisorState = { pid: process.pid, startedAt: new Date().toISOString() };
-	persistSupervisor(context.cwd, state); await convergeSupervisor(invocation, context, state);
+	persistSupervisor(context.cwd, state);
+	await runPlatformMutationWhenAvailable(context.cwd, state, async () => convergeSupervisor(invocation, context, state));
+	persistSupervisor(context.cwd, state);
 	const stop = () => process.exit(0); process.once('SIGTERM', stop); process.once('SIGINT', stop);
 	const interval = Math.max(15_000, Number(context.env.TREESEED_PLATFORM_POLL_INTERVAL_MS ?? 30_000));
 	let polling = false;

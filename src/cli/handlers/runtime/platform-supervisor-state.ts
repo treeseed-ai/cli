@@ -2,7 +2,16 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readConfigurationGeneration } from '@treeseed/sdk/workflow-support';
 
-export type PlatformSupervisorState = { pid: number; startedAt: string; lastConvergedAt?: string; lastRemotePollAt?: string; lastError?: string; generationId?: string };
+export type PlatformSupervisorState = {
+	pid: number;
+	startedAt: string;
+	lastConvergedAt?: string;
+	lastRemotePollAt?: string;
+	lastDeferredAt?: string;
+	deferredByWorkflow?: { scope: 'worktree' | 'shared'; runId: string; command: string };
+	lastError?: string;
+	generationId?: string;
+};
 
 export function platformSupervisorPaths(root: string) {
 	const directory = resolve(root, '.treeseed', 'run');

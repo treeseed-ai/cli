@@ -1,6 +1,11 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.deployment.local-platform.workflow-deferral:
+    kind: nodeScript
+    ownerPackage: "@treeseed/cli"
+    command: packages/cli/tests/unit/runtime/platform-supervisor-workflows.test.ts
+    description: "The persistent platform supervisor checks worktree and shared workflow locks before each mutation and defers reconciliation when a workflow becomes active between phases."
   cli.capacity.assignment.forensic-reads-fail-visible:
     kind: nodeScript
     ownerPackage: "@treeseed/cli"
