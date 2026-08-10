@@ -90,7 +90,7 @@ export function resolveSdkCatalogFixturePath() {
 		items: [
 			templateCatalogItemBase('research', 'TreeSeed Research', 'Research starter.', {
 				kind: 'git',
-				repoUrl: 'https://github.com/treeseed-templates/research.git',
+				repoUrl: 'https://github.com/treeseed-ai/template-research.git',
 				directory: '.',
 				ref: 'staging',
 				integrity: 'cli-test',

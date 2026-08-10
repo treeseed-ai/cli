@@ -241,7 +241,7 @@ export function remoteSeedWorkspace() {
 	process.env.TREESEED_KEY_PASSPHRASE = 'test-passphrase';
 	try {
 		setMarketSession(root, {
-			marketId: 'central',
+			marketId: 'treeseed',
 			accessToken: 'test-token',
 			principal: {
 				id: 'user-1',
