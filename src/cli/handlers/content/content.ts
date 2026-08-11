@@ -4,6 +4,7 @@ import { MarketClientError } from '@treeseed/sdk/market-client';
 import type { CommandHandler, ParsedInvocation } from '../../types.js';
 import { createMarketClientForInvocation } from './market-utils.js';
 import { fail, guidedResult } from '../utilities/utils.js';
+import { handleContentPublish } from './publish.js';
 
 function textArg(invocation: ParsedInvocation, key: string) {
 	const value = invocation.args[key];
@@ -43,7 +44,8 @@ function reportResult(plan: ContentSyncPlan, applied: boolean, market: string, p
 
 export const handleContent: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'sync';
-	if (action !== 'sync') return fail(`Unknown content action: ${action}. Use content sync.`);
+	if (action === 'publish') return handleContentPublish(invocation, context);
+	if (action !== 'sync') return fail(`Unknown content action: ${action}. Use content sync or content publish.`);
 	const projectId = textArg(invocation, 'project');
 	if (!projectId) return fail('Content sync requires --project <project-id>.');
 	const branch = textArg(invocation, 'branch') ?? 'staging';
