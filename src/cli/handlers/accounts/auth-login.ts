@@ -29,7 +29,7 @@ function localWebApprovalUrlFromApiUrl(value: string, profileId: string) {
 }
 
 function centralWebApprovalUrlFromApiUrl(value: string, profileId: string) {
-	if (profileId !== 'central') {
+	if (profileId !== 'treeseed') {
 		return value;
 	}
 	const explicit = process.env.TREESEED_CENTRAL_MARKET_WEB_URL?.trim();

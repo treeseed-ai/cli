@@ -6,6 +6,15 @@ import { MarketClientError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketSelector } from '../content/market-utils.js';
 import { loadLocalSeedModule, requireLocalSeedSession } from '../accounts/seed-session.js';
 import { handleSeedRepositories } from './seed-repositories.js';
+import { handleSeedContentRepositories } from './migrations/seed-content-repositories.js';
+import { handleSeedSourceRepositories } from './migrations/seed-source-repositories.js';
+import { handleSeedPlatformWorkspace } from './migrations/seed-platform-workspace.js';
+import { handleSeedSupportWorkflows } from './migrations/seed-support-workflows.js';
+import { handleSeedLicenses } from './migrations/seed-licenses.js';
+import { handleSeedAdminDescriptor } from './migrations/seed-admin-descriptor.js';
+import { handleSeedGatewayContracts } from './migrations/seed-gateway-contracts.js';
+import { handleSeedMarketApiWorkspace } from './migrations/seed-market-api-workspace.js';
+import { handleSeedOrganizationReferences } from './migrations/seed-organization-references.js';
 
 function seedRequestBody(invocation: Parameters<CommandHandler>[0]) {
 	return {
@@ -191,6 +200,33 @@ async function handleSeedExport(invocation: Parameters<CommandHandler>[0], conte
 }
 
 export const handleSeed: CommandHandler = async (invocation, context) => {
+	if (invocation.positionals[0] === 'platform-workspace') {
+		return handleSeedPlatformWorkspace(invocation, context);
+	}
+	if (invocation.positionals[0] === 'support-workflows') {
+		return handleSeedSupportWorkflows(invocation, context);
+	}
+	if (invocation.positionals[0] === 'licenses') {
+		return handleSeedLicenses(invocation, context);
+	}
+	if (invocation.positionals[0] === 'admin-descriptor') {
+		return handleSeedAdminDescriptor(invocation, context);
+	}
+	if (invocation.positionals[0] === 'gateway-contracts') {
+		return handleSeedGatewayContracts(invocation, context);
+	}
+	if (invocation.positionals[0] === 'market-api-workspace') {
+		return handleSeedMarketApiWorkspace(invocation, context);
+	}
+	if (invocation.positionals[0] === 'organization-references') {
+		return handleSeedOrganizationReferences(invocation, context);
+	}
+	if (invocation.positionals[0] === 'source-repositories') {
+		return handleSeedSourceRepositories(invocation, context);
+	}
+	if (invocation.positionals[0] === 'content-repositories') {
+		return handleSeedContentRepositories(invocation, context);
+	}
 	if (invocation.positionals[0] === 'repositories') {
 		return handleSeedRepositories(invocation, context);
 	}

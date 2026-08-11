@@ -241,7 +241,7 @@ export function remoteSeedWorkspace() {
 	process.env.TREESEED_KEY_PASSPHRASE = 'test-passphrase';
 	try {
 		setMarketSession(root, {
-			marketId: 'central',
+			marketId: 'treeseed',
 			accessToken: 'test-token',
 			principal: {
 				id: 'user-1',
@@ -325,9 +325,9 @@ resources:
       repository:
         role: primary
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         name: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
         defaultBranch: main
         checkoutPath: .
       architecture:
@@ -358,9 +358,9 @@ resources:
       searchText: TreeSeed market control plane starter template
       metadata:
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         repository: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
   catalogArtifacts:
     - key: catalog-artifact:treeseed/market-template/1.0.0
       product: product:treeseed/market-template
@@ -370,9 +370,9 @@ resources:
       manifestKey: seeds/treeseed.yaml
       metadata:
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         repository: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
 `;
 
 export const VALID_MINIMAL_SEED = `
@@ -393,9 +393,9 @@ resources:
       repository:
         role: primary
         provider: github
-        owner: knowledge-coop
+        owner: treeseed-ai
         name: market
-        gitUrl: https://github.com/knowledge-coop/market.git
+        gitUrl: https://github.com/treeseed-ai/market.git
         defaultBranch: main
       architecture:
         topology: single_repository_site
