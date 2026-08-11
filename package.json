@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.fix-stage-fixture-alias-cleanup.20260810T091950Z",
+  "version": "0.12.59-dev.migration-final-platform-market-architec.20260811T025907Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -47,11 +47,11 @@
     "release:verify": "node --import tsx ./scripts/packages/release-verify.ts",
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
-	"dependencies": {
-		"@treeseed/agent": "github:treeseed-ai/agent#15721a83d635e0f6162fbb2eed4fcd3ed6059849",
-		"@treeseed/core": "github:treeseed-ai/core#f59657ec14cffe85396046d224e196b5f4550ce0",
-		"@treeseed/sdk": "github:treeseed-ai/sdk#9607911e8a0728008eab27a18563d6c5fefcac51",
-		"@treeseed/ui": "github:treeseed-ai/ui#5f6981b9a7618e0f9d82e784aafa890c1492e31c",
+  "dependencies": {
+    "@treeseed/agent": "github:treeseed-ai/agent#483164e06f3efb148508e9fba9e46a41469257b9",
+    "@treeseed/core": "github:treeseed-ai/core#0aa683652fad9b250b79b1bb88501fc9130a7013",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#040a371af731de01b52076124e166b5cf044c0b4",
+    "@treeseed/ui": "github:treeseed-ai/ui#6fb94ae8b1e3b493de92301f24fd7d371f6aabdd",
     "ink": "^7.0.0",
     "react": "^19.2.5",
     "yaml": "^2.8.1"
