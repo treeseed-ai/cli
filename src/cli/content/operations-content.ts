@@ -9,10 +9,11 @@ export const contentOperationSpecs: OperationSpec[] = [{
 	description: 'Sync compares Git, TreeDX, and publication refs. Publish accepts only paired content repositories and emits a read-back-verified, secret-free receipt.',
 	provider: 'default',
 	related: ['db', 'save', 'projects'],
-	usage: 'treeseed content sync --project <project-id> [--branch <ref>] [--path <checkout>] [--plan] [--json]\n       treeseed content publish --team <team-id> --project <project-id> [--branch <ref>] [--channel <channel>] [--path <checkout>] (--plan|--apply --yes) [--json]',
+	usage: 'treeseed content sync --project <project-id> [--branch <ref>] [--path <checkout>] [--plan] [--json]\n       treeseed content publish --team <team-id> --project <project-id> [--branch <ref>] [--channel <channel>] [--path <checkout>] (--plan|--apply --yes) [--json]\n       treeseed content publish --seed <name> [--project <slug>] [--branch <ref>] [--channel <channel>] (--plan|--apply --yes) [--json]',
 	arguments: [{ name: 'action', description: 'Content action: sync or publish.', required: false }],
 	options: [
 		{ name: 'market', flags: '--market <id-or-url>', description: 'Configured Market profile or API URL.', kind: 'string' },
+		{ name: 'seed', flags: '--seed <name>', description: 'Fetch and publish every paired content repository declared by a seed.', kind: 'string' },
 		{ name: 'project', flags: '--project <project-id>', description: 'Project whose bound TreeDX repository is compared.', kind: 'string' },
 		{ name: 'team', flags: '--team <team-id>', description: 'Owning team for publication keys.', kind: 'string' },
 		{ name: 'branch', flags: '--branch <ref>', description: 'Publication branch to compare; defaults to staging.', kind: 'string' },

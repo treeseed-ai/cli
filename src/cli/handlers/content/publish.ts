@@ -9,6 +9,7 @@ import {
 } from '@treeseed/sdk';
 import type { CommandContext,CommandResult,ParsedInvocation } from '../../types.js';
 import { fail } from '../utilities/utils.js';
+import { handleSeedContentPublish } from './seed-publish.js';
 
 const credentialKeys = [
 	'TREESEED_CLOUDFLARE_ACCOUNT_ID',
@@ -34,6 +35,7 @@ function publicationChannel(value: string | null, branch: string): ContentPublic
 }
 
 export async function handleContentPublish(invocation: ParsedInvocation, context: CommandContext): Promise<CommandResult> {
+	if (textArg(invocation, 'seed')) return handleSeedContentPublish(invocation, context);
 	const projectId = textArg(invocation, 'project');
 	const teamId = textArg(invocation, 'team');
 	if (!projectId || !teamId) return fail('Content publish requires --team <team-id> and --project <project-id>.');
