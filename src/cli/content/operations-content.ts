@@ -9,8 +9,8 @@ export const contentOperationSpecs: OperationSpec[] = [{
 	description: 'Sync compares Git, TreeDX, and publication refs. Publish accepts only paired content repositories and emits a read-back-verified, secret-free receipt.',
 	provider: 'default',
 	related: ['db', 'save', 'projects'],
-	usage: 'treeseed content sync --project <project-id> [--branch <ref>] [--path <checkout>] [--plan] [--json]\n       treeseed content publish --team <team-id> --project <project-id> [--branch <ref>] [--channel <channel>] [--path <checkout>] (--plan|--apply --yes) [--json]\n       treeseed content publish --seed <name> [--project <slug>] [--branch <ref>] [--channel <channel>] (--plan|--apply --yes) [--json]',
-	arguments: [{ name: 'action', description: 'Content action: sync or publish.', required: false }],
+	usage: 'treeseed content sync --project <project-id> [--branch <ref>] [--path <checkout>] [--plan] [--json]\n       treeseed content publish --team <team-id> --project <project-id> [--branch <ref>] [--channel <channel>] [--path <checkout>] (--plan|--apply --yes) [--json]\n       treeseed content publish --seed <name> [--project <slug>] [--branch <ref>] [--channel <channel>] (--plan|--apply --yes) [--json]\n       treeseed content cutover --seed <name> --project <slug> --branch staging (--plan|--apply --yes [--remove-software-content]) [--json]',
+	arguments: [{ name: 'action', description: 'Content action: sync, publish, or cutover.', required: false }],
 	options: [
 		{ name: 'market', flags: '--market <id-or-url>', description: 'Configured Market profile or API URL.', kind: 'string' },
 		{ name: 'seed', flags: '--seed <name>', description: 'Fetch and publish every paired content repository declared by a seed.', kind: 'string' },
@@ -22,6 +22,7 @@ export const contentOperationSpecs: OperationSpec[] = [{
 		{ name: 'plan', flags: '--plan', description: 'Inspect exact refs without changing the checkout.', kind: 'boolean' },
 		{ name: 'apply', flags: '--apply', description: 'Publish immutable objects and conditionally advance the selected R2 pointer.', kind: 'boolean' },
 		{ name: 'yes', flags: '--yes', description: 'Confirm live R2 publication.', kind: 'boolean' },
+		{ name: 'removeSoftwareContent', flags: '--remove-software-content', description: 'After exact cutover verification, remove only the redundant legacy content path from the software worktree.', kind: 'boolean' },
 		{ name: 'json', flags: '--json', description: 'Emit machine-readable output.', kind: 'boolean' },
 	],
 	examples: [
