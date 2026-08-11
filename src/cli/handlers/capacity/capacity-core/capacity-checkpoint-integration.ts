@@ -64,6 +64,8 @@ export async function runCapacityCheckpointIntegration(
 			{ label: 'Task branch', value: result.targetBranch },
 			{ label: 'Checkpoint', value: result.checkpointCommit },
 			{ label: 'Integrated commit', value: result.integratedCommit },
+			{ label: 'Execution authority', value: result.authorityId },
+			{ label: 'Authority receipt', value: result.authorityReceiptPath },
 		],
 		sections: [
 			{ title: 'Changed paths', lines: result.changedPaths.map((path) => `- ${path}`) },
