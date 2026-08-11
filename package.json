@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.fix-organization-reference-idempotency.20260811T063604Z",
+  "version": "0.12.59-dev.feature-platform-live-workspace.20260811T072157Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -48,9 +48,9 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#f0d29a197819e2d5402a3dcbb125eaa57910a6e0",
-    "@treeseed/core": "github:treeseed-ai/core#d4397ded1674d244ed674a092f843f9a655d614d",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#1b90e1efe0dec6f599bbae93df409dd695012f76",
+    "@treeseed/agent": "github:treeseed-ai/agent#b8e2169ffc147ab109352a30232c03d1ccb2b24e",
+    "@treeseed/core": "github:treeseed-ai/core#9fc51d9e79d544ab3c8b64e62866b9e724de0ca7",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#14d5799da365fb230cc6ce8aacca53de8591012c",
     "@treeseed/ui": "github:treeseed-ai/ui#6fb94ae8b1e3b493de92301f24fd7d371f6aabdd",
     "ink": "^7.0.0",
     "react": "^19.2.5",
