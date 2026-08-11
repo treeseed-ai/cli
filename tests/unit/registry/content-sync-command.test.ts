@@ -12,7 +12,7 @@ test('content exposes fail-closed sync and explicit publication modes', () => {
 	assert.match(operation.usage, /content publish --seed/u);
 	assert.deepEqual(
 		operation.options?.map(({ name }) => name),
-		['market', 'seed', 'project', 'team', 'branch', 'channel', 'path', 'plan', 'apply', 'yes', 'json'],
+		['market', 'seed', 'project', 'team', 'branch', 'channel', 'path', 'plan', 'apply', 'yes', 'removeSoftwareContent', 'json'],
 	);
 	assert.equal(operation.options?.some(({ name }) => name === 'force'), false);
 	assert.equal(operation.notes?.some((note) => note.includes('fast-forwards only')), true);
