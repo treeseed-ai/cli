@@ -50,7 +50,7 @@
   "dependencies": {
     "@treeseed/agent": "github:treeseed-ai/agent#68112d135f5e747be176ecc69a8d483ccfb993cd",
     "@treeseed/core": "github:treeseed-ai/core#0fbddcd84576c0ed335ae42820f4dea8bc4157fd",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#4d2047ef5e830101440b9f0ee5aced0e0cbb5207",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#7406c10e7010a719b6fea8f5710c59f2371cd8e5",
     "@treeseed/ui": "github:treeseed-ai/ui#c68ed1d9fc64c93426304eddaaf7c449622f2f61",
     "ink": "^7.0.0",
     "react": "^19.2.5",
