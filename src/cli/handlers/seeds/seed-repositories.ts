@@ -1,5 +1,6 @@
 import { formatSeedDiagnostics, loadAndCompileSeedRepositoryUnits } from '@treeseed/sdk/seeds';
 import { planReconciliation, reconcileTarget } from '@treeseed/sdk/reconcile';
+import type { ReconcileSelector } from '@treeseed/sdk/reconcile';
 import type { CommandHandler } from '../../types.js';
 
 function environment(value: unknown) {
@@ -31,13 +32,20 @@ export const handleSeedRepositories: CommandHandler = async (invocation, context
 	const supportRepository = selectedProject ? compiled.manifest?.resources.supportRepositories.find((entry) => entry.name === selectedProject) : null;
 	if (selectedProject && !project && !supportRepository) return { exitCode: 1, stderr: [`Seed ${seedName} does not declare project or support repository ${selectedProject}.`], report: { command: 'seed repositories', ok: false, error: `Unknown project or support repository ${selectedProject}.` } };
 	const selectedResourceKey = project?.key ?? supportRepository?.key;
-	const units = selectedResourceKey ? compiled.units.filter((unit) => unit.identity.projectId === selectedResourceKey) : compiled.units;
+	const repositoryRole = typeof invocation.args.repositoryRole === 'string' ? invocation.args.repositoryRole.trim() : '';
+	if (repositoryRole && !['primary', 'content', 'support'].includes(repositoryRole)) throw new Error('Repository role must be primary, content, or support.');
+	const unitTypes = typeof invocation.args.unitTypes === 'string' ? new Set(invocation.args.unitTypes.split(',').map((entry) => entry.trim()).filter(Boolean)) : null;
+	const units = compiled.units.filter((unit) =>
+		(!selectedResourceKey || unit.identity.projectId === selectedResourceKey)
+		&& (!repositoryRole || unit.metadata.repositoryRole === repositoryRole));
+	const selector: ReconcileSelector | undefined = unitTypes ? { unitType: [...unitTypes] as ReconcileSelector['unitType'] } : undefined;
+	if (unitTypes && !units.some((unit) => unitTypes.has(unit.unitType))) throw new Error(`No repository reconciliation units matched --unit-types ${[...unitTypes].join(',')}.`);
 	const target = { kind: 'persistent' as const, scope: selectedEnvironment };
 	const live = invocation.args.apply === true;
 	if (live && invocation.args.yes !== true) return { exitCode: 1, stderr: ['Repository reconciliation mutates GitHub. Re-run with --apply --yes after inspecting --plan.'], report: { command: 'seed repositories', ok: false, error: 'Confirmation required. Re-run with --apply --yes after inspecting --plan.' } };
 	if (live && selectedEnvironment === 'prod') return { exitCode: 2, stderr: ['Production GitHub mutation is restricted to the protected hosted reconciliation workflow.'], report: { command: 'seed repositories', ok: false, blocked: true, blocker: 'hosted-production-authority' } };
 	if (!live) {
-		const planned = await planReconciliation({ tenantRoot: context.cwd, target, env: context.env, units });
+		const planned = await planReconciliation({ tenantRoot: context.cwd, target, env: context.env, units, selector });
 		const plans = summarizedPlans(planned.plans);
 		return {
 			exitCode: plans.some((plan) => plan.action === 'blocked') ? 2 : 0,
@@ -45,7 +53,7 @@ export const handleSeedRepositories: CommandHandler = async (invocation, context
 			report: { command: 'seed repositories', ok: !plans.some((plan) => plan.action === 'blocked'), mode: 'plan', seed: seedName, project: selectedProject || null, environment: selectedEnvironment, manifestPath: compiled.manifestPath, plans },
 		};
 	}
-	const reconciled = await reconcileTarget({ tenantRoot: context.cwd, target, env: context.env, units, write: (line) => context.write(`[seed repositories] ${line}`, 'stderr') });
+	const reconciled = await reconcileTarget({ tenantRoot: context.cwd, target, env: context.env, units, selector, write: (line) => context.write(`[seed repositories] ${line}`, 'stderr') });
 	const plans = summarizedPlans(reconciled.plans);
 	const ok = reconciled.results.every((result) => result.verification?.verified === true);
 	return {
