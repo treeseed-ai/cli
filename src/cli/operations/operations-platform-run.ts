@@ -39,28 +39,34 @@ export const platformRunOperationSpecs: OperationSpec[] = [
 	},
 	{
 		id: 'local.platform', name: 'platform', aliases: [], group: 'Local Development', provider: 'default', related: ['run', 'status'],
-		summary: 'Inspect or stop the persistent local TreeSeed platform.', description: 'Expose status, logs, and stop diagnostics for the platform managed by trsd run.',
-		usage: 'trsd platform status|logs|stop [--json]', arguments: [{ name: 'action', description: 'status, logs, or stop', required: true }],
-		options: [{ name: 'json', flags: '--json', description: 'Emit structured results.', kind: 'boolean' }], examples: ['trsd platform status --json'],
+		summary: 'Materialize, inspect, or stop the local TreeSeed platform.', description: 'Materialize an exact ephemeral repository workset or expose status, logs, and stop diagnostics for the platform managed by trsd run.',
+		usage: 'trsd platform status|logs|stop|workset [--plan|--apply --yes] [--branch <name>] [--json]', arguments: [{ name: 'action', description: 'status, logs, stop, or workset', required: true }],
+		options: [
+			{ name: 'plan', flags: '--plan', description: 'Preview exact workset materialization without mutation.', kind: 'boolean' },
+			{ name: 'apply', flags: '--apply', description: 'Materialize missing repositories from the exact Platform portfolio.', kind: 'boolean' },
+			{ name: 'yes', flags: '--yes', description: 'Confirm workset materialization.', kind: 'boolean' },
+			{ name: 'branch', flags: '--branch <name>', description: 'Create repositories on this local integration branch; otherwise use detached exact refs.', kind: 'string' },
+			{ name: 'json', flags: '--json', description: 'Emit structured results.', kind: 'boolean' },
+		], examples: ['trsd platform status --json', 'trsd platform workset --plan --json', 'trsd platform workset --apply --yes --branch feature/federated-change --json'],
 		help: {
 			workflowPosition: 'inspect local platform',
 			longSummary: [
-				'Platform exposes status, logs, and stop controls for the persistent local platform supervised by `trsd run`.',
+				'Platform materializes the exact repositories in `treeseed.portfolio.json` as independent ephemeral checkouts and exposes status, logs, and stop controls for the persistent runtime.',
 			],
 			whenToUse: [
-				'Use this to inspect or stop a previously reconciled local platform without changing its exact persisted seed selection.',
+				'Use `workset` from a clean Platform clone to assemble integrated development repositories without gitlinks. Use the other actions to inspect or stop the local runtime.',
 			],
 			beforeYouRun: [
-				'Run from the workspace that owns the local platform state and choose one action: status, logs, or stop.',
+				'Run from the workspace that owns the local platform state. Workset apply requires `--apply --yes` and refuses dirty, divergent, or incorrectly sourced existing checkouts.',
 			],
 			outcomes: [
-				'Returns supervisor state or stops the persistent local platform while preserving the desired seed record.',
+				'Returns supervisor state, stops the runtime, or creates a verified and replay-safe exact repository workset.',
 			],
 			automationNotes: [
-				'Use `--json` for stable supervisor records in scripts and diagnostics.',
+				'Use `workset --plan --json` for a non-mutating preview. Repeating a successful apply produces an all-noop plan.',
 			],
 			warnings: [
-				'`platform stop` stops local runtime processes; it does not destroy reconciled resources or clear the selected seeds.',
+				'Workset never resets or deletes an existing repository and cannot materialize Market, Market API, or content repositories.',
 			],
 		},
 		helpVisible: true, helpFeatured: false, executionMode: 'handler', handlerName: 'platform',

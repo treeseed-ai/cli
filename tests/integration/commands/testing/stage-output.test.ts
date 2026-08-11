@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { repositoryIdentityKey } from '@treeseed/sdk';
 import { makeTenantWorkspace } from '../../../support/cli-test-fixtures.ts';
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync,mkdtempSync,writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,10 +40,35 @@ test('staging promotion plan json stays compact', async () => {
 	spawnSync('git', ['push', '-u', 'origin', 'staging'], { cwd: root, stdio: 'ignore' });
 	spawnSync('git', ['checkout', '-b', 'feature/stage-plan'], { cwd: root, stdio: 'ignore' });
 	spawnSync('git', ['push', '-u', 'origin', 'feature/stage-plan'], { cwd: root, stdio: 'ignore' });
+	const commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+	const receiptPath = join(root, '.treeseed', 'workflow', 'integration-receipts', 'latest.json');
+	mkdirSync(join(root, '.treeseed', 'workflow', 'integration-receipts'), { recursive: true });
+	writeFileSync(receiptPath, `${JSON.stringify({
+		schemaVersion: 1,
+		kind: 'treeseed.integration-change-set/v1',
+		scope: 'federated',
+		receiptId: 'stage-plan-receipt',
+		runId: 'stage-plan-save',
+		sourceBranch: 'feature/stage-plan',
+		createdAt: new Date().toISOString(),
+		repositories: [{
+			name: '@treeseed/market',
+			role: 'root',
+			repository: { canonicalKey: repositoryIdentityKey(origin), remoteUrl: origin },
+			workspacePath: '.',
+			sourceBranch: 'feature/stage-plan',
+			commit,
+			dependencies: [],
+			contractDigests: { packageManifest: null, lockfile: null },
+			verification: { status: 'skipped', mode: null },
+			remoteProof: { kind: 'branch_head', ref: 'feature/stage-plan', refCommit: commit },
+			remoteVerified: true,
+		}],
+	}, null, 2)}\n`);
 
 	const result = await runCli(['stage', '--plan', '--json', 'staging promotion plan'], root);
 
-	assert.equal(result.exitCode, 0);
+	assert.equal(result.exitCode, 0, result.output);
 	const payload = parseJsonOutput(result.output);
 	assert.equal(payload.command, 'stage');
 	assert.equal(payload.ok, true);

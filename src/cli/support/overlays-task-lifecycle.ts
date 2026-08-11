@@ -142,18 +142,20 @@ export const taskLifecycleCommandOverlays: Array<[string, CommandOverlay]> = [
 	['save', command({
 			arguments: [{ name: 'message', description: 'Optional hint for generated save commit messages.', required: false, kind: 'message_tail' }],
 			options: [
+				{ name: 'federated', flags: '--federated', description: 'Save the complete checked-out repository federation and emit a staging-eligible integration receipt.', kind: 'boolean' },
 				{ name: 'hotfix', flags: '--hotfix', description: 'Allow save on main for an explicit hotfix.', kind: 'boolean' },
 				{ name: 'preview', flags: '--preview', description: 'Create or refresh the branch preview during save.', kind: 'boolean' },
 				{ name: 'verifyMode', flags: '--verify <mode>', description: 'Run package-local verification before pushing.', kind: 'enum', values: ['fast', 'local', 'skip'] },
 				{ name: 'workspaceLinks', flags: '--workspace-links <mode>', description: 'Control local workspace package links.', kind: 'enum', values: ['auto', 'off'] },
-				{ name: 'plan', flags: '--plan', description: 'Compute the recursive save plan without mutating any repo.', kind: 'boolean' },
+				{ name: 'plan', flags: '--plan', description: 'Compute the repository-scoped or explicit federated save plan without mutation.', kind: 'boolean' },
 				{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 			],
-			examples: ['treeseed save', 'treeseed save "add search filters"', 'treeseed save --preview', 'treeseed save --verify local', 'treeseed save --plan', 'treeseed save --hotfix "fix production form submit"'],
+			examples: ['treeseed save', 'treeseed save "add search filters"', 'treeseed save --federated "integrate API and Admin"', 'treeseed save --preview', 'treeseed save --verify local', 'treeseed save --plan', 'treeseed save --hotfix "fix production form submit"'],
 			help: {
 				workflowPosition: 'checkpoint work',
 				longSummary: [
-					'Save is the main task-branch checkpoint command. It verifies, commits, syncs, pushes, and can refresh the task preview so the branch remains in a clean, reviewable state.',
+					'Save is the main task-branch checkpoint command. By default it verifies, commits, and pushes only the repository containing the invocation directory.',
+					'Use `--federated` at an integration boundary to save the checked-out repository graph and produce the exact receipt required by stage.',
 					'Use it instead of ad hoc manual git-and-preview sequences when you want the standard Treeseed task-save behavior.',
 					'Save is deliberately limited to a fast repository checkpoint. It never waits for hosted deployment or runs release guarantees.',
 				],
@@ -171,17 +173,19 @@ export const taskLifecycleCommandOverlays: Array<[string, CommandOverlay]> = [
 				outcomes: [
 					'Verifies and commits current work using a generated commit message.',
 					'Syncs and pushes branch state.',
-					'Saves dependency-ordered repositories without hosted CI, deploy waits, package installation, or guarantee execution.',
+					'Saves one repository by default, or dependency-ordered repositories with `--federated`, without hosted CI, deploy waits, or guarantee execution.',
 					'Optionally refreshes preview infrastructure if requested.',
 				],
 				examples: [
 					example('treeseed save', 'Fast checkpoint', 'Commit and push the current task branch through the default fast lane.'),
 					example('treeseed save "add search filters"', 'Checkpoint with a hint', 'Feed a short hint into commit-message generation without replacing the generated message.'),
+					example('treeseed save --federated "integrate API and Admin"', 'Federated checkpoint', 'Save the complete checked-out graph and emit a staging-eligible exact repository receipt.'),
 					example('treeseed save --verify local "add search filters"', 'Fast checkpoint with local verification', 'Keep hosted waits off while running package-local verification before pushing.'),
 					example('treeseed save --preview', 'Checkpoint plus preview refresh', 'Include preview refresh when the save should update the branch environment.'),
 					example('treeseed save --hotfix "fix production form submit"', 'Explicit hotfix save', 'Allow a save from main when the work is a deliberate hotfix path.', { why: 'Use sparingly and only when the workflow intentionally bypasses the usual task-branch rule.' }),
 				],
 				warnings: [
+					'Stage rejects repository-scoped receipts. Run a reviewed `save --federated` after cross-project integration is coherent.',
 					'Use `stage` for hosted candidate proof and `release` for production promotion.',
 					'`--verify local` can still be expensive because package-local verify scripts may run builds, unit tests, and smoke tests even though hosted gates remain off.',
 					'`--hotfix` deliberately loosens the normal task-branch safety model. Keep it exceptional.',

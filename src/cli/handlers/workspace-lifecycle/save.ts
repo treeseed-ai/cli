@@ -2,6 +2,7 @@ import type { CommandHandler } from '../../types.js';
 import { guidedResult } from '../utilities/utils.js';
 import { createWorkflowSdk, renderWorkflowNextSteps, workflowErrorResult } from '../operations/workflow.js';
 import { compileDesiredResourceGraph, selectDesiredResources } from '@treeseed/sdk/platform/desired-state';
+import { resolveWorkflowPaths } from '@treeseed/sdk/workflow-support';
 
 type SavePlanRepo = {
 	name: string;
@@ -98,7 +99,8 @@ function desiredResourceSections(input: {
 	const selectedApps = Array.isArray(input.applicationSelection?.selected)
 		? input.applicationSelection.selected.filter((entry): entry is string => typeof entry === 'string')
 		: [];
-	const graph = compileDesiredResourceGraph({ tenantRoot: input.context.cwd, target });
+	const tenantRoot = resolveWorkflowPaths(input.context.cwd).tenantRoot ?? input.context.cwd;
+	const graph = compileDesiredResourceGraph({ tenantRoot, target });
 	const resourceKind = [
 		...(input.preview ? ['branch-preview'] : []),
 		...(input.verifyDeployedResources ? ['save-gate', 'release-gate'] : []),
@@ -126,6 +128,7 @@ export const handleSave: CommandHandler = async (invocation, context) => {
 			write: progressWrite,
 		}).save({
 			message: invocation.positionals.join(' ').trim(),
+			federated: invocation.args.federated === true,
 			hotfix: invocation.args.hotfix === true,
 			preview: invocation.args.preview === true,
 			lane: typeof invocation.args.lane === 'string' ? invocation.args.lane as 'fast' | 'promotion' : undefined,
@@ -139,6 +142,7 @@ export const handleSave: CommandHandler = async (invocation, context) => {
 		});
 		const payload = result.payload as {
 			mode: 'root-only' | 'recursive-workspace';
+			repositoryScope?: 'repository' | 'federated';
 			branch: string;
 			scope: string;
 			hotfix: boolean;
@@ -159,6 +163,10 @@ export const handleSave: CommandHandler = async (invocation, context) => {
 			rootRepo?: {
 				committed?: boolean;
 				pushed?: boolean;
+			};
+			integrationReceipt?: {
+				receiptId?: string;
+				repositories?: unknown[];
 			};
 			repositoryPlan?: {
 				repos?: SavePlanRepo[];
@@ -202,6 +210,7 @@ export const handleSave: CommandHandler = async (invocation, context) => {
 				: payload.noChanges ? 'Treeseed save found no new changes and confirmed branch sync.' : 'Treeseed save completed successfully.',
 			facts: [
 				{ label: 'Mode', value: payload.mode },
+				{ label: 'Repository scope', value: payload.repositoryScope ?? 'repository' },
 				{ label: 'Branch', value: payload.branch },
 				{ label: 'Environment scope', value: payload.scope },
 				{ label: 'Hotfix', value: payload.hotfix ? 'yes' : 'no' },
@@ -213,13 +222,15 @@ export const handleSave: CommandHandler = async (invocation, context) => {
 				},
 				{ label: 'Commit', value: commitSha },
 				{ label: 'Commit created', value: payload.commitCreated ? 'yes' : 'no' },
+				{ label: 'Integration receipt', value: payload.integrationReceipt?.receiptId?.slice(0, 12) ?? (result.executionMode === 'plan' ? 'planned' : 'missing') },
+				{ label: 'Receipt repositories', value: String(payload.integrationReceipt?.repositories?.length ?? (result.executionMode === 'plan' ? (payload.repositoryPlan?.repos?.length ?? 0) + (payload.repositoryPlan?.rootRepo ? 1 : 0) : 0)) },
 				{
 					label: result.executionMode === 'plan' ? 'Workspace repos planned' : 'Workspace repos',
 					value: result.executionMode === 'plan'
 						? (plannedRepos || 'not applicable')
 						: savedRepos || ((payload.repos ?? []).length > 0 ? 'none saved' : 'not applicable'),
 				},
-				{ label: 'Market pushed', value: payload.rootRepo?.pushed ? 'yes' : 'no' },
+				{ label: 'Primary repository pushed', value: payload.rootRepo?.pushed ? 'yes' : 'no' },
 				{ label: 'Preview action', value: payload.previewAction?.status ?? 'skipped' },
 				{ label: 'Lane', value: payload.lane ?? 'fast' },
 				{ label: 'CI mode', value: payload.ciMode ?? 'auto' },

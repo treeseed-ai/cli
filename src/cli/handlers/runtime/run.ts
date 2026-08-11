@@ -4,6 +4,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { loadAndPlanSeed } from '@treeseed/sdk/seeds';
+import { applyPlatformWorkset,planPlatformWorkset } from '@treeseed/sdk';
 import { getMachineConfigPaths, readConfigurationGeneration, settleConfigurationGeneration } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler, ParsedInvocation } from '../../types.js';
 import { handleConfig } from '../configuration/config.js';
@@ -252,7 +253,19 @@ export const handleRun: CommandHandler = async (invocation, context) => {
 export const handlePlatform: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'status';
 	if (action === 'supervise') return supervise(invocation, context);
-	if (!['status', 'logs', 'stop'].includes(action)) return fail('Usage: trsd platform status|logs|stop');
+	if (action === 'workset') {
+		const branch = typeof invocation.args.branch === 'string' ? invocation.args.branch : null;
+		if (invocation.args.apply === true && invocation.args.yes !== true) return fail('Applying a Platform workset requires --apply --yes.');
+		try {
+			const report = invocation.args.apply === true
+				? applyPlatformWorkset({ root: context.cwd, branch, env: context.env })
+				: planPlatformWorkset({ root: context.cwd, branch });
+			return { exitCode: report.summary.blocked ? 1 : 0, report: { command: 'platform workset', ok: report.summary.blocked === 0, executionMode: invocation.args.apply === true ? 'apply' : 'plan', ...report } };
+		} catch (error) {
+			return fail(error instanceof Error ? error.message : String(error));
+		}
+	}
+	if (!['status', 'logs', 'stop'].includes(action)) return fail('Usage: trsd platform status|logs|stop|workset');
 	const result = await handleDev(invocationFor('dev', invocation, [action], { ...invocation.args, json: invocation.args.json }), context);
 	const supervisor = readPlatformSupervisor(context.cwd);
 	if (action === 'stop' && invocation.args.plan !== true && supervisor && processIsAlive(supervisor.pid)) process.kill(supervisor.pid, 'SIGTERM');

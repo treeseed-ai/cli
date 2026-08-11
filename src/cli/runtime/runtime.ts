@@ -401,9 +401,10 @@ export function resolveCommandCwd(spec: OperationSpec, cwd: string) {
 	const workflowPaths = resolveWorkflowPaths(cwd);
 	const resolvedProjectRoot = workflowPaths.tenantRoot;
 	const resolvedWorkspaceRoot = resolvedProjectRoot ? findNearestWorkspaceRoot(resolvedProjectRoot) : null;
+	const preserveRepositoryCwd = spec.name === 'save';
 
 	return {
-		cwd: resolvedProjectRoot ?? cwd,
+		cwd: preserveRepositoryCwd ? cwd : resolvedProjectRoot ?? cwd,
 		resolvedProjectRoot,
 		resolvedWorkspaceRoot,
 	};
