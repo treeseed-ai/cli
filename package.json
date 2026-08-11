@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.fix-market-api-build-boundary.20260811T061222Z",
+  "version": "0.12.59-dev.fix-organization-reference-idempotency.20260811T063604Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -48,9 +48,9 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#689f29724169bce5541d6a41dfb268523f210909",
-    "@treeseed/core": "github:treeseed-ai/core#11cfb8074e134a520408468f98787946c050a8bd",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#c1582069610e51dd8ad30cd583c489a2174a397a",
+    "@treeseed/agent": "github:treeseed-ai/agent#f0d29a197819e2d5402a3dcbb125eaa57910a6e0",
+    "@treeseed/core": "github:treeseed-ai/core#d4397ded1674d244ed674a092f843f9a655d614d",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#1b90e1efe0dec6f599bbae93df409dd695012f76",
     "@treeseed/ui": "github:treeseed-ai/ui#6fb94ae8b1e3b493de92301f24fd7d371f6aabdd",
     "ink": "^7.0.0",
     "react": "^19.2.5",
