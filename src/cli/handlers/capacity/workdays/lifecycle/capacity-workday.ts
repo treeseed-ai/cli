@@ -11,8 +11,11 @@ export const CAPACITY_WORKDAY_ACTIONS = new Set([
 	'workday-pause',
 	'workday-resume',
 	'workday-tick',
+	'workday-close-admission',
 	'workday-complete',
 	'workday-cancel',
+	'workday-run-complete',
+	'workday-run-cancel',
 	'workday-status',
 	'workday-summary',
 ]);
@@ -35,6 +38,19 @@ function planResult(action: string, profile: { id: string; baseUrl: string }, re
 	});
 }
 
+export function compileWorkdayRunCancellation(input: { teamId: string; workdayRunId: string; reason?: string | null }) {
+	return {
+		teamId: input.teamId,
+		workdayRunId: input.workdayRunId,
+		status: 'cancelled' as const,
+		...(input.reason?.trim() ? { reason: input.reason.trim() } : {}),
+	};
+}
+
+export function compileWorkdayRunCompletion(input: { teamId: string; workdayRunId: string }) {
+	return { teamId: input.teamId, workdayRunId: input.workdayRunId, status: 'completed' as const };
+}
+
 type WorkdaySummaryEvidence = 'assignments' | 'mode-runs' | 'reservations' | 'usage-actuals' | 'ledger-entries';
 
 export function parseCapacityWorkdaySummaryOptions(args: Record<string, unknown>): {
@@ -52,6 +68,7 @@ export function parseCapacityWorkdaySummaryOptions(args: Record<string, unknown>
 	if (cursor && !evidence) return { error: '--cursor requires --evidence for capacity workday-summary.' };
 	const rawLimit = args.limit;
 	const limit = typeof rawLimit === 'number' ? rawLimit : typeof rawLimit === 'string' && rawLimit.trim() ? Number(rawLimit) : null;
+	if (limit !== null && !evidence) return { error: '--limit requires --evidence for capacity workday-summary.' };
 	if (limit !== null && (!Number.isInteger(limit) || limit < 1 || limit > 200)) {
 		return { error: '--limit must be an integer from 1 through 200.' };
 	}
@@ -80,6 +97,43 @@ export async function runCapacityWorkdayAction(action: string, invocation: Parse
 		});
 		return guidedResult({
 			command: `capacity ${action}`, summary: `Ticked capacity workday run ${workdayId}.`,
+			facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Team', value: teamId }, { label: 'Workday run', value: workdayId }],
+			report: { action, mode: 'live', payload: response.payload },
+		});
+	}
+	if (action === 'workday-close-admission') {
+		const teamSelector = stringArg(invocation, 'team');
+		if (!teamSelector) return fail('Missing --team for capacity workday-close-admission.');
+		if (!workdayId) return fail('Missing --workday for capacity workday-close-admission.');
+		if (planRequested(invocation) === executeRequested(invocation)) return fail('Capacity workday-close-admission is mutating. Choose exactly one of --plan or --execute.');
+		const { teamId } = await resolveCapacityTeam(client, teamSelector);
+		const request = { teamId, workdayRunId: workdayId };
+		if (planRequested(invocation)) return planResult(action, profile, request);
+		const response = await client.closeWorkdayAdmission(teamId, workdayId, {
+			idempotencyKey: stringArg(invocation, 'idempotencyKey') ?? `cli:workday-close-admission:${randomUUID()}`,
+		});
+		return guidedResult({
+			command: `capacity ${action}`, summary: `Closed admission for capacity workday run ${workdayId}.`,
+			facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Team', value: teamId }, { label: 'Workday run', value: workdayId }],
+			report: { action, mode: 'live', payload: response.payload },
+		});
+	}
+	if (action === 'workday-run-complete' || action === 'workday-run-cancel') {
+		const teamSelector = stringArg(invocation, 'team');
+		if (!teamSelector) return fail(`Missing --team for capacity ${action}.`);
+		if (!workdayId) return fail(`Missing --workday for capacity ${action}.`);
+		if (planRequested(invocation) === executeRequested(invocation)) return fail(`Capacity ${action} is mutating. Choose exactly one of --plan or --execute.`);
+		const { teamId } = await resolveCapacityTeam(client, teamSelector);
+		const request = action === 'workday-run-complete'
+			? compileWorkdayRunCompletion({ teamId, workdayRunId: workdayId })
+			: compileWorkdayRunCancellation({ teamId, workdayRunId: workdayId, reason: stringArg(invocation, 'reason') });
+		if (planRequested(invocation)) return planResult(action, profile, request);
+		const response = await client.updateWorkdayRun(teamId, workdayId, request);
+		return guidedResult({
+			command: `capacity ${action}`,
+			summary: action === 'workday-run-complete'
+				? `Completed API-owned workday run ${workdayId} after its authoritative admission fence.`
+				: `Cancelled API-owned workday run ${workdayId} and its remaining admission and assignment authority.`,
 			facts: [{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` }, { label: 'Team', value: teamId }, { label: 'Workday run', value: workdayId }],
 			report: { action, mode: 'live', payload: response.payload },
 		});

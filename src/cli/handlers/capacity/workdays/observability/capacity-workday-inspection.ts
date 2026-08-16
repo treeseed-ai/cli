@@ -8,6 +8,7 @@ import { redactCapacityOutputSecrets } from '../../capacity-core/capacity-output
 import { contextPackSummaries, dedupeExecutionRunRecords, groupWorkdayExecutionRecords, normalizeExecutionRunRecord, workdaySummaryFacts } from './capacity-workday-log-records.js';
 import { compactDuration, enrichWorkdayLogRecordsWithModeRuns, executionRunsForAssignments, workdayAssignmentIdsForLog, workdayHumanAssignmentLabel, workdayLogDetailLines, workdayTimelineBlock } from './capacity-workday-log.js';
 import { followWorkdayActivity } from './capacity-workday-follow.js';
+import { agentTranscriptPayloadSchema } from '@treeseed/sdk/agent-capacity';
 
 function yamlScalar(value: unknown) {
 	if (value === null || value === undefined) return 'null';
@@ -46,20 +47,20 @@ function toYaml(value: unknown, indent = 0): string {
 
 export async function readCompleteTranscript(client: unknown, executionRunId: string) {
 	const entries: unknown[] = [];
-	let after: string | null = null;
+	let cursor: string | null = null;
 	let redactionStatus: unknown = null;
 	for (;;) {
-		const suffix = new URLSearchParams({ limit: '200', ...(after ? { after } : {}) });
+		const suffix = new URLSearchParams({ limit: '200', ...(cursor ? { cursor } : {}) });
 		const response = await marketRequest<Record<string, unknown>>(client,
 			`/v1/execution-runs/${encodeURIComponent(executionRunId)}/transcript?${suffix}`, { requireAuth: true });
-		const payload = isRecord(response.payload) ? response.payload : response;
+		const payload = agentTranscriptPayloadSchema.parse(isRecord(response.payload) ? response.payload : response);
 		if (redactionStatus === null) redactionStatus = payload.redactionStatus ?? null;
 		if (Array.isArray(payload.entries)) entries.push(...payload.entries);
-		const page = isRecord(payload.page) ? payload.page : {};
-		if (!page.hasMore || typeof page.nextAfter !== 'string' || !page.nextAfter) break;
-		after = page.nextAfter;
+		const page = payload.page;
+		if (!page.hasMore || !page.nextCursor) break;
+		cursor = page.nextCursor;
 	}
-	return { executionRunId, redactionStatus, entries, page: { limit: entries.length, hasMore: false, nextAfter: null } };
+	return { executionRunId, redactionStatus, entries, page: { limit: entries.length, hasMore: false, nextCursor: null } };
 }
 
 export async function runExecutionRunsInspection(invocation: ParsedInvocation, context: CommandContext, options: { action?: 'execution-runs' | 'workday-log' } = {}) {

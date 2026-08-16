@@ -1,10 +1,17 @@
 import type { CommandHandler } from '../../types.js';
 import { guidedResult } from '../utilities/utils.js';
 import { createWorkflowSdk, hostingGraphSections, renderWorkflowNextSteps, resolveWorkflowHostingGraph, workflowErrorResult } from '../operations/workflow.js';
+import { createMarketClientForInvocation } from '../content/market-utils.js';
 
 export const handleStage: CommandHandler = async (invocation, context) => {
 	try {
-		const result = await createWorkflowSdk(context).stage({
+		const result = await createWorkflowSdk(context, {
+			validateExecutionAuthorities: async (authorities) => {
+				const { client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
+				const response = await client.request<{ payload: Array<{ authorityId: string | null; valid: boolean; code: string | null; message: string | null }> }>('/v1/governance/execution-authorities/validate', { method: 'POST', body: { authorities }, requireAuth: true });
+				return response.payload;
+			},
+		}).stage({
 			message: invocation.positionals.join(' ').trim(),
 			verifyMode: typeof invocation.args.verify === 'string' ? invocation.args.verify as 'action' | 'local' | 'none' : undefined,
 			ciMode: typeof invocation.args.ciMode === 'string' ? invocation.args.ciMode as 'hosted' | 'off' : undefined,

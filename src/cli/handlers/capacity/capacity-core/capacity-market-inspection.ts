@@ -17,6 +17,10 @@ const isRecord = isCapacityRecord;
 const listLines = capacityInspectionLines;
 const decorateInspectionRecords = decorateCapacityInspectionRecords;
 
+export function exactWorkdayRunPath(teamId: string, runId: string) {
+	return `/v1/teams/${encodeURIComponent(teamId)}/workday-runs/${encodeURIComponent(runId)}`;
+}
+
 export async function runCapacityMarketInspection(action: string, invocation: ParsedInvocation, context: CommandContext) {
 	const teamId = stringArg(invocation, 'team');
 	const projectId = stringArg(invocation, 'project');
@@ -25,12 +29,13 @@ export async function runCapacityMarketInspection(action: string, invocation: Pa
 	const mode = stringArg(invocation, 'mode');
 	const assignmentId = stringArg(invocation, 'assignment');
 	const executionProviderId = stringArg(invocation, 'execution-provider');
+	const executionKind = stringArg(invocation, 'executionKind');
 	const limit = positiveNumberArg(invocation, 'limit', 50);
 	const cursor = stringArg(invocation, 'cursor');
 	const decisionId = stringArg(invocation, 'decision');
 	const capacityPlanId = stringArg(invocation, 'capacity-plan') ?? stringArg(invocation, 'plan');
 	const workdayId = stringArg(invocation, 'workday');
-	if ((action === 'availability-sessions' || action === 'assignments' || action === 'workday-runs') && !teamId) {
+	if ((action === 'availability-sessions' || action === 'assignments' || action === 'workday-runs' || action === 'workday') && !teamId) {
 		return fail(`Missing --team. Use \`trsd capacity ${action} --team <team-id> --json\`.`);
 	}
 	if ((action === 'mode-runs' || action === 'fallback-outputs' || action === 'treedx-proxy-audit') && !projectId) {
@@ -44,6 +49,9 @@ export async function runCapacityMarketInspection(action: string, invocation: Pa
 	}
 	if (action === 'workday' && !workdayId) {
 		return fail(`Missing --workday. Use \`trsd capacity ${action} --workday <workday-id> --json\`.`);
+	}
+	if (action === 'workday-runs' && workdayId) {
+		return fail('Use `trsd capacity workday --team <team-id> --workday <run-id> --json` for exact workday-run inspection.');
 	}
 	const { profile, client, authMode } = createCapacityWorkdayMarketClient(invocation, context);
 	const resolvedTeam = teamId
@@ -68,7 +76,7 @@ export async function runCapacityMarketInspection(action: string, invocation: Pa
 		})}`;
 		scopeLabel = `team ${resolvedTeamId}`;
 	} else if (action === 'workday-runs') {
-		path = `/v1/teams/${encodeURIComponent(resolvedTeamId!)}/workday-runs${queryFromFilters({ status, limit, cursor })}`;
+		path = `/v1/teams/${encodeURIComponent(resolvedTeamId!)}/workday-runs${queryFromFilters({ status, executionKind, limit, cursor })}`;
 		scopeLabel = `team ${resolvedTeamId}`;
 	} else if (action === 'mode-runs') {
 		path = `/v1/projects/${encodeURIComponent(projectId!)}/agent-mode-runs${queryFromFilters({ mode, assignmentId, limit, cursor })}`;
@@ -92,8 +100,8 @@ export async function runCapacityMarketInspection(action: string, invocation: Pa
 		path = `/v1/capacity-plans/${encodeURIComponent(capacityPlanId!)}`;
 		scopeLabel = `capacity plan ${capacityPlanId}`;
 	} else if (action === 'workday') {
-		path = `/v1/workdays/${encodeURIComponent(workdayId!)}`;
-		scopeLabel = `workday ${workdayId}`;
+		path = exactWorkdayRunPath(resolvedTeamId!, workdayId!);
+		scopeLabel = `workday run ${workdayId}`;
 	}
 	const response = await marketRequest<{
 		ok: true;
@@ -125,7 +133,7 @@ export async function runCapacityMarketInspection(action: string, invocation: Pa
 			action,
 			market: { id: profile.id, baseUrl: profile.baseUrl },
 			scope: { teamId, projectId },
-			filters: { providerId, status, mode, assignmentId, workdayId, executionProviderId, limit, cursor, capacityPlanId },
+			filters: { providerId, status, mode, assignmentId, workdayId, executionProviderId, executionKind, limit, cursor, capacityPlanId },
 			records: decoratedRecords,
 			...(page ? { page } : {}),
 		},

@@ -32,6 +32,18 @@ export function createMarketClientForInvocation(invocation: ParsedInvocation, co
 		? localAcceptanceAdminToken(context.env)
 		: null;
 	const accessToken = localAccessToken ?? session?.accessToken ?? null;
+	const configuredMode = context.env.TREESEED_CONTROL_PLANE_MODE?.trim();
+	const controlPlaneMode = configuredMode === 'managed' || configuredMode === 'external' || configuredMode === 'market-passthrough'
+		? configuredMode
+		: 'market-passthrough';
+	const marketBaseUrl = profile.id === 'treeseed'
+		? profile.baseUrl
+		: context.env.TREESEED_MARKET_API_BASE_URL?.trim() || profile.baseUrl;
+	const configuredControlPlaneUrl = context.env.TREESEED_API_BASE_URL?.trim();
+	if (controlPlaneMode !== 'market-passthrough' && !configuredControlPlaneUrl) {
+		throw new Error(`Control-plane mode ${controlPlaneMode} requires TREESEED_API_BASE_URL.`);
+	}
+	const controlPlaneBaseUrl = controlPlaneMode === 'market-passthrough' ? marketBaseUrl : configuredControlPlaneUrl!;
 	if (options.requireAuth && !accessToken) {
 		throw new Error(`Not logged in to market "${profile.id}". Run treeseed auth:login --market ${profile.id}.`);
 	}
@@ -40,6 +52,9 @@ export function createMarketClientForInvocation(invocation: ParsedInvocation, co
 		session,
 		client: new MarketClient({
 			profile,
+			marketBaseUrl,
+			controlPlaneBaseUrl,
+			controlPlaneMode,
 			accessToken,
 			userAgent: 'treeseed-cli',
 		}),

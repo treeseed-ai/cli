@@ -72,7 +72,7 @@ describe('capacity checkpoint integration admission', () => {
 			const checkpointCommit = await git(repositoryPath, 'rev-parse', 'HEAD');
 			await git(repositoryPath, 'switch', 'task/checkpoint-canary');
 			const assignment = {
-				id: 'assignment-canary', projectId: 'project-sdk', status: 'completed', mode: 'acting',
+				id: 'assignment-canary', projectId: 'project-sdk', status: 'completed', mode: 'acting', executionMode: 'production',
 				decisionInput: { input: { workGraphId: 'graph-canary', workGraphNodeId: 'implementation-canary' } },
 				lifecycleOutput: { artifactManifest: {
 					schemaVersion: 1, assignmentId: 'assignment-canary', modeRunId: 'mode-canary', teamId: 'team-a', projectId: 'project-sdk', providerId: 'provider-a', mode: 'acting',
@@ -81,12 +81,12 @@ describe('capacity checkpoint integration admission', () => {
 				} },
 			};
 			const graph = {
-				id: 'graph-canary', projectId: 'project-sdk', decisionId: 'decision-canary', status: 'completed', metadata: { exactBaseRef: baseCommit },
+				id: 'graph-canary', projectId: 'project-sdk', decisionId: 'decision-canary', status: 'completed', executionMode: 'production', metadata: { exactBaseRef: baseCommit },
 				nodes: [
-					{ id: 'implementation-canary', status: 'completed', metadata: { stage: 'implementation', producesDeliverableContractId: 'contract-implementation' } },
-					{ id: 'verification-canary', status: 'completed', metadata: { stage: 'verification', producesDeliverableContractId: 'contract-verification' } },
-					{ id: 'review-canary', status: 'completed', metadata: { stage: 'review', producesDeliverableContractId: 'contract-review' } },
-					{ id: 'release-canary', status: 'completed', metadata: { stage: 'release', producesDeliverableContractId: 'contract-release' } },
+					{ id: 'implementation-canary', activityType: 'acting', status: 'completed', metadata: { stage: 'implementation', producesDeliverableContractId: 'contract-implementation' } },
+					{ id: 'verification-canary', activityType: 'acting', status: 'completed', metadata: { stage: 'verification', producesDeliverableContractId: 'contract-verification' } },
+					{ id: 'review-canary', activityType: 'reviewing', status: 'completed', metadata: { stage: 'review', producesDeliverableContractId: 'contract-review' } },
+					{ id: 'release-canary', activityType: 'reporting', status: 'completed', metadata: { stage: 'release', producesDeliverableContractId: 'contract-release' } },
 				],
 				deliverableContracts: ['contract-implementation', 'contract-verification', 'contract-review', 'contract-release'].map((id) => ({ id, status: 'approved' })),
 			};

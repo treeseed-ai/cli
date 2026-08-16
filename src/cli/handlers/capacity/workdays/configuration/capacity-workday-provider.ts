@@ -14,6 +14,18 @@ function providerMatchesSelector(provider: Record<string, unknown>, selector: st
 		.some((value) => String(value ?? '').toLowerCase() === selector.toLowerCase());
 }
 
+function sessionSupportsWorkdays(session: Record<string, unknown>) {
+	const snapshot = session.snapshot && typeof session.snapshot === 'object' ? session.snapshot as Record<string, unknown> : {};
+	const capabilities = Array.isArray(snapshot.capabilities) ? snapshot.capabilities.map(String) : [];
+	return capabilities.includes('planning') || capabilities.includes('agent_mode_run');
+}
+
+function sessionAdvertisesPreferredExecution(session: Record<string, unknown>) {
+	const snapshot = session.snapshot && typeof session.snapshot === 'object' ? session.snapshot as Record<string, unknown> : {};
+	return Array.isArray(snapshot.executionProviders) && snapshot.executionProviders.some((candidate) =>
+		candidate && typeof candidate === 'object' && (candidate as Record<string, unknown>).preferred === true);
+}
+
 /** Resolve a CLI selector to a globally stable provider identity authorized by the team. */
 export async function resolveCapacityWorkdayProviderId(
 	client: CapacityWorkdayProviderClient,
@@ -34,10 +46,14 @@ export async function resolveCapacityWorkdayProviderId(
 
 	if (selector.toLowerCase() === 'local') {
 		const sessionsResponse = await client.providerAvailabilitySessions(teamId, { status: 'open' }).catch(() => ({ payload: { items: [] } }));
-		const localProviderIds = [...new Set(capacityCollectionItems(sessionsResponse.payload)
+		const localSessions = capacityCollectionItems(sessionsResponse.payload)
 			.filter(isCapacityRecord)
 			.filter((session) => String(session.status ?? 'open').toLowerCase() === 'open')
-			.filter((session) => String(session.environment ?? '').toLowerCase() === 'local')
+			.filter((session) => !session.environment || String(session.environment).toLowerCase() === 'local')
+			.filter(sessionSupportsWorkdays);
+		const preferred = localSessions.filter(sessionAdvertisesPreferredExecution);
+		const selectable = preferred.length ? preferred : localSessions;
+		const localProviderIds = [...new Set(selectable
 			.map((session) => String(session.providerId ?? session.capacityProviderId ?? ''))
 			.filter((providerId) => providers.some((provider) => String(provider.id) === providerId)))];
 		if (localProviderIds.length === 1) return { providerId: localProviderIds[0]!, providers };

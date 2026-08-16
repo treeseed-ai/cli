@@ -206,6 +206,8 @@ test('capacity inspection exposes read-only execution visibility summaries', () 
 	assert.match(capacityHandler, /adapter=/u);
 	assert.match(capacityHandler, /external=/u);
 	assert.match(operationsRegistry, /execution visibility and capability match summaries/u);
+	assert.match(operationsRegistry, /--fresh-for-seconds <seconds>/u);
+	assert.match(operationsRegistry, /--include-result/u);
 });
 
 test('command metadata stays aligned with help coverage', () => {

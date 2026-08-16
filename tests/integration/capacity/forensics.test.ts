@@ -71,15 +71,15 @@ describe('capacity forensic reads', () => {
 			async request<T>(path: string): Promise<T> {
 				paths.push(path);
 				return (paths.length === 1
-					? { payload: { redactionStatus: 'sanitized', entries: [{ sequence: 1 }], page: { hasMore: true, nextAfter: '1' } } }
-					: { payload: { redactionStatus: 'sanitized', entries: [{ sequence: 2 }], page: { hasMore: false, nextAfter: null } } }) as T;
+					? { payload: { executionRunId: 'execution-a', redactionStatus: 'sanitized', entries: [{ sequence: 1 }], page: { limit: 200, hasMore: true, nextCursor: 'cursor-1' } } }
+					: { payload: { executionRunId: 'execution-a', redactionStatus: 'sanitized', entries: [{ sequence: 2 }], page: { limit: 200, hasMore: false, nextCursor: null } } }) as T;
 			},
 		};
 
 		const transcript = await readCompleteTranscript(client, 'execution-a');
 		assert.deepEqual(transcript.entries, [{ sequence: 1 }, { sequence: 2 }]);
-		assert.deepEqual(transcript.page, { limit: 2, hasMore: false, nextAfter: null });
+		assert.deepEqual(transcript.page, { limit: 2, hasMore: false, nextCursor: null });
 		assert.match(paths[0]!, /limit=200/u);
-		assert.match(paths[1]!, /after=1/u);
+		assert.match(paths[1]!, /cursor=cursor-1/u);
 	});
 });

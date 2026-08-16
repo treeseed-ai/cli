@@ -25,9 +25,6 @@ export async function resolveCapacityTeam(client: unknown, teamSelector: string)
 		const activity = capacityRecordValue(payload, 'activity');
 		const projects = activity && typeof activity === 'object' && Array.isArray((activity as Record<string, unknown>).projects) ? (activity as Record<string, unknown>).projects as Array<Record<string, unknown>> : [];
 		const profileTeam = record(team);
-		if (typeof profileTeam.id === 'string' && profileTeam.id) {
-			return { teamId: profileTeam.id, teamSelector, team, projects };
-		}
 		const identity = await capacityMarketRequest<{ ok: boolean; payload?: Record<string, unknown> }>(client, '/v1/me', { requireAuth: true }).catch(() => null);
 		const identityPayload = record(identity?.payload);
 		const principal = record(identityPayload.principal);
@@ -37,6 +34,9 @@ export async function resolveCapacityTeam(client: unknown, teamSelector: string)
 			Boolean(candidate.id ?? candidate.teamId) && matchesTeamSelector(candidate, teamSelector));
 		const resolvedTeamId = resolved?.id ?? resolved?.teamId;
 		if (resolvedTeamId) return { teamId: String(resolvedTeamId), teamSelector, team, projects };
+		if (typeof profileTeam.id === 'string' && profileTeam.id && profileTeam.id.toLowerCase() !== teamSelector.toLowerCase()) {
+			return { teamId: profileTeam.id, teamSelector, team, projects };
+		}
 	}
 	return { teamId: teamSelector, teamSelector, team: null, projects: [] as Array<Record<string, unknown>> };
 }

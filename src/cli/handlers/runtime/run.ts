@@ -4,7 +4,8 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { loadAndPlanSeed } from '@treeseed/sdk/seeds';
-import { applyPlatformWorkset,planPlatformWorkset } from '@treeseed/sdk';
+import { applyPlatformWorkset,planPlatformWorkset,type PlatformWorksetAuthority } from '@treeseed/sdk';
+import { applyPlatformInitialization,planPlatformInitialization } from '@treeseed/sdk/operations';
 import { getMachineConfigPaths, readConfigurationGeneration, settleConfigurationGeneration } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler, ParsedInvocation } from '../../types.js';
 import { handleConfig } from '../configuration/config.js';
@@ -14,6 +15,9 @@ import { handleUpdate } from '../workspace-lifecycle/update.js';
 import { fail } from '../utilities/utils.js';
 import { platformSupervisorPaths, processIsAlive, readPlatformSupervisor, type PlatformSupervisorState } from './platform-supervisor-state.js';
 import { runPlatformMutationWhenAvailable } from './platform-supervisor-workflows.js';
+import { loadPlatformWorksetInventory } from './platform-workset-inventory.js';
+import { inspectPlatformRepositories } from './platform-repository-status.js';
+import { createMarketClientForInvocation } from '../content/market-utils.js';
 
 type RunState = {
 	schemaVersion: 1;
@@ -125,6 +129,11 @@ async function supervise(invocation: ParsedInvocation, context: Parameters<Comma
 }
 
 function systemdQuote(value: string) { return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`; }
+export function platformUserServiceIdentity(root: string) {
+	const scope = Buffer.from(root).toString('base64url').slice(0, 20).toLowerCase();
+	const unit = `treeseed-platform-${scope}.service`;
+	return { unit, path: resolve(homedir(), '.config', 'systemd', 'user', unit) };
+}
 export function renderPlatformUserService(input: { root: string; executable: string; entrypoint: string; pathValue?: string }) {
 	const pathEntries = [dirname(input.executable), ...(input.pathValue ?? '').split(':')].filter(Boolean);
 	const runtimePath = [...new Set(pathEntries)].join(':');
@@ -132,11 +141,10 @@ export function renderPlatformUserService(input: { root: string; executable: str
 }
 function reconcileUserService(root: string) {
 	if (process.platform !== 'linux' || !process.argv[1]) return { supported: false, installed: false };
-	const scope = Buffer.from(root).toString('base64url').slice(0, 20).toLowerCase();
-	const directory = resolve(homedir(), '.config', 'systemd', 'user'); const path = resolve(directory, `treeseed-platform-${scope}.service`);
+	const { unit, path } = platformUserServiceIdentity(root);
+	const directory = dirname(path);
 	const content = renderPlatformUserService({ root, executable: process.execPath, entrypoint: resolve(process.argv[1]), pathValue: process.env.PATH });
 	mkdirSync(directory, { recursive: true }); if (!existsSync(path) || readFileSync(path, 'utf8') !== content) writeFileSync(path, content, 'utf8');
-	const unit = `treeseed-platform-${scope}.service`;
 	const existing = readPlatformSupervisor(root);
 	if (existing && processIsAlive(existing.pid)) process.kill(existing.pid, 'SIGTERM');
 	const reload = spawnSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'ignore' });
@@ -147,6 +155,27 @@ function reconcileUserService(root: string) {
 		: null;
 	const pid = Number.parseInt(pidResult?.stdout.trim() ?? '', 10);
 	return { supported: true, installed: true, enabled: enable?.status === 0, active: restart?.status === 0, pid: Number.isFinite(pid) && pid > 0 ? pid : null, path, unit };
+}
+
+export function platformUserServiceStopArgs(mode: 'pause' | 'stop') {
+	return mode === 'stop' ? ['--user', 'disable', '--now'] : ['--user', 'stop'];
+}
+
+function stopUserService(root: string, mode: 'pause' | 'stop') {
+	if (process.platform !== 'linux') return { supported: false, stopped: false };
+	const { unit, path } = platformUserServiceIdentity(root);
+	if (!existsSync(path)) return { supported: true, installed: false, stopped: true, unit, path };
+	const result = spawnSync('systemctl', [...platformUserServiceStopArgs(mode), unit], { encoding: 'utf8' });
+	return {
+		supported: true,
+		installed: true,
+		stopped: result.status === 0,
+		unit,
+		path,
+		enabled: mode === 'pause',
+		status: result.status,
+		...(result.status === 0 ? {} : { error: (result.stderr || result.stdout || `systemctl --user ${mode === 'stop' ? 'disable --now' : 'stop'} failed`).trim() }),
+	};
 }
 
 function startSupervisor(root: string) {
@@ -198,6 +227,36 @@ export function compileSeedSet(root: string, seeds: string[]) {
 
 function invocationFor(commandName: string, source: ParsedInvocation, positionals: string[], args: Record<string, string | string[] | boolean | undefined>): ParsedInvocation {
 	return { commandName, rawArgs: source.rawArgs, positionals, args };
+}
+
+function object(value: unknown): Record<string, unknown> {
+	return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+export async function governedWorksetAuthority(client: ReturnType<typeof createMarketClientForInvocation>['client'], teamId: string, assignmentId: string): Promise<PlatformWorksetAuthority> {
+	const assignment = (await client.capacityProviderAssignment(teamId, assignmentId)).payload;
+	if (assignment.teamId !== teamId || assignment.mode !== 'acting' || !['pending', 'leased', 'running'].includes(String(assignment.status))) throw new Error('Writable workset custody requires an active acting assignment for this team.');
+	const decisionInput = object(assignment.decisionInput);
+	const selectedInput = object(decisionInput.input);
+	const decisionMetadata = object(decisionInput.metadata);
+	const assignmentMetadata = object(assignment.metadata);
+	const capacityEnvelope = object(assignment.capacityEnvelope);
+	const capacityMetadata = object(capacityEnvelope.metadata);
+	const decisionId = String(assignment.decisionId ?? decisionInput.decisionId ?? '').trim();
+	const capacityPlanId = String(assignmentMetadata.capacityPlanId ?? decisionMetadata.capacityPlanId ?? capacityMetadata.capacityPlanId ?? '').trim();
+	const workDayId = String(assignment.workDayId ?? decisionInput.workDayId ?? '').trim();
+	const baseCommit = String(selectedInput.exactBaseRef ?? decisionMetadata.exactBaseRef ?? '').trim().toLowerCase();
+	const capabilityHandles = object(assignment.capabilityHandles);
+	const repositoryHandles = Array.isArray(capabilityHandles.repository) ? capabilityHandles.repository.map(object) : [];
+	const expiresAt = [assignment.leaseExpiresAt, ...repositoryHandles.map((handle) => handle.expiresAt)]
+		.map(String).filter((value) => Number.isFinite(Date.parse(value)) && Date.parse(value) > Date.now()).sort()[0] ?? '';
+	if (!decisionId || !capacityPlanId || !workDayId || !/^[a-f0-9]{40}$/u.test(baseCommit) || !expiresAt) throw new Error('Acting assignment is missing decision, accepted capacity plan, workday, exact source base, or unexpired repository authority.');
+	const capacityPlan = (await client.capacityPlan(capacityPlanId)).payload;
+	if (!capacityPlan || !['accepted', 'scheduled', 'active'].includes(String(capacityPlan.status))) throw new Error(`Capacity plan ${capacityPlanId} is not accepted, scheduled, or active.`);
+	if (String(capacityPlan.teamId) !== teamId || String(capacityPlan.projectId) !== String(assignment.projectId) || String(capacityPlan.decisionId) !== decisionId) {
+		throw new Error(`Capacity plan ${capacityPlanId} does not govern this assignment team, project, and decision.`);
+	}
+	return { schemaVersion: 1, kind: 'treeseed.governed-workset-authority', status: 'active', teamId, projectId: String(assignment.projectId), decisionId, capacityPlanId, workDayId, assignmentId, mode: 'acting', baseCommit, expiresAt };
 }
 
 export const handleRun: CommandHandler = async (invocation, context) => {
@@ -253,21 +312,58 @@ export const handleRun: CommandHandler = async (invocation, context) => {
 export const handlePlatform: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'status';
 	if (action === 'supervise') return supervise(invocation, context);
+	if (action === 'init') {
+		if (invocation.args.plan === invocation.args.apply) return fail('Platform init requires exactly one of --plan or --apply.');
+		if (invocation.args.apply === true && invocation.args.yes !== true) return fail('Applying Platform initialization requires --apply --yes.');
+		const targetRoot = invocation.positionals[1]?.trim();
+		const repository = typeof invocation.args.repository === 'string' ? invocation.args.repository.trim() : '';
+		const ref = typeof invocation.args.ref === 'string' ? invocation.args.ref.trim() : '';
+		const templateId = typeof invocation.args.template === 'string' ? invocation.args.template.trim() : '';
+		const team = typeof invocation.args.team === 'string' ? invocation.args.team.trim() : '';
+		if (!targetRoot || !repository || !ref || !templateId || !team) return fail('Usage: trsd platform init <directory> --repository treeseed-ai/platform --ref <branch-or-sha> --template <id> --team <team> --plan|--apply [--yes] --json');
+		try {
+			const input = { targetRoot, repository, ref, templateId, team, controlPlaneBaseUrl: typeof invocation.args.controlPlaneBaseUrl === 'string' ? invocation.args.controlPlaneBaseUrl : undefined };
+			const report = invocation.args.apply === true ? applyPlatformInitialization(input) : planPlatformInitialization(input);
+			return { exitCode: report.blockers.length ? 1 : 0, report: { command: 'platform init', ok: report.blockers.length === 0, executionMode: invocation.args.apply === true ? 'apply' : 'plan', ...report } };
+		} catch (error) {
+			return fail(error instanceof Error ? error.message : String(error));
+		}
+	}
 	if (action === 'workset') {
 		const branch = typeof invocation.args.branch === 'string' ? invocation.args.branch : null;
+		const assignmentId = typeof invocation.args.assignment === 'string' ? invocation.args.assignment.trim() : '';
+		const teamSelector = typeof invocation.args.team === 'string' ? invocation.args.team : context.env.TREESEED_TEAM_ID?.trim() || 'treeseed';
 		if (invocation.args.apply === true && invocation.args.yes !== true) return fail('Applying a Platform workset requires --apply --yes.');
+		if (branch && !assignmentId) return fail('A writable Platform workset branch requires --assignment <acting-assignment-id>.');
 		try {
+			const { client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
+			const { teamId, inventory } = await loadPlatformWorksetInventory(client, teamSelector);
+			const authority = assignmentId ? await governedWorksetAuthority(client, teamId, assignmentId) : null;
+			const input = { root: context.cwd, teamId, inventory, branch, authority, env: context.env };
 			const report = invocation.args.apply === true
-				? applyPlatformWorkset({ root: context.cwd, branch, env: context.env })
-				: planPlatformWorkset({ root: context.cwd, branch });
+				? applyPlatformWorkset(input)
+				: planPlatformWorkset(input);
 			return { exitCode: report.summary.blocked ? 1 : 0, report: { command: 'platform workset', ok: report.summary.blocked === 0, executionMode: invocation.args.apply === true ? 'apply' : 'plan', ...report } };
 		} catch (error) {
 			return fail(error instanceof Error ? error.message : String(error));
 		}
 	}
-	if (!['status', 'logs', 'stop'].includes(action)) return fail('Usage: trsd platform status|logs|stop|workset');
-	const result = await handleDev(invocationFor('dev', invocation, [action], { ...invocation.args, json: invocation.args.json }), context);
+	if (!['status', 'logs', 'pause', 'stop'].includes(action)) return fail('Usage: trsd platform init|status|logs|pause|stop|workset');
 	const supervisor = readPlatformSupervisor(context.cwd);
-	if (action === 'stop' && invocation.args.plan !== true && supervisor && processIsAlive(supervisor.pid)) process.kill(supervisor.pid, 'SIGTERM');
-	return { ...result, report: { ...(result.report ?? {}), supervisor: supervisor ? { ...supervisor, running: processIsAlive(supervisor.pid), logPath: platformSupervisorPaths(context.cwd).log } : null } };
+	const stopping = action === 'pause' || action === 'stop';
+	const userService = stopping && invocation.args.plan !== true ? stopUserService(context.cwd, action) : null;
+	if (stopping && invocation.args.plan !== true && supervisor && processIsAlive(supervisor.pid)) process.kill(supervisor.pid, 'SIGTERM');
+	const result = await handleDev(invocationFor('dev', invocation, [action === 'pause' ? 'stop' : action], { ...invocation.args, json: invocation.args.json }), context);
+	let repositories: unknown = null;
+	if (action === 'status') {
+		try {
+			const teamSelector = typeof invocation.args.team === 'string' ? invocation.args.team : context.env.TREESEED_TEAM_ID?.trim() || 'treeseed';
+			const { client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
+			const inventory = await loadPlatformWorksetInventory(client, teamSelector);
+			repositories = { teamId: inventory.teamId, items: inspectPlatformRepositories(context.cwd, inventory.inventory) };
+		} catch (error) {
+			repositories = { unavailable: true, error: error instanceof Error ? error.message : String(error) };
+		}
+	}
+	return { ...result, report: { ...(result.report ?? {}), userService, repositories, supervisor: supervisor ? { ...supervisor, running: processIsAlive(supervisor.pid), logPath: platformSupervisorPaths(context.cwd).log } : null } };
 };

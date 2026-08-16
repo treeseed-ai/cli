@@ -101,6 +101,45 @@ evidence:
 `, 'utf8');
 }
 
+function addAgentCatalogGuarantee(root) {
+	const directory = resolve(root, 'guarantees', 'agent', 'profile');
+	mkdirSync(directory, { recursive: true });
+	writeFileSync(resolve(directory, 'planning.guarantee.yaml'), `schemaVersion: treeseed.guarantee/v2
+id: guarantee.agent.profile.planning.901
+journeyIndex: 901
+type: agent
+subtype: profile
+journey: Prove planning
+ownerPackage: "@treeseed/market"
+summary: Prove exact planning output.
+status: planned
+capabilityId: agent.profile.planning
+catalog: agent.system
+activation: { minimumConsecutivePasses: 3, requiredVariants: [baseline, clean-repeat, interruption-resume], invalidateOnSourceChange: true }
+proof:
+  requiredCommands: [capacity.assignment]
+  minimumRepositoryPostconditions: 0
+  outcomePredicates:
+    planning.output: [planning.model]
+outcomes:
+  - id: planning.output
+    kind: required
+    description: Exact planning output exists.
+    evidenceKinds: [content_read_back]
+    authoritativeSubjects: [assignment]
+dependencies: { journeys: [], guarantees: [] }
+actors: { allowed: [operator], forbidden: [] }
+devices: { required: [] }
+gates: [core]
+preconditions: { fixtures: [] }
+api: { required: false, verifierRefs: [] }
+content: { required: false, verifierRefs: [] }
+audit: { required: false, verifierRefs: [] }
+negativeCases: []
+evidence: { required: [verifier_evidence] }
+`);
+}
+
 test('guarantees validate emits structured filtered result', async () => {
 	const root = makeWorkspace();
 	const result = await runCli(['guarantees', 'validate', '--type', 'project', '--subtype', 'question', '--json'], root);
@@ -165,6 +204,47 @@ test('guarantees run emits skipped planned entries when requested', async () => 
 	assert.equal(payload.counts.planned, 1);
 	assert.equal(payload.counts.skipped, 1);
 	assert.equal(result.spawns.length, 0);
+});
+
+test('guarantees catalog-status exposes machine-readable activation counts', async () => {
+	const root = makeWorkspace();
+	const result = await runCli(['guarantees', 'catalog-status', '--json'], root);
+	assert.equal(result.exitCode, 0, result.output);
+	const payload = parseJsonOutput(result.output);
+	assert.equal(payload.command, 'guarantees catalog-status');
+	assert.equal(payload.schemaVersion, 'treeseed.agent-guarantee-catalog-status/v1');
+	assert.deepEqual(payload.counts, { total: 0, broken: 0, blocked: 0, passing: 0, active: 0 });
+});
+
+test('candidate proof requires an explicit activation variant', async () => {
+	const root = makeWorkspace();
+	const result = await runCli(['guarantees', 'run', '--prove-planned', '--json'], root);
+	assert.equal(result.exitCode, 1, result.output);
+	const payload = parseJsonOutput(result.output);
+	assert.equal(payload.error, 'guarantee_variant_required');
+});
+
+test('agent proof input is accepted only for a planned activation candidate', async () => {
+	const root = makeWorkspace();
+	const result = await runCli(['guarantees', 'run', '--proof-input', '.treeseed/proof.json', '--json'], root);
+	assert.equal(result.exitCode, 1, result.output);
+	const payload = parseJsonOutput(result.output);
+	assert.equal(payload.error, 'guarantee_proof_input_without_candidate');
+});
+
+test('agent proof template exposes every required predicate and fails closed until resolved', async () => {
+	const root = makeWorkspace(); addAgentCatalogGuarantee(root);
+	const output = '.treeseed/guarantees/inputs/planning.json';
+	const created = await runCli(['guarantees', 'proof-template', '--id', 'guarantee.agent.profile.planning.901', '--variant', 'baseline', '--output', output, '--json'], root);
+	assert.equal(created.exitCode, 0, created.output);
+	const createPayload = parseJsonOutput(created.output);
+	assert.equal(createPayload.ready, false);
+	assert.deepEqual(createPayload.outcomePredicates['planning.output'], ['planning.model']);
+	const validated = await runCli(['guarantees', 'proof-validate', '--id', 'guarantee.agent.profile.planning.901', '--variant', 'baseline', '--proof-input', output, '--json'], root);
+	assert.equal(validated.exitCode, 1, validated.output);
+	const validatePayload = parseJsonOutput(validated.output);
+	assert.equal(validatePayload.ok, false);
+	assert.match(validatePayload.issues.join('\n'), /unresolved placeholder/u);
 });
 
 test('guarantee preflight verifies managed source closure even when endpoints may already be healthy', async () => {

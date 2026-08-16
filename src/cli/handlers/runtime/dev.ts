@@ -72,11 +72,13 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 		);
 		const hasLocalApi = localProcessServiceIds.has('api');
 		const selectedSurfaces = foundationOnly ? 'api' : appId === 'api'
-			? 'api'
+			? 'api,operations-runner'
+			: appId === 'operations-runner'
+				? appId
 			: appId === 'web' || apiMode === 'remote'
 				? 'web'
 				: hasLocalApi
-					? 'web,api'
+					? 'web,api,operations-runner'
 					: 'web';
 
 		const passthroughArgs: string[] = ['--surfaces', selectedSurfaces];
@@ -197,7 +199,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			...selectedServiceIds.map((serviceId) => `local-process:${serviceId}`),
 			'local-docker-compose:api-postgres',
 			...(foundationOnly ? [] : ['local-docker-compose:mailpit']),
-			...(!foundationOnly && selectedServiceIds.includes('api') ? capacityProviderUnitIds : []),
+			...(!foundationOnly && !appId && selectedServiceIds.includes('api') ? capacityProviderUnitIds : []),
 			...(includeTreeDxUnits ? [
 				'local-treedx:team-primary',
 				'local-docker-compose:treedx',

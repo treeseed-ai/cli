@@ -79,6 +79,7 @@ test('treeseed dev delegates to the core dev-platform entrypoint in workspace mo
 	const payload = JSON.parse(result.stdout || result.output);
 	assert.equal(payload.command, 'dev');
 	assert.equal(payload.ok, true);
+	assert.equal(payload.selectedSurfaces, 'web,api,operations-runner');
 	assert.deepEqual(payload.args.slice(payload.args.indexOf('--local-content'), payload.args.indexOf('--local-content') + 2), ['--local-content', 'preview']);
 });
 
@@ -149,6 +150,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	const startPayload = JSON.parse(start.stdout || start.output);
 	assert.equal(startPayload.command, 'dev start');
 	assert.equal(startPayload.ok, true);
+	assert.equal(startPayload.selectedSurfaces, 'web,api,operations-runner');
 
 	const status = await runCli(['dev', 'status', '--all', '--json'], {
 		cwd: workspaceRoot,
@@ -189,7 +191,7 @@ test('treeseed dev forwards managed subcommands with dev subcommand syntax', asy
 	assert.doesNotMatch(stopAll.output, /"reconcile"/u);
 });
 
-test('treeseed dev api-only plans include provider-isolated TreeDX dependencies', async () => {
+test('treeseed dev api restart refreshes the API and its operations-runner process', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-api-only');
 	installCoreDevFixture(workspaceRoot, { workspace: true });
 	mkdirSync(resolve(workspaceRoot, 'seeds'), { recursive: true });
@@ -267,12 +269,27 @@ artifacts:
 	});
 	assert.equal(payload.command, 'dev restart');
 	assert.equal(payload.ok, true);
-	assert.equal(payload.selectedSurfaces, 'api');
+	assert.equal(payload.selectedSurfaces, 'api,operations-runner');
 	assert.match(serialized, /local-process:api/u);
-	assert.doesNotMatch(serialized, /local-process:operations-runner/u);
-	assert.match(serialized, /capacity-provider:agent-/u);
+	assert.match(serialized, /local-process:operations-runner/u);
+	assert.doesNotMatch(serialized, /capacity-provider:agent-/u);
 	assert.doesNotMatch(serialized, /local-treedx:team-primary/u);
-	assert.match(serialized, /local-docker-compose:treedx/u);
+	assert.doesNotMatch(serialized, /local-docker-compose:treedx/u);
+
+	const runnerResult = await runCli(['dev', 'restart', '--app', 'operations-runner', '--web-runtime', 'local', '--force', '--plan', '--json'], {
+		cwd: workspaceRoot,
+		env: {
+			HOME: workspaceRoot,
+			TREESEED_KEY_PASSPHRASE: 'test-passphrase',
+		},
+	});
+	assert.equal(runnerResult.exitCode, 0, runnerResult.output);
+	const runnerPayload = JSON.parse(runnerResult.stdout || runnerResult.output);
+	const runnerSerialized = JSON.stringify(runnerPayload.reconcile);
+	assert.equal(runnerPayload.selectedSurfaces, 'operations-runner');
+	assert.match(runnerSerialized, /local-process:operations-runner/u);
+	assert.match(runnerSerialized, /local-process:api/u);
+	assert.doesNotMatch(runnerSerialized, /local-process:market-web/u);
 });
 
 test('treeseed dev web-only restart retains runtime dependencies without selecting treedx content sync', async () => {

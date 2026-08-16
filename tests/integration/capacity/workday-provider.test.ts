@@ -33,8 +33,8 @@ describe('capacity workday provider resolution', () => {
 				{ providerId: 'provider-hosted', status: 'approved' },
 			] },
 			sessions: { items: [
-				{ providerId: 'provider-local', status: 'open', environment: 'local' },
-				{ providerId: 'provider-hosted', status: 'open', environment: 'staging' },
+				{ providerId: 'provider-local', status: 'open', snapshot: { capabilities: ['planning', 'agent_mode_run'] } },
+				{ providerId: 'provider-hosted', status: 'open', environment: 'staging', snapshot: { capabilities: ['planning'] } },
 			] },
 		}), 'team-a', 'local');
 		assert.equal(resolved.providerId, 'provider-local');
@@ -47,10 +47,24 @@ describe('capacity workday provider resolution', () => {
 				{ providerId: 'provider-b', status: 'approved' },
 			],
 			sessions: [
-				{ providerId: 'provider-a', status: 'open', environment: 'local' },
-				{ providerId: 'provider-b', status: 'open', environment: 'local' },
+				{ providerId: 'provider-a', status: 'open', snapshot: { capabilities: ['planning'] } },
+				{ providerId: 'provider-b', status: 'open', snapshot: { capabilities: ['agent_mode_run'] } },
 			],
 		}), 'team-a', 'local'), /ambiguous/u);
+	});
+
+	it('selects the sole workday provider advertising a preferred execution provider', async () => {
+		const resolved = await resolveCapacityWorkdayProviderId(client({
+			memberships: [
+				{ providerId: 'provider-current', status: 'approved' },
+				{ providerId: 'provider-legacy', status: 'approved' },
+			],
+			sessions: [
+				{ providerId: 'provider-current', status: 'open', snapshot: { capabilities: ['planning'], executionProviders: [{ id: 'codex', preferred: true }] } },
+				{ providerId: 'provider-legacy', status: 'open', snapshot: { capabilities: ['planning'], executionProviders: [{ id: 'legacy' }] } },
+			],
+		}), 'team-a', 'local');
+		assert.equal(resolved.providerId, 'provider-current');
 	});
 
 	it('never returns the literal local selector as a provider identity', async () => {

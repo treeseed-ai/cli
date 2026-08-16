@@ -1,4 +1,5 @@
 import { integrateAgentCheckpoint } from '@treeseed/sdk/operations';
+import { readFile } from 'node:fs/promises';
 import type { CommandContext, ParsedInvocation } from '../../../types.js';
 import { createMarketClientForInvocation } from '../../content/market-utils.js';
 import { capacityFlagArg as flag, capacityStringArg as text } from './capacity-command-arguments.js';
@@ -49,7 +50,28 @@ export async function runCapacityCheckpointIntegration(
 		deliverableManifest,
 		mode: execute ? 'execute' : 'plan',
 	});
-	const ok = result.ok;
+	let integrationRecorded=false;
+	if(execute&&result.ok&&result.authorityReceiptPath){
+		const integrationNode=graphNodes.find((node)=>record(node.metadata).platformControlled===true&&record(node.metadata).stage==='integration');
+		const integrationContractId=String(record(integrationNode?.metadata).producesDeliverableContractId??'').trim();
+		const integrationContract=(Array.isArray(graph.deliverableContracts)?graph.deliverableContracts.map(record):[]).find((entry)=>String(entry.id??'')===integrationContractId);
+		if(!integrationContractId) return fail('Decision graph does not expose its governed platform-integration contract.');
+		if(integrationContract?.status==='approved') integrationRecorded=true;
+		else {
+			const authority=JSON.parse(await readFile(result.authorityReceiptPath,'utf8')) as Record<string,unknown>;
+			const integratedCommit=String(result.integratedCommit??result.checkpointCommit);
+			await client.submitDeliverableManifest(integrationContractId,{
+				id:`integration:${graphId}:${integratedCommit}`,deliverableContractId:integrationContractId,projectId,decisionId:String(graph.decisionId??''),
+				producedRefs:[{model:'repository_checkpoint',collection:'repository-checkpoints',slug:integratedCommit,id:integratedCommit}],
+				summary:`Governed platform integration of ${assignmentId} at ${integratedCommit}.`,readyForReview:true,
+				metadata:{authorityId:result.authorityId,executionMode:String(authority.executionMode??'simulation')},
+			});
+			await client.approveDeliverableContract(integrationContractId,{approvedBy:'governed-platform-integration',executionAuthority:authority});
+			integrationRecorded=true;
+		}
+	}
+	const ok = result.ok&&(!execute||integrationRecorded);
+	const executionMode = String(assignment.executionMode ?? record(assignment.metadata).executionMode ?? graph.executionMode ?? 'simulation');
 	return guidedResult({
 		command: 'capacity checkpoint-integrate',
 		summary: ok
@@ -59,6 +81,7 @@ export async function runCapacityCheckpointIntegration(
 			{ label: 'Market', value: `${profile.id} (${profile.baseUrl})` },
 			{ label: 'Team', value: teamId },
 			{ label: 'Assignment', value: assignmentId },
+			{ label: 'Execution mode', value: executionMode },
 			{ label: 'Graph', value: graphId },
 			{ label: 'Repository', value: result.repositoryPath },
 			{ label: 'Task branch', value: result.targetBranch },
@@ -66,14 +89,15 @@ export async function runCapacityCheckpointIntegration(
 			{ label: 'Integrated commit', value: result.integratedCommit },
 			{ label: 'Execution authority', value: result.authorityId },
 			{ label: 'Authority receipt', value: result.authorityReceiptPath },
+			{ label: 'Graph integration', value: integrationRecorded?'recorded':execute?'not recorded':'planned' },
 		],
 		sections: [
 			{ title: 'Changed paths', lines: result.changedPaths.map((path) => `- ${path}`) },
 			{ title: 'Blockers', lines: result.blockers.map((blocker) => `- ${blocker}`) },
 		],
-		nextSteps: ok && execute
+		nextSteps: ok && execute && executionMode === 'production'
 			? [`Run npx trsd save "Integrate supervised agent assignment ${assignmentId}" --json from this managed task worktree.`]
-			: ok ? [`Re-run with --execute after reviewing assignment ${assignmentId}, its checkpoint, and the changed paths above.`] : [],
+			: ok && !execute ? [`Re-run with --execute after reviewing assignment ${assignmentId}, its checkpoint, and the changed paths above.`] : [],
 		report: { mode: execute ? 'execute' : 'plan', result },
 		exitCode: ok ? 0 : 1,
 		stderr: ok ? undefined : result.blockers,

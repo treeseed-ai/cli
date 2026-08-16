@@ -40,18 +40,25 @@ export const platformRunOperationSpecs: OperationSpec[] = [
 	{
 		id: 'local.platform', name: 'platform', aliases: [], group: 'Local Development', provider: 'default', related: ['run', 'status'],
 		summary: 'Materialize, inspect, or stop the local TreeSeed platform.', description: 'Materialize an exact ephemeral repository workset or expose status, logs, and stop diagnostics for the platform managed by trsd run.',
-		usage: 'trsd platform status|logs|stop|workset [--plan|--apply --yes] [--branch <name>] [--json]', arguments: [{ name: 'action', description: 'status, logs, stop, or workset', required: true }],
+		usage: 'trsd platform init|status|logs|pause|stop|workset [directory] [--plan|--apply --yes] [--team <team>] [--json]', arguments: [{ name: 'action', description: 'init, status, logs, pause, stop, or workset', required: true }, { name: 'directory', description: 'Platform clone target for init.', required: false }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Preview exact workset materialization without mutation.', kind: 'boolean' },
-			{ name: 'apply', flags: '--apply', description: 'Materialize missing repositories from the exact Platform portfolio.', kind: 'boolean' },
+			{ name: 'apply', flags: '--apply', description: 'Materialize missing repositories from the authenticated team project inventory.', kind: 'boolean' },
 			{ name: 'yes', flags: '--yes', description: 'Confirm workset materialization.', kind: 'boolean' },
+			{ name: 'team', flags: '--team <team>', description: 'Team ID or slug whose project inventory defines the workset.', kind: 'string' },
+			{ name: 'repository', flags: '--repository <owner/repository>', description: 'Canonical live Platform repository (treeseed-ai/platform).', kind: 'string' },
+			{ name: 'ref', flags: '--ref <branch-or-sha>', description: 'Exact Platform branch or commit to observe and clone.', kind: 'string' },
+			{ name: 'template', flags: '--template <id>', description: 'Canonical Platform template identity.', kind: 'string' },
+			{ name: 'controlPlaneBaseUrl', flags: '--control-plane-base-url <url>', description: 'Required external control-plane binding for external templates.', kind: 'string' },
+			{ name: 'market', flags: '--market <id-or-url>', description: 'Select the control-plane profile that owns the team inventory.', kind: 'string' },
 			{ name: 'branch', flags: '--branch <name>', description: 'Create repositories on this local integration branch; otherwise use detached exact refs.', kind: 'string' },
+			{ name: 'assignment', flags: '--assignment <id>', description: 'Active acting assignment that grants writable workset custody.', kind: 'string' },
 			{ name: 'json', flags: '--json', description: 'Emit structured results.', kind: 'boolean' },
-		], examples: ['trsd platform status --json', 'trsd platform workset --plan --json', 'trsd platform workset --apply --yes --branch feature/federated-change --json'],
+		], examples: ['trsd platform init /home/adrian/Projects/treeseed/platform --repository treeseed-ai/platform --ref staging --template platform-local-managed-codex --team treeseed --plan --json', 'trsd platform status --json', 'trsd platform workset --plan --json', 'trsd platform workset --apply --yes --branch feature/federated-change --assignment assignment-id --json'],
 		help: {
 			workflowPosition: 'inspect local platform',
 			longSummary: [
-				'Platform materializes the exact repositories in `treeseed.portfolio.json` as independent ephemeral checkouts and exposes status, logs, and stop controls for the persistent runtime.',
+				'Platform reads the authenticated live team project inventory, observes exact repository branch heads, materializes independent ephemeral checkouts, and exposes runtime controls.',
 			],
 			whenToUse: [
 				'Use `workset` from a clean Platform clone to assemble integrated development repositories without gitlinks. Use the other actions to inspect or stop the local runtime.',

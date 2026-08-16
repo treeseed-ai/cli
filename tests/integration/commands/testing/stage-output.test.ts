@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { repositoryIdentityKey } from '@treeseed/sdk';
+import { integrationChangeSetReceiptId,repositoryIdentityKey } from '@treeseed/sdk';
 import { makeTenantWorkspace } from '../../../support/cli-test-fixtures.ts';
 import { mkdirSync,mkdtempSync,writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -32,7 +32,7 @@ function parseJsonOutput(output) {
 	return JSON.parse(output.slice(start));
 }
 
-test('staging promotion plan json stays compact', async () => {
+test('staging promotion plan fails closed without Platform root authority', async () => {
 	const root = makeTenantWorkspace('staging');
 	const origin = mkdtempSync(join(tmpdir(), 'treeseed-stage-origin-'));
 	spawnSync('git', ['init', '--bare'], { cwd: origin, stdio: 'ignore' });
@@ -43,11 +43,11 @@ test('staging promotion plan json stays compact', async () => {
 	const commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim();
 	const receiptPath = join(root, '.treeseed', 'workflow', 'integration-receipts', 'latest.json');
 	mkdirSync(join(root, '.treeseed', 'workflow', 'integration-receipts'), { recursive: true });
-	writeFileSync(receiptPath, `${JSON.stringify({
+	const receipt = {
 		schemaVersion: 1,
 		kind: 'treeseed.integration-change-set/v1',
-		scope: 'federated',
-		receiptId: 'stage-plan-receipt',
+		scope: 'federated' as const,
+		receiptId: '',
 		runId: 'stage-plan-save',
 		sourceBranch: 'feature/stage-plan',
 		createdAt: new Date().toISOString(),
@@ -61,27 +61,25 @@ test('staging promotion plan json stays compact', async () => {
 			dependencies: [],
 			contractDigests: { packageManifest: null, lockfile: null },
 			verification: { status: 'skipped', mode: null },
+			executionAuthorities: [],
 			remoteProof: { kind: 'branch_head', ref: 'feature/stage-plan', refCommit: commit },
 			remoteVerified: true,
 		}],
-	}, null, 2)}\n`);
+	};
+	receipt.receiptId = integrationChangeSetReceiptId(receipt as never);
+	writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
 
 	const result = await runCli(['stage', '--plan', '--json', 'staging promotion plan'], root);
 
-	assert.equal(result.exitCode, 0, result.output);
+	assert.equal(result.exitCode, 1, result.output);
 	const payload = parseJsonOutput(result.output);
 	assert.equal(payload.command, 'stage');
-	assert.equal(payload.ok, true);
-	assert.equal(payload.summary, 'Treeseed stage promotion plan ready.');
+	assert.equal(payload.ok, false);
+	assert.equal(payload.summary, 'Treeseed stage plan blocked.');
 	assert.equal(payload.payload.mode, 'stage-promotion');
 	assert.equal(payload.payload.branchName, 'feature/stage-plan');
 	assert.equal(payload.payload.mergeTarget, 'staging');
-	assert.equal(payload.payload.verifyMode, 'action');
-	assert.equal(payload.payload.ciMode, 'off');
-	assert.equal(payload.payload.cleanupMode, 'success');
-	assert.ok(Array.isArray(payload.payload.phases));
-	assert.equal(payload.payload.phases.includes('promote-to-staging'), true);
-	assert.equal(payload.payload.plan.targetBranch, 'staging');
+	assert.deepEqual(payload.payload.blockers, ['Platform root base and pointer-update authority is missing or stale.']);
 	assert.equal(payload.hostingGraph, undefined);
 	assert.equal(payload.desiredGraph, undefined);
 	assert.equal(payload.payload.finalState, undefined);
@@ -90,6 +88,4 @@ test('staging promotion plan json stays compact', async () => {
 	assert.equal(payload.payload.units, undefined);
 	assert.equal(payload.payload.plannedSteps, undefined);
 
-	const manualResult = await runCli(['stage', '--plan', '--cleanup', 'manual', '--json', 'manual cleanup plan'], root);
-	assert.equal(parseJsonOutput(manualResult.output).payload.cleanupMode, 'manual');
 });

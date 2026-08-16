@@ -73,7 +73,7 @@ export const marketProjectsOperationSpecs: OperationSpec[] = [
 			description: 'List projects and inspect team access while project launch and repository management are rebuilt on Services capability bindings.',
 			provider: 'default',
 			related: ['market', 'teams', 'config'],
-			usage: 'treeseed projects [list|access]',
+			usage: 'treeseed projects [list|access|archive|restore]',
 			arguments: [
 				{ name: 'action', description: 'Projects action.', required: false },
 				{ name: 'project-id', description: 'Project id for access inspection.', required: false },
@@ -81,11 +81,13 @@ export const marketProjectsOperationSpecs: OperationSpec[] = [
 			options: [
 				{ name: 'market', flags: '--market <id-or-url>', description: 'Select a configured market id or direct API URL.', kind: 'string' },
 				{ name: 'team', flags: '--team <team-id>', description: 'Limit project list to a team.', kind: 'string' },
+				{ name: 'execute', flags: '--execute', description: 'Apply a reversible project inventory archive or restore action.', kind: 'boolean' },
 				{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' },
 			],
 			examples: [
 				'treeseed projects list',
 				'treeseed projects access project_123',
+				'treeseed projects archive project_123 --execute',
 			],
 			help: {
 				longSummary: ['Projects reads project identity, architecture, and access state from the selected API.'],

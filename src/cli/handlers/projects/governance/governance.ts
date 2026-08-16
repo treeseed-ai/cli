@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { CommandHandler, ParsedInvocation } from '../../../types.js';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { parse as parseYaml } from 'yaml';
+import type { CommandContext, CommandHandler, ParsedInvocation } from '../../../types.js';
 import { createMarketClientForInvocation } from '../../content/market-utils.js';
 import { fail, guidedResult } from '../../utilities/utils.js';
 
@@ -10,6 +13,16 @@ function text(invocation: ParsedInvocation, name: string) {
 	return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 function flag(invocation: ParsedInvocation, name: string) { return invocation.args[name] === true; }
+async function document(invocation: ParsedInvocation, context: CommandContext): Promise<JsonRecord> {
+	const inline = text(invocation, 'document');
+	const file = text(invocation, 'file');
+	if (!inline && !file) return {};
+	if (inline && file) throw new Error('Use only one of --file or --document.');
+	const source = inline ?? await readFile(resolve(context.cwd, file!), 'utf8');
+	const value = parseYaml(source);
+	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Proposal input must be a YAML or JSON object.');
+	return value as JsonRecord;
+}
 function payload(value: unknown): JsonRecord {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
 	const record = value as JsonRecord;
@@ -47,33 +60,48 @@ export const handleGovernance: CommandHandler = async (invocation, context) => {
 	const proposalPath = proposalId ? `/v1/projects/${encodeURIComponent(projectId)}/proposals/${encodeURIComponent(proposalId)}` : null;
 	try {
 		const provenance = simulation(invocation);
+		const supplied = await document(invocation, context);
 		const idempotencyKey = text(invocation, 'idempotencyKey') ?? `governance:${action}:${randomUUID()}`;
 		const headers = { 'Idempotency-Key': idempotencyKey };
+		const request = (path:string, options:Record<string,unknown> = {}) => market.client.request(path, { ...options, requireAuth:true });
 		let response: unknown;
-		if (action === 'proposal-list') response = await market.client.request(`/v1/projects/${encodeURIComponent(projectId)}/proposals?limit=${encodeURIComponent(text(invocation, 'limit') ?? '50')}${text(invocation, 'status') ? `&status=${encodeURIComponent(text(invocation, 'status')!)}` : ''}`);
+		if (action === 'proposal-list') response = await request(`/v1/projects/${encodeURIComponent(projectId)}/proposals?limit=${encodeURIComponent(text(invocation, 'limit') ?? '50')}${text(invocation, 'status') ? `&status=${encodeURIComponent(text(invocation, 'status')!)}` : ''}`);
 		else if (action === 'proposal-show' || action === 'proposal-events') {
 			if (!proposalPath) return fail('This action requires --proposal.');
-			response = await market.client.request(`${proposalPath}${action === 'proposal-events' ? '/events' : ''}`);
-		} else if (action === 'decision-list') response = await market.client.request(`/v1/projects/${encodeURIComponent(projectId)}/decisions?limit=${encodeURIComponent(text(invocation, 'limit') ?? '50')}`);
+			response = await request(`${proposalPath}${action === 'proposal-events' ? '/events' : ''}`);
+		} else if (action === 'decision-list') response = await request(`/v1/projects/${encodeURIComponent(projectId)}/decisions?limit=${encodeURIComponent(text(invocation, 'limit') ?? '50')}`);
 		else if (action === 'decision-show' || action === 'decision-events') {
 			if (!decisionId) return fail('This action requires --decision.');
-			response = await market.client.request(`/v1/projects/${encodeURIComponent(projectId)}/decisions/${encodeURIComponent(decisionId)}${action === 'decision-events' ? '/events' : ''}`);
+			response = await request(`/v1/projects/${encodeURIComponent(projectId)}/decisions/${encodeURIComponent(decisionId)}${action === 'decision-events' ? '/events' : ''}`);
 		} else {
 			if (!mutatingActions.has(action)) return fail(`Unknown governance action ${action}.`);
 			let current: JsonRecord = {};
-			if (proposalPath) current = payload(await market.client.request(proposalPath));
+			if (proposalPath) current = payload(await request(proposalPath));
 			const expectedProposalVersion = Number(current.activeVersion ?? 0) || undefined;
 			let method = 'POST';
 			let path = `/v1/projects/${encodeURIComponent(projectId)}/proposals`;
 			let body: JsonRecord = { simulation: provenance, expectedProposalVersion };
 			if (action === 'proposal-create') body = {
-				title: text(invocation, 'title'), summary: text(invocation, 'summary'), body: text(invocation, 'body'),
-				proposalType: text(invocation, 'proposalType') ?? 'editorial', metadata: { simulation: provenance },
+				...supplied,
+				title: text(invocation, 'title') ?? supplied.title, summary: text(invocation, 'summary') ?? supplied.summary,
+				body: text(invocation, 'body') ?? supplied.body,
+				proposalType: text(invocation, 'proposalType') ?? supplied.proposalType ?? 'editorial',
+				metadata: { ...payload(supplied.metadata), simulation: provenance },
 			};
 			else {
 				if (!proposalPath) return fail('This action requires --proposal.');
 				path = proposalPath;
-				if (action === 'proposal-update') { method = 'PATCH'; body = { ...body, title: text(invocation, 'title'), summary: text(invocation, 'summary'), body: text(invocation, 'body') }; }
+				if (action === 'proposal-update') {
+					method = 'PATCH';
+					body = {
+						...supplied, ...body,
+						title: text(invocation, 'title') ?? supplied.title,
+						summary: text(invocation, 'summary') ?? supplied.summary,
+						body: text(invocation, 'body') ?? supplied.body,
+						changeReason: text(invocation, 'changeReason') ?? text(invocation, 'reason') ?? supplied.changeReason,
+						metadata: { ...payload(supplied.metadata), simulation: provenance },
+					};
+				}
 				if (action === 'proposal-open') { path += '/open'; body.reason = text(invocation, 'reason'); }
 				if (action === 'proposal-discuss') { path += '/discussion'; body = { ...body, kind: text(invocation, 'kind'), message: text(invocation, 'message'), contentContributorRef: text(invocation, 'contributor'), automatedEvolutionTest: Boolean(provenance) }; }
 				if (action === 'proposal-start-voting') { path += '/start-voting'; body.reason = text(invocation, 'reason'); }
@@ -87,7 +115,7 @@ export const handleGovernance: CommandHandler = async (invocation, context) => {
 				if (action === 'proposal-withdraw') { path += '/withdraw'; body.reason = text(invocation, 'reason'); }
 				if (action === 'proposal-supersede') { path += '/supersede'; body.reason = text(invocation, 'reason'); }
 			}
-			response = await market.client.request(path, { method, body, headers });
+			response = await request(path, { method, body, headers });
 		}
 		const result = payload(response);
 		return guidedResult({

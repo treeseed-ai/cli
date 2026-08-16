@@ -67,7 +67,7 @@ export async function readCapacityWorkdayAgentSpecs(context: CommandContext, pro
 			return [[activityType, {
 				handler,
 				branchPolicy: objectArg(profile.branchPolicy),
-				contentAccess: objectArg(profile.contentAccess),
+				permissions: objectArg(profile.permissions),
 				purpose: optionalString(identity.purpose) ?? optionalString(frontmatter.description) ?? `Perform configured ${activityType} work.`,
 				promptTask: optionalString(prompt.task),
 				outputContract: objectArg(profile.outputs),

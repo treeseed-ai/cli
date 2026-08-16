@@ -7,6 +7,7 @@ import { capacityMarketRequest } from '../../capacity-core/capacity-values.js';
 import { resolveCapacityWorkdayProviderId } from '../configuration/capacity-workday-provider.js';
 
 export const CAPACITY_WORKDAY_SCHEDULE_ACTIONS = new Set([
+	'workday-schedules', 'workday-schedule',
 	'workday-schedule-plan', 'workday-schedule-create', 'workday-schedule-status', 'workday-schedule-pause',
 	'workday-schedule-resume', 'workday-schedule-update', 'workday-schedule-retire', 'workday-schedule-tick',
 ]);
@@ -19,7 +20,8 @@ export async function runCapacityWorkdayScheduleAction(action: string, invocatio
 	const teamSelector = text(invocation, 'team'); if (!teamSelector) return fail('Workday schedule commands require --team.');
 	const { client } = createCapacityMarketClient(invocation, context); const { teamId, projects } = await resolveCapacityTeam(client, teamSelector);
 	const scheduleId = text(invocation, 'schedule'); const base = `/v1/teams/${encodeURIComponent(teamId)}/workday-schedules`;
-	if (action === 'workday-schedule-status') {
+	if (action === 'workday-schedules' || action === 'workday-schedule' || action === 'workday-schedule-status') {
+		if (action === 'workday-schedule' && !scheduleId) return fail('workday-schedule requires --schedule.');
 		const value = await capacityMarketRequest(client, scheduleId ? `${base}/${encodeURIComponent(scheduleId)}` : base, { requireAuth: true }); return report(action, value);
 	}
 	const execute = flag(invocation, 'execute');
@@ -31,7 +33,7 @@ export async function runCapacityWorkdayScheduleAction(action: string, invocatio
 		const provider = await resolveCapacityWorkdayProviderId(client, teamId, text(invocation, 'provider') ?? 'local');
 		const durationSeconds = positive(invocation, 'durationSeconds', 1800); const maxActiveAssignments = positive(invocation, 'maxActiveAssignments', 3); const planningOnly = flag(invocation, 'planningOnly');
 		const body = { purpose: text(invocation, 'purpose') ?? 'Recurring TreeSeed Guide editorial workday', projectIds, capacityProviderId: provider.providerId,
-			agentSelection: normalizeWorkdayAgentSelection({ classIds: classSelectors.filter((value) => value.includes(':')), classSlugs: classSelectors.filter((value) => !value.includes(':')), agentSlugs: csv(invocation, 'agents', []), mode: text(invocation, 'selectionMode') }),
+			agentSelection: normalizeWorkdayAgentSelection({ classIds: classSelectors.filter((value) => value.includes(':')), classSlugs: classSelectors.filter((value) => !value.includes(':')), agentSlugs: csv(invocation, 'agents', []), activityTypes: csv(invocation, 'activityProfiles', []), mode: text(invocation, 'selectionMode') }),
 			cadenceSeconds: positive(invocation, 'cadenceSeconds', 3600), durationSeconds, maxActiveAssignments, availableSeconds: positive(invocation, 'availableSeconds', durationSeconds * maxActiveAssignments), planningOnly,
 			timePolicy: { cooperativePlanningPercent: positive(invocation, 'planningPercent', planningOnly ? 90 : 25), governedExecutionPercent: planningOnly ? 0 : positive(invocation, 'executionPercent', 65), reservePercent: positive(invocation, 'reservePercent', 10) },
 			publicationPolicy: { bookIds: csv(invocation, 'bookIds', ['treeseed-guide']), target: text(invocation, 'target') === 'production' ? 'production' : 'staging', cohortMode: 'accepted', requireTechnicalReview: true, requireAudienceReview: true, requireGraphReviewWhenStructural: true, simulatedHumanApproval: flag(invocation, 'simulateHuman') },

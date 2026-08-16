@@ -12,7 +12,7 @@ export const handleProjects: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'list';
 	let market;
 	try {
-		market = createMarketClientForInvocation(invocation, context, { requireAuth: true });
+		market = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
 	} catch (error) {
 		return authFailure(error) ?? fail(error instanceof Error ? error.message : String(error), 1);
 	}
@@ -47,6 +47,17 @@ export const handleProjects: CommandHandler = async (invocation, context) => {
 				],
 				report: { marketId: profile.id, access: redact(response.payload) },
 			});
+		}
+
+		if (action === 'archive' || action === 'restore') {
+			const projectId = invocation.positionals[1];
+			if (!projectId) return fail(projectUsage(action));
+			if (invocation.args.execute !== true) return guidedResult({
+				command: 'projects', summary: `Plan to ${action} project inventory membership`,
+				report: { marketId: profile.id, executionMode: 'plan', method: 'POST', path: `/v1/projects/${encodeURIComponent(projectId)}/${action}`, projectId },
+			});
+			const response = action === 'archive' ? await client.archiveProject(projectId) : await client.restoreProject(projectId);
+			return guidedResult({ command: 'projects', summary: `Project ${action} completed`, report: { marketId: profile.id, executionMode: 'execute', project: redact(response.payload) } });
 		}
 
 		return fail(`Unknown projects action: ${action}`);

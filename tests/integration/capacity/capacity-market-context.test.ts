@@ -7,7 +7,7 @@ describe('capacity team resolution', () => {
 		const client = {
 			request: async (path: string) => path === '/v1/me'
 				? { ok: true, payload: { principal: { metadata: { teamId: 'team-123', teamName: 'treeseed' } }, teams: [] } }
-				: { ok: true, payload: { team: { name: 'treeseed' }, knowledge: {} } },
+				: { ok: true, payload: { team: { id: 'treeseed', name: 'treeseed' }, knowledge: {} } },
 		};
 		const resolved = await resolveCapacityTeam(client, 'treeseed');
 		assert.equal(resolved.teamId, 'team-123');

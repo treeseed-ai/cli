@@ -1,6 +1,7 @@
 import {
 	auditGuaranteeJourneys,
 	createGuaranteeStatusReport,
+	createAgentGuaranteeCatalogStatus,
 	discoverGuarantees,
 	exportGuaranteesCsv,
 	exportGuaranteesJson,
@@ -13,10 +14,14 @@ import {
 	type GuaranteeGate,
 	type GuaranteeStatus,
 } from '@treeseed/sdk/guarantees';
-import { runManagedDev } from '@treeseed/sdk';
 import { collectConfigSeedValues } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler } from '../../operations/operations-types.ts';
 import { spawnSync } from 'node:child_process';
+import { handleAgentProofInput } from './agent-proof-input.ts';
+import { applyAgentGuaranteeExecutionProviderMode,ensureLocalDevForGuaranteeRun,handleAgentGuaranteePreflight } from './agent-guarantee-preflight.ts';
+import { handleAgentCampaignStatus,handleAgentProofCapture,handleAgentProofRebase } from './agent-campaign.ts';
+import { runCapacityWorkdayWatch } from '../capacity/workdays/observability/capacity-workday-watch.ts';
+import { handleAgentCampaignCleanup,handleAgentCampaignRun } from './agent-campaign-runner.ts';
 
 const VALID_FORMATS = new Set(['csv', 'json', 'markdown']);
 const VALID_GATES = new Set(['smoke', 'core', 'release', 'security', 'migration', 'demo', 'backlog', 'future']);
@@ -141,84 +146,7 @@ function loadApiAcceptanceServiceEnv(environment: string) {
 	}
 }
 
-export type AgentGuaranteeExecutionProviderMode = 'live-codex' | 'auto';
-
-function codexAuthAvailable(env: NodeJS.ProcessEnv) {
-	const explicit = env.TREESEED_CODEX_AUTH_FILE || env.CODEX_AUTH_FILE;
-	if (explicit?.trim()) return true;
-	const home = env.HOME || process.env.HOME;
-	if (!home) return false;
-	return spawnSync('test', ['-f', `${home}/.codex/auth.json`]).status === 0;
-}
-
-function resolveAgentGuaranteeExecutionProviderMode(input: { environment: string; env: NodeJS.ProcessEnv }): AgentGuaranteeExecutionProviderMode {
-	const configured = input.env.TREESEED_AGENT_GUARANTEE_EXECUTION_PROVIDER?.trim();
-	if (configured === 'live-codex' || configured === 'auto') return configured;
-	if (input.env.CI === 'true' || input.env.GITHUB_ACTIONS === 'true') return 'live-codex';
-	if (input.environment === 'staging') return 'live-codex';
-	return 'auto';
-}
-
-function applyAgentGuaranteeExecutionProviderMode(input: { environment: string; env: NodeJS.ProcessEnv }) {
-	const mode = resolveAgentGuaranteeExecutionProviderMode(input);
-	input.env.TREESEED_AGENT_GUARANTEE_EXECUTION_PROVIDER = mode;
-	if (mode === 'live-codex') {
-		if (!codexAuthAvailable(input.env)) {
-			return { ok: false, diagnostics: ['missing_codex_auth: live Codex agent guarantees require ~/.codex/auth.json or TREESEED_CODEX_AUTH_FILE.'] };
-		}
-		input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'codex';
-		return { ok: true, diagnostics: ['Agent guarantees will use the live Codex execution provider.'] };
-	}
-	if (codexAuthAvailable(input.env)) {
-		input.env.TREESEED_AGENT_EXECUTION_PROVIDER = 'codex';
-		return { ok: true, diagnostics: ['Agent guarantee auto mode selected live Codex because Codex auth was detected.'] };
-	}
-	return { ok: false, diagnostics: ['missing_codex_auth: agent guarantees require a real execution provider; no mock or synthetic provider fallback is permitted.'] };
-}
-
-function planNeedsLocalDev(input: { environment: string; filter: GuaranteeFilter; includeDependencies?: boolean; includePlanned?: boolean; cwd: string }) {
-	if (input.environment !== 'local') return false;
-	const plan = planGuarantees({
-		workspaceRoot: input.cwd,
-		filter: input.filter,
-		environment: input.environment,
-		includeDependencies: input.includeDependencies,
-	});
-	return plan.entries.some((entry) => {
-		if (entry.status !== 'active') return false;
-		return Boolean(entry.sceneManifest || entry.apiVerifierRefs.length > 0);
-	});
-}
-
-export async function ensureLocalDevForGuaranteeRun(
-	context: Parameters<CommandHandler>[1],
-	input: { filter: GuaranteeFilter; includeDependencies?: boolean; includePlanned?: boolean },
-	runDev: typeof runManagedDev = runManagedDev,
-) {
-	if (process.env.TREESEED_GUARANTEE_SKIP_LOCAL_DEV === '1') return { ok: true, diagnostics: [] as string[] };
-	if (!planNeedsLocalDev({ environment: 'local', filter: input.filter, includeDependencies: input.includeDependencies, includePlanned: input.includePlanned, cwd: context.cwd })) {
-		return { ok: true, diagnostics: [] as string[] };
-	}
-	const result = await runDev({
-				action: 'start',
-				cwd: context.cwd,
-				surfaces: 'web,api',
-				webRuntime: 'local',
-				force: false,
-				forceConflicts: true,
-				env: context.env,
-			});
-	if (!result.ok) {
-		return {
-			ok: false,
-			diagnostics: ['Managed local dev startup failed before guarantee execution. Run `npx trsd dev restart --web-runtime local --app web --force --force-conflicts --json` and retry, then verify API health at http://127.0.0.1:3000/healthz.'],
-		};
-	}
-	return {
-		ok: true,
-		diagnostics: ['Managed local dev web/API source closures and health were verified before local guarantee execution.'],
-	};
-}
+export { ensureLocalDevForGuaranteeRun } from './agent-guarantee-preflight.ts';
 
 export const handleGuarantees: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'status';
@@ -247,6 +175,30 @@ export const handleGuarantees: CommandHandler = async (invocation, context) => {
 			report: { command: 'guarantees status', ...report },
 		};
 	}
+	if (action === 'catalog-status') {
+		const catalog = typeof invocation.args.catalog === 'string' ? invocation.args.catalog : 'agent.system';
+		const report = createAgentGuaranteeCatalogStatus({ workspaceRoot: context.cwd, catalog });
+		return {
+			exitCode: report.ok ? 0 : 1,
+			stdout: [
+				`Agent guarantee catalog: ${catalog}`,
+				`Active: ${report.counts.active}/${report.counts.total}`,
+				`Passing: ${report.counts.passing}`,
+				`Blocked: ${report.counts.blocked}`,
+				`Broken: ${report.counts.broken}`,
+			],
+			stderr: report.ok ? [] : humanDiagnostics(report.diagnostics.filter((entry) => entry.severity === 'error')),
+			report: { command: 'guarantees catalog-status', catalog, ...report },
+		};
+	}
+	if (action === 'preflight') return handleAgentGuaranteePreflight(context);
+	if (action === 'campaign-status') return handleAgentCampaignStatus(context);
+	if (action === 'watch') return runCapacityWorkdayWatch(invocation,context);
+	if (action === 'proof-rebase') return handleAgentProofRebase(invocation,context);
+	if (action === 'proof-capture') return handleAgentProofCapture(invocation,context);
+	if (action === 'campaign-run') return handleAgentCampaignRun(invocation,context);
+	if (action === 'campaign-cleanup') return handleAgentCampaignCleanup(invocation,context);
+	if (action === 'proof-template' || action === 'proof-validate') return handleAgentProofInput(action, invocation, context);
 
 	if (action === 'validate') {
 		const report = discoverGuarantees({ workspaceRoot: context.cwd, filter });
@@ -352,6 +304,11 @@ export const handleGuarantees: CommandHandler = async (invocation, context) => {
 		const device = typeof invocation.args.device === 'string' ? invocation.args.device : undefined;
 		const includeDependencies = invocation.args.dependencies === false || invocation.args.noDependencies === true ? false : undefined;
 		const includePlanned = invocation.args.includePlanned === true;
+		const provePlanned = invocation.args.provePlanned === true;
+		const variant = typeof invocation.args.variant === 'string' ? invocation.args.variant : undefined;
+		const proofInput = typeof invocation.args.proofInput === 'string' ? invocation.args.proofInput : undefined;
+		if (provePlanned && !variant) return { exitCode: 1, stdout: [], stderr: ['--prove-planned requires --variant.'], report: { command: 'guarantees run', ok: false, error: 'guarantee_variant_required' } };
+		if (proofInput && !provePlanned) return { exitCode: 1, stdout: [], stderr: ['--proof-input is valid only with --prove-planned.'], report: { command: 'guarantees run', ok: false, error: 'guarantee_proof_input_without_candidate' } };
 		const agentExecutionProvider = filter.ownerPackage === '@treeseed/agent' || filter.ownerPackages?.includes('@treeseed/agent')
 			? applyAgentGuaranteeExecutionProviderMode({ environment, env: context.env })
 			: { ok: true, diagnostics: [] as string[] };
@@ -420,6 +377,9 @@ export const handleGuarantees: CommandHandler = async (invocation, context) => {
 			outputRoot,
 			includeDependencies,
 			includePlanned,
+			provePlanned,
+			variant,
+			proofInput,
 			record: invocation.args.record === true,
 			sceneArtifacts: invocation.args.noSceneVideo === true ? 'screenshots' : typeof invocation.args.sceneArtifacts === 'string' ? invocation.args.sceneArtifacts as 'full' | 'screenshots' : undefined,
 			device,
@@ -461,7 +421,7 @@ export const handleGuarantees: CommandHandler = async (invocation, context) => {
 	return {
 		exitCode: 1,
 		stdout: [],
-		stderr: [`Unsupported guarantees action "${action}". Use status, validate, audit-journeys, plan, export, or run.`],
+		stderr: [`Unsupported guarantees action "${action}". Use status, catalog-status, validate, audit-journeys, plan, export, or run.`],
 		report: { command: 'guarantees', ok: false, error: `Unsupported action: ${action}` },
 	};
 };
