@@ -39,11 +39,11 @@ export const platformRunOperationSpecs: OperationSpec[] = [
 	},
 	{
 		id: 'local.platform', name: 'platform', aliases: [], group: 'Local Development', provider: 'default', related: ['run', 'status'],
-		summary: 'Materialize, inspect, or stop the local TreeSeed platform.', description: 'Materialize an exact ephemeral repository workset or expose status, logs, and stop diagnostics for the platform managed by trsd run.',
+		summary: 'Materialize, inspect, or stop the local TreeSeed platform.', description: 'Materialize an exact ephemeral repository workset from local seed inventory or expose status, logs, and stop diagnostics for the platform managed by trsd run.',
 		usage: 'trsd platform init|status|logs|pause|stop|workset [directory] [--plan|--apply --yes] [--team <team>] [--json]', arguments: [{ name: 'action', description: 'init, status, logs, pause, stop, or workset', required: true }, { name: 'directory', description: 'Platform clone target for init.', required: false }],
 		options: [
 			{ name: 'plan', flags: '--plan', description: 'Preview exact workset materialization without mutation.', kind: 'boolean' },
-			{ name: 'apply', flags: '--apply', description: 'Materialize missing repositories from the authenticated team project inventory.', kind: 'boolean' },
+			{ name: 'apply', flags: '--apply', description: 'Materialize missing repositories from the configured local seed or authenticated control-plane inventory.', kind: 'boolean' },
 			{ name: 'yes', flags: '--yes', description: 'Confirm workset materialization.', kind: 'boolean' },
 			{ name: 'team', flags: '--team <team>', description: 'Team ID or slug whose project inventory defines the workset.', kind: 'string' },
 			{ name: 'repository', flags: '--repository <owner/repository>', description: 'Canonical live Platform repository (treeseed-ai/platform).', kind: 'string' },
@@ -58,10 +58,10 @@ export const platformRunOperationSpecs: OperationSpec[] = [
 		help: {
 			workflowPosition: 'inspect local platform',
 			longSummary: [
-				'Platform reads the authenticated live team project inventory, observes exact repository branch heads, materializes independent ephemeral checkouts, and exposes runtime controls.',
+				'Platform reads the configured local seed when Market connectivity is disabled, or the authenticated control-plane inventory when enabled. It observes exact repository branch heads, materializes independent ephemeral checkouts, and exposes runtime controls.',
 			],
 			whenToUse: [
-				'Use `workset` from a clean Platform clone to assemble integrated development repositories without gitlinks. Use the other actions to inspect or stop the local runtime.',
+				'Use `workset` from a clean Platform clone to assemble integrated development repositories without gitlinks. Read-only seed inventory requires no Market service or login. Use the other actions to inspect or stop the local runtime.',
 			],
 			beforeYouRun: [
 				'Run from the workspace that owns the local platform state. Workset apply requires `--apply --yes` and refuses dirty, divergent, or incorrectly sourced existing checkouts.',

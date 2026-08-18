@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, reconcileLocalSeedRuntime, type SeedPlan } from '@treeseed/sdk/seeds';
 import { MarketClientError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketSelector } from '../content/market-utils.js';
+import { resolveMarketIntegrationMode } from '../content/support/market-mode.js';
 import { loadLocalSeedModule, requireLocalSeedSession } from '../accounts/seed-session.js';
 import { handleSeedRepositories } from './seed-repositories.js';
 import { handleSeedContentRepositories } from './migrations/seed-content-repositories.js';
@@ -338,7 +339,10 @@ export const handleSeed: CommandHandler = async (invocation, context) => {
 			return remoteSeedError(error, 'seed');
 		}
 		const localModule = await loadLocalSeedModule(context.cwd);
-		const runner = localAuth.session.accessToken
+		const marketMode = resolveMarketIntegrationMode(context.cwd);
+		const runner = !marketMode.enabled
+			? localModule.applyLocalSeedFromCli ?? localModule.applyLocalSeedViaApiFromCli
+			: localAuth.session.accessToken
 			? localModule.applyLocalSeedViaApiFromCli ?? localModule.applyLocalSeedFromCli
 			: localModule.applyLocalSeedFromCli ?? localModule.applyLocalSeedViaApiFromCli;
 		if (typeof runner !== 'function') {

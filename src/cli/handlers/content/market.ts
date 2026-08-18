@@ -7,9 +7,23 @@ import {
 import type { CommandHandler } from '../../types.js';
 import { guidedResult } from '../utilities/utils.js';
 import { createMarketClientForInvocation, formatMarketProfile } from './market-utils.js';
+import { resolveMarketIntegrationMode } from './support/market-mode.js';
 
 export const handleMarket: CommandHandler = async (invocation, context) => {
 	const action = invocation.positionals[0] ?? 'list';
+	const mode = resolveMarketIntegrationMode(context.cwd);
+	if (!mode.enabled) {
+		const inspectOnly = action === 'list' || action === 'status';
+		return guidedResult({
+			command: 'market',
+			summary: 'Market integration is disabled for this local development workspace.',
+			facts: [{ label: 'Enabled', value: false }, { label: 'Configured profile', value: mode.profile }],
+			nextSteps: ['Use the local customer-owned control plane for development.', 'Enable Market explicitly only after its service is available.'],
+			report: { code: 'market_integration_disabled', enabled: false, profile: mode.profile },
+			exitCode: inspectOnly ? 0 : 1,
+			...(inspectOnly ? {} : { stderr: ['Market mutations are unavailable while Market integration is disabled.'] }),
+		});
+	}
 	if (action === 'list') {
 		const state = loadMarketRegistryState();
 		return guidedResult({

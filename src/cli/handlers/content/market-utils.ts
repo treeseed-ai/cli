@@ -8,6 +8,7 @@ import {
 } from '@treeseed/sdk/market-client';
 import { findNearestRoot } from '@treeseed/sdk/workflow-support';
 import type { CommandContext, ParsedInvocation } from '../../types.js';
+import { assertMarketIntegrationEnabled } from './support/market-mode.js';
 
 export function marketAuthRoot(context: CommandContext) {
 	return findNearestRoot(context.cwd) ?? resolve(context.env.HOME || homedir());
@@ -27,6 +28,7 @@ export function localAcceptanceAdminToken(env: NodeJS.ProcessEnv) {
 
 export function createMarketClientForInvocation(invocation: ParsedInvocation, context: CommandContext, options: { requireAuth?: boolean; allowLocalAcceptanceAdmin?: boolean } = {}) {
 	const profile = resolveMarketProfile(marketSelector(invocation));
+	assertMarketIntegrationEnabled(context.cwd, profile.id);
 	const session = resolveMarketSession(marketAuthRoot(context), profile.id);
 	const localAccessToken = options.allowLocalAcceptanceAdmin && profile.id === 'local'
 		? localAcceptanceAdminToken(context.env)

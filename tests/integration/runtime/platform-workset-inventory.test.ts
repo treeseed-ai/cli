@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import test from 'node:test';
-import { loadPlatformWorksetInventory } from '../../../src/cli/handlers/runtime/platform-workset-inventory.ts';
+import { loadLocalPlatformWorksetInventory, loadPlatformWorksetInventory } from '../../../src/cli/handlers/runtime/platform-workset-inventory.ts';
 import { governedWorksetAuthority } from '../../../src/cli/handlers/runtime/run.ts';
 
 test('Platform workset resolves a team and selects only managed software and fixture repositories', async () => {
@@ -29,6 +32,45 @@ test('Platform workset resolves a team and selects only managed software and fix
 				{ projectId: 'project-platform', role: 'fixture', path: '.fixtures/treeseed-fixtures', repository: 'treeseed-ai/fixtures', branch: 'staging' },
 			],
 		});
+});
+
+test('Platform workset compiles local seed inventory without Market or content custody', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-local-workset-'));
+	try {
+		mkdirSync(resolve(root, 'seeds'));
+		writeFileSync(resolve(root, 'seeds/treeseed.yaml'), `resources:
+  teams:
+    - key: team:treeseed
+      slug: treeseed
+  projects:
+    - key: project:treeseed/platform
+      repository: { role: primary, owner: treeseed-ai, name: platform, checkoutPath: ., defaultBranch: main }
+    - key: project:treeseed/api
+      repository: { role: primary, owner: treeseed-ai, name: api, checkoutPath: packages/api, defaultBranch: main, repositoryPolicy: { stagingBranch: staging } }
+    - key: project:treeseed/market
+      repository: { role: primary, owner: treeseed-ai, name: market, checkoutPath: packages/market, defaultBranch: main }
+    - key: project:treeseed/content
+      repository: { role: primary, owner: treeseed-ai, name: docs-content, checkoutPath: packages/docs-content, defaultBranch: main }
+  hubRepositories:
+    - project: project:treeseed/platform
+      role: fixture
+      owner: treeseed-ai
+      name: fixtures
+      submodulePath: .fixtures/treeseed-fixtures
+      currentBranch: staging
+`);
+		assert.deepEqual(loadLocalPlatformWorksetInventory(root, 'treeseed'), {
+			teamId: 'team:treeseed',
+			inventory: [
+				{ projectId: 'project:treeseed/api', role: 'primary', path: 'packages/api', repository: 'treeseed-ai/api', branch: 'staging' },
+				{ projectId: 'project:treeseed/platform', role: 'fixture', path: '.fixtures/treeseed-fixtures', repository: 'treeseed-ai/fixtures', branch: 'staging' },
+			],
+			inventorySource: 'local-seed',
+			seedPath: 'seeds/treeseed.yaml',
+		});
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
 });
 
 test('writable Platform workset custody is compiled only from a matching active acting assignment and plan',async () => {

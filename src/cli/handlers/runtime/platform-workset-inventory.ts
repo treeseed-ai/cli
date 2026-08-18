@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { PlatformWorksetInventoryRepository } from '@treeseed/sdk';
 import type { MarketClient } from '@treeseed/sdk/market-client';
+import { parse } from 'yaml';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -62,4 +65,50 @@ export async function loadPlatformWorksetInventory(client: MarketClient, teamSel
 		return repositories.map((repository) => materializableRepository(project, repository)).filter((entry): entry is PlatformWorksetInventoryRepository => Boolean(entry));
 	});
 	return { teamId: response.payload?.teamId ?? teamId, inventory };
+}
+
+function localRepository(projectId: string, repository: JsonRecord): PlatformWorksetInventoryRepository | null {
+	const role = text(repository.role);
+	if (role !== 'primary' && role !== 'fixture') return null;
+	const owner = text(repository.owner);
+	const name = text(repository.name);
+	if (!owner || !name || /^(market|market-api)$/u.test(name) || name.endsWith('-content') || name === 'platform') return null;
+	const path = text(repository.submodulePath) ?? text(repository.checkoutPath);
+	const policy = record(repository.repositoryPolicy);
+	const branch = text(repository.currentBranch) ?? text(policy.stagingBranch) ?? text(repository.defaultBranch);
+	if (!path || !branch) throw new Error(`Local Platform inventory repository ${owner}/${name} is missing a checkout path or branch.`);
+	return { projectId, role, path, repository: `${owner}/${name}`, branch };
+}
+
+function localTeamId(resources: JsonRecord, selector: string) {
+	const teams = Array.isArray(resources.teams) ? resources.teams.map(record) : [];
+	const team = teams.find((candidate) => matchesTeam(candidate, selector)
+		|| text(candidate.key)?.toLowerCase() === `team:${selector.toLowerCase()}`);
+	if (!team) throw new Error(`Local Platform inventory does not declare team ${selector}.`);
+	return text(team.key) ?? text(team.id) ?? text(team.slug) ?? selector;
+}
+
+export function loadLocalPlatformWorksetInventory(root: string, teamSelector: string, seedPath = 'seeds/treeseed.yaml') {
+	const document = record(parse(readFileSync(resolve(root, seedPath), 'utf8')));
+	const resources = record(document.resources);
+	const teamId = localTeamId(resources, teamSelector);
+	const projects = Array.isArray(resources.projects) ? resources.projects.map(record) : [];
+	const projectRepositories = projects.map((project) => {
+		const projectId = text(project.key) ?? text(project.id) ?? text(project.slug);
+		if (!projectId) throw new Error('Local Platform inventory contains a project without an identity.');
+		return localRepository(projectId, record(project.repository));
+	});
+	const supportRepositories = (Array.isArray(resources.hubRepositories) ? resources.hubRepositories.map(record) : [])
+		.map((repository) => {
+			const projectId = text(repository.project);
+			if (!projectId) throw new Error('Local Platform inventory contains a support repository without a project identity.');
+			return localRepository(projectId, repository);
+		});
+	return {
+		teamId,
+		inventory: [...projectRepositories, ...supportRepositories]
+			.filter((entry): entry is PlatformWorksetInventoryRepository => Boolean(entry)),
+		inventorySource: 'local-seed' as const,
+		seedPath,
+	};
 }
