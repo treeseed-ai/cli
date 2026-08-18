@@ -52,6 +52,15 @@ function desiredGraphDigest(seedDigests: Record<string, string>) {
 	return createHash('sha256').update(JSON.stringify(Object.entries(seedDigests).sort(([left], [right]) => left.localeCompare(right)))).digest('hex');
 }
 
+export function platformUsesBackendOnlyRuntime(root: string) {
+	return existsSync(resolve(root, '.treeseed', 'template-state.json'))
+		&& !['astro.config.ts', 'astro.config.mjs', 'astro.config.js'].some((path) => existsSync(resolve(root, path)));
+}
+
+function managedRuntimeArgs(root: string) {
+	return platformUsesBackendOnlyRuntime(root) ? { backendOnly: true } : {};
+}
+
 function persistState(root: string, state: RunState) {
 	const target = statePath(root);
 	mkdirSync(dirname(target), { recursive: true });
@@ -79,7 +88,7 @@ async function convergeSupervisor(invocation: ParsedInvocation, context: Paramet
 			const applied = await handleSeed(invocationFor('seed', invocation, [seed], { apply: true, environments: 'local', yes: true, json: true }), context);
 			if ((applied.exitCode ?? 0) !== 0) throw new Error(applied.stderr?.join('\n') ?? `Seed ${seed} reconciliation failed.`);
 		}
-		const runtime = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', seeds: desired?.seeds.join(','), json: true }), context);
+		const runtime = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', seeds: desired?.seeds.join(','), ...managedRuntimeArgs(context.cwd), json: true }), context);
 		if ((runtime.exitCode ?? 0) !== 0) throw new Error(runtime.stderr?.join('\n') ?? 'Local runtime reconciliation failed.');
 		state.lastConvergedAt = new Date().toISOString(); state.lastError = undefined;
 		if (generation?.status === 'pending') { settleConfigurationGeneration(context.cwd, generation.id, 'applied', { runtimeReady: true }); state.generationId = generation.id; }
@@ -293,7 +302,7 @@ export const handleRun: CommandHandler = async (invocation, context) => {
 		if ((result.exitCode ?? 0) !== 0) return { ...result, report: { ...(result.report ?? {}), command: 'run', failedSeed: seed, platformStarted: true } };
 		applied.push({ seed, report: result.report ?? null });
 	}
-	const started = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', seeds: requested.join(','), json: invocation.args.json }), context);
+	const started = await handleDev(invocationFor('dev', invocation, ['start'], { webRuntime: 'local', seeds: requested.join(','), ...managedRuntimeArgs(context.cwd), json: invocation.args.json }), context);
 	if ((started.exitCode ?? 0) !== 0) return started;
 	const generation = readConfigurationGeneration(context.cwd);
 	persistState(context.cwd, { schemaVersion: 1, seeds: requested, seedDigests, trackedBranch: trackedBranch(context.cwd), configurationGenerationId: generation?.id ?? null, desiredGraphDigest: desiredGraphDigest(seedDigests), lastSuccessfulRuntimeGeneration: generation?.status === 'applied' ? generation.id : null, updatedAt: new Date().toISOString() });

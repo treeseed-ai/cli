@@ -44,6 +44,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 		const subcommand = typeof invocation.positionals[0] === 'string' ? invocation.positionals[0] : '';
 		const effectiveSubcommand = subcommand || 'start';
 		const foundationOnly = invocation.args.foundationOnly === true;
+		const backendOnly = invocation.args.backendOnly === true;
 		const managedSubcommands = new Set(['start', 'status', 'logs', 'stop', 'restart']);
 		if (subcommand && !managedSubcommands.has(subcommand)) {
 			return fail(`Unknown dev subcommand "${subcommand}". Use start, status, logs, stop, or restart.`);
@@ -72,7 +73,9 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 			}).map((unit) => typeof unit.metadata.serviceId === 'string' ? unit.metadata.serviceId : null),
 		);
 		const hasLocalApi = localProcessServiceIds.has('api');
-		const selectedSurfaces = foundationOnly ? 'api' : appId === 'api'
+		const selectedSurfaces = foundationOnly ? 'api' : backendOnly
+			? 'api,operations-runner'
+			: appId === 'api'
 			? 'api,operations-runner'
 			: appId === 'operations-runner'
 				? appId

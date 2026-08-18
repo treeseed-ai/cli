@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { compileSeedSet } from '../../../src/cli/handlers/runtime/run.ts';
+import { compileSeedSet, platformUsesBackendOnlyRuntime } from '../../../src/cli/handlers/runtime/run.ts';
 
 function seed(name: string, executionProviderId: string) {
 	return `name: ${name}\nversion: 1\ndefaultEnvironments: [local]\nenvironments: [local]\nreferences: [team:example, project:example/app]\nresources: {}\nruntime:\n  capacityProviders:\n    - key: capacity-provider:example/agents\n      providerClass: agent\n      environments: [local]\n      team: team:example\n      manifest: provider.yaml\n      connectionId: primary\n      approval: trusted-local-owner\n      projects: [project:example/app]\n      allowedModes: [planning]\n      executionProviderIds: [${executionProviderId}]\n  agentLabServicePrincipals: []\noperationRecipes: []\n`;
@@ -20,6 +20,19 @@ test('run rejects conflicting runtime prerequisite ownership across selected see
 		assert.equal(result.ok, false);
 		assert.ok(result.diagnostics.some((entry) => entry.code === 'seed.desired_identity_conflict'
 			&& entry.path === 'capacityProvider:capacity-provider:example/agents'), JSON.stringify(result.diagnostics));
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test('a template-initialized Platform without an application layer runs backend surfaces only', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-run-platform-runtime-'));
+	try {
+		mkdirSync(resolve(root, '.treeseed'), { recursive: true });
+		writeFileSync(resolve(root, '.treeseed/template-state.json'), '{}\n');
+		assert.equal(platformUsesBackendOnlyRuntime(root), true);
+		writeFileSync(resolve(root, 'astro.config.ts'), 'export default {};\n');
+		assert.equal(platformUsesBackendOnlyRuntime(root), false);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
