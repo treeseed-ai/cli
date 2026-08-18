@@ -15,9 +15,10 @@ import { handleUpdate } from '../workspace-lifecycle/update.js';
 import { fail } from '../utilities/utils.js';
 import { platformSupervisorPaths, processIsAlive, readPlatformSupervisor, type PlatformSupervisorState } from './platform-supervisor-state.js';
 import { runPlatformMutationWhenAvailable } from './platform-supervisor-workflows.js';
-import { loadPlatformWorksetInventory } from './platform-workset-inventory.js';
+import { loadLocalPlatformWorksetInventory, loadPlatformWorksetInventory } from './platform-workset-inventory.js';
 import { inspectPlatformRepositories } from './platform-repository-status.js';
-import { createMarketClientForInvocation } from '../content/market-utils.js';
+import { createMarketClientForInvocation, marketSelector } from '../content/market-utils.js';
+import { resolveMarketIntegrationMode } from '../content/support/market-mode.js';
 
 type RunState = {
 	schemaVersion: 1;
@@ -345,14 +346,27 @@ export const handlePlatform: CommandHandler = async (invocation, context) => {
 		if (invocation.args.apply === true && invocation.args.yes !== true) return fail('Applying a Platform workset requires --apply --yes.');
 		if (branch && !assignmentId) return fail('A writable Platform workset branch requires --assignment <acting-assignment-id>.');
 		try {
-			const { client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
-			const { teamId, inventory } = await loadPlatformWorksetInventory(client, teamSelector);
-			const authority = assignmentId ? await governedWorksetAuthority(client, teamId, assignmentId) : null;
-			const input = { root: context.cwd, teamId, inventory, branch, authority, env: context.env };
+			const marketMode = resolveMarketIntegrationMode(context.cwd);
+			if (assignmentId && !marketMode.enabled && marketSelector(invocation) !== 'local') {
+				const message = 'Writable workset custody requires the local control plane; start it and use --market local before requesting an assignment branch.';
+				return { exitCode: 1, stderr: [message], report: { command: 'platform workset', ok: false, code: 'control_plane_required_for_writable_workset', error: message } };
+			}
+			const inventoryClient = marketMode.inventorySource === 'api'
+				? createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true }).client
+				: null;
+			const authorityClient = assignmentId
+				? createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true }).client
+				: null;
+			const loaded = inventoryClient
+				? await loadPlatformWorksetInventory(inventoryClient, teamSelector)
+				: loadLocalPlatformWorksetInventory(marketMode.workspaceRoot, teamSelector, marketMode.seedPath);
+			const { teamId, inventory } = loaded;
+			const authority = assignmentId && authorityClient ? await governedWorksetAuthority(authorityClient, teamId, assignmentId) : null;
+			const input = { root: marketMode.workspaceRoot, teamId, inventory, branch, authority, env: context.env };
 			const report = invocation.args.apply === true
 				? applyPlatformWorkset(input)
 				: planPlatformWorkset(input);
-			return { exitCode: report.summary.blocked ? 1 : 0, report: { command: 'platform workset', ok: report.summary.blocked === 0, executionMode: invocation.args.apply === true ? 'apply' : 'plan', ...report } };
+			return { exitCode: report.summary.blocked ? 1 : 0, report: { command: 'platform workset', ok: report.summary.blocked === 0, executionMode: invocation.args.apply === true ? 'apply' : 'plan', inventorySource: 'inventorySource' in loaded ? loaded.inventorySource : 'api', ...report } };
 		} catch (error) {
 			return fail(error instanceof Error ? error.message : String(error));
 		}
@@ -367,9 +381,11 @@ export const handlePlatform: CommandHandler = async (invocation, context) => {
 	if (action === 'status') {
 		try {
 			const teamSelector = typeof invocation.args.team === 'string' ? invocation.args.team : context.env.TREESEED_TEAM_ID?.trim() || 'treeseed';
-			const { client } = createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true });
-			const inventory = await loadPlatformWorksetInventory(client, teamSelector);
-			repositories = { teamId: inventory.teamId, items: inspectPlatformRepositories(context.cwd, inventory.inventory) };
+			const marketMode = resolveMarketIntegrationMode(context.cwd);
+			const inventory = marketMode.inventorySource === 'api'
+				? await loadPlatformWorksetInventory(createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true }).client, teamSelector)
+				: loadLocalPlatformWorksetInventory(marketMode.workspaceRoot, teamSelector, marketMode.seedPath);
+			repositories = { teamId: inventory.teamId, inventorySource: 'inventorySource' in inventory ? inventory.inventorySource : 'api', items: inspectPlatformRepositories(marketMode.workspaceRoot, inventory.inventory) };
 		} catch (error) {
 			repositories = { unavailable: true, error: error instanceof Error ? error.message : String(error) };
 		}

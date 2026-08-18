@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import test from 'node:test';
-import { loadPlatformWorksetInventory } from '../../../src/cli/handlers/runtime/platform-workset-inventory.ts';
-import { governedWorksetAuthority } from '../../../src/cli/handlers/runtime/run.ts';
+import { loadLocalPlatformWorksetInventory, loadPlatformWorksetInventory } from '../../../src/cli/handlers/runtime/platform-workset-inventory.ts';
+import { governedWorksetAuthority, handlePlatform } from '../../../src/cli/handlers/runtime/run.ts';
+import { localSeedApplyPreference } from '../../../src/cli/handlers/seeds/seed.ts';
 
 test('Platform workset resolves a team and selects only managed software and fixture repositories', async () => {
 		const client = {
@@ -29,6 +33,64 @@ test('Platform workset resolves a team and selects only managed software and fix
 				{ projectId: 'project-platform', role: 'fixture', path: '.fixtures/treeseed-fixtures', repository: 'treeseed-ai/fixtures', branch: 'staging' },
 			],
 		});
+});
+
+test('Platform workset compiles local seed inventory without Market or content custody', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-local-workset-'));
+	try {
+		mkdirSync(resolve(root, 'seeds'));
+		const policy = { visibility: 'public', lifecycle: 'create-or-adopt', deletionPolicy: 'retain', defaultBranch: 'main', stagingBranch: 'staging', issues: true, actions: true, workflows: ['verify.yml'] };
+		const architecture = { topology: 'split_site_content', rootPath: '.', sitePath: 'docs', contentPath: 'src/content', contentRuntimeSource: 'r2_preview_overlay', localContentMaterialization: 'none', requiresLocalContentForCi: false, requiresLocalContentForDeploy: false, contentPublishTarget: { kind: 'cloudflare_r2', prefix: 'fixture' } };
+		const project = (team: string, slug: string, name = slug) => ({
+			key: `project:${team.split(':')[1]}/${slug}`, team, slug, name,
+			repository: { role: 'primary', provider: 'github', owner: 'treeseed-ai', name: slug, gitUrl: `https://github.com/treeseed-ai/${slug}.git`, defaultBranch: 'main', checkoutPath: slug === 'platform' ? '.' : `packages/${slug}`, repositoryPolicy: policy },
+			architecture,
+		});
+		writeFileSync(resolve(root, 'seeds/treeseed.yaml'), JSON.stringify({
+			name: 'treeseed', version: 1, defaultEnvironments: ['local'], environments: ['local'],
+			resources: {
+				teams: [
+					{ key: 'team:treeseed', slug: 'treeseed', name: 'treeseed', displayName: 'TreeSeed' },
+					{ key: 'team:other', slug: 'other', name: 'other', displayName: 'Other' },
+				],
+				projects: [project('team:treeseed', 'platform'), project('team:treeseed', 'api'), project('team:treeseed', 'market'), project('team:treeseed', 'docs-content'), project('team:other', 'other-package')],
+				hubRepositories: [{ key: 'repository:treeseed/fixtures', project: 'project:treeseed/platform', role: 'fixture', provider: 'github', owner: 'treeseed-ai', name: 'fixtures', gitUrl: 'https://github.com/treeseed-ai/fixtures.git', defaultBranch: 'main', currentBranch: 'staging', submodulePath: '.fixtures/treeseed-fixtures', status: 'active', repositoryPolicy: policy }],
+			},
+		}));
+		assert.deepEqual(loadLocalPlatformWorksetInventory(root, 'treeseed'), {
+			teamId: 'team:treeseed',
+			inventory: [
+				{ projectId: 'project:treeseed/api', role: 'primary', path: 'packages/api', repository: 'https://github.com/treeseed-ai/api.git', branch: 'staging' },
+				{ projectId: 'project:treeseed/platform', role: 'fixture', path: '.fixtures/treeseed-fixtures', repository: 'https://github.com/treeseed-ai/fixtures.git', branch: 'staging' },
+			],
+			inventorySource: 'local-seed',
+			seedPath: 'seeds/treeseed.yaml',
+		});
+		mkdirSync(resolve(root, 'packages/nested'), { recursive: true });
+		assert.equal(loadLocalPlatformWorksetInventory(root, 'treeseed').inventory.length, 2);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test('Market-disabled writable workset returns a stable local-control-plane requirement', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-local-workset-authority-'));
+	try {
+		writeFileSync(resolve(root, 'treeseed.site.yaml'), 'market: { profile: treeseed }\ndevelopment: { local: { marketConnectivity: disabled, inventory: { source: seed } } }\n');
+		const result = await handlePlatform({ commandName: 'platform', args: { branch: 'codex/test', assignment: 'assignment-a' }, positionals: ['workset'], rawArgs: [] }, {
+			cwd: root, env: {}, outputFormat: 'json', write() {}, spawn: (() => { throw new Error('unexpected spawn'); }) as never,
+		});
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.report?.code, 'control_plane_required_for_writable_workset');
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test('Market-disabled local seed apply prefers the direct store adapter', () => {
+	assert.equal(localSeedApplyPreference(false, true), 'direct');
+	assert.equal(localSeedApplyPreference(true, true), 'api');
+	assert.equal(localSeedApplyPreference(true, false), 'direct');
 });
 
 test('writable Platform workset custody is compiled only from a matching active acting assignment and plan',async () => {

@@ -5,6 +5,7 @@ import {
 import { KeyAgentError } from '@treeseed/sdk/workflow-support';
 import { guidedResult } from '../utilities/utils.js';
 import { createMarketClientForInvocation, marketAuthRoot } from '../content/market-utils.js';
+import { MarketIntegrationDisabledError } from '../content/support/market-mode.js';
 
 function sleep(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -109,6 +110,15 @@ export const handleAuthLogin: CommandHandler = async (invocation, context) => {
 			stderr: ['Treeseed API login expired before approval completed.'],
 		};
 	} catch (error) {
+		if (error instanceof MarketIntegrationDisabledError) {
+			return guidedResult({
+				command: 'auth:login',
+				summary: error.message,
+				report: { code: error.code },
+				exitCode: 1,
+				stderr: [error.message],
+			});
+		}
 		if (error instanceof KeyAgentError) {
 			return {
 				exitCode: 1,

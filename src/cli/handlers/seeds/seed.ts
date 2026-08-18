@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { formatSeedDiagnostics, formatSeedPlan, loadAndPlanSeed, reconcileLocalSeedRuntime, type SeedPlan } from '@treeseed/sdk/seeds';
 import { MarketClientError } from '@treeseed/sdk/market-client';
 import { createMarketClientForInvocation, marketSelector } from '../content/market-utils.js';
+import { resolveMarketIntegrationMode } from '../content/support/market-mode.js';
 import { loadLocalSeedModule, requireLocalSeedSession } from '../accounts/seed-session.js';
 import { handleSeedRepositories } from './seed-repositories.js';
 import { handleSeedContentRepositories } from './migrations/seed-content-repositories.js';
@@ -41,6 +42,10 @@ function planFromRemotePayload(payload: Record<string, unknown>): SeedPlan {
 
 export function localRuntimePlan(planned: SeedPlan, applied: SeedPlan): SeedPlan {
 	return { ...applied, runtime: planned.runtime };
+}
+
+export function localSeedApplyPreference(marketEnabled: boolean, hasAccessToken: boolean): 'direct' | 'api' {
+	return !marketEnabled || !hasAccessToken ? 'direct' : 'api';
 }
 
 function remoteSeedResult(payload: Record<string, unknown>, command: string, exitCode = 0) {
@@ -338,9 +343,10 @@ export const handleSeed: CommandHandler = async (invocation, context) => {
 			return remoteSeedError(error, 'seed');
 		}
 		const localModule = await loadLocalSeedModule(context.cwd);
-		const runner = localAuth.session.accessToken
-			? localModule.applyLocalSeedViaApiFromCli ?? localModule.applyLocalSeedFromCli
-			: localModule.applyLocalSeedFromCli ?? localModule.applyLocalSeedViaApiFromCli;
+		const marketMode = resolveMarketIntegrationMode(context.cwd);
+		const runner = localSeedApplyPreference(marketMode.enabled, Boolean(localAuth.session.accessToken)) === 'direct'
+			? localModule.applyLocalSeedFromCli ?? localModule.applyLocalSeedViaApiFromCli
+			: localModule.applyLocalSeedViaApiFromCli ?? localModule.applyLocalSeedFromCli;
 		if (typeof runner !== 'function') {
 			throw new Error('Local seed apply service is not available in this market project.');
 		}
