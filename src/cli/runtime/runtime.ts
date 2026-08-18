@@ -25,6 +25,7 @@ import {
 	resolveColorEnabled,
 	stripGlobalFlags,
 } from './runtime-output.js';
+import { hydrateProjectEnvironment } from './runtime-environment.ts';
 
 export { colorizeCliOutput } from './runtime-output.js';
 
@@ -458,6 +459,7 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 	}
 
 	const baseCwd = overrides.cwd ?? process.cwd();
+	overrides = { ...overrides, env: hydrateProjectEnvironment(baseCwd, overrides.env ?? process.env) };
 	const resolved = resolveCommandCwd(spec, baseCwd);
 	if (commandNeedsProjectRoot(spec) && !resolved.resolvedProjectRoot) {
 		return writeCommandResult({

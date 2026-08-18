@@ -10,7 +10,7 @@ import {
 	type ReconcileSelector,
 } from '@treeseed/sdk/reconcile';
 import { compileDesiredResourceGraph, compileDesiredUnitsFromGraph } from '@treeseed/sdk/platform/desired-state';
-import { resolveLaunchEnvironment } from '@treeseed/sdk/workflow-support';
+import { applyEnvironmentToProcess,resolveLaunchEnvironment } from '@treeseed/sdk/workflow-support';
 import type { CommandHandler } from '../../types.js';
 import { resolveDevProcessAction } from './dev-lifecycle.js';
 import { workflowErrorResult } from '../operations/workflow.js';
@@ -53,6 +53,7 @@ export const handleDev: CommandHandler = async (invocation, context) => {
 		const localContent = (stringOption(invocation.args, 'localContent') as 'auto' | 'none' | 'preview' | 'edit' | undefined) ?? 'auto';
 		const seedNames = stringOption(invocation.args, 'seeds')?.split(',').map((entry) => entry.trim()).filter(Boolean);
 		const target = { kind: 'persistent' as const, scope: 'local' as const };
+		applyEnvironmentToProcess({ tenantRoot: context.cwd, scope: 'local' });
 		const launchEnv = resolveLaunchEnvironment({
 			tenantRoot: context.cwd,
 			scope: 'local',

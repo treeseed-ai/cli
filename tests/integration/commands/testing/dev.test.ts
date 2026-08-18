@@ -98,7 +98,7 @@ test('treeseed dev leaves live feedback disabled when feedback is off', async ()
 	assert.equal(result.spawns.length, 0);
 });
 
-test('treeseed dev resolves configured local runtime values before reconciliation', () => {
+test('treeseed dev resolves configured local runtime values before reconciliation', async () => {
 	const workspaceRoot = makeTenantWorkspace('feature/dev-config-environment');
 	mkdirSync(resolve(workspaceRoot, '.treeseed', 'config'), { recursive: true });
 	mkdirSync(resolve(workspaceRoot, 'src'), { recursive: true });
@@ -125,6 +125,8 @@ environments:
   local:
     values:
       TREESEED_API_BOOTSTRAP_ADMIN_ALLOWLIST: original-admin@example.test
+      TREESEED_HOSTING_TEAM_ID: configured-team
+      TREESEED_PROJECT_ID: configured-project
     secrets: {}
   staging: { values: {}, secrets: {} }
   prod: { values: {}, secrets: {} }
@@ -132,6 +134,11 @@ environments:
 
 	const environment = resolveLaunchEnvironment({ tenantRoot: workspaceRoot, scope: 'local', baseEnv: {} });
 	assert.equal(environment.TREESEED_API_BOOTSTRAP_ADMIN_ALLOWLIST, 'original-admin@example.test');
+	const result = await runCli(['dev', '--plan', '--json'], {
+		cwd: workspaceRoot,
+		env: { HOME: workspaceRoot, TREESEED_KEY_PASSPHRASE: 'test-passphrase' },
+	});
+	assert.equal(result.exitCode, 0, result.output);
 });
 
 test('treeseed dev forwards managed subcommands with dev subcommand syntax', async () => {
