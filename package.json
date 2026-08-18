@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.fix-platform-machine-identity.20260818T062536Z",
+  "version": "0.12.59-dev.fix-platform-template-assets.20260818T085317Z",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -48,9 +48,9 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#1b37cdd02a006afb65ff93d058a5b664492c7ef9",
-    "@treeseed/core": "github:treeseed-ai/core#fc4095c303265410b5639768be0627bf8ff6d03d",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#6b2a5b14fd42ab63f1150b15658966a6715979f3",
+    "@treeseed/agent": "github:treeseed-ai/agent#391d49eadaf0225a19f898b89ae4528dbec6d78b",
+    "@treeseed/core": "github:treeseed-ai/core#38693329ebd4aa2745a846a0f49b8ed8039b8749",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#623b218752adbef1723034fb5885942d137ec612",
     "@treeseed/ui": "github:treeseed-ai/ui#d622525826d4222ced78e7748880750f6c1377bb",
     "ink": "^7.0.0",
     "react": "^19.2.5",
