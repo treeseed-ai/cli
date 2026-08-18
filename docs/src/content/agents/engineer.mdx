@@ -11,10 +11,10 @@ enabled: true
 description: Implements decision-scoped code and configuration changes without modifying tests.
 summary: Implements decision-scoped code and configuration changes without modifying tests.
 runtimeStatus: active
-tags:
+groupIds:
   - agent
-  - engineering-team
   - engineering
+  - engineering-team
 identity:
   purpose: Implements decision-scoped code and configuration changes without modifying tests.
   responsibilities:
@@ -39,45 +39,88 @@ activityProfiles:
   planning:
     activityType: planning
     enabled: true
-    handler: actor
+    handler: writer
     prompt:
       system: |
         You are the Engineer for this TreeSeed project. Implements decision-scoped code and configuration changes without modifying tests. Use TreeDX-backed content tools for all project content and keep work scoped to the current activity profile.
       task: planning
     branchPolicy:
-      kind: read-only
-      base: main
-    contentAccess:
-      read:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+      kind: staging-content
+      base: staging
+    permissions:
+      content:
+        question:
+          operations:
           - describe
           - query
           - read
-      write:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        objective:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        note:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        proposal:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        decision:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        knowledge:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        agent:
+          operations:
+          - describe
+          - query
+          - read
           - create
           - update
           - link
           - validate
           - commit
       commit:
-        allowed: false
+        allowed: true
     tools:
       allowed:
         - treeseed.content.describe
@@ -85,9 +128,18 @@ activityProfiles:
         - treeseed.content.read
         - treedx.build_context
         - treedx.read_repository_files
+        - treeseed.repository.read_file
+        - treeseed.repository.search
         - treedx.search_workspace
         - treedx.read_workspace_file
         - treeseed.status
+        - treeseed.content.create
+        - treeseed.content.update
+        - treeseed.content.link
+        - treeseed.content.validate
+        - treeseed.content.commit
+        - treedx.apply_workspace_changeset
+        - treedx.commit_workspace
     outputs:
       messageTypes: []
       modelMutations:
@@ -99,8 +151,8 @@ activityProfiles:
       defaultAnswerPolicy:
         kind: human-or-agent
     execution:
-      providerPreference:
-        - codex
+      requiredCapabilities:
+        - agent-execution
       maxRuntimeSeconds: 1800
       maxRetries: 2
       verificationRequired: true
@@ -115,30 +167,73 @@ activityProfiles:
     branchPolicy:
       kind: read-only
       base: main
-    contentAccess:
-      read:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+    permissions:
+      content:
+        question:
+          operations:
           - describe
           - query
           - read
-      write:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        objective:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        note:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        proposal:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        decision:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        knowledge:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        agent:
+          operations:
+          - describe
+          - query
+          - read
           - create
           - update
           - link
@@ -153,6 +248,8 @@ activityProfiles:
         - treeseed.content.read
         - treedx.build_context
         - treedx.read_repository_files
+        - treeseed.repository.read_file
+        - treeseed.repository.search
         - treedx.search_workspace
         - treedx.read_workspace_file
         - treeseed.status
@@ -166,8 +263,8 @@ activityProfiles:
       defaultAnswerPolicy:
         kind: human-or-agent
     execution:
-      providerPreference:
-        - codex
+      requiredCapabilities:
+        - agent-execution
       maxRuntimeSeconds: 1800
       maxRetries: 2
       verificationRequired: false
@@ -182,30 +279,73 @@ activityProfiles:
     branchPolicy:
       kind: read-only
       base: main
-    contentAccess:
-      read:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+    permissions:
+      content:
+        question:
+          operations:
           - describe
           - query
           - read
-      write:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        objective:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        note:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        proposal:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        decision:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        knowledge:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        agent:
+          operations:
+          - describe
+          - query
+          - read
           - create
           - update
           - link
@@ -220,6 +360,8 @@ activityProfiles:
         - treeseed.content.read
         - treedx.build_context
         - treedx.read_repository_files
+        - treeseed.repository.read_file
+        - treeseed.repository.search
         - treedx.search_workspace
         - treedx.read_workspace_file
         - treeseed.status
@@ -233,8 +375,8 @@ activityProfiles:
       defaultAnswerPolicy:
         kind: human-or-agent
     execution:
-      providerPreference:
-        - codex
+      requiredCapabilities:
+        - agent-execution
       maxRuntimeSeconds: 1800
       maxRetries: 2
       verificationRequired: false
@@ -255,30 +397,73 @@ activityProfiles:
       updateBaseBeforeRun: true
       mergeTargetBeforeSave: true
       prefix: engineer
-    contentAccess:
-      read:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+    permissions:
+      content:
+        question:
+          operations:
           - describe
           - query
           - read
-      write:
-        models:
-          - question
-          - objective
-          - note
-          - proposal
-          - decision
-          - knowledge
-          - agent
-        actions:
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        objective:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        note:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        proposal:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        decision:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        knowledge:
+          operations:
+          - describe
+          - query
+          - read
+          - create
+          - update
+          - link
+          - validate
+          - commit
+        agent:
+          operations:
+          - describe
+          - query
+          - read
           - create
           - update
           - link
@@ -293,6 +478,8 @@ activityProfiles:
         - treeseed.content.read
         - treedx.build_context
         - treedx.read_repository_files
+        - treeseed.repository.read_file
+        - treeseed.repository.search
         - treedx.search_workspace
         - treedx.read_workspace_file
         - treeseed.status
@@ -301,7 +488,7 @@ activityProfiles:
         - treeseed.content.link
         - treeseed.content.validate
         - treeseed.content.commit
-        - treedx.write_workspace_file
+        - treedx.apply_workspace_changeset
         - treedx.commit_workspace
         - treeseed.changed_paths
         - treeseed.verify
@@ -316,8 +503,8 @@ activityProfiles:
       defaultAnswerPolicy:
         kind: human-or-agent
     execution:
-      providerPreference:
-        - codex
+      requiredCapabilities:
+        - agent-execution
       maxRuntimeSeconds: 1800
       maxRetries: 2
       verificationRequired: true

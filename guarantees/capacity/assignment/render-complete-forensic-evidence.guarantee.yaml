@@ -1,0 +1,55 @@
+schemaVersion: treeseed.guarantee/v1
+id: guarantee.capacity.assignment.render-complete-forensic-evidence.503
+journeyIndex: 503
+type: capacity
+subtype: assignment
+journey: Render Complete Forensic Evidence
+ownerPackage: "@treeseed/cli"
+surface: cli
+summary: "CLI execution-run and workday-log commands preserve bounded assignment and mode-run evidence and fail visibly when the control plane cannot provide a complete trace."
+status: planned
+dependencies:
+  journeys: []
+  guarantees:
+    - guarantee.capacity.assignment.preserve-execution-run-evidence.502
+actors:
+  allowed:
+    - capacity_operator
+    - team_owner
+  forbidden:
+    - anonymous_user
+    - unauthorized_user
+devices:
+  required: []
+gates:
+  - core
+  - release
+preconditions:
+  fixtures:
+    - integrated_treeseed_project
+  notes:
+    - "Exercises the same bounded API request helpers used by execution-runs and workday-log without requiring an Admin UI."
+scene:
+  required: false
+api:
+  required: true
+  verifierRefs:
+    - cli.capacity.assignment.forensic-reads-fail-visible
+content:
+  required: false
+  verifierRefs: []
+audit:
+  required: true
+  verifierRefs:
+    - cli.capacity.assignment.forensic-reads-fail-visible
+negativeCases:
+  - id: api-uncertainty-is-not-empty-success
+    actor: capacity_operator
+    verifierRefs:
+      - cli.capacity.assignment.forensic-reads-fail-visible
+evidence:
+  required:
+    - guarantee_report
+    - verifier_evidence
+notes:
+  - "The API dependency owns durable evidence; the CLI owns faithful, fail-visible operator rendering."

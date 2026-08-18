@@ -1,0 +1,45 @@
+schemaVersion: treeseed.guarantee/v1
+id: guarantee.capacity.assignment.integrate-reviewed-agent-checkpoint.512
+journeyIndex: 512
+type: capacity
+subtype: assignment
+journey: Integrate Reviewed Agent Checkpoint
+ownerPackage: "@treeseed/cli"
+surface: cli
+summary: "A supervisor can plan and explicitly integrate only the final API-selected, independently reviewed assignment checkpoint into a clean unprotected managed task branch without granting the agent push, stage, release, or deployment authority."
+status: planned
+dependencies:
+  journeys: []
+  guarantees: []
+actors:
+  allowed: [capacity_operator, team_owner]
+  forbidden: [capacity_provider, anonymous_user, unauthorized_user]
+devices:
+  required: []
+gates: [core, release]
+preconditions:
+  fixtures: [integrated_treeseed_project]
+  notes:
+    - "The assignment graph, selected deliverable manifest, project repository topology, local task branch, and immutable checkpoint must all agree."
+scene:
+  required: false
+api:
+  required: true
+  verifierRefs: [cli.capacity.assignment.reviewed-checkpoint-integration]
+content:
+  required: false
+  verifierRefs: []
+audit:
+  required: true
+  verifierRefs: [cli.capacity.assignment.reviewed-checkpoint-integration]
+negativeCases:
+  - id: stale-divergent-or-superseded-checkpoint-is-blocked
+    actor: capacity_operator
+    verifierRefs: [cli.capacity.assignment.reviewed-checkpoint-integration]
+  - id: provider-cannot-publish-checkpoint
+    actor: capacity_provider
+    verifierRefs: [cli.capacity.assignment.reviewed-checkpoint-integration]
+evidence:
+  required: [guarantee_report, verifier_evidence]
+notes:
+  - "Keep planned through production readiness; activate during post-readiness transition Stage B only after a bounded real-package canary proves plan, execute, replay, standalone verification, and subsequent trsd save handoff without direct provider publication."
