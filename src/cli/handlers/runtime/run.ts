@@ -17,7 +17,7 @@ import { platformSupervisorPaths, processIsAlive, readPlatformSupervisor, type P
 import { runPlatformMutationWhenAvailable } from './platform-supervisor-workflows.js';
 import { loadLocalPlatformWorksetInventory, loadPlatformWorksetInventory } from './platform-workset-inventory.js';
 import { inspectPlatformRepositories } from './platform-repository-status.js';
-import { createMarketClientForInvocation } from '../content/market-utils.js';
+import { createMarketClientForInvocation, marketSelector } from '../content/market-utils.js';
 import { resolveMarketIntegrationMode } from '../content/support/market-mode.js';
 
 type RunState = {
@@ -347,16 +347,22 @@ export const handlePlatform: CommandHandler = async (invocation, context) => {
 		if (branch && !assignmentId) return fail('A writable Platform workset branch requires --assignment <acting-assignment-id>.');
 		try {
 			const marketMode = resolveMarketIntegrationMode(context.cwd);
-			if (!marketMode.enabled && assignmentId) return fail('Writable workset custody requires the local control plane; start it and use --market local before requesting an assignment branch.');
-			const client = marketMode.enabled
+			if (assignmentId && !marketMode.enabled && marketSelector(invocation) !== 'local') {
+				const message = 'Writable workset custody requires the local control plane; start it and use --market local before requesting an assignment branch.';
+				return { exitCode: 1, stderr: [message], report: { command: 'platform workset', ok: false, code: 'control_plane_required_for_writable_workset', error: message } };
+			}
+			const inventoryClient = marketMode.inventorySource === 'api'
 				? createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true }).client
 				: null;
-			const loaded = client
-				? await loadPlatformWorksetInventory(client, teamSelector)
-				: loadLocalPlatformWorksetInventory(context.cwd, teamSelector, marketMode.seedPath);
+			const authorityClient = assignmentId
+				? createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true }).client
+				: null;
+			const loaded = inventoryClient
+				? await loadPlatformWorksetInventory(inventoryClient, teamSelector)
+				: loadLocalPlatformWorksetInventory(marketMode.workspaceRoot, teamSelector, marketMode.seedPath);
 			const { teamId, inventory } = loaded;
-			const authority = assignmentId && client ? await governedWorksetAuthority(client, teamId, assignmentId) : null;
-			const input = { root: context.cwd, teamId, inventory, branch, authority, env: context.env };
+			const authority = assignmentId && authorityClient ? await governedWorksetAuthority(authorityClient, teamId, assignmentId) : null;
+			const input = { root: marketMode.workspaceRoot, teamId, inventory, branch, authority, env: context.env };
 			const report = invocation.args.apply === true
 				? applyPlatformWorkset(input)
 				: planPlatformWorkset(input);
@@ -376,10 +382,10 @@ export const handlePlatform: CommandHandler = async (invocation, context) => {
 		try {
 			const teamSelector = typeof invocation.args.team === 'string' ? invocation.args.team : context.env.TREESEED_TEAM_ID?.trim() || 'treeseed';
 			const marketMode = resolveMarketIntegrationMode(context.cwd);
-			const inventory = marketMode.enabled
+			const inventory = marketMode.inventorySource === 'api'
 				? await loadPlatformWorksetInventory(createMarketClientForInvocation(invocation, context, { requireAuth: true, allowLocalAcceptanceAdmin: true }).client, teamSelector)
-				: loadLocalPlatformWorksetInventory(context.cwd, teamSelector, marketMode.seedPath);
-			repositories = { teamId: inventory.teamId, inventorySource: 'inventorySource' in inventory ? inventory.inventorySource : 'api', items: inspectPlatformRepositories(context.cwd, inventory.inventory) };
+				: loadLocalPlatformWorksetInventory(marketMode.workspaceRoot, teamSelector, marketMode.seedPath);
+			repositories = { teamId: inventory.teamId, inventorySource: 'inventorySource' in inventory ? inventory.inventorySource : 'api', items: inspectPlatformRepositories(marketMode.workspaceRoot, inventory.inventory) };
 		} catch (error) {
 			repositories = { unavailable: true, error: error instanceof Error ? error.message : String(error) };
 		}

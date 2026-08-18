@@ -10,11 +10,17 @@ function record(value: unknown): JsonRecord {
 
 function siteManifestPath(cwd: string) {
 	let current = resolve(cwd);
+	let fallback: string | null = null;
 	while (true) {
 		const candidate = resolve(current, 'treeseed.site.yaml');
-		if (existsSync(candidate)) return candidate;
+		if (existsSync(candidate)) {
+			fallback ??= candidate;
+			const document = record(parse(readFileSync(candidate, 'utf8')));
+			const localDevelopment = record(record(document.development).local);
+			if (typeof localDevelopment.marketConnectivity === 'string') return candidate;
+		}
 		const parent = dirname(current);
-		if (parent === current) return null;
+		if (parent === current) return fallback;
 		current = parent;
 	}
 }
@@ -22,6 +28,7 @@ function siteManifestPath(cwd: string) {
 export type MarketIntegrationMode = {
 	enabled: boolean;
 	manifestPath: string | null;
+	workspaceRoot: string;
 	profile: string;
 	inventorySource: 'api' | 'seed';
 	seedPath: string;
@@ -38,7 +45,7 @@ export class MarketIntegrationDisabledError extends Error {
 
 export function resolveMarketIntegrationMode(cwd: string): MarketIntegrationMode {
 	const manifestPath = siteManifestPath(cwd);
-	if (!manifestPath) return { enabled: true, manifestPath: null, profile: 'treeseed', inventorySource: 'api', seedPath: 'seeds/treeseed.yaml' };
+	if (!manifestPath) return { enabled: true, manifestPath: null, workspaceRoot: resolve(cwd), profile: 'treeseed', inventorySource: 'api', seedPath: 'seeds/treeseed.yaml' };
 	const document = record(parse(readFileSync(manifestPath, 'utf8')));
 	const market = record(document.market);
 	const localDevelopment = record(record(document.development).local);
@@ -53,6 +60,7 @@ export function resolveMarketIntegrationMode(cwd: string): MarketIntegrationMode
 	return {
 		enabled: marketConnectivity !== 'disabled' && market.enabled !== false,
 		manifestPath,
+		workspaceRoot: dirname(manifestPath),
 		profile: typeof market.profile === 'string' && market.profile.trim() ? market.profile.trim() : 'treeseed',
 		inventorySource,
 		seedPath: typeof inventory.path === 'string' && inventory.path.trim() ? inventory.path.trim() : 'seeds/treeseed.yaml',
