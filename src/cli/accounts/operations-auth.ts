@@ -35,6 +35,7 @@ export const authOperationSpecs: OperationSpec[] = [{
 	],
 	help: {
 		longSummary: ['Human accounts can be created, confirmed, recovered, and used entirely through the CLI and local API.'],
+		whenToUse: ['Use this command tree when a human needs to register, confirm, recover, sign in, inspect, or end a TreeSeed account session without relying on the web UI.'],
 		beforeYouRun: ['Use an interactive terminal for passwords and confirmation or recovery tokens. They are never accepted as options.'],
 		automationNotes: ['Agent automation must use a scoped service principal instead of a human password session.'],
 		warnings: ['Never paste a password, confirmation token, recovery token, session cookie, or access token into chat or a command argument.'],
