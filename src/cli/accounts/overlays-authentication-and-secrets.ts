@@ -24,6 +24,7 @@ export const authenticationAndSecretsCommandOverlays: Array<[string, CommandOver
 			},
 			executionMode: 'handler',
 			handlerName: 'auth:login',
+			helpVisible: false,
 		})],
 	['auth:logout', command({
 			options: [
@@ -42,6 +43,7 @@ export const authenticationAndSecretsCommandOverlays: Array<[string, CommandOver
 			},
 			executionMode: 'handler',
 			handlerName: 'auth:logout',
+			helpVisible: false,
 		})],
 	['auth:whoami', command({
 			options: [
@@ -60,6 +62,7 @@ export const authenticationAndSecretsCommandOverlays: Array<[string, CommandOver
 			},
 			executionMode: 'handler',
 			handlerName: 'auth:whoami',
+			helpVisible: false,
 		})],
 	['secrets:status', command({
 			options: [{ name: 'json', flags: '--json', description: 'Emit machine-readable JSON instead of human-readable text.', kind: 'boolean' }],
