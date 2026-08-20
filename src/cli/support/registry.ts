@@ -60,7 +60,6 @@ import { handleClean } from '../handlers/diagnostics/cleanup.js';
 import { handleServices } from '../handlers/services/services.js';
 import { handleContent } from '../handlers/content/content.js';
 import { handleGovernance } from '../handlers/projects/governance/governance.js';
-import { handleContribution } from '../handlers/projects/governance/contribution.js';
 import { handleKnowledge } from '../handlers/projects/knowledge/knowledge.js';
 import { handlePlatform, handleRun } from '../handlers/runtime/run.js';
 
@@ -128,7 +127,6 @@ export const COMMAND_HANDLERS = {
 	services: handleServices,
 	content: handleContent,
 	governance: handleGovernance,
-	contribution: handleContribution,
 	knowledge: handleKnowledge,
 } as const;
 
