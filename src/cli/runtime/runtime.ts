@@ -380,6 +380,7 @@ function commandNeedsProjectRoot(spec: OperationSpec) {
 		'auth:login',
 		'auth:logout',
 		'auth:whoami',
+		'auth',
 		'market',
 		'teams',
 		'projects',

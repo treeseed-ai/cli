@@ -23,6 +23,7 @@ import { handleSync } from '../handlers/content/sync.js';
 import { handleAuthLogin } from '../handlers/accounts/auth-login.js';
 import { handleAuthLogout } from '../handlers/accounts/auth-logout.js';
 import { handleAuthWhoAmI } from '../handlers/accounts/auth-whoami.js';
+import { handleAuth } from '../handlers/accounts/auth.js';
 import { handleMarket } from '../handlers/content/market.js';
 import { handleTeams } from '../handlers/teams/teams.js';
 import { handleProjects } from '../handlers/projects/projects-core/projects.js';
@@ -96,6 +97,7 @@ export const COMMAND_HANDLERS = {
 	'auth:login': handleAuthLogin,
 	'auth:logout': handleAuthLogout,
 	'auth:whoami': handleAuthWhoAmI,
+	auth: handleAuth,
 	market: handleMarket,
 	teams: handleTeams,
 	projects: handleProjects,

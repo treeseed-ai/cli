@@ -29,6 +29,7 @@ import { contentOperationSpecs } from '../content/operations-content.ts';
 import { governanceOperationSpecs } from '../projects/governance/operations-governance.ts';
 import { knowledgeOperationSpecs } from '../projects/knowledge/operations-knowledge.ts';
 import { platformRunOperationSpecs } from './operations-platform-run.ts';
+import { authOperationSpecs } from '../accounts/operations-auth.ts';
 
 const CLI_COMMAND_OVERLAYS = new Map<string, CommandOverlay>([
 	...taskLifecycleCommandOverlays,
@@ -57,6 +58,7 @@ const CLI_ONLY_OPERATION_SPECS = [
 	...governanceOperationSpecs,
 	...knowledgeOperationSpecs,
 	...platformRunOperationSpecs,
+	...authOperationSpecs,
 ];
 
 function mergeOperationSpec(metadata: OperationMetadata): OperationSpec {
