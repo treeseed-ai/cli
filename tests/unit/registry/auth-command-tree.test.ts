@@ -2,6 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findCommandSpec, listCommandNames } from '../../../src/cli/support/registry.ts';
 import { executeCommand } from '../../../src/cli/runtime/runtime.ts';
+import { tokenFromSecretInput } from '../../../src/cli/handlers/accounts/auth.ts';
+
+test('auth accepts a complete confirmation or reset link without exposing the token', () => {
+	assert.equal(tokenFromSecretInput('https://local.test/auth/reset-password?token=secret-value&next=%2F'), 'secret-value');
+	assert.equal(tokenFromSecretInput('  raw-secret-value  '), 'raw-secret-value');
+});
 
 test('auth is a discoverable command tree and colon commands are hidden compatibility entries', () => {
 	const auth = findCommandSpec('auth');

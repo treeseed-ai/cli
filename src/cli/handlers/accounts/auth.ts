@@ -13,6 +13,17 @@ function value(input: unknown) {
 	return typeof input === 'string' ? input.trim() : '';
 }
 
+export function tokenFromSecretInput(input: string) {
+	const candidate = input.trim();
+	if (!candidate) return '';
+	try {
+		const parsed = new URL(candidate);
+		return parsed.searchParams.get('token')?.trim() || candidate;
+	} catch {
+		return candidate;
+	}
+}
+
 function secretInputAllowed(context: CommandContext) {
 	return context.interactiveUi !== false
 		&& context.outputFormat !== 'json'
@@ -85,7 +96,7 @@ async function register(invocation: ParsedInvocation, context: CommandContext) {
 
 async function confirmEmail(invocation: ParsedInvocation, context: CommandContext) {
 	requireSecretInput(context);
-	const token = value(await promptHidden('Email confirmation token: '));
+	const token = tokenFromSecretInput(await promptHidden('Email confirmation token or link: '));
 	if (!token) throw new Error('Email confirmation token is required.');
 	const { client } = createMarketClientForInvocation(invocation, context);
 	const response = await client.confirmWebEmail({ token });
@@ -134,7 +145,7 @@ async function requestPasswordReset(invocation: ParsedInvocation, context: Comma
 
 async function completePasswordReset(invocation: ParsedInvocation, context: CommandContext) {
 	requireSecretInput(context);
-	const token = value(await promptHidden('Password-reset token: '));
+	const token = tokenFromSecretInput(await promptHidden('Password-reset token or link: '));
 	if (!token) throw new Error('Password-reset token is required.');
 	const password = await passwordWithConfirmation(context, 'New password');
 	const { profile, client } = createMarketClientForInvocation(invocation, context);
