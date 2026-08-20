@@ -27,7 +27,6 @@ import { agentRuntimeOperationSpecs } from './operations-agent-runtime.ts';
 import { serviceOperationSpecs } from '../services/operations-services.ts';
 import { contentOperationSpecs } from '../content/operations-content.ts';
 import { governanceOperationSpecs } from '../projects/governance/operations-governance.ts';
-import { contributionOperationSpecs } from '../projects/governance/operations-contribution.ts';
 import { knowledgeOperationSpecs } from '../projects/knowledge/operations-knowledge.ts';
 import { platformRunOperationSpecs } from './operations-platform-run.ts';
 import { authOperationSpecs } from '../accounts/operations-auth.ts';
@@ -57,7 +56,6 @@ const CLI_ONLY_OPERATION_SPECS = [
 	...serviceOperationSpecs,
 	...contentOperationSpecs,
 	...governanceOperationSpecs,
-	...contributionOperationSpecs,
 	...knowledgeOperationSpecs,
 	...platformRunOperationSpecs,
 	...authOperationSpecs,

@@ -1,7 +1,5 @@
-# CLI agent contribution policy
+# CLI workspace guidance
 
-Agents may populate or update the managed **Agent contribution attestation** only when their definition enables `delegated-project-authorization`, their assignment and capacity grant include `contribution_attestation`, and TreeSeed provides a valid project authorization receipt bound to the exact repository, agent, capacity provider, assignment, base SHA, and head SHA.
+The CLI is an Apache-2.0 repository. It has no contributor-grant checkbox, approved-committer allowlist, or contribution-attestation requirement. Human and agent changes use the same durable pull-request record and the same exact-head verification, review, staging, and release gates.
 
-Agents must never check or edit the **Human contribution affirmation** and may not run contribution `apply`, `revoke`, or trusted-policy `project` actions. Those actions require an authenticated human team owner and explicit confirmation. Agents may use only `show` and `diagnose` until a scoped receipt is issued.
-
-Keep work scoped to this CLI repository and preserve local operation without a hosted Market dependency.
+Agents must act only within their assignment authority, preserve exact repository and commit evidence, keep password and token material out of arguments and logs, and keep GitHub credentials outside execution workspaces. Preserve fully local operation without a hosted Market dependency.
