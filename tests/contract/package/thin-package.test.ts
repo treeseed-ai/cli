@@ -7,6 +7,7 @@ test('package has one executable and no runtime package dependency', () => {
 	assert.deepEqual(pkg.bin, { trsd: './dist/cli/main.js' });
 	assert.equal(pkg.exports, undefined);
 	assert.equal(pkg.types, undefined);
+	assert.equal(pkg.files.some((path: string) => path.startsWith('scripts/')), false);
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
 	assert.equal(pkg.dependencies.ink, undefined);
 	assert.equal(pkg.dependencies.react, undefined);
