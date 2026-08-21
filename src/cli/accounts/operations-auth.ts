@@ -3,7 +3,6 @@ import type { OperationSpec } from '../operations/operations-types.ts';
 export const authOperationSpecs: OperationSpec[] = [{
 	id: 'auth.login',
 	name: 'auth',
-	aliases: [],
 	group: 'Utilities',
 	provider: 'default',
 	related: [],

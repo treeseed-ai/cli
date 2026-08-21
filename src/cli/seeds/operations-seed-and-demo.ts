@@ -9,7 +9,6 @@ export const seedAndDemoOperationSpecs: OperationSpec[] = [
 	{
 			id: 'seed.plan',
 			name: 'seed',
-			aliases: [],
 			group: 'Validation',
 			summary: 'Validate and plan declarative Treeseed environment seeds.',
 			description: 'Load a seed manifest from seeds/<name>.yaml, validate references and environment targeting, produce a deterministic plan, apply governed seeds through the market store/API, or export a team portfolio to YAML.',
@@ -92,7 +91,6 @@ export const seedAndDemoOperationSpecs: OperationSpec[] = [
 	{
 				id: 'demo.generate',
 				name: 'demo',
-				aliases: [],
 				group: 'Validation',
 				summary: 'Generate the seed-driven TreeSeed demo workflow.',
 				description: 'Resolve a seed operation recipe DAG and coordinate the local UI and CLI acceptance demo, including screenshots, Playwright video, traces, private TreeDX, capacity provider registration, allocation, work, artifact review, and publishing.',

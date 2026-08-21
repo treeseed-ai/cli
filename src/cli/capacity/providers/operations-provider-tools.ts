@@ -9,7 +9,6 @@ export const providerToolsOperationSpecs: OperationSpec[] = [
 	{
 			id: 'tools.gh',
 			name: 'gh',
-			aliases: [],
 			group: 'Passthrough',
 			summary: 'Run the managed GitHub CLI with Treeseed environment credentials.',
 			description: 'Decrypt Treeseed machine configuration for the selected environment and pass it to the managed GitHub CLI.',
@@ -33,7 +32,6 @@ export const providerToolsOperationSpecs: OperationSpec[] = [
 	{
 			id: 'tools.railway',
 			name: 'railway',
-			aliases: [],
 			group: 'Passthrough',
 			summary: 'Run the managed Railway CLI with Treeseed environment credentials.',
 			description: 'Decrypt Treeseed machine configuration for the selected environment, select the matching Railway environment, and pass it to the managed Railway CLI.',
@@ -57,7 +55,6 @@ export const providerToolsOperationSpecs: OperationSpec[] = [
 	{
 			id: 'tools.wrangler',
 			name: 'wrangler',
-			aliases: [],
 			group: 'Passthrough',
 			summary: 'Run the managed Wrangler CLI with Treeseed environment credentials.',
 			description: 'Decrypt Treeseed machine configuration for the selected environment and pass it to the managed Wrangler CLI.',
@@ -81,7 +78,6 @@ export const providerToolsOperationSpecs: OperationSpec[] = [
 	{
 			id: 'tools.docker',
 			name: 'docker',
-			aliases: [],
 			group: 'Passthrough',
 			summary: 'Run Docker with Treeseed DockerHub credentials.',
 			description: 'Decrypt Treeseed machine configuration for the selected environment, authenticate Docker with an isolated config directory, and forward arguments to Docker.',

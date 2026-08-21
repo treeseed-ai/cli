@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.treeseed.dev/cli/command-result-v1.json",
+  "title": "TreeSeed command result",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "commandPath",
+    "mode",
+    "ok",
+    "result",
+    "error",
+    "warnings",
+    "blockers",
+    "receipts",
+    "nextActions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "treeseed.command-result/v1"
+    },
+    "commandPath": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*$"
+      }
+    },
+    "mode": {
+      "enum": [
+        "execute",
+        "plan"
+      ]
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {},
+    "error": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "category",
+            "code",
+            "message"
+          ]
+        }
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ]
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ]
+      }
+    },
+    "nextActions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -9,7 +9,6 @@ export const scenesAndGuaranteesOperationSpecs: OperationSpec[] = [
 	{
 			id: 'scene',
 			name: 'scene',
-			aliases: [],
 			group: 'Validation',
 			summary: 'Inspect the Treeseed scene workflow testing and video platform.',
 			description: 'Reports readiness for, validates, plans, and runs the manifest-driven acceptance test harness and demo/training video generator.',
@@ -135,7 +134,6 @@ export const scenesAndGuaranteesOperationSpecs: OperationSpec[] = [
 	{
 			id: 'guarantees',
 			name: 'guarantees',
-			aliases: [],
 			group: 'Validation',
 			summary: 'Validate, plan, run, and export TreeSeed product guarantees.',
 			description: 'Discovers package-local guarantee YAML manifests, validates lowercase taxonomy and dependency graphs, plans focused or release-wide guarantee coverage, executes active guarantees, and exports generated CSV/JSON/Markdown reports from the canonical YAML source.',

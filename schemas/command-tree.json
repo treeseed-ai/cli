@@ -1,0 +1,1200 @@
+{
+  "schemaVersion": "treeseed.command-tree/v1",
+  "executable": "trsd",
+  "commands": [
+    {
+      "nodeType": "branch",
+      "segment": "auth",
+      "description": "Auth operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "login",
+          "description": "Login the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.login",
+            "confirmation": "credential"
+          },
+          "resultSchemaId": "treeseed.command.login/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "logout",
+          "description": "Logout the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.logout",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.logout/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.status/v1"
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "secrets",
+      "description": "Secrets operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.status/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "unlock",
+          "description": "Unlock the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.unlock",
+            "confirmation": "credential"
+          },
+          "resultSchemaId": "treeseed.command.unlock/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "lock",
+          "description": "Lock the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.lock",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.lock/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "rotate",
+          "description": "Rotate the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.rotate",
+            "confirmation": "credential"
+          },
+          "resultSchemaId": "treeseed.command.rotate/v1"
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "agents",
+      "description": "Agents operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "agent",
+              "description": "agent identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "validate",
+          "description": "Validate the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.validate/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "diff",
+          "description": "Diff the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.diff/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "diagnose",
+          "description": "Diagnose the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.diagnose/v1"
+        },
+        {
+          "nodeType": "branch",
+          "segment": "classes",
+          "description": "Classes operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "class",
+                  "description": "class identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1"
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "bindings",
+          "description": "Bindings operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "binding",
+                  "description": "binding identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "explain",
+              "description": "Explain the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "binding",
+                  "description": "binding identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.explain/v1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "providers",
+      "description": "Providers operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "provider",
+              "description": "provider identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "provider",
+              "description": "provider identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.status/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "diagnose",
+          "description": "Diagnose the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "provider",
+              "description": "provider identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.diagnose/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "connect",
+          "description": "Connect the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.connect",
+            "confirmation": "credential"
+          },
+          "resultSchemaId": "treeseed.command.connect/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "disconnect",
+          "description": "Disconnect the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "connection",
+              "description": "connection identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.disconnect",
+            "confirmation": "destructive"
+          },
+          "resultSchemaId": "treeseed.command.disconnect/v1"
+        },
+        {
+          "nodeType": "branch",
+          "segment": "requests",
+          "description": "Requests operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "request",
+                  "description": "request identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "approve",
+              "description": "Approve the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "request",
+                  "description": "request identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.approve",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.approve/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "reject",
+              "description": "Reject the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "request",
+                  "description": "request identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.reject",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.reject/v1"
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "credentials",
+          "description": "Credentials operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "connection identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.status/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "rotate",
+              "description": "Rotate the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "connection identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.rotate",
+                "confirmation": "credential"
+              },
+              "resultSchemaId": "treeseed.command.rotate/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "revoke",
+              "description": "Revoke the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "connection identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.revoke",
+                "confirmation": "irreversible"
+              },
+              "resultSchemaId": "treeseed.command.revoke/v1"
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "offers",
+          "description": "Offers operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "connection identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "validate",
+              "description": "Validate the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.validate/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "plan",
+              "description": "Plan the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.plan/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "apply",
+              "description": "Apply the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.apply",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.apply/v1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "capacity",
+      "description": "Capacity operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.status/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "explain",
+          "description": "Explain the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.explain/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "usage",
+          "description": "Usage the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.usage/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "ledger",
+          "description": "Ledger the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.ledger/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "audit",
+          "description": "Audit the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.audit/v1"
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "plans",
+      "description": "Plans operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "plan",
+              "description": "plan identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "explain",
+          "description": "Explain the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "plan",
+              "description": "plan identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.explain/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "diff",
+          "description": "Compare two API-derived plans.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "left",
+              "description": "Left plan identity.",
+              "required": true
+            },
+            {
+              "name": "right",
+              "description": "Right plan identity.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.plans.diff/v1"
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "workdays",
+      "description": "Workdays operations.",
+      "children": [
+        {
+          "nodeType": "branch",
+          "segment": "profiles",
+          "description": "Profiles operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "profile",
+                  "description": "profile identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "validate",
+              "description": "Validate the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.validate/v1"
+            }
+          ]
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "plan",
+          "description": "Plan the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.plan/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "start",
+          "description": "Start the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.start",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.start/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "workday",
+              "description": "workday identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "watch",
+          "description": "Watch the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "workday",
+              "description": "workday identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.watch/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "pause",
+          "description": "Pause the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "workday",
+              "description": "workday identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.pause",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.pause/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "resume",
+          "description": "Resume the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "workday",
+              "description": "workday identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.resume",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.resume/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "stop",
+          "description": "Stop the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "workday",
+              "description": "workday identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.stop",
+            "confirmation": "destructive"
+          },
+          "resultSchemaId": "treeseed.command.stop/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "cancel",
+          "description": "Cancel the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "workday",
+              "description": "workday identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.cancel",
+            "confirmation": "destructive"
+          },
+          "resultSchemaId": "treeseed.command.cancel/v1"
+        },
+        {
+          "nodeType": "branch",
+          "segment": "schedules",
+          "description": "Schedules operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "schedule",
+                  "description": "schedule identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "plan",
+              "description": "Plan the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.plan/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "start",
+              "description": "Start the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.start",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.start/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "pause",
+              "description": "Pause the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "schedule",
+                  "description": "schedule identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.pause",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.pause/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "resume",
+              "description": "Resume the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "schedule",
+                  "description": "schedule identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.resume",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.resume/v1"
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "retire",
+              "description": "Retire the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "schedule",
+                  "description": "schedule identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.retire",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.command.retire/v1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "assignments",
+      "description": "Assignments operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "assignment",
+              "description": "assignment identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "explain",
+          "description": "Explain the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "assignment",
+              "description": "assignment identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.explain/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "watch",
+          "description": "Watch the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "assignment",
+              "description": "assignment identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.watch/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "retry",
+          "description": "Retry the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "assignment",
+              "description": "assignment identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.retry",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.retry/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "cancel",
+          "description": "Cancel the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "assignment",
+              "description": "assignment identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.cancel",
+            "confirmation": "destructive"
+          },
+          "resultSchemaId": "treeseed.command.cancel/v1"
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "artifacts",
+          "description": "Artifacts the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "assignment",
+              "description": "assignment identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.artifacts/v1"
+        }
+      ]
+    },
+    {
+      "nodeType": "leaf",
+      "segment": "save",
+      "description": "Save the selected resource.",
+      "kind": "mutation",
+      "options": [
+        {
+          "name": "--plan",
+          "description": "Return the exact proposed outcome without mutation.",
+          "type": "boolean"
+        }
+      ],
+      "authorization": {
+        "capability": "command.save",
+        "confirmation": "never"
+      },
+      "resultSchemaId": "treeseed.command.save/v1"
+    },
+    {
+      "nodeType": "leaf",
+      "segment": "stage",
+      "description": "Stage the selected resource.",
+      "kind": "mutation",
+      "options": [
+        {
+          "name": "--plan",
+          "description": "Return the exact proposed outcome without mutation.",
+          "type": "boolean"
+        }
+      ],
+      "authorization": {
+        "capability": "command.stage",
+        "confirmation": "authority"
+      },
+      "resultSchemaId": "treeseed.command.stage/v1"
+    },
+    {
+      "nodeType": "leaf",
+      "segment": "release",
+      "description": "Release the selected resource.",
+      "kind": "mutation",
+      "options": [
+        {
+          "name": "--plan",
+          "description": "Return the exact proposed outcome without mutation.",
+          "type": "boolean"
+        }
+      ],
+      "authorization": {
+        "capability": "command.release",
+        "confirmation": "production"
+      },
+      "resultSchemaId": "treeseed.command.release/v1"
+    },
+    {
+      "nodeType": "leaf",
+      "segment": "status",
+      "description": "Status the selected resource.",
+      "kind": "read",
+      "resultSchemaId": "treeseed.command.status/v1"
+    },
+    {
+      "nodeType": "leaf",
+      "segment": "diagnose",
+      "description": "Diagnose the selected resource.",
+      "kind": "read",
+      "resultSchemaId": "treeseed.command.diagnose/v1"
+    }
+  ]
+}

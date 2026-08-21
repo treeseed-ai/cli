@@ -3,7 +3,6 @@ import type { OperationSpec } from '../../operations/operations-types.ts';
 export const governanceOperationSpecs: OperationSpec[] = [{
 	id: 'market.governance',
 	name: 'governance',
-	aliases: [],
 	group: 'Utilities',
 	summary: 'Inspect and operate project proposals and decisions through the authenticated control plane.',
 	description: 'Provides the CLI human and AI-operated human cockpit for proposal discussion, voting, evaluation, and decision inspection.',

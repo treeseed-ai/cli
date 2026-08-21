@@ -3,7 +3,6 @@ import type { OperationSpec } from '../operations/operations-types.ts';
 export const contentOperationSpecs: OperationSpec[] = [{
 	id: 'content.sync',
 	name: 'content',
-	aliases: [],
 	group: 'Utilities',
 	summary: 'Synchronize content checkouts or explicitly publish exact content commits to R2.',
 	description: 'Sync compares Git, TreeDX, and publication refs. Publish accepts only paired content repositories and emits a read-back-verified, secret-free receipt.',

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.treeseed.dev/cli/command-tree-v1.json",
+  "title": "TreeSeed command tree",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "executable",
+    "commands"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "treeseed.command-tree/v1"
+    },
+    "executable": {
+      "const": "trsd"
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": [
+        "nodeType",
+        "segment",
+        "description"
+      ],
+      "properties": {
+        "nodeType": {
+          "enum": [
+            "branch",
+            "leaf"
+          ]
+        },
+        "segment": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "kind": {
+          "enum": [
+            "read",
+            "mutation"
+          ]
+        },
+        "resultSchemaId": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

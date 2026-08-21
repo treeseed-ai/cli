@@ -1,9 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { findNearestWorkspaceRoot, resolveWorkflowPaths } from '@treeseed/sdk/workflow-support';
 import { OperationsSdk as SdkOperationsRuntime } from '@treeseed/sdk/operations';
+import { createCommandResult } from '@treeseed/sdk/operator-contracts';
 import type {
 	CommandContext,
 	HandlerResolver,
@@ -28,8 +25,6 @@ import {
 import { hydrateProjectEnvironment } from './runtime-environment.ts';
 
 export { colorizeCliOutput } from './runtime-output.js';
-
-const require = createRequire(import.meta.url);
 
 function isHelpFlag(value: string | undefined) {
 	return value === '--help' || value === '-h';
@@ -60,61 +55,13 @@ function resolveCommandHelpTarget(spec: OperationSpec, argv: string[]) {
 function resolveExplicitHelpTarget(args: string[]) {
 	const helpArgs = args.filter((arg) => !arg.startsWith('-'));
 	if (helpArgs.length === 0) return null;
-	for (let length = Math.min(3, helpArgs.length); length > 0; length -= 1) {
+	for (let length = helpArgs.length; length > 0; length -= 1) {
 		const candidate = helpArgs.slice(0, length).join(' ');
-		if (findOperation(candidate)) {
+		if (findOperation(candidate) || TRESEED_OPERATION_SPECS.some((spec) => spec.name.startsWith(`${candidate} `))) {
 			return candidate;
 		}
 	}
 	return helpArgs[0] ?? null;
-}
-
-function resolveCoreAgentCliEntrypoint(cwd: string) {
-	const unavailableMessage = 'Treeseed agent commands require the integrated `@treeseed/core` runtime. '
-		+ 'Install `@treeseed/core` in the current project or run the CLI inside a Treeseed workspace.';
-	const workspaceRoot = findNearestWorkspaceRoot(cwd) ?? cwd;
-	const workspacePackageJsonPath = resolve(workspaceRoot, 'packages', 'core', 'package.json');
-	const siblingPackageJsonPath = resolve(cwd, '..', 'core', 'package.json');
-	const installedPackageJsonPath = resolve(cwd, 'node_modules', '@treeseed', 'core', 'package.json');
-	let packageJsonPath = workspacePackageJsonPath;
-	if (!existsSync(packageJsonPath)) {
-		packageJsonPath = existsSync(siblingPackageJsonPath) ? siblingPackageJsonPath : installedPackageJsonPath;
-	}
-	if (!existsSync(packageJsonPath)) {
-		try {
-			const resolvedPath = require.resolve('@treeseed/core', { paths: [cwd] });
-			let currentDir = dirname(resolvedPath);
-			while (!existsSync(resolve(currentDir, 'package.json'))) {
-				const parentDir = dirname(currentDir);
-				if (parentDir === currentDir) {
-					throw new Error('Unable to resolve the installed @treeseed/core package root.');
-				}
-				currentDir = parentDir;
-			}
-			packageJsonPath = resolve(currentDir, 'package.json');
-		} catch {
-			throw new Error(unavailableMessage);
-		}
-	}
-
-	const packageRoot = dirname(packageJsonPath);
-	const sourceEntrypoint = resolve(packageRoot, 'src', 'agents', 'cli.ts');
-	if (existsSync(sourceEntrypoint)) {
-		return pathToFileURL(sourceEntrypoint).href;
-	}
-
-	const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
-		exports?: Record<string, string | { default?: string }>;
-	};
-	const exportedEntrypoint = packageJson.exports?.['./agent/cli'];
-	const distRelativePath = typeof exportedEntrypoint === 'string'
-		? exportedEntrypoint
-		: exportedEntrypoint?.default ?? './dist/agents/cli.js';
-	const distEntrypoint = resolve(packageRoot, distRelativePath);
-	if (!existsSync(distEntrypoint)) {
-		throw new Error(unavailableMessage);
-	}
-	return pathToFileURL(distEntrypoint).href;
 }
 
 const sdkOperationsRuntime = new SdkOperationsRuntime();
@@ -123,8 +70,33 @@ function formatValidationError(spec: OperationSpec, errors: string[]) {
 	return [
 		...errors,
 		`Usage: ${renderUsage(spec)}`,
-		`Run \`treeseed help ${spec.name}\` for details.`,
+		`Run \`trsd help ${spec.name}\` for details.`,
 	].join('\n');
+}
+
+function standardizeJsonResult(spec: OperationSpec, argv: string[], result: OperationResult): OperationResult {
+	if (result.report?.schemaVersion === 'treeseed.command-result/v1') return result;
+	const ok = (result.exitCode ?? 0) === 0;
+	const report = result.report ?? { stdout: result.stdout ?? [], stderr: result.stderr ?? [] };
+	const message = !ok
+		? String((report as Record<string, unknown>).error ?? result.stderr?.[0] ?? `${spec.name} failed.`)
+		: null;
+	return {
+		...result,
+		report: createCommandResult({
+			commandPath: spec.name.split(' '),
+			mode: argv.includes('--plan') ? 'plan' : 'execute',
+			ok,
+			result: ok ? report : null,
+			error: message ? { category: 'internal_error', code: 'command_failed', message } : null,
+			warnings: [],
+			blockers: message ? [{ code: 'command_failed', message }] : [],
+			receipts: [],
+			nextActions: Array.isArray((report as Record<string, unknown>).nextSteps)
+				? (report as Record<string, unknown>).nextSteps as string[]
+				: [],
+		}) as unknown as Record<string, unknown>,
+	};
 }
 
 export function createCommandContext(overrides: Partial<CommandContext> = {}): CommandContext {
@@ -200,7 +172,7 @@ export class OperationsSdk {
 				outputFormat: invocation.args.json === true ? 'json' : (context.outputFormat ?? 'human'),
 			};
 			if (errors.length > 0) {
-				return writeCommandResult({
+				const invalidResult: OperationResult = {
 					exitCode: 1,
 					stderr: [formatValidationError(spec, errors)],
 					report: {
@@ -210,7 +182,8 @@ export class OperationsSdk {
 						errors,
 						usage: renderUsage(spec),
 					},
-				}, handlerContext);
+				};
+				return writeCommandResult(handlerContext.outputFormat === 'json' ? standardizeJsonResult(spec, argv, invalidResult) : invalidResult, handlerContext);
 			}
 
 			const handlerName = spec.handlerName;
@@ -230,20 +203,22 @@ export class OperationsSdk {
 				}, handlerContext);
 			}
 			const result = await handler(invocation, handlerContext);
-			return writeCommandResult(result, handlerContext);
+			return writeCommandResult(handlerContext.outputFormat === 'json' ? standardizeJsonResult(spec, argv, result) : result, handlerContext);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			const wantsJson = argv.includes('--json');
-			return writeCommandResult({
+			const failedResult: OperationResult = {
 				exitCode: 1,
-				stderr: [message, `Run \`treeseed help ${spec.name}\` for details.`],
+				stderr: [message, `Run \`trsd help ${spec.name}\` for details.`],
 				report: {
 					command: spec.name,
 					ok: false,
 					error: message,
-					hint: `treeseed help ${spec.name}`,
+					hint: `trsd help ${spec.name}`,
 				},
-			}, { ...context, outputFormat: wantsJson ? 'json' : (context.outputFormat ?? 'human') });
+			};
+			const failedContext = { ...context, outputFormat: wantsJson ? 'json' as const : (context.outputFormat ?? 'human') };
+			return writeCommandResult(failedContext.outputFormat === 'json' ? standardizeJsonResult(spec, argv, failedResult) : failedResult, failedContext);
 		}
 	}
 
@@ -279,31 +254,9 @@ export class OperationsSdk {
 			}, adapterContext));
 	}
 
-	private async executeAgents(argv: string[], context: CommandContext) {
-		try {
-			const { runAgentCli } = await import(resolveCoreAgentCliEntrypoint(context.cwd));
-			return await runAgentCli(argv, {
-				cwd: context.cwd,
-				env: context.env,
-				outputFormat: context.outputFormat,
-				write: context.write,
-			});
-		} catch (error) {
-			return writeCommandResult({
-				exitCode: 1,
-				stderr: [error instanceof Error ? error.message : String(error)],
-				report: {
-					command: 'agents',
-					ok: false,
-					error: error instanceof Error ? error.message : String(error),
-				},
-			}, context);
-		}
-	}
-
 	async executeOperation(request: OperationRequest, overrides: Partial<CommandContext> = {}) {
-		const context = createCommandContext(overrides);
 		const argv = request.argv ?? [];
+		const context = createCommandContext({ ...overrides, outputFormat: argv.includes('--json') ? 'json' : overrides.outputFormat });
 		const commandName = request.commandName;
 
 		const spec = findOperation(commandName);
@@ -315,12 +268,20 @@ export class OperationsSdk {
 				}
 			}
 			const suggestions = suggestCommands(commandName);
-			const lines = [`Unknown treeseed command: ${commandName}`];
+			const lines = [`Unknown trsd command: ${commandName}`];
 			if (suggestions.length > 0) {
 				lines.push(`Did you mean: ${suggestions.map((value) => `\`${value}\``).join(', ')}?`);
 			}
-			lines.push('Run `treeseed help` to see the full command list.');
-			return writeCommandResult({ exitCode: 1, stderr: [lines.join('\n')] }, context);
+			lines.push('Run `trsd help` to see the full command list.');
+			return writeCommandResult({
+				exitCode: 1,
+				stderr: [lines.join('\n')],
+				report: createCommandResult({
+					commandPath: commandName.split(' ').filter(Boolean), mode: 'execute', ok: false, result: null,
+					error: { category: 'unknown_command', code: 'unknown_command', message: lines.join('\n') },
+					warnings: [], blockers: [{ code: 'unknown_command', message: lines[0]! }], receipts: [], nextActions: ['trsd help'],
+				}) as unknown as Record<string, unknown>,
+			}, context);
 		}
 
 		if (shouldRenderCommandHelp(spec, argv)) {
@@ -337,13 +298,20 @@ export class OperationsSdk {
 
 		return spec.executionMode === 'adapter'
 			? this.executeAdapter(spec, argv, context)
-			: spec.executionMode === 'delegate'
-				? this.executeAgents(argv, context)
-				: this.executeHandler(spec, argv, context);
+			: this.executeHandler(spec, argv, context);
+	}
+
+	private resolveCommand(argv: string[]) {
+		for (let length = argv.length; length > 0; length -= 1) {
+			const candidate = argv.slice(0, length).join(' ');
+			const spec = findOperation(candidate);
+			if (spec) return { spec, commandName: candidate, argv: argv.slice(length) };
+		}
+		return null;
 	}
 
 	async run(argv: string[], overrides: Partial<CommandContext> = {}) {
-		const context = createCommandContext(overrides);
+		const context = createCommandContext({ ...overrides, outputFormat: argv.includes('--json') ? 'json' : overrides.outputFormat });
 		const [firstArg, ...restArgs] = argv;
 
 		if (!firstArg || isHelpFlag(firstArg) || firstArg === 'help') {
@@ -356,10 +324,18 @@ export class OperationsSdk {
 			}
 			const helpText = renderHelp(commandName);
 			context.write(helpText, 'stdout');
-			return commandName && helpText.startsWith('Unknown treeseed command:') ? 1 : 0;
+			return commandName && helpText.startsWith('Unknown trsd command:') ? 1 : 0;
 		}
 
-		return this.executeOperation({ commandName: firstArg, argv: restArgs }, context);
+		const resolved = this.resolveCommand(argv);
+		const branchPath = argv.filter((value) => !value.startsWith('-')).join(' ');
+		if (!resolved && TRESEED_OPERATION_SPECS.some((candidate) => candidate.name.startsWith(`${branchPath} `))) {
+			context.write(renderHelp(branchPath), 'stdout');
+			return 0;
+		}
+		return resolved
+			? this.executeOperation({ commandName: resolved.commandName, argv: resolved.argv }, context)
+			: this.executeOperation({ commandName: firstArg, argv: restArgs }, context);
 	}
 }
 
@@ -368,7 +344,7 @@ function formatProjectError(spec: OperationSpec) {
 		`Treeseed command \`${spec.name}\` must be run inside a Treeseed project.`,
 		'No ancestor directory containing `treeseed.site.yaml` was found.',
 		`Usage: ${renderUsage(spec)}`,
-		`Run \`treeseed help ${spec.name}\` for details.`,
+		`Run \`trsd help ${spec.name}\` for details.`,
 	].join('\n');
 }
 
@@ -377,17 +353,18 @@ function commandNeedsProjectRoot(spec: OperationSpec) {
 		'init',
 		'export',
 		'install',
-		'auth:login',
-		'auth:logout',
-		'auth:whoami',
-		'auth',
-		'market',
-		'teams',
-		'projects',
-		'capacity',
-		'packs',
-		'template',
-		'scene',
+		'auth login',
+		'auth logout',
+		'auth status',
+		'agents list',
+		'agents show',
+		'providers list',
+		'capacity status',
+		'plans list',
+		'workdays plan',
+		'workdays start',
+		'workdays list',
+		'assignments list',
 	]).has(spec.name);
 }
 
@@ -439,7 +416,7 @@ export async function executeCommand(commandName: string, argv: string[], contex
 				command: spec.name,
 				ok: false,
 				error: `No ancestor containing treeseed.site.yaml was found from ${commandContext.cwd}.`,
-				hint: `treeseed help ${spec.name}`,
+				hint: `trsd help ${spec.name}`,
 			},
 		}, { ...commandContext, outputFormat: cleanArgv.includes('--json') ? 'json' : (commandContext.outputFormat ?? 'human') });
 	}
@@ -450,12 +427,20 @@ export async function executeCommand(commandName: string, argv: string[], contex
 export async function runCommandLine(argv: string[], overrides: Partial<CommandContext> = {}) {
 	const cleanArgv = stripGlobalFlags(argv);
 	const colorEnabled = resolveColorEnabled(argv, overrides.env ?? process.env, overrides.colorEnabled);
-	const [firstArg] = cleanArgv;
-	const spec = firstArg ? cliOperationsSdk.findOperation(firstArg) : null;
-	if (!spec) {
+	let resolvedCommand: { spec: OperationSpec; commandName: string; argv: string[] } | null = null;
+	for (let length = cleanArgv.length; length > 0; length -= 1) {
+		const commandName = cleanArgv.slice(0, length).join(' ');
+		const candidate = cliOperationsSdk.findOperation(commandName);
+		if (candidate) {
+			resolvedCommand = { spec: candidate, commandName, argv: cleanArgv.slice(length) };
+			break;
+		}
+	}
+	if (!resolvedCommand) {
 		return cliOperationsSdk.run(cleanArgv, { ...overrides, colorEnabled });
 	}
-	if (shouldRenderCommandHelp(spec, cleanArgv.slice(1))) {
+	const { spec } = resolvedCommand;
+	if (shouldRenderCommandHelp(spec, resolvedCommand.argv)) {
 		return cliOperationsSdk.run(cleanArgv, { ...overrides, colorEnabled });
 	}
 
@@ -470,7 +455,7 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 				command: spec.name,
 				ok: false,
 				error: `No ancestor containing treeseed.site.yaml was found from ${baseCwd}.`,
-				hint: `treeseed help ${spec.name}`,
+				hint: `trsd help ${spec.name}`,
 			},
 		}, createCommandContext({
 			...overrides,

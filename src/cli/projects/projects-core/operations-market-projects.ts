@@ -9,7 +9,6 @@ export const marketProjectsOperationSpecs: OperationSpec[] = [
 	{
 			id: 'market.registry',
 			name: 'market',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Manage configured Treeseed API endpoints.',
 			description: 'List, add, select, remove, and inspect API profiles stored in local machine configuration.',
@@ -39,7 +38,6 @@ export const marketProjectsOperationSpecs: OperationSpec[] = [
 	{
 			id: 'market.teams',
 			name: 'teams',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Inspect teams from the selected market.',
 			description: 'List teams, select a team context, and inspect team membership through the API client.',
@@ -67,7 +65,6 @@ export const marketProjectsOperationSpecs: OperationSpec[] = [
 	{
 			id: 'market.projects',
 			name: 'projects',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Inspect projects from the selected API.',
 			description: 'List projects and inspect team access while project launch and repository management are rebuilt on Services capability bindings.',

@@ -291,7 +291,7 @@ function assertPackageDependencyShape() {
 		dependencies?: Record<string, string>;
 	};
 	const dependencyNames = Object.keys(packageJson.dependencies ?? {}).sort();
-	const expectedDependencies = ['@treeseed/agent', '@treeseed/core', '@treeseed/sdk', '@treeseed/ui', 'ink', 'react', 'yaml'];
+	const expectedDependencies = ['@treeseed/agent', '@treeseed/sdk', 'ink', 'react', 'yaml'];
 	if (dependencyNames.join(',') !== expectedDependencies.join(',')) {
 		throw new Error(`CLI runtime dependencies must be exactly ${expectedDependencies.join(', ')}. Found: ${dependencyNames.join(', ') || '(none)'}`);
 	}
@@ -329,7 +329,9 @@ try {
 	writeFileSync(resolve(installRoot, 'package.json'), `${JSON.stringify({ name: 'treeseed-cli-smoke', private: true, type: 'module' }, null, 2)}\n`, 'utf8');
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', '--help'], installRoot);
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', 'agents', '--help'], installRoot);
-	run(process.execPath, ['node_modules/.bin/treeseed', '--help'], installRoot);
+	if (existsSync(resolve(installRoot, 'node_modules', '.bin', 'treeseed'))) {
+		throw new Error('The removed treeseed executable alias was recreated in the packed install.');
+	}
 	run(process.execPath, ['node_modules/.bin/trsd', '--help'], installRoot);
 	run(process.execPath, ['node_modules/.bin/trsd', 'agents', '--help'], installRoot);
 	console.log('CLI packed-install bin smoke passed.');

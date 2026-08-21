@@ -9,7 +9,6 @@ export const hostingAndReconciliationOperationSpecs: OperationSpec[] = [
 	{
 				id: 'audit.hosting',
 				name: 'audit',
-			aliases: [],
 			group: 'Validation',
 			summary: 'Audit TreeSeed hosting readiness.',
 			description: 'Run a read-only or explicit repair audit for Repository, Web, Processing, and Email hosting setup.',
@@ -52,7 +51,6 @@ export const hostingAndReconciliationOperationSpecs: OperationSpec[] = [
 	{
 			id: 'hosting',
 			name: 'hosting',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Plan, apply, verify, and inspect the Treeseed hosting graph.',
 			description: 'Resolve host-agnostic service types into environment-specific host bindings for local dev, staging, and production.',
@@ -96,7 +94,6 @@ export const hostingAndReconciliationOperationSpecs: OperationSpec[] = [
 	{
 			id: 'reconcile',
 			name: 'reconcile',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Run canonical reconciliation platform diagnostics.',
 			description: 'Plan, apply, verify, destroy, and live-test SDK-owned exact-state reconciliation.',
