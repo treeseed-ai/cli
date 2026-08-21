@@ -1,12 +1,9 @@
 import type {
 	OperationContext as SdkOperationContext,
-	OperationGroup,
-	OperationId,
-	OperationMetadata,
-	OperationResult as SdkOperationResult,
+	OperationResult as SdkOperationResultType,
 } from '@treeseed/sdk/operations';
 
-export type CommandGroup = OperationGroup;
+export type CommandGroup = string;
 
 export type ExecutionDelegate = 'agents';
 export type ExecutionMode = 'handler' | 'adapter' | 'delegate';
@@ -106,7 +103,14 @@ export type AdapterInputBuilder = (
 	context: CommandContext,
 ) => Record<string, unknown>;
 
-export type OperationSpec = OperationMetadata & {
+export type OperationSpec = {
+	id: string;
+	name: string;
+	group: CommandGroup;
+	summary: string;
+	description: string;
+	provider: string;
+	related: string[];
 	usage?: string;
 	arguments?: CommandArgumentSpec[];
 	options?: CommandOptionSpec[];
@@ -144,4 +148,4 @@ export type OperationExecutor = (
 
 export type HandlerResolver = (handlerName: string) => CommandHandler | null;
 
-export type SdkOperationResult = SdkOperationResult;
+export type SdkOperationResult = SdkOperationResultType;

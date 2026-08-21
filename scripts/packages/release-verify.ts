@@ -329,7 +329,9 @@ try {
 	writeFileSync(resolve(installRoot, 'package.json'), `${JSON.stringify({ name: 'treeseed-cli-smoke', private: true, type: 'module' }, null, 2)}\n`, 'utf8');
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', '--help'], installRoot);
 	run(process.execPath, ['node_modules/@treeseed/cli/dist/cli/main.js', 'agents', '--help'], installRoot);
-	run(process.execPath, ['node_modules/.bin/treeseed', '--help'], installRoot);
+	if (existsSync(resolve(installRoot, 'node_modules', '.bin', 'treeseed'))) {
+		throw new Error('The removed treeseed executable alias was recreated in the packed install.');
+	}
 	run(process.execPath, ['node_modules/.bin/trsd', '--help'], installRoot);
 	run(process.execPath, ['node_modules/.bin/trsd', 'agents', '--help'], installRoot);
 	console.log('CLI packed-install bin smoke passed.');

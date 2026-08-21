@@ -115,12 +115,11 @@ function relatedMap(details: CommandRelatedDetail[] | undefined) {
 
 function commandSectionEntries(spec: OperationSpec): HelpEntry[] {
 	const entries: HelpEntry[] = [
-		{ label: 'Command path', summary: `treeseed ${spec.name}` },
+		{ label: 'Command path', summary: `trsd ${spec.name}` },
 		{ label: 'Group', summary: spec.group },
 		{ label: 'Workflow position', summary: spec.help?.workflowPosition ?? 'general' },
 		{ label: 'Execution', summary: formatExecutionMode(spec) },
 		{ label: 'Provider', summary: spec.provider },
-		{ label: 'Aliases', summary: spec.aliases.length > 0 ? spec.aliases.join(', ') : 'none' },
 	];
 	return entries;
 }
@@ -207,7 +206,7 @@ export function renderUsage(spec: OperationSpec) {
 	if (spec.usage) return spec.usage;
 	const args = (spec.arguments ?? []).map((arg) => (arg.required ? `<${arg.name}>` : `[${arg.name}]`));
 	const options = (spec.options ?? []).map((option) => (option.repeatable ? `[${option.flags}]...` : `[${option.flags}]`));
-	return ['treeseed', spec.name, ...args, ...options].join(' ').replace(/\s+/gu, ' ').trim();
+	return ['trsd', spec.name, ...args, ...options].join(' ').replace(/\s+/gu, ' ').trim();
 }
 
 export function suggestCommands(input: string) {
@@ -247,9 +246,9 @@ export function buildHelpView(commandName?: string | null): HelpView {
 			id: 'help',
 			title: 'Help',
 			lines: [
-				'treeseed --help',
-				'treeseed help <command>',
-				'treeseed <command> --help',
+				'trsd --help',
+				'trsd help <command path>',
+				'trsd <command path> --help',
 			],
 		});
 		sections.push({
@@ -264,8 +263,8 @@ export function buildHelpView(commandName?: string | null): HelpView {
 		});
 		return {
 			kind: 'top',
-			title: 'Treeseed CLI',
-			subtitle: 'Command surface over the Treeseed SDK workflow operations, local adapters, and delegated runtime namespaces.',
+			title: 'TreeSeed CLI',
+			subtitle: 'Human-centered command tree over authoritative control-plane operations.',
 			badge: `${listOperationNames().length} commands`,
 			sidebarTitle: 'Sections',
 			sections,
@@ -277,10 +276,24 @@ export function buildHelpView(commandName?: string | null): HelpView {
 
 	const spec = findOperation(commandName);
 	if (!spec) {
+		const branchChildren = TRESEED_OPERATION_SPECS.filter((candidate) => candidate.name.startsWith(`${commandName} `));
+		if (branchChildren.length > 0) {
+			return {
+				kind: 'command',
+				title: `trsd ${commandName}`,
+				subtitle: 'Command group',
+				badge: `${branchChildren.length} commands`,
+				sidebarTitle: commandName,
+				sections: [{ id: 'commands', title: 'Commands', entries: specEntries(branchChildren) }],
+				statusPrimary: 'Choose a leaf command.',
+				statusSecondary: 'Intermediate help is generated from the same canonical command tree.',
+				exitCode: 0,
+			};
+		}
 		const suggestions = suggestCommands(commandName);
 		return {
 			kind: 'unknown',
-			title: `Unknown treeseed command: ${commandName}`,
+			title: `Unknown trsd command: ${commandName}`,
 			subtitle: suggestions.length > 0
 				? `Closest matches: ${suggestions.map((item) => `\`${item}\``).join(', ')}`
 				: 'No close registry matches were found.',
@@ -297,7 +310,7 @@ export function buildHelpView(commandName?: string | null): HelpView {
 				{
 					id: 'help',
 					title: 'Help',
-					lines: ['Run `treeseed help` to see the full command list.'],
+					lines: ['Run `trsd help` to see the full command list.'],
 				},
 			],
 			statusPrimary: 'Enter, q, or Esc exits help.',
@@ -374,13 +387,6 @@ export function buildHelpView(commandName?: string | null): HelpView {
 			id: 'options',
 			title: 'Options',
 			lines: ['This command does not define CLI options.'],
-		});
-	}
-	if (spec.aliases.length > 0) {
-		sections.push({
-			id: 'aliases',
-			title: 'Aliases',
-			entries: spec.aliases.map((alias) => ({ label: alias, accent: 'alias', targetCommand: alias })),
 		});
 	}
 	if (normalizeStructuredExamples(spec).length > 0) {

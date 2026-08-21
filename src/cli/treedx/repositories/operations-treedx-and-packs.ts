@@ -9,7 +9,6 @@ export const treedxAndPacksOperationSpecs: OperationSpec[] = [
 	{
 			id: 'market.db',
 			name: 'db',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Manage team TreeDX knowledge-library bindings.',
 			description: 'Inspect, provision, connect, mirror, share, and bind TreeDX libraries, and plan TreeDX image policy.',
@@ -69,7 +68,6 @@ export const treedxAndPacksOperationSpecs: OperationSpec[] = [
 	{
 			id: 'market.packs',
 			name: 'packs',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Build and download repository-native knowledge packs.',
 			description: 'List, build, inspect, and download immutable packs from exact TreeDX book snapshots through the selected TreeSeed API.',

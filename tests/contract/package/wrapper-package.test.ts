@@ -45,10 +45,8 @@ test('published dist contains the cli runtime surface', () => {
 	}
 });
 
-test('package bin exports both treeseed and trsd', () => {
+test('package bin exports only the canonical trsd executable', () => {
 	const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
-	assert.deepEqual(packageJson.bin, {
-		treeseed: './dist/cli/main.js',
-		trsd: './dist/cli/main.js',
-	});
+	assert.deepEqual(packageJson.bin, { trsd: './dist/cli/main.js' });
+	assert.deepEqual(packageJson.exports, { '.': { types: './dist/index.d.ts', default: './dist/index.js' } });
 });

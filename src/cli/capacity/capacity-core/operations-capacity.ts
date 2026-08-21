@@ -9,7 +9,6 @@ export const capacityOperationSpecs: OperationSpec[] = [
 	{
 			id: 'market.capacity',
 			name: 'capacity',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Inspect capacity diagnostics and operate the package-owned capacity provider runtime.',
 			description: 'Govern provider memberships, grants, allocations, workdays, assignments, and package-owned provider lifecycle resources.',

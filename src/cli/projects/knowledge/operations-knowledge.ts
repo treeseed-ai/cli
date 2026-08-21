@@ -2,7 +2,7 @@ import type { OperationSpec } from '../../operations/operations-types.ts';
 
 export const knowledgeOperationSpecs: OperationSpec[] = [{
 	id: 'market.knowledge',
-	name: 'knowledge', aliases: [], group: 'Knowledge', summary: 'Operate governed knowledge workspaces, reviews, and publication.',
+	name: 'knowledge', group: 'Knowledge', summary: 'Operate governed knowledge workspaces, reviews, and publication.',
 	description: 'Creates and inspects TreeDX workspaces, records independent editorial reviews, and publishes only approved exact revisions.',
 	provider: 'default',
 	related: ['governance', 'capacity'],

@@ -9,7 +9,6 @@ export const operationsAndReadinessOperationSpecs: OperationSpec[] = [
 	{
 			id: 'ready',
 			name: 'ready',
-			aliases: [],
 			group: 'Workflow',
 			summary: 'Check whether an environment is ready for staging or release.',
 			description: 'Runs deployment graph readiness, hosted service checks, and Treeseed operations runner smoke diagnostics before expensive workflow promotion.',
@@ -41,7 +40,6 @@ export const operationsAndReadinessOperationSpecs: OperationSpec[] = [
 	{
 			id: 'operations',
 			name: 'operations',
-			aliases: [],
 			group: 'Utilities',
 			summary: 'Run Treeseed operation-runner diagnostics.',
 			description: 'Queues a diagnostic Market platform operation and verifies that the deployed operations runner claims and completes it.',

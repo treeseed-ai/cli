@@ -3,7 +3,6 @@ import type { OperationSpec } from '../operations/operations-types.ts';
 export const serviceOperationSpecs: OperationSpec[] = [{
 	id: 'market.services',
 	name: 'services',
-	aliases: [],
 	group: 'Utilities',
 	summary: 'Inspect team provider services, capability bindings, encrypted envelopes, and operation leases.',
 	description: 'Reads the provider-first service control plane without accepting provider credentials or passphrases as command arguments.',

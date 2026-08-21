@@ -2,7 +2,7 @@ import type { OperationSpec } from './operations-types.ts';
 
 export const platformRunOperationSpecs: OperationSpec[] = [
 	{
-		id: 'local.run', name: 'run', aliases: [], group: 'Local Development', provider: 'default', related: ['config', 'platform', 'status'],
+		id: 'local.run', name: 'run', group: 'Local Development', provider: 'default', related: ['config', 'platform', 'status'],
 		summary: 'Converge and start the persistent local TreeSeed platform from an exact seed set.',
 		description: 'Validate an exact desired seed set, configure the project when needed, reconcile the full local platform, apply seeds, verify readiness, and persist the selected set.',
 		usage: 'trsd run [seed...] [--plan] [--yes] [--foreground] [--json]',
@@ -38,7 +38,7 @@ export const platformRunOperationSpecs: OperationSpec[] = [
 		helpVisible: true, helpFeatured: true, executionMode: 'handler', handlerName: 'run',
 	},
 	{
-		id: 'local.platform', name: 'platform', aliases: [], group: 'Local Development', provider: 'default', related: ['run', 'status'],
+		id: 'local.platform', name: 'platform', group: 'Local Development', provider: 'default', related: ['run', 'status'],
 		summary: 'Materialize, inspect, or stop the local TreeSeed platform.', description: 'Materialize an exact ephemeral repository workset from local seed inventory or expose status, logs, and stop diagnostics for the platform managed by trsd run.',
 		usage: 'trsd platform init|status|logs|pause|stop|workset [directory] [--plan|--apply --yes] [--team <team>] [--json]', arguments: [{ name: 'action', description: 'init, status, logs, pause, stop, or workset', required: true }, { name: 'directory', description: 'Platform clone target for init.', required: false }],
 		options: [

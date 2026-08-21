@@ -91,7 +91,6 @@ export function devManagedHelpCommand(
 	return {
 		id: `dev.${subcommand}` as OperationSpec['id'],
 		name: `dev ${subcommand}`,
-		aliases: [],
 		group: 'Local Development',
 		summary: spec.summary,
 		description: spec.description,

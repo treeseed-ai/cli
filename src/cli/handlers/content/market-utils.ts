@@ -27,7 +27,9 @@ export function localAcceptanceAdminToken(env: NodeJS.ProcessEnv) {
 }
 
 export function createMarketClientForInvocation(invocation: ParsedInvocation, context: CommandContext, options: { requireAuth?: boolean; allowLocalAcceptanceAdmin?: boolean } = {}) {
-	const profile = resolveMarketProfile(marketSelector(invocation));
+	const explicitSelector = marketSelector(invocation);
+	const selector = explicitSelector ?? (context.env.TREESEED_CONTROL_PLANE_MODE?.trim() === 'managed' ? 'local' : null);
+	const profile = resolveMarketProfile(selector);
 	assertMarketIntegrationEnabled(context.cwd, profile.id);
 	const session = resolveMarketSession(marketAuthRoot(context), profile.id);
 	const localAccessToken = options.allowLocalAcceptanceAdmin && profile.id === 'local'
@@ -47,7 +49,7 @@ export function createMarketClientForInvocation(invocation: ParsedInvocation, co
 	}
 	const controlPlaneBaseUrl = controlPlaneMode === 'market-passthrough' ? marketBaseUrl : configuredControlPlaneUrl!;
 	if (options.requireAuth && !accessToken) {
-		throw new Error(`Not logged in to market "${profile.id}". Run treeseed auth:login --market ${profile.id}.`);
+		throw new Error(`Not logged in to market "${profile.id}". Run trsd auth login --market ${profile.id}.`);
 	}
 	return {
 		profile,
