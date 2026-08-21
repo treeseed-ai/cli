@@ -10,6 +10,7 @@ function context(fetchCalls: Array<{ url: string; method: string }>) {
 			cwd: process.cwd(), interactiveUi: false,
 			env: { ...process.env, TREESEED_CONTROL_PLANE_MODE: 'managed', TREESEED_API_BASE_URL: 'http://127.0.0.1:3002' },
 			write: (value: string) => writes.push(value), spawn: () => ({ status: 0 }),
+			confirm: async () => false,
 		},
 		fetchCalls,
 	};
