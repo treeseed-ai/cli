@@ -47,21 +47,19 @@
     "build:dist": "npm run build:operator-docs && node --import tsx ./scripts/build/build-dist.ts",
     "prepare": "node --import tsx ./scripts/support/prepare.ts",
     "prepack": "npm run build:dist",
-    "verify:direct": "npm run release:verify && npm run pack:tool-closure",
+    "verify:direct": "npm run release:verify && npm run pack:artifact",
     "verify:local": "TREESEED_VERIFY_DRIVER=direct TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
     "verify:action": "TREESEED_VERIFY_DRIVER=act TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
     "verify": "TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
     "release:setup": "npm run setup:ci",
-    "pack:tool-closure": "node --import tsx ./scripts/packages/pack-tool-closure.ts",
+    "pack:artifact": "node --import tsx ./scripts/packages/pack-package-artifact.ts",
     "release:check-tag": "node --import tsx ./scripts/packages/assert-release-tag-version.ts",
     "release:verify": "node --import tsx ./scripts/packages/release-verify.ts",
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
     "@treeseed/agent": "github:treeseed-ai/agent#6e1a7345e6ec1c75d8020ce4c08c68bea7ad99e7",
-    "@treeseed/core": "github:treeseed-ai/core#32a5c1eeb5f6e5e655910f679c684bf4f2cad244",
     "@treeseed/sdk": "0.13.0-rc.5",
-    "@treeseed/ui": "github:treeseed-ai/ui#d622525826d4222ced78e7748880750f6c1377bb",
     "ink": "^7.0.0",
     "react": "^19.2.5",
     "yaml": "^2.8.1"
