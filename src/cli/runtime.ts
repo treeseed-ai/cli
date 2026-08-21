@@ -1,0 +1,77 @@
+import { createCommandResult, type CommandErrorCategory } from '@treeseed/sdk/operator-contracts';
+import { runAuth } from './commands/auth.js';
+import { renderHelp } from './help.js';
+import { runOperator } from './commands/operator.js';
+import { parseInvocation } from './parser.js';
+import { isCommandBranch, resolveCommand } from './registry.js';
+import { runSecrets } from './commands/secrets.js';
+import type { CommandContext, CommandFailure, ParsedInvocation, Writer } from './types.js';
+import { promptText } from './support/prompts.js';
+
+function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
+	(stream === 'stderr' ? process.stderr : process.stdout).write(`${output}\n`);
+}
+
+export function createCommandContext(overrides: Partial<CommandContext> = {}): CommandContext {
+	const context: CommandContext = { cwd: overrides.cwd ?? process.cwd(), env: overrides.env ?? process.env, write: overrides.write ?? defaultWrite as Writer, outputFormat: overrides.outputFormat ?? 'human', interactiveUi: overrides.interactiveUi ?? true, prompt: overrides.prompt, confirm: overrides.confirm, apiRequest: overrides.apiRequest };
+	if (!context.confirm && context.interactiveUi) context.confirm = async (question) => /^y(?:es)?$/iu.test(await promptText(context, `${question} [y/N] `));
+	return context;
+}
+
+function envelope(invocation: ParsedInvocation, ok: boolean, result: unknown, failure?: CommandFailure) {
+	return createCommandResult({ commandPath: invocation.command.path, mode: invocation.options.plan === true ? 'plan' : 'execute', ok, result: ok ? result : null, error: failure ?? null, warnings: [], blockers: failure ? [{ code: failure.code, message: failure.message }] : [], receipts: [], nextActions: [] });
+}
+
+function failure(category: CommandErrorCategory, code: string, message: string): CommandFailure { return { category, code, message }; }
+
+async function confirmed(invocation: ParsedInvocation, context: CommandContext) {
+	if (invocation.command.confirmation === 'never' || invocation.options.plan === true || invocation.options.yes === true) return true;
+	if (!context.interactiveUi || !context.confirm) return false;
+	return context.confirm(`Execute governed operation \`${invocation.command.name}\`?`, 'no');
+}
+
+async function execute(invocation: ParsedInvocation, context: CommandContext) {
+	if (!(await confirmed(invocation, context))) throw Object.assign(new Error('Interactive confirmation is required, or pass --yes for authorized automation.'), { category: 'confirmation_required', code: 'confirmation_required' });
+	if (invocation.options.plan === true && ['auth', 'secrets'].includes(invocation.command.path[0]!)) return { action: invocation.command.name, mutation: false, authority: 'local_credential_custody' };
+	if (invocation.command.path[0] === 'auth') return runAuth(invocation, context);
+	if (invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
+	return runOperator(invocation, context);
+}
+
+function print(context: CommandContext, value: unknown, ok = true) {
+	if (context.outputFormat === 'json') context.write(JSON.stringify(value, null, 2), ok ? 'stdout' : 'stderr');
+	else if (ok) context.write(typeof value === 'string' ? value : JSON.stringify(value, null, 2), 'stdout');
+	else {
+		const message = value && typeof value === 'object' && 'error' in value ? (value as { error?: { message?: string } }).error?.message : null;
+		context.write(message ?? String(value), 'stderr');
+	}
+}
+
+export async function runCommandLine(argv: string[], overrides: Partial<CommandContext> = {}) {
+	const context = createCommandContext({ ...overrides, outputFormat: argv.includes('--json') ? 'json' : overrides.outputFormat });
+	if (!argv.length || argv[0] === '--help' || argv[0] === '-h') { print(context, renderHelp()); return 0; }
+	if (argv[0] === 'help') { const path = argv.slice(1).join(' '); const output = renderHelp(path); print(context, output, !output.startsWith('Unknown')); return output.startsWith('Unknown') ? 1 : 0; }
+	const resolved = resolveCommand(argv);
+	if (!resolved) {
+		const branch = argv.filter((value) => !value.startsWith('-')).join(' ');
+		if (isCommandBranch(branch)) { print(context, renderHelp(branch)); return 0; }
+		const message = `Unknown trsd command: ${argv[0]}`;
+		print(context, createCommandResult({ commandPath: [argv[0]!], mode: 'execute', ok: false, result: null, error: failure('unknown_command', 'unknown_command', message), warnings: [], blockers: [{ code: 'unknown_command', message }], receipts: [], nextActions: ['trsd help'] }), false);
+		return 1;
+	}
+	if (resolved.rest.includes('--help') || resolved.rest.includes('-h')) { print(context, renderHelp(resolved.command.name)); return 0; }
+	let invocation: ParsedInvocation;
+	try { invocation = parseInvocation(resolved.command, resolved.rest); }
+	catch (error) { const message = error instanceof Error ? error.message : String(error); const stub = { command: resolved.command, arguments: [], options: {} }; print(context, envelope(stub, false, null, failure('invalid_input', 'invalid_input', message)), false); return 1; }
+	try {
+		const response = await execute(invocation, context);
+		const api = response && typeof response === 'object' ? response as { ok?: boolean; payload?: unknown; code?: string; error?: string } : null;
+		if (api?.ok === false) { const failed = failure('policy_blocked', api.code ?? 'control_plane_rejected', api.error ?? 'The control plane rejected the operation.'); print(context, envelope(invocation, false, null, failed), false); return 1; }
+		const result = api && 'payload' in api ? api.payload : response;
+		print(context, envelope(invocation, true, result)); return 0;
+	} catch (error) {
+		const value = error as { category?: CommandErrorCategory; code?: string; message?: string };
+		const failed = failure(value.category ?? 'internal_error', value.code ?? 'command_failed', value.message ?? String(error));
+		print(context, envelope(invocation, false, null, failed), false); return 1;
+	}
+}

@@ -102,80 +102,8 @@ function runtimeDependencyNames() {
 	return new Set(Object.keys(packageJson.dependencies ?? {}));
 }
 
-function runtimeDependencyNamesFor(root: string) {
-	const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
-		dependencies?: Record<string, string>;
-	};
-	return Object.keys(packageJson.dependencies ?? {});
-}
-
-function resolveWorkspaceRuntimePackageRoots() {
-	const runtimeDependencies = runtimeDependencyNames();
-	const roots = new Map<string, string>();
-	for (const packageName of runtimeDependencies) {
-		if (!packageName.startsWith('@treeseed/')) continue;
-		const folderName = packageName.slice('@treeseed/'.length);
-		const candidateRoot = resolve(packageRoot, '..', folderName);
-		if (existsSync(resolve(candidateRoot, 'package.json'))) {
-			roots.set(packageName, candidateRoot);
-		}
-	}
-	return roots;
-}
-
-function ensureWorkspaceRuntimePackageLinks() {
-	for (const [packageName, runtimePackageRoot] of resolveWorkspaceRuntimePackageRoots()) {
-		const linkPath = resolve(packageRoot, 'node_modules', ...packageName.split('/'));
-		if (existsSync(linkPath)) {
-			continue;
-		}
-		mkdirSync(dirname(linkPath), { recursive: true });
-		symlinkSync(runtimePackageRoot, linkPath, 'dir');
-	}
-}
-
-function prepareWorkspaceRuntimePackageBuilds() {
-	for (const runtimePackageRoot of resolveWorkspaceRuntimePackageRoots().values()) {
-		const packageJson = JSON.parse(readFileSync(resolve(runtimePackageRoot, 'package.json'), 'utf8')) as {
-			scripts?: Record<string, string>;
-		};
-		if (packageJson.scripts?.['build:dist']) {
-			run('npm', ['run', 'build:dist'], runtimePackageRoot);
-			continue;
-		}
-		if (packageJson.scripts?.build) {
-			run('npm', ['run', 'build'], runtimePackageRoot);
-		}
-	}
-}
-
 function collectRuntimeDependenciesForPackaging() {
-	const dependencyNames = new Set<string>(runtimeDependencyNames());
-	const workspaceRuntimePackageRoots = resolveWorkspaceRuntimePackageRoots();
-	const queue = [...workspaceRuntimePackageRoots.values()];
-	const visited = new Set<string>();
-
-	while (queue.length > 0) {
-		const nextRoot = queue.shift();
-		if (!nextRoot || visited.has(nextRoot)) {
-			continue;
-		}
-		visited.add(nextRoot);
-
-		for (const dependencyName of runtimeDependencyNamesFor(nextRoot)) {
-			dependencyNames.add(dependencyName);
-			if (!dependencyName.startsWith('@treeseed/')) {
-				continue;
-			}
-			const folderName = dependencyName.slice('@treeseed/'.length);
-			const candidateRoot = resolve(packageRoot, '..', folderName);
-			if (existsSync(resolve(candidateRoot, 'package.json'))) {
-				queue.push(candidateRoot);
-			}
-		}
-	}
-
-	return dependencyNames;
+	return runtimeDependencyNames();
 }
 
 function resolveInstalledPackageRoot(packageName: string, searchRoots: string[]) {
@@ -212,10 +140,7 @@ function resolveInstalledPackageRoot(packageName: string, searchRoots: string[])
 
 function mirrorDependencies(tempRoot: string, excludedPackages = new Set<string>()) {
 	const runtimeDependencies = collectRuntimeDependenciesForPackaging();
-	const searchRoots = [
-		packageRoot,
-		...resolveWorkspaceRuntimePackageRoots().values(),
-	];
+	const searchRoots = [packageRoot];
 
 	for (const packageName of runtimeDependencies) {
 		if (excludedPackages.has(packageName) || packageName === '@treeseed/cli') {
@@ -269,10 +194,10 @@ function linkPackageBins(tempRoot: string, packageRootPath: string) {
 
 function assertRequiredDistFiles() {
 	const requiredPaths = [
-		resolve(packageRoot, 'dist', 'index.js'),
 		resolve(packageRoot, 'dist', 'cli', 'main.js'),
-		resolve(packageRoot, 'dist', 'cli', 'runtime', 'runtime.js'),
-		resolve(packageRoot, 'dist', 'cli', 'support', 'registry.js'),
+		resolve(packageRoot, 'dist', 'cli', 'runtime.js'),
+		resolve(packageRoot, 'dist', 'cli', 'registry.js'),
+		resolve(packageRoot, 'dist', 'cli', 'commands', 'operator.js'),
 	];
 
 	for (const filePath of requiredPaths) {
@@ -291,15 +216,13 @@ function assertPackageDependencyShape() {
 		dependencies?: Record<string, string>;
 	};
 	const dependencyNames = Object.keys(packageJson.dependencies ?? {}).sort();
-	const expectedDependencies = ['@treeseed/agent', '@treeseed/sdk', 'ink', 'react', 'yaml'];
+	const expectedDependencies = ['@treeseed/sdk', 'yaml'];
 	if (dependencyNames.join(',') !== expectedDependencies.join(',')) {
 		throw new Error(`CLI runtime dependencies must be exactly ${expectedDependencies.join(', ')}. Found: ${dependencyNames.join(', ') || '(none)'}`);
 	}
 }
 
 assertNoLocalDependencyLinks();
-ensureWorkspaceRuntimePackageLinks();
-prepareWorkspaceRuntimePackageBuilds();
 run('npm', ['run', 'lint']);
 assertPackageDependencyShape();
 scanDirectory(resolve(packageRoot, 'dist'));
@@ -309,21 +232,12 @@ run('npm', ['test']);
 const stageRoot = mkdtempSync(join(tmpdir(), 'treeseed-cli-release-'));
 const extractRoot = resolve(stageRoot, 'extract');
 const installRoot = resolve(stageRoot, 'install');
-const workspaceRuntimePackageRoots = resolveWorkspaceRuntimePackageRoots();
-
 try {
 	mkdirSync(extractRoot, { recursive: true });
 	const cliTarball = pack(packageRoot, 'treeseed-cli.tgz');
 	const stagedTarballs: string[] = [cliTarball];
 
-	mirrorDependencies(installRoot, new Set(workspaceRuntimePackageRoots.keys()));
-	for (const [packageName, dependencyRoot] of workspaceRuntimePackageRoots.entries()) {
-		const folderName = packageName.slice('@treeseed/'.length);
-		const tarballPath = pack(dependencyRoot, `treeseed-${folderName}.tgz`);
-		stagedTarballs.push(tarballPath);
-		installPackagedPackage(extractRoot, installRoot, tarballPath, folderName);
-		linkPackageBins(installRoot, resolve(installRoot, 'node_modules', '@treeseed', folderName));
-	}
+	mirrorDependencies(installRoot);
 	installPackagedPackage(extractRoot, installRoot, cliTarball, 'cli');
 	linkPackageBins(installRoot, resolve(installRoot, 'node_modules', '@treeseed', 'cli'));
 	writeFileSync(resolve(installRoot, 'package.json'), `${JSON.stringify({ name: 'treeseed-cli-smoke', private: true, type: 'module' }, null, 2)}\n`, 'utf8');
