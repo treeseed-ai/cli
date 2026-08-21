@@ -1,7 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { build } from 'esbuild';
-import ts from 'typescript';
 import { packageRoot } from '../packages/package-tools.ts';
 
 const srcRoot = resolve(packageRoot, 'src');
@@ -20,7 +19,7 @@ function walkFiles(root) {
 	return files;
 }
 
-const publishableSourceFiles = walkFiles(srcRoot).filter((filePath) => filePath.endsWith('.ts') && !filePath.endsWith('.d.ts'));
+const publishableSourceFiles = walkFiles(srcRoot).filter((filePath) => filePath.endsWith('.ts') && !filePath.endsWith('.d.ts') && !filePath.endsWith('/types.ts'));
 
 function ensureDir(filePath) {
 	mkdirSync(dirname(filePath), { recursive: true });
@@ -44,40 +43,11 @@ async function compileModule(filePath) {
 	writeFileSync(outputFile, rewriteRuntimeSpecifiers(readFileSync(outputFile, 'utf8')), 'utf8');
 }
 
-function emitDeclarations() {
-	const program = ts.createProgram({
-		rootNames: publishableSourceFiles,
-		options: {
-			allowImportingTsExtensions: true,
-			target: ts.ScriptTarget.ES2022,
-			module: ts.ModuleKind.ESNext,
-			moduleResolution: ts.ModuleResolutionKind.Bundler,
-			strict: true,
-			noEmit: false,
-			declaration: true,
-			emitDeclarationOnly: true,
-			declarationDir: distRoot,
-			types: ['node'],
-		},
-	});
-	const result = program.emit();
-	if (result.emitSkipped) {
-		const diagnostics = ts.formatDiagnosticsWithColorAndContext(result.diagnostics, {
-			getCanonicalFileName: (fileName) => fileName,
-			getCurrentDirectory: () => process.cwd(),
-			getNewLine: () => '\n',
-		});
-		throw new Error(`Declaration build failed.\n${diagnostics}`);
-	}
-}
-
 rmSync(distRoot, { recursive: true, force: true });
 
 for (const filePath of publishableSourceFiles) {
 	await compileModule(filePath);
 }
-
-emitDeclarations();
 
 if (existsSync(resolve(packageRoot, 'README.md'))) {
 	copyFileSync(resolve(packageRoot, 'README.md'), resolve(distRoot, '..', 'README.md'));
