@@ -5,6 +5,7 @@ import {
 	listCommandPaths,
 	type CommandNodeDescriptor,
 } from '@treeseed/sdk/operator-contracts';
+import { commandIndex } from '../../src/cli/registry.ts';
 
 const root = process.cwd();
 const paths = listCommandPaths(TREESEED_COMMAND_TREE_V1);
@@ -13,8 +14,9 @@ function markdown(nodes: CommandNodeDescriptor[], parent: string[] = []): string
 	return nodes.flatMap((node) => {
 		const path = [...parent, node.segment];
 		if (node.nodeType === 'branch') return [`## trsd ${path.join(' ')}`, '', node.description, '', ...markdown(node.children, path)];
+		const command = commandIndex.get(path.join(' '));
 		const args = (node.arguments ?? []).map((argument) => ` <${argument.name}>`).join('');
-		const options = (node.options ?? []).map((option) => `- \`${option.name}\`: ${option.description}`);
+		const options = (command?.options ?? []).map((option) => `- \`${option.flag}${option.kind === 'string' ? ' <value>' : ''}\`: ${option.description}`);
 		return [
 			`### trsd ${path.join(' ')}${args}`,
 			'', node.description, '',

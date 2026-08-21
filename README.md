@@ -52,7 +52,7 @@ trsd workdays plan --team treeseed --profile balanced --projects sdk --duration 
 trsd workdays start --team treeseed --preflight <id> --digest <sha256> --plan --json
 ```
 
-With `TREESEED_CONTROL_PLANE_MODE=managed`, commands default to the local control-plane profile. `TREESEED_API_BASE_URL` must identify that API. An explicit `--market` still takes precedence.
+Commands default to the local managed control plane at `http://127.0.0.1:3002`. `TREESEED_API_BASE_URL` overrides that address, and `TREESEED_CONTROL_PLANE_MODE=external` requires an explicit API URL. Market passthrough is not available.
 
 ## Workdays and capacity
 
@@ -76,7 +76,7 @@ The build generates all public interface artifacts from the same SDK command tre
 - `schemas/command-result.schema.json`
 - `completions/trsd.bash`
 
-The package exports only its root module. Internal handler and runtime paths are not public API.
+The package exposes only the `trsd` executable. It has no JavaScript library export and ships no backend, integration, UI, Agent-runtime, or repository-workflow implementation.
 
 ## Development
 

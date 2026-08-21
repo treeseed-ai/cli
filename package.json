@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.2",
+  "version": "0.13.0-rc.3",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -16,13 +16,6 @@
   "type": "module",
   "engines": {
     "node": ">=22"
-  },
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
   },
   "files": [
     "README.md",
@@ -58,10 +51,7 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "0.13.0-rc.1",
     "@treeseed/sdk": "0.13.0-rc.5",
-    "ink": "^7.0.0",
-    "react": "^19.2.5",
     "yaml": "^2.8.1"
   },
   "overrides": {
