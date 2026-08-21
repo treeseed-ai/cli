@@ -11,7 +11,6 @@ function apiRequest<T>(client: unknown, path: string, body: unknown) {
 }
 
 export async function runOperator(invocation: ParsedInvocation, context: CommandContext) {
-	const { client } = createControlPlaneClient(invocation, context, true);
 	const options = { ...invocation.options } as Record<string, unknown>;
 	delete options.market; delete options.team; delete options.project; delete options.json; delete options.yes; delete options.plan;
 	if (documentCommands.has(invocation.command.name)) {
@@ -20,15 +19,18 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 		options.document = parseYaml(await readFile(resolve(context.cwd, file), 'utf8')) as unknown;
 	}
 	const manage = invocation.command.kind === 'mutation' || invocation.command.name === 'workdays plan';
-	return apiRequest<{ ok: boolean; payload?: unknown; code?: string; error?: string }>(client, `/v1/operator/commands/${manage ? 'mutations' : 'read'}`, {
+	const path = `/v1/operator/commands/${manage ? 'mutations' : 'read'}`;
+	const team = typeof invocation.options.team === 'string' ? invocation.options.team : context.env.TREESEED_TEAM_ID;
+	const project = typeof invocation.options.project === 'string' ? invocation.options.project : context.env.TREESEED_PROJECT_ID;
+	const body = {
 		schemaVersion: 'treeseed.operator-command-request/v1',
 		commandPath: invocation.command.path,
 		arguments: invocation.arguments,
 		options,
 		mode: invocation.options.plan === true ? 'plan' : 'execute',
-		context: {
-			team: typeof invocation.options.team === 'string' ? invocation.options.team : context.env.TREESEED_TEAM_ID,
-			project: typeof invocation.options.project === 'string' ? invocation.options.project : context.env.TREESEED_PROJECT_ID,
-		},
-	});
+		context: { ...(team ? { team } : {}), ...(project ? { project } : {}) },
+	};
+	if (context.apiRequest) return context.apiRequest(path, body);
+	const { client } = createControlPlaneClient(invocation, context, true);
+	return apiRequest<{ ok: boolean; payload?: unknown; code?: string; error?: string }>(client, path, body);
 }

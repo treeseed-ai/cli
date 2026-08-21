@@ -11,6 +11,7 @@ export interface CommandContext {
 	interactiveUi: boolean;
 	prompt?: (question: string) => Promise<string> | string;
 	confirm?: (question: string, defaultValue?: 'yes' | 'no') => Promise<boolean> | boolean;
+	apiRequest?: (path: string, body: unknown) => Promise<unknown>;
 }
 
 export interface OptionSpec {

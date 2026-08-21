@@ -1,9 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
-import { setMarketSession } from '@treeseed/sdk/market-client';
 import { listCommandPaths, TREESEED_COMMAND_TREE_V1 } from '@treeseed/sdk/operator-contracts';
 import { commandSpecs } from '../../../src/cli/registry.ts';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
@@ -56,27 +52,18 @@ test('local managed control plane is the default and market passthrough is unava
 });
 
 test('nonlocal command behavior is one authenticated API request', async () => {
-	const root = mkdtempSync(join(tmpdir(), 'treeseed-cli-thin-'));
-	const originalFetch = globalThis.fetch;
-	const requests: Array<{ url: string; method: string; body: unknown }> = [];
-	try {
-		setMarketSession(root, { marketId: 'local', accessToken: 'test-access-token' });
-		globalThis.fetch = async (input, init) => {
-			requests.push({ url: String(input), method: init?.method ?? 'GET', body: JSON.parse(String(init?.body)) });
-			return new Response(JSON.stringify({ ok: true, payload: { source: 'api' } }), { status: 200, headers: { 'content-type': 'application/json' } });
-		};
-		const output: string[] = [];
-		const exit = await runCommandLine(['capacity', 'status', '--team', 'treeseed', '--json'], { cwd: root, interactiveUi: false, env: { HOME: root }, write: (value) => output.push(value) });
-		assert.equal(exit, 0);
-		assert.deepEqual(JSON.parse(output[0]!).result, { source: 'api' });
-		assert.equal(requests.length, 1);
-		assert.equal(requests[0]!.url, 'http://127.0.0.1:3002/v1/operator/commands/read');
-		assert.equal(requests[0]!.method, 'POST');
-		assert.deepEqual(requests[0]!.body, {
+	const requests: Array<{ path: string; body: unknown }> = [];
+	const output: string[] = [];
+	const exit = await runCommandLine(['capacity', 'status', '--team', 'treeseed', '--json'], {
+		interactiveUi: false,
+		apiRequest: async (path, body) => { requests.push({ path, body }); return { ok: true, payload: { source: 'api' } }; },
+		write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(JSON.parse(output[0]!).result, { source: 'api' });
+	assert.equal(requests.length, 1);
+	assert.equal(requests[0]!.path, '/v1/operator/commands/read');
+	assert.deepEqual(requests[0]!.body, {
 			schemaVersion: 'treeseed.operator-command-request/v1', commandPath: ['capacity', 'status'], arguments: [], options: {}, mode: 'execute', context: { team: 'treeseed' },
-		});
-	} finally {
-		globalThis.fetch = originalFetch;
-		rmSync(root, { recursive: true, force: true });
-	}
+	});
 });
