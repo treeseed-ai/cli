@@ -58,7 +58,7 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#6e1a7345e6ec1c75d8020ce4c08c68bea7ad99e7",
+    "@treeseed/agent": "0.13.0-rc.1",
     "@treeseed/sdk": "0.13.0-rc.5",
     "ink": "^7.0.0",
     "react": "^19.2.5",
