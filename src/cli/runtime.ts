@@ -13,7 +13,7 @@ function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 }
 
 export function createCommandContext(overrides: Partial<CommandContext> = {}): CommandContext {
-	const context: CommandContext = { cwd: overrides.cwd ?? process.cwd(), env: overrides.env ?? process.env, write: overrides.write ?? defaultWrite as Writer, outputFormat: overrides.outputFormat ?? 'human', interactiveUi: overrides.interactiveUi ?? true, prompt: overrides.prompt, confirm: overrides.confirm, apiRequest: overrides.apiRequest };
+	const context: CommandContext = { cwd: overrides.cwd ?? process.cwd(), env: overrides.env ?? process.env, write: overrides.write ?? defaultWrite as Writer, outputFormat: overrides.outputFormat ?? 'human', interactiveUi: overrides.interactiveUi ?? true, prompt: overrides.prompt, confirm: overrides.confirm, operationInvoke: overrides.operationInvoke };
 	if (!context.confirm && context.interactiveUi) context.confirm = async (question) => /^y(?:es)?$/iu.test(await promptText(context, `${question} [y/N] `));
 	return context;
 }
@@ -24,8 +24,25 @@ function envelope(invocation: ParsedInvocation, ok: boolean, result: unknown, fa
 
 function failure(category: CommandErrorCategory, code: string, message: string): CommandFailure { return { category, code, message }; }
 
+function categorized(error: unknown): CommandFailure {
+	const value = error as { category?: CommandErrorCategory; code?: string; message?: string; status?: number; problem?: { code?: string; detail?: string; title?: string } };
+	if (value.category) return failure(value.category, value.code ?? 'command_failed', value.message ?? String(error));
+	const code = value.problem?.code ?? value.code ?? 'command_failed';
+	const message = value.problem?.detail ?? value.problem?.title ?? value.message ?? String(error);
+	if (code === 'confirmation_required' || code === 'confirmation_invalid') return failure('confirmation_required', code, message);
+	if (code === 'stale_preflight') return failure('stale_preflight', code, message);
+	if (value.status === 400 || value.status === 412) return failure('invalid_input', code, message);
+	if (value.status === 401) return failure('authentication_required', code, message);
+	if (value.status === 403) return failure('authorization_denied', code, message);
+	if (value.status === 404) return failure('not_found', code, message);
+	if (value.status === 409) return failure('conflict', code, message);
+	if (value.status === 429) return failure('rate_limited', code, message);
+	if (value.status && value.status >= 500) return failure('provider_unavailable', code, message);
+	return failure('internal_error', code, message);
+}
+
 async function confirmed(invocation: ParsedInvocation, context: CommandContext) {
-	if (invocation.command.confirmation === 'never' || invocation.options.plan === true || invocation.options.yes === true) return true;
+	if (invocation.command.confirmation === 'never' || invocation.options.plan === true || invocation.options.yes === true || invocation.command.execution.kind === 'operation') return true;
 	if (!context.interactiveUi || !context.confirm) return false;
 	return context.confirm(`Execute governed operation \`${invocation.command.name}\`?`, 'no');
 }
@@ -33,8 +50,8 @@ async function confirmed(invocation: ParsedInvocation, context: CommandContext) 
 async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (!(await confirmed(invocation, context))) throw Object.assign(new Error('Interactive confirmation is required, or pass --yes for authorized automation.'), { category: 'confirmation_required', code: 'confirmation_required' });
 	if (invocation.options.plan === true && ['auth', 'secrets'].includes(invocation.command.path[0]!)) return { action: invocation.command.name, mutation: false, authority: 'local_credential_custody' };
-	if (invocation.command.path[0] === 'auth') return runAuth(invocation, context);
-	if (invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
+	if (invocation.command.execution.kind === 'protocol') return runAuth(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
 	return runOperator(invocation, context);
 }
 
@@ -67,11 +84,10 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 		const response = await execute(invocation, context);
 		const api = response && typeof response === 'object' ? response as { ok?: boolean; payload?: unknown; code?: string; error?: string } : null;
 		if (api?.ok === false) { const failed = failure('policy_blocked', api.code ?? 'control_plane_rejected', api.error ?? 'The control plane rejected the operation.'); print(context, envelope(invocation, false, null, failed), false); return 1; }
-		const result = api && 'payload' in api ? api.payload : response;
+		const result = api && 'payload' in api ? api.payload : response && typeof response === 'object' && 'data' in response ? (response as { data: unknown }).data : response;
 		print(context, envelope(invocation, true, result)); return 0;
 	} catch (error) {
-		const value = error as { category?: CommandErrorCategory; code?: string; message?: string };
-		const failed = failure(value.category ?? 'internal_error', value.code ?? 'command_failed', value.message ?? String(error));
+		const failed = categorized(error);
 		print(context, envelope(invocation, false, null, failed), false); return 1;
 	}
 }

@@ -1,4 +1,4 @@
-import type { CommandErrorCategory } from '@treeseed/sdk/operator-contracts';
+import type { CommandErrorCategory, CommandExecutionBinding } from '@treeseed/sdk/operator-contracts';
 
 export type OutputFormat = 'human' | 'json';
 export type Writer = (output: string, stream?: 'stdout' | 'stderr') => void;
@@ -11,13 +11,13 @@ export interface CommandContext {
 	interactiveUi: boolean;
 	prompt?: (question: string) => Promise<string> | string;
 	confirm?: (question: string, defaultValue?: 'yes' | 'no') => Promise<boolean> | boolean;
-	apiRequest?: (path: string, body: unknown) => Promise<unknown>;
+	operationInvoke?: (operationId: string, input: unknown) => Promise<unknown>;
 }
 
 export interface OptionSpec {
 	name: string;
 	flag: string;
-	kind: 'boolean' | 'string';
+	kind: 'boolean' | 'string' | 'number' | 'string[]';
 	repeatable?: boolean;
 	description: string;
 }
@@ -30,6 +30,7 @@ export interface CommandSpec {
 	arguments: Array<{ name: string; description: string; required: boolean }>;
 	options: OptionSpec[];
 	confirmation: 'never' | 'destructive' | 'credential' | 'authority' | 'production' | 'irreversible';
+	execution: CommandExecutionBinding;
 }
 
 export interface ParsedInvocation {

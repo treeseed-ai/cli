@@ -11,6 +11,7 @@ test('package has one executable and no runtime package dependency', () => {
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
 	assert.equal(pkg.dependencies.ink, undefined);
 	assert.equal(pkg.dependencies.react, undefined);
+	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.18' });
 });
 
 test('built package contains executable runtime only', () => {
@@ -23,4 +24,7 @@ test('source contains no legacy implementation residue', () => {
 	const walk = (root: string): string[] => readdirSync(root, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? walk(`${root}/${entry.name}`) : [`${root}/${entry.name}`]);
 	const files = walk('src').join('\n');
 	for (const forbidden of ['handlers/capacity', 'workspace-lifecycle', 'handlers/hosting', 'handlers/treedx', 'handlers/scenes', 'handlers/seeds', 'handlers/agents']) assert.equal(files.includes(forbidden), false, forbidden);
+	const source = walk('src').map((file) => readFileSync(file, 'utf8')).join('\n');
+	for (const forbidden of ['MarketClient', 'marketId', '--market', '/v1/', 'operator/commands', 'workflow-support']) assert.equal(source.includes(forbidden), false, forbidden);
+	for (const removed of ['docs/src', 'guarantees', '.gitmodules']) assert.equal(existsSync(removed), false, removed);
 });

@@ -15,7 +15,11 @@ export function parseInvocation(command: CommandSpec, argv: string[]): ParsedInv
 		if (spec.kind === 'boolean') { options[spec.name] = true; continue; }
 		const value = inline ?? remaining.shift();
 		if (!value) throw new Error(`Missing value for ${flag}`);
-		if (spec.repeatable) options[spec.name] = [...(Array.isArray(options[spec.name]) ? options[spec.name] as string[] : []), value];
+		if (spec.kind === 'number') {
+			const parsed = Number(value);
+			if (!Number.isFinite(parsed)) throw new Error(`Invalid number for ${flag}`);
+			options[spec.name] = String(parsed);
+		} else if (spec.repeatable || spec.kind === 'string[]') options[spec.name] = [...(Array.isArray(options[spec.name]) ? options[spec.name] as string[] : []), value];
 		else options[spec.name] = value;
 	}
 	const missing = command.arguments.filter((argument, index) => argument.required && !args[index]);

@@ -6,7 +6,7 @@ import {
 import type { CommandSpec, OptionSpec } from './types.js';
 
 const contextOptions: OptionSpec[] = [
-	{ name: 'market', flag: '--market', kind: 'string', description: 'Control-plane profile.' },
+	{ name: 'server', flag: '--server', kind: 'string', description: 'Control-plane server profile or URL.' },
 	{ name: 'team', flag: '--team', kind: 'string', description: 'Team id or slug.' },
 	{ name: 'project', flag: '--project', kind: 'string', description: 'Project id or slug.' },
 	{ name: 'provider', flag: '--provider', kind: 'string', description: 'Provider identity.' },
@@ -28,29 +28,10 @@ const contextOptions: OptionSpec[] = [
 	{ name: 'json', flag: '--json', kind: 'boolean', description: 'Emit the stable JSON envelope.' },
 ];
 
-function add(names: Set<string>, ...values: string[]) { values.forEach((value) => names.add(value)); }
-
 function optionNames(path: string[], leaf: CommandLeafDescriptor) {
-	const root = path[0];
-	const command = path.join(' ');
 	const names = new Set(['json']);
-	if (root === 'auth') add(names, 'market');
-	if (root === 'agents') add(names, 'market', 'project');
-	if (root === 'providers') add(names, 'market', 'team');
-	if (root === 'capacity') add(names, 'market', 'team', 'project');
-	if (root === 'plans') add(names, 'market', 'team');
-	if (root === 'workdays') add(names, 'market', 'team');
-	if (root === 'assignments') add(names, 'market', 'team', 'project');
-	if (['save', 'stage', 'release', 'status', 'diagnose'].includes(command)) add(names, 'market', 'team', 'project');
-	if (/ (?:list|watch)$/u.test(command) || ['capacity status', 'capacity usage', 'capacity ledger', 'capacity audit'].includes(command)) add(names, 'status', 'limit', 'cursor');
-	if (command === 'providers diagnose') add(names, 'status');
-	if (command === 'providers connect') add(names, 'provider');
-	if (command === 'providers credentials revoke') add(names, 'credential');
-	if (command === 'plans list') add(names, 'decision');
-	if (command === 'workdays plan') add(names, 'profile', 'projects', 'start', 'end', 'duration', 'objective');
-	if (['workdays schedules plan', 'workdays schedules start'].includes(command)) add(names, 'profile', 'projects', 'duration');
-	if (command === 'workdays start') add(names, 'preflight', 'digest');
-	if (/(?:disconnect|approve|reject|pause|resume|stop|cancel|retry|retire)$/u.test(command)) add(names, 'reason');
+	if (leaf.execution.kind === 'operation' || leaf.execution.kind === 'protocol') names.add('server');
+	if (leaf.execution.kind === 'operation') for (const binding of leaf.execution.input) if (binding.source === 'option' || binding.source === 'context') names.add(binding.name);
 	if (leaf.kind === 'mutation') names.add('yes');
 	return names;
 }
@@ -76,6 +57,7 @@ function flatten(nodes: CommandNodeDescriptor[], parent: string[] = []): Command
 			arguments: (node.arguments ?? []).map((argument) => ({ ...argument, required: argument.required === true })),
 			options: options(path, node),
 			confirmation: node.authorization?.confirmation ?? 'never',
+			execution: node.execution,
 		}];
 	});
 }

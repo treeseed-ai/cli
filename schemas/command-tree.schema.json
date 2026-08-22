@@ -58,8 +58,117 @@
         },
         "resultSchemaId": {
           "type": "string"
+        },
+        "execution": {
+          "$ref": "#/$defs/execution"
         }
       }
+    },
+    "execution": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "operationId",
+            "input"
+          ],
+          "properties": {
+            "kind": {
+              "const": "operation"
+            },
+            "operationId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)+$"
+            },
+            "input": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "field",
+                  "source",
+                  "name",
+                  "target"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "enum": [
+                      "argument",
+                      "context",
+                      "option"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "enum": [
+                      "path",
+                      "query",
+                      "body"
+                    ]
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "transform": {
+                    "enum": [
+                      "identity",
+                      "integer",
+                      "csv"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "handlerId"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "local",
+                "protocol"
+              ]
+            },
+            "handlerId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "code",
+            "reason"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unavailable"
+            },
+            "code": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

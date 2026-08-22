@@ -37,22 +37,20 @@ Run `trsd help <command path>` for leaf and intermediate-node help. The complete
 
 - Read commands execute immediately.
 - Mutations execute by default after any required confirmation.
-- `--plan` returns the exact proposed mutation without performing it.
+- `--plan` returns the exact request projection without performing a mutation.
 - `--yes` confirms authorized noninteractive work; it never bypasses API policy.
 - `--json` emits the stable `treeseed.command-result/v1` envelope.
 
 Examples:
 
 ```sh
-trsd auth login --market local
-trsd agents validate --project sdk --json
-trsd capacity explain --team treeseed --json
-trsd workdays profiles show balanced --team treeseed --json
-trsd workdays plan --team treeseed --profile balanced --projects sdk --duration 3600 --json
-trsd workdays start --team treeseed --preflight <id> --digest <sha256> --plan --json
+trsd auth login --server local
+trsd agents list --project sdk --json
+trsd capacity status --team treeseed --json
+trsd workdays list --team treeseed --json
 ```
 
-Commands default to the local managed control plane at `http://127.0.0.1:3002`. `TREESEED_API_BASE_URL` overrides that address, and `TREESEED_CONTROL_PLANE_MODE=external` requires an explicit API URL. Market passthrough is not available.
+Commands default to the local control plane at `http://127.0.0.1:3002`. `TREESEED_API_BASE_URL` overrides that address. Server profiles and encrypted OAuth sessions are owned locally by the CLI; control-plane behavior remains API-owned.
 
 ## Workdays and capacity
 
