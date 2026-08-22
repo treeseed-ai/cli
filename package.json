@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.3",
+  "version": "0.13.0-rc.4",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -40,9 +40,8 @@
     "prepare": "node --import tsx ./scripts/support/prepare.ts",
     "prepack": "npm run build:dist",
     "verify:direct": "npm run release:verify && npm run pack:artifact",
-    "verify:local": "TREESEED_VERIFY_DRIVER=direct TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
-    "verify:action": "TREESEED_VERIFY_DRIVER=act TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
-    "verify": "TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
+    "verify:local": "npm run verify:direct",
+    "verify": "npm run verify:direct",
     "release:setup": "npm run setup:ci",
     "pack:artifact": "node --import tsx ./scripts/packages/pack-package-artifact.ts",
     "release:check-tag": "node --import tsx ./scripts/packages/assert-release-tag-version.ts",
@@ -50,8 +49,7 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.5",
-    "yaml": "^2.8.1"
+    "@treeseed/sdk": "0.13.0-rc.18"
   },
   "overrides": {
     "@treeseed/sdk": "$@treeseed/sdk"

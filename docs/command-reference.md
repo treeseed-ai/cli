@@ -11,8 +11,9 @@ Auth operations.
 Login the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.login/v1`.
+Execution: `protocol.oauth.device.login`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -22,8 +23,9 @@ Operation: mutation. Result schema: `treeseed.command.login/v1`.
 Logout the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.logout/v1`.
+Execution: `protocol.oauth.revoke`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -33,8 +35,9 @@ Operation: mutation. Result schema: `treeseed.command.logout/v1`.
 Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `accounts.current.show`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd secrets
@@ -46,10 +49,8 @@ Secrets operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Execution: `local.secrets.list`.
 
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd secrets status
@@ -57,6 +58,7 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.secrets.status`.
 
 - `--json`: Emit the stable JSON envelope.
 
@@ -65,6 +67,7 @@ Operation: read. Result schema: `treeseed.command.status/v1`.
 Unlock the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.unlock/v1`.
+Execution: `local.secrets.unlock`.
 
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
@@ -75,6 +78,7 @@ Operation: mutation. Result schema: `treeseed.command.unlock/v1`.
 Lock the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.lock/v1`.
+Execution: `local.secrets.lock`.
 
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
@@ -85,6 +89,7 @@ Operation: mutation. Result schema: `treeseed.command.lock/v1`.
 Rotate the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.rotate/v1`.
+Execution: `local.secrets.rotate`.
 
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
@@ -99,8 +104,9 @@ Agents operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `agents.list`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--project <value>`: Project id or slug.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
@@ -112,8 +118,9 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `agents.show`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
@@ -122,9 +129,8 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Validate the selected resource.
 
 Operation: read. Result schema: `treeseed.command.validate/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd agents diff
@@ -132,9 +138,8 @@ Operation: read. Result schema: `treeseed.command.validate/v1`.
 Diff the selected resource.
 
 Operation: read. Result schema: `treeseed.command.diff/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd agents diagnose
@@ -142,9 +147,8 @@ Operation: read. Result schema: `treeseed.command.diff/v1`.
 Diagnose the selected resource.
 
 Operation: read. Result schema: `treeseed.command.diagnose/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd agents classes
@@ -156,12 +160,10 @@ Classes operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `agents.classes.list`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--project <value>`: Project id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd agents classes show <class>
@@ -169,8 +171,9 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `agents.classes.show`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
@@ -183,12 +186,8 @@ Bindings operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--project <value>`: Project id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd agents bindings show <binding>
@@ -196,9 +195,8 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd agents bindings explain <binding>
@@ -206,9 +204,8 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Explain the selected resource.
 
 Operation: read. Result schema: `treeseed.command.explain/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd providers
@@ -220,9 +217,9 @@ Providers operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `services.providers.list`.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
+- `--server <value>`: Control-plane server profile or URL.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
@@ -233,8 +230,9 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `services.connections.show`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
@@ -243,8 +241,9 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `services.connections.show`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
@@ -253,10 +252,8 @@ Operation: read. Result schema: `treeseed.command.status/v1`.
 Diagnose the selected resource.
 
 Operation: read. Result schema: `treeseed.command.diagnose/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers connect
@@ -264,8 +261,9 @@ Operation: read. Result schema: `treeseed.command.diagnose/v1`.
 Connect the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.connect/v1`.
+Control-plane operation: `services.connections.create`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--provider <value>`: Provider identity.
 - `--yes`: Confirm authorized automation.
@@ -277,8 +275,9 @@ Operation: mutation. Result schema: `treeseed.command.connect/v1`.
 Disconnect the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.disconnect/v1`.
+Control-plane operation: `services.connections.disconnect`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
@@ -294,12 +293,8 @@ Requests operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers requests show <request>
@@ -307,9 +302,8 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers requests approve <request>
@@ -317,10 +311,8 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Approve the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.approve/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -330,10 +322,8 @@ Operation: mutation. Result schema: `treeseed.command.approve/v1`.
 Reject the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.reject/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -347,8 +337,9 @@ Credentials operations.
 Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `services.credential.authorities.list`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
@@ -357,9 +348,8 @@ Operation: read. Result schema: `treeseed.command.status/v1`.
 Rotate the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.rotate/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -369,10 +359,8 @@ Operation: mutation. Result schema: `treeseed.command.rotate/v1`.
 Revoke the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.revoke/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--credential <value>`: Credential identity.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -386,9 +374,8 @@ Offers operations.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers offers validate <file>
@@ -396,9 +383,8 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Validate the selected resource.
 
 Operation: read. Result schema: `treeseed.command.validate/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers offers plan <file>
@@ -406,9 +392,8 @@ Operation: read. Result schema: `treeseed.command.validate/v1`.
 Plan the selected resource.
 
 Operation: read. Result schema: `treeseed.command.plan/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers offers apply <file>
@@ -416,9 +401,8 @@ Operation: read. Result schema: `treeseed.command.plan/v1`.
 Apply the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.apply/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -432,10 +416,10 @@ Capacity operations.
 Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `capacity.status`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
@@ -446,10 +430,8 @@ Operation: read. Result schema: `treeseed.command.status/v1`.
 Explain the selected resource.
 
 Operation: read. Result schema: `treeseed.command.explain/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd capacity usage
@@ -457,13 +439,10 @@ Operation: read. Result schema: `treeseed.command.explain/v1`.
 Usage the selected resource.
 
 Operation: read. Result schema: `treeseed.command.usage/v1`.
+Control-plane operation: `capacity.usage`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd capacity ledger
@@ -471,10 +450,10 @@ Operation: read. Result schema: `treeseed.command.usage/v1`.
 Ledger the selected resource.
 
 Operation: read. Result schema: `treeseed.command.ledger/v1`.
+Control-plane operation: `capacity.ledger`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
@@ -485,13 +464,8 @@ Operation: read. Result schema: `treeseed.command.ledger/v1`.
 Audit the selected resource.
 
 Operation: read. Result schema: `treeseed.command.audit/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd plans
@@ -503,9 +477,9 @@ Plans operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `plans.list`.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
+- `--server <value>`: Control-plane server profile or URL.
 - `--decision <value>`: Approved decision identity.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
@@ -517,9 +491,9 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `plans.show`.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
+- `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd plans explain <plan>
@@ -527,9 +501,8 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Explain the selected resource.
 
 Operation: read. Result schema: `treeseed.command.explain/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd plans diff <left> <right>
@@ -537,9 +510,8 @@ Operation: read. Result schema: `treeseed.command.explain/v1`.
 Compare two API-derived plans.
 
 Operation: read. Result schema: `treeseed.command.plans.diff/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd workdays
@@ -555,12 +527,8 @@ Profiles operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays profiles show <profile>
@@ -568,9 +536,8 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays profiles validate <file>
@@ -578,18 +545,18 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Validate the selected resource.
 
 Operation: read. Result schema: `treeseed.command.validate/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays plan
 
 Plan the selected resource.
 
-Operation: read. Result schema: `treeseed.command.plan/v1`.
+Operation: mutation. Result schema: `treeseed.command.plan/v1`.
+Control-plane operation: `workdays.plan`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--profile <value>`: Workday profile identity.
 - `--projects <value>`: Project scope or comma-separated projects.
@@ -597,15 +564,18 @@ Operation: read. Result schema: `treeseed.command.plan/v1`.
 - `--end <value>`: ISO end time.
 - `--duration <value>`: Duration in seconds.
 - `--objective <value>`: Objective filter.
+- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd workdays start
 
 Start the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.start/v1`.
+Control-plane operation: `workdays.start`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--preflight <value>`: Exact preflight identity.
 - `--digest <value>`: Exact preflight digest.
@@ -618,8 +588,9 @@ Operation: mutation. Result schema: `treeseed.command.start/v1`.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `workdays.list`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
@@ -631,8 +602,9 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `workdays.show`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
@@ -641,12 +613,8 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Watch the selected resource.
 
 Operation: read. Result schema: `treeseed.command.watch/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays pause <workday>
@@ -654,10 +622,8 @@ Operation: read. Result schema: `treeseed.command.watch/v1`.
 Pause the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.pause/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -667,10 +633,8 @@ Operation: mutation. Result schema: `treeseed.command.pause/v1`.
 Resume the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.resume/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -680,10 +644,8 @@ Operation: mutation. Result schema: `treeseed.command.resume/v1`.
 Stop the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.stop/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -693,10 +655,8 @@ Operation: mutation. Result schema: `treeseed.command.stop/v1`.
 Cancel the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.cancel/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -710,12 +670,10 @@ Schedules operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `workdays.schedules.list`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays schedules show <schedule>
@@ -723,9 +681,8 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays schedules plan
@@ -733,12 +690,8 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Plan the selected resource.
 
 Operation: read. Result schema: `treeseed.command.plan/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--profile <value>`: Workday profile identity.
-- `--projects <value>`: Project scope or comma-separated projects.
-- `--duration <value>`: Duration in seconds.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays schedules start
@@ -746,8 +699,9 @@ Operation: read. Result schema: `treeseed.command.plan/v1`.
 Start the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.start/v1`.
+Control-plane operation: `workdays.schedules.create`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--profile <value>`: Workday profile identity.
 - `--projects <value>`: Project scope or comma-separated projects.
@@ -761,10 +715,8 @@ Operation: mutation. Result schema: `treeseed.command.start/v1`.
 Pause the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.pause/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -774,10 +726,8 @@ Operation: mutation. Result schema: `treeseed.command.pause/v1`.
 Resume the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.resume/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -787,10 +737,8 @@ Operation: mutation. Result schema: `treeseed.command.resume/v1`.
 Retire the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.retire/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -804,10 +752,10 @@ Assignments operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `assignments.list`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
@@ -818,10 +766,10 @@ Operation: read. Result schema: `treeseed.command.list/v1`.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `assignments.show`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd assignments explain <assignment>
@@ -829,10 +777,10 @@ Operation: read. Result schema: `treeseed.command.show/v1`.
 Explain the selected resource.
 
 Operation: read. Result schema: `treeseed.command.explain/v1`.
+Control-plane operation: `assignments.explain`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd assignments watch <assignment>
@@ -840,13 +788,8 @@ Operation: read. Result schema: `treeseed.command.explain/v1`.
 Watch the selected resource.
 
 Operation: read. Result schema: `treeseed.command.watch/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd assignments retry <assignment>
@@ -854,10 +797,10 @@ Operation: read. Result schema: `treeseed.command.watch/v1`.
 Retry the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.retry/v1`.
+Control-plane operation: `assignments.retry`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
@@ -868,10 +811,10 @@ Operation: mutation. Result schema: `treeseed.command.retry/v1`.
 Cancel the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.cancel/v1`.
+Control-plane operation: `assignments.cancel`.
 
-- `--market <value>`: Control-plane profile.
+- `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
@@ -882,10 +825,8 @@ Operation: mutation. Result schema: `treeseed.command.cancel/v1`.
 Artifacts the selected resource.
 
 Operation: read. Result schema: `treeseed.command.artifacts/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd save
@@ -893,10 +834,8 @@ Operation: read. Result schema: `treeseed.command.artifacts/v1`.
 Save the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.save/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). Unified GitHub-backed save is intentionally fail-closed during this cutover.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -906,10 +845,8 @@ Operation: mutation. Result schema: `treeseed.command.save/v1`.
 Stage the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.stage/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). Unified GitHub-backed stage is intentionally fail-closed during this cutover.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -919,10 +856,8 @@ Operation: mutation. Result schema: `treeseed.command.stage/v1`.
 Release the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.release/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). Production release is intentionally fail-closed during this cutover.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -932,10 +867,9 @@ Operation: mutation. Result schema: `treeseed.command.release/v1`.
 Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `status.show`.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
+- `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd diagnose
@@ -943,8 +877,6 @@ Operation: read. Result schema: `treeseed.command.status/v1`.
 Diagnose the selected resource.
 
 Operation: read. Result schema: `treeseed.command.diagnose/v1`.
+Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
-- `--market <value>`: Control-plane profile.
-- `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
