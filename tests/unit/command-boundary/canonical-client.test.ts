@@ -139,3 +139,36 @@ test('expired sessions rotate through OAuth before invoking the operation', asyn
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+test('JSON device login keeps human approval instructions off stdout', async () => {
+	let baseUrl = '';
+	const server = createServer((request, response) => {
+		response.setHeader('content-type', 'application/json');
+		response.end(JSON.stringify(request.url === '/oauth/device_authorization'
+			? { device_code: 'device-a', user_code: 'ABCD-EFGH', verification_uri: `${baseUrl}/approve`,
+				verification_uri_complete: `${baseUrl}/approve?user_code=ABCD-EFGH`, expires_in: 60, interval: 0 }
+			: { token_type: 'Bearer', access_token: 'access-a', refresh_token: 'refresh-a', expires_in: 600,
+				scope: 'treeseed:read', audience: baseUrl, principal: { id: 'user-a' } }));
+	});
+	await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept));
+	const address = server.address();
+	if (!address || typeof address === 'string') throw new Error('Test server did not bind.');
+	baseUrl = `http://127.0.0.1:${address.port}`;
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-device-'));
+	const output: Array<{ value: string; stream?: string }> = [];
+	try {
+		saveServerProfile({ serverId: 'test', label: 'Test', baseUrl }, { TREESEED_CONFIG_HOME: root });
+		const exit = await runCommandLine(['auth', 'login', '--server', 'test', '--yes', '--json'], {
+			env: { TREESEED_CONFIG_HOME: root }, interactiveUi: false,
+			write: (value, stream) => output.push({ value, stream }),
+		});
+		assert.equal(exit, 0, JSON.stringify(output));
+		assert.match(output.find(({ stream }) => stream === 'stderr')!.value, /ABCD-EFGH/u);
+		const stdout = output.filter(({ stream }) => stream === 'stdout');
+		assert.equal(stdout.length, 1);
+		assert.equal(JSON.parse(stdout[0]!.value).ok, true);
+	} finally {
+		await new Promise<void>((accept, reject) => server.close((error) => error ? reject(error) : accept()));
+		rmSync(root, { recursive: true, force: true });
+	}
+});

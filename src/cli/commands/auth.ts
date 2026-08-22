@@ -18,7 +18,7 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 	const { profile, session, client } = await createControlPlaneClient(invocation, context, false);
 	if (invocation.command.name === 'auth login') {
 		const authorization = await client.authorizeDevice(CONTROL_PLANE_CLI_CLIENT_ID, DEFAULT_SCOPES);
-		context.write(`Open ${authorization.verificationUriComplete ?? authorization.verificationUri} and enter code ${authorization.userCode}.`);
+		context.write(`Open ${authorization.verificationUriComplete ?? authorization.verificationUri} and enter code ${authorization.userCode}.`, 'stderr');
 		const deadline = Date.now() + authorization.expiresIn * 1_000;
 		let interval = Math.max(1, authorization.interval) * 1_000;
 		while (Date.now() < deadline) {

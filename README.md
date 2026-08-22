@@ -45,11 +45,9 @@ Examples:
 
 ```sh
 trsd auth login --server local
-trsd agents validate --project sdk --json
-trsd capacity explain --team treeseed --json
-trsd workdays profiles show balanced --team treeseed --json
-trsd workdays plan --team treeseed --profile balanced --projects sdk --duration 3600 --json
-trsd workdays start --team treeseed --preflight <id> --digest <sha256> --plan --json
+trsd agents list --project sdk --json
+trsd capacity status --team treeseed --json
+trsd workdays list --team treeseed --json
 ```
 
 Commands default to the local control plane at `http://127.0.0.1:3002`. `TREESEED_API_BASE_URL` overrides that address. Server profiles and encrypted OAuth sessions are owned locally by the CLI; control-plane behavior remains API-owned.
