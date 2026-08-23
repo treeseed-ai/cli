@@ -45,7 +45,11 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Seed file must contain one portable seed bundle object.'), { category: 'invalid_input', code: 'seed_bundle_file_invalid' });
 		delete input.body.file;
 		input.body.bundle = parsed;
-		if (typeof input.path.name !== 'string' && typeof (parsed as Record<string, unknown>).name === 'string') input.path.name = (parsed as Record<string, unknown>).name;
+		if (operation.descriptor.rest?.path.includes('{name}')
+			&& typeof input.path.name !== 'string'
+			&& typeof (parsed as Record<string, unknown>).name === 'string') {
+			input.path.name = (parsed as Record<string, unknown>).name;
+		}
 	}
 	for (const binding of deferred) if (input[binding.target][binding.field] === undefined) {
 		throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });

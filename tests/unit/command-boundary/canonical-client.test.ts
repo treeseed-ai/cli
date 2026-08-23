@@ -70,6 +70,7 @@ test('seed commands upload parsed portable bundles instead of API-local paths', 
 			operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { data: { ok: true } }; }, write: () => undefined });
 		assert.equal(exit, 0);
 		assert.equal(invocations[0]?.operationId, 'seeds.validate');
+		assert.deepEqual(invocations[0]?.input.path, {});
 		assert.equal(invocations[0]?.input.body.bundle.schemaVersion, 'treeseed.seed-bundle/v2');
 		assert.equal('file' in invocations[0]?.input.body, false);
 	} finally { rmSync(root, { recursive: true, force: true }); }
