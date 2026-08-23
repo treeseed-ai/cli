@@ -32,9 +32,10 @@ function transform(value: unknown, binding: CommandInputBinding) {
 async function operationInput(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'operation') throw new Error('Command is not operation-bound.');
 	const input = { path: {} as Record<string, unknown>, query: {} as Record<string, unknown>, body: {} as Record<string, unknown> };
+	const deferred: CommandInputBinding[] = [];
 	for (const binding of invocation.command.execution.input) {
 		const value = transform(sourceValue(binding, invocation, context), binding);
-		if (binding.required && value === undefined) throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });
+		if (binding.required && value === undefined) { deferred.push(binding); continue; }
 		if (value !== undefined) input[binding.target][binding.field] = value;
 	}
 	const operation = controlPlaneOperation(invocation.command.execution.operationId);
@@ -44,6 +45,10 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Seed file must contain one portable seed bundle object.'), { category: 'invalid_input', code: 'seed_bundle_file_invalid' });
 		delete input.body.file;
 		input.body.bundle = parsed;
+		if (typeof input.path.name !== 'string' && typeof (parsed as Record<string, unknown>).name === 'string') input.path.name = (parsed as Record<string, unknown>).name;
+	}
+	for (const binding of deferred) if (input[binding.target][binding.field] === undefined) {
+		throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });
 	}
 	return { operation, input: { ...input, body: Object.keys(input.body).length ? input.body : undefined } };
 }
