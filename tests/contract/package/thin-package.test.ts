@@ -20,6 +20,12 @@ test('built package contains executable runtime only', () => {
 	assert.equal(readdirSync('dist', { recursive: true }).some((path) => String(path).endsWith('.d.ts')), false);
 });
 
+test('the executable drains complete output before exiting', () => {
+	const main = readFileSync('src/cli/main.ts', 'utf8');
+	assert.equal(main.includes('process.exit('), false);
+	assert.equal(main.includes('process.exitCode = await runCommandLine'), true);
+});
+
 test('source contains no legacy implementation residue', () => {
 	const walk = (root: string): string[] => readdirSync(root, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? walk(`${root}/${entry.name}`) : [`${root}/${entry.name}`]);
 	const files = walk('src').join('\n');
