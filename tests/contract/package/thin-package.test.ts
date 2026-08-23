@@ -11,7 +11,7 @@ test('package has one executable and no runtime package dependency', () => {
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
 	assert.equal(pkg.dependencies.ink, undefined);
 	assert.equal(pkg.dependencies.react, undefined);
-	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.18' });
+	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.19' });
 });
 
 test('built package contains executable runtime only', () => {

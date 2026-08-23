@@ -10,6 +10,7 @@ const contextOptions: OptionSpec[] = [
 	{ name: 'team', flag: '--team', kind: 'string', description: 'Team id or slug.' },
 	{ name: 'project', flag: '--project', kind: 'string', description: 'Project id or slug.' },
 	{ name: 'provider', flag: '--provider', kind: 'string', description: 'Provider identity.' },
+	{ name: 'connection', flag: '--connection', kind: 'string', description: 'Trusted service connection identity.' },
 	{ name: 'credential', flag: '--credential', kind: 'string', description: 'Credential identity.' },
 	{ name: 'profile', flag: '--profile', kind: 'string', description: 'Workday profile identity.' },
 	{ name: 'decision', flag: '--decision', kind: 'string', description: 'Approved decision identity.' },
@@ -32,7 +33,7 @@ function optionNames(path: string[], leaf: CommandLeafDescriptor) {
 	const names = new Set(['json']);
 	if (leaf.execution.kind === 'operation' || leaf.execution.kind === 'protocol') names.add('server');
 	if (leaf.execution.kind === 'operation') for (const binding of leaf.execution.input) if (binding.source === 'option' || binding.source === 'context') names.add(binding.name);
-	if (leaf.kind === 'mutation') names.add('yes');
+	if (leaf.kind === 'mutation' && leaf.authorization?.confirmation && leaf.authorization.confirmation !== 'never') names.add('yes');
 	return names;
 }
 

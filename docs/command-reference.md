@@ -26,7 +26,6 @@ Operation: mutation. Result schema: `treeseed.command.logout/v1`.
 Execution: `protocol.oauth.revoke`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
@@ -80,7 +79,6 @@ Lock the selected resource.
 Operation: mutation. Result schema: `treeseed.command.lock/v1`.
 Execution: `local.secrets.lock`.
 
-- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
@@ -564,7 +562,6 @@ Control-plane operation: `workdays.plan`.
 - `--end <value>`: ISO end time.
 - `--duration <value>`: Duration in seconds.
 - `--objective <value>`: Objective filter.
-- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
@@ -829,6 +826,107 @@ Availability: fail-closed (`standards_migration_not_enabled`). This capability i
 
 - `--json`: Emit the stable JSON envelope.
 
+## trsd projects
+
+Projects operations.
+
+## trsd projects treedx
+
+Treedx operations.
+
+### trsd projects treedx show <project>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `treedx.library.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd projects treedx bind <project>
+
+Bind the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.bind/v1`.
+Control-plane operation: `treedx.library.bind`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--connection <value>`: Trusted service connection identity.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd projects treedx status <project>
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `treedx.health.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd projects treedx diagnose <project>
+
+Diagnose the selected resource.
+
+Operation: read. Result schema: `treeseed.command.diagnose/v1`.
+Control-plane operation: `treedx.service.contract`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd projects treedx capabilities <project>
+
+Capabilities the selected resource.
+
+Operation: read. Result schema: `treeseed.command.capabilities/v1`.
+Control-plane operation: `treedx.capabilities.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd projects treedx workspaces
+
+Workspaces operations.
+
+### trsd projects treedx workspaces list <project>
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `treedx.workspaces.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd projects treedx workspaces show <workspace>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `treedx.workspaces.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd projects treedx workspaces abandon <workspace>
+
+Abandon the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.abandon/v1`.
+Control-plane operation: `treedx.workspaces.abandon`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
 ### trsd save
 
 Save the selected resource.
@@ -836,7 +934,6 @@ Save the selected resource.
 Operation: mutation. Result schema: `treeseed.command.save/v1`.
 Availability: fail-closed (`standards_migration_not_enabled`). Unified GitHub-backed save is intentionally fail-closed during this cutover.
 
-- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
