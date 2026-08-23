@@ -14,6 +14,16 @@ test('registry exactly matches the SDK command tree', () => {
 	assert.equal(commandSpecs.some((command) => command.name.includes(':')), false);
 });
 
+test('send maps project-qualified recipients to the catalog without raw routes', async () => {
+	const calls: Array<{ operationId: string; input: unknown }> = []; const output: string[] = [];
+	const exit = await runCommandLine(['send', 'engineering', 'How should this work?', '--team', 'team-1', '--project', 'project-sdk', '--to', 'sdk/architect', '--json'], {
+		interactiveUi: false, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { sendId: 'send-1', status: 'queued' } }; }, write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(calls, [{ operationId: 'communications.send', input: { path: { teamId: 'team-1', channel: 'engineering' }, query: {}, body: { message: 'How should this work?', projectId: 'project-sdk', recipients: ['sdk/architect'] } } }]);
+	assert.equal(JSON.parse(output[0]!).result.sendId, 'send-1');
+});
+
 test('leaf commands expose only catalog-derived high-level options', () => {
 	const byName = new Map(commandSpecs.map((command) => [command.name, command.options.map((option) => option.flag)]));
 	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--plan']);

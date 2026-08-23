@@ -2,6 +2,22 @@
 
 This file is generated from the accepted `@treeseed/sdk/operator-contracts` command tree. Do not edit it by hand.
 
+### trsd send <channel> <message>
+
+Send a message to project agents through a team discussion channel.
+
+Operation: mutation. Result schema: `treeseed.communication-send-receipt/v1`.
+Control-plane operation: `communications.send`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--to <value>`: Agent target; use project/agent when names may be ambiguous.
+- `--topic <value>`: Optional discussion topic.
+- `--wait <value>`: Seconds to wait for durable responses.
+
 ## trsd auth
 
 Auth operations.

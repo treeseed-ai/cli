@@ -3,6 +3,124 @@
   "executable": "trsd",
   "commands": [
     {
+      "nodeType": "leaf",
+      "segment": "send",
+      "description": "Send a message to project agents through a team discussion channel.",
+      "kind": "mutation",
+      "arguments": [
+        {
+          "name": "channel",
+          "description": "Team discussion channel.",
+          "required": true
+        },
+        {
+          "name": "message",
+          "description": "Markdown message to send.",
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "name": "--plan",
+          "description": "Return the exact proposed outcome without mutation.",
+          "type": "boolean"
+        },
+        {
+          "name": "--team",
+          "description": "Team identity or slug.",
+          "type": "string"
+        },
+        {
+          "name": "--project",
+          "description": "Default project for unqualified agent names.",
+          "type": "string"
+        },
+        {
+          "name": "--to",
+          "description": "Agent target; use project/agent when names may be ambiguous.",
+          "type": "string[]"
+        },
+        {
+          "name": "--topic",
+          "description": "Optional discussion topic.",
+          "type": "string"
+        },
+        {
+          "name": "--wait",
+          "description": "Seconds to wait for durable responses.",
+          "type": "number",
+          "defaultValue": 0
+        }
+      ],
+      "authorization": {
+        "capability": "agents.execute",
+        "confirmation": "never"
+      },
+      "resultSchemaId": "treeseed.communication-send-receipt/v1",
+      "execution": {
+        "kind": "operation",
+        "operationId": "communications.send",
+        "input": [
+          {
+            "target": "path",
+            "field": "teamId",
+            "source": "context",
+            "name": "team",
+            "required": true,
+            "transform": "identity"
+          },
+          {
+            "target": "path",
+            "field": "channel",
+            "source": "argument",
+            "name": "channel",
+            "required": true,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "message",
+            "source": "argument",
+            "name": "message",
+            "required": true,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "projectId",
+            "source": "context",
+            "name": "project",
+            "required": false,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "recipients",
+            "source": "option",
+            "name": "to",
+            "required": false,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "topic",
+            "source": "option",
+            "name": "topic",
+            "required": false,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "waitSeconds",
+            "source": "option",
+            "name": "wait",
+            "required": false,
+            "transform": "integer"
+          }
+        ]
+      }
+    },
+    {
       "nodeType": "branch",
       "segment": "auth",
       "description": "Auth operations.",

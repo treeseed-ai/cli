@@ -33,6 +33,24 @@ function principalName(value: unknown) {
 	return String(principal.displayName ?? principal.username ?? principal.email ?? principal.id ?? '').trim() || null;
 }
 
+function markdown(value: string) {
+	return value.split('\n').map((line) => {
+		if (/^#{1,6}\s/u.test(line)) return `\u001b[1;36m${line}\u001b[0m`;
+		if (/^```/u.test(line)) return `\u001b[2;33m${line}\u001b[0m`;
+		return line.replace(/\*\*([^*]+)\*\*/gu, '\u001b[1m$1\u001b[0m').replace(/`([^`]+)`/gu, '\u001b[33m$1\u001b[0m');
+	}).join('\n');
+}
+
+function communicationPanels(result: Record<string, unknown>) {
+	const responses = Array.isArray(result.responses) ? result.responses.filter((value) => value && typeof value === 'object') as Record<string, unknown>[] : [];
+	const heading = `Channel ${scalar(result.channel)} · ${scalar(result.status)} · ${responses.length}/${Array.isArray(result.targets) ? result.targets.length : 0} responses`;
+	const panels = responses.flatMap((response) => {
+		const title = `${scalar(response.agentSlug)} · ${scalar(response.projectId)}`;
+		return [`┌─ ${title}`, ...markdown(String(response.markdown ?? '')).split('\n').map((line) => `│ ${line}`), '└─'];
+	});
+	return [heading, ...panels, responses.length ? '' : 'No agent responses have completed yet.', `Send: ${scalar(result.sendId)}`].filter((line, index, all) => line !== '' || index < all.length - 1).join('\n');
+}
+
 export function renderHumanCommandResult(value: unknown) {
 	if (!value || typeof value !== 'object') return scalar(value);
 	const envelope = value as { commandPath?: string[]; ok?: boolean; result?: unknown; warnings?: unknown[]; nextActions?: unknown[] };
@@ -50,6 +68,7 @@ export function renderHumanCommandResult(value: unknown) {
 		const teams = Array.isArray(result.teams) ? result.teams.length : 0;
 		return `${name ? `Authenticated as ${name}.` : 'Not authenticated.'}\nTeams available: ${teams}`;
 	}
+	if (path === 'send' && result) return communicationPanels(result);
 	const rendered = lines(envelope.result);
 	const warnings = Array.isArray(envelope.warnings) && envelope.warnings.length ? [`Warnings: ${envelope.warnings.map(scalar).join('; ')}`] : [];
 	const next = Array.isArray(envelope.nextActions) && envelope.nextActions.length ? ['Next actions:', ...envelope.nextActions.map((item) => `- ${scalar(item)}`)] : [];

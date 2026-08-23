@@ -88,14 +88,34 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 		}
 		return response;
 	};
+	const waitForCommunication = async (response: unknown) => {
+		if (operation.descriptor.operationId !== 'communications.send') return response;
+		const seconds = Math.max(0, Math.min(3_600, Number(invocation.options.wait ?? 0) || 0));
+		if (!seconds) return response;
+		const initial = response && typeof response === 'object' ? response as Record<string, unknown> : {};
+		let value = recordData(initial); const sendId = typeof value.sendId === 'string' ? value.sendId : '';
+		const teamId = typeof input.path.teamId === 'string' ? input.path.teamId : '';
+		if (!sendId || !teamId) return response;
+		const statusOperation = controlPlaneOperation('communications.sends.show'); const deadline = Date.now() + seconds * 1_000;
+		while (Date.now() < deadline && !['complete', 'partial', 'failed'].includes(String(value.status))) {
+			await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(1_000, Math.max(1, deadline - Date.now()))));
+			const observed = await client.invoke(statusOperation, { path: { teamId, sendId }, query: {}, body: undefined });
+			value = recordData(observed as unknown as Record<string, unknown>);
+		}
+		return { data: value };
+	};
 	try {
-		return await finalize(await client.invoke(operation, input, options));
+		return await finalize(await waitForCommunication(await client.invoke(operation, input, options)));
 	} catch (error) {
 		const required = error instanceof ControlPlaneClientError ? error.problem.inputRequired : undefined;
 		if (!required) throw error;
 		const approved = invocation.options.yes === true || (context.interactiveUi && context.confirm ? await context.confirm(required.prompt, 'no') : false);
 		if (!approved) throw Object.assign(new Error(required.prompt), { category: 'confirmation_required', code: 'confirmation_required' });
 		options.headers['x-treeseed-confirmation'] = encodeConfirmationState(required.confirmation);
-		return finalize(await client.invoke(operation, input, options));
+		return finalize(await waitForCommunication(await client.invoke(operation, input, options)));
 	}
+}
+
+function recordData(value: Record<string, unknown>) {
+	return value.data && typeof value.data === 'object' && !Array.isArray(value.data) ? value.data as Record<string, unknown> : value;
 }
