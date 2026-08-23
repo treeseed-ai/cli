@@ -418,8 +418,16 @@
           "resultSchemaId": "treeseed.command.list/v1",
           "execution": {
             "kind": "operation",
-            "operationId": "services.providers.list",
+            "operationId": "providers.list",
             "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
               {
                 "target": "query",
                 "field": "status",
@@ -462,7 +470,7 @@
           "resultSchemaId": "treeseed.command.show/v1",
           "execution": {
             "kind": "operation",
-            "operationId": "services.connections.show",
+            "operationId": "providers.show",
             "input": [
               {
                 "target": "path",
@@ -474,7 +482,7 @@
               },
               {
                 "target": "path",
-                "field": "connectionId",
+                "field": "providerId",
                 "source": "argument",
                 "name": "provider",
                 "required": true,
@@ -498,7 +506,7 @@
           "resultSchemaId": "treeseed.command.status/v1",
           "execution": {
             "kind": "operation",
-            "operationId": "services.connections.show",
+            "operationId": "providers.status",
             "input": [
               {
                 "target": "path",
@@ -510,7 +518,7 @@
               },
               {
                 "target": "path",
-                "field": "connectionId",
+                "field": "providerId",
                 "source": "argument",
                 "name": "provider",
                 "required": true,
@@ -533,9 +541,26 @@
           ],
           "resultSchemaId": "treeseed.command.diagnose/v1",
           "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
+            "kind": "operation",
+            "operationId": "providers.diagnose",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "providerId",
+                "source": "argument",
+                "name": "provider",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
           }
         },
         {
@@ -557,21 +582,13 @@
           "resultSchemaId": "treeseed.command.connect/v1",
           "execution": {
             "kind": "operation",
-            "operationId": "services.connections.create",
+            "operationId": "providers.connect",
             "input": [
               {
                 "target": "path",
                 "field": "teamId",
                 "source": "context",
                 "name": "team",
-                "required": true,
-                "transform": "identity"
-              },
-              {
-                "target": "body",
-                "field": "providerId",
-                "source": "option",
-                "name": "provider",
                 "required": true,
                 "transform": "identity"
               }
@@ -604,7 +621,7 @@
           "resultSchemaId": "treeseed.command.disconnect/v1",
           "execution": {
             "kind": "operation",
-            "operationId": "services.connections.disconnect",
+            "operationId": "providers.disconnect",
             "input": [
               {
                 "target": "path",
@@ -645,9 +662,42 @@
               "kind": "read",
               "resultSchemaId": "treeseed.command.list/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.requests.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "status",
+                    "source": "option",
+                    "name": "status",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "required": false,
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -664,9 +714,26 @@
               ],
               "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.requests.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "requestId",
+                    "source": "argument",
+                    "name": "request",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -694,9 +761,26 @@
               },
               "resultSchemaId": "treeseed.command.approve/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.requests.approve",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "requestId",
+                    "source": "argument",
+                    "name": "request",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -724,9 +808,26 @@
               },
               "resultSchemaId": "treeseed.command.reject/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.requests.reject",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "requestId",
+                    "source": "argument",
+                    "name": "request",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             }
           ]
@@ -751,7 +852,7 @@
               "resultSchemaId": "treeseed.command.status/v1",
               "execution": {
                 "kind": "operation",
-                "operationId": "services.credential.authorities.list",
+                "operationId": "providers.credentials.status",
                 "input": [
                   {
                     "target": "path",
@@ -797,9 +898,26 @@
               },
               "resultSchemaId": "treeseed.command.rotate/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.credentials.rotate",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "connectionId",
+                    "source": "argument",
+                    "name": "connection",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -827,9 +945,26 @@
               },
               "resultSchemaId": "treeseed.command.revoke/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.credentials.revoke",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "connectionId",
+                    "source": "argument",
+                    "name": "connection",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             }
           ]
@@ -932,6 +1067,180 @@
     },
     {
       "nodeType": "branch",
+      "segment": "seeds",
+      "description": "Seeds operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "validate",
+          "description": "Validate the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "file",
+              "description": "file identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.validate/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "seeds.validate",
+            "input": [
+              {
+                "target": "body",
+                "field": "file",
+                "source": "argument",
+                "name": "file",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "plan",
+          "description": "Plan the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "file",
+              "description": "file identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.plan/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "seeds.plan",
+            "input": [
+              {
+                "target": "path",
+                "field": "name",
+                "source": "context",
+                "name": "seed",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "argument",
+                "name": "file",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "apply",
+          "description": "Apply the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "file",
+              "description": "file identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.apply",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.apply/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "seeds.apply",
+            "input": [
+              {
+                "target": "path",
+                "field": "name",
+                "source": "context",
+                "name": "seed",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "argument",
+                "name": "file",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "seed",
+              "description": "seed identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "seeds.show",
+            "input": [
+              {
+                "target": "path",
+                "field": "name",
+                "source": "argument",
+                "name": "seed",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "verify",
+          "description": "Verify the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "seed",
+              "description": "seed identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.verify/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "seeds.verify",
+            "input": [
+              {
+                "target": "path",
+                "field": "name",
+                "source": "argument",
+                "name": "seed",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
       "segment": "capacity",
       "description": "Capacity operations.",
       "children": [
@@ -987,9 +1296,18 @@
           "kind": "read",
           "resultSchemaId": "treeseed.command.explain/v1",
           "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
+            "kind": "operation",
+            "operationId": "capacity.explain",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
           }
         },
         {
@@ -1065,9 +1383,42 @@
           "kind": "read",
           "resultSchemaId": "treeseed.command.audit/v1",
           "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
+            "kind": "operation",
+            "operationId": "capacity.audit",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
           }
         }
       ]

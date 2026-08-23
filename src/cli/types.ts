@@ -12,6 +12,7 @@ export interface CommandContext {
 	prompt?: (question: string) => Promise<string> | string;
 	confirm?: (question: string, defaultValue?: 'yes' | 'no') => Promise<boolean> | boolean;
 	operationInvoke?: (operationId: string, input: unknown) => Promise<unknown>;
+	providerEnrollmentHandoff?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
 
 export interface OptionSpec {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -58,6 +58,21 @@ test('remote commands invoke exactly one SDK operation without a URL', async () 
 	assert.equal(exit, 0);
 	assert.deepEqual(JSON.parse(output[0]!).result, { source: 'api' });
 	assert.deepEqual(invocations, [{ operationId: 'capacity.status', input: { path: { teamId: 'team-1' }, query: {}, body: undefined } }]);
+});
+
+test('seed commands upload parsed portable bundles instead of API-local paths', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-seed-'));
+	const file = resolve(root, 'treeseed.yaml');
+	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v2\nname: treeseed\nversion: 1\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources:\n  teams: []\n  memberships: []\n  projects: []\n  repositories: []\nruntime:\n  capacityProviders: []\n`);
+	const invocations: Array<{ operationId: string; input: any }> = [];
+	try {
+		const exit = await runCommandLine(['seeds', 'validate', file, '--json'], { cwd: root, interactiveUi: false,
+			operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { data: { ok: true } }; }, write: () => undefined });
+		assert.equal(exit, 0);
+		assert.equal(invocations[0]?.operationId, 'seeds.validate');
+		assert.equal(invocations[0]?.input.body.bundle.schemaVersion, 'treeseed.seed-bundle/v2');
+		assert.equal('file' in invocations[0]?.input.body, false);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('unavailable commands fail closed before network or filesystem mutation', async () => {
