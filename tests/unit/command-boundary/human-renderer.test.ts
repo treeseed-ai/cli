@@ -18,3 +18,14 @@ test('generic human output renders labels and values without JSON punctuation', 
 	assert.equal(output, 'Seed Name: treeseed\nVerified: yes\nLanes: communication, platform, workday');
 	assert.doesNotMatch(output, /[{}]/u);
 });
+
+test('communication responses render as Markdown panels without an envelope dump', () => {
+	const output = renderHumanCommandResult({ commandPath: ['send'], ok: true, result: {
+		channel: 'engineering', status: 'complete', sendId: 'send-1', targets: [{ agentSlug: 'architect' }],
+		responses: [{ projectId: 'sdk', agentSlug: 'architect', markdown: '## Direction\n\nUse **one catalog**.' }],
+	} });
+	assert.match(output, /Channel engineering · complete · 1\/1 responses/u);
+	assert.match(output, /┌─ architect · sdk/u);
+	assert.match(output, /## Direction/u);
+	assert.doesNotMatch(output, /schemaVersion|commandPath|"responses"/u);
+});
