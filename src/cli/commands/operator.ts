@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 import { controlPlaneOperation, encodeConfirmationState, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
 import { ControlPlaneClientError } from '@treeseed/sdk/control-plane-client';
 import type { CommandContext, ParsedInvocation } from '../types.js';
@@ -26,7 +29,7 @@ function transform(value: unknown, binding: CommandInputBinding) {
 	return value;
 }
 
-function operationInput(invocation: ParsedInvocation, context: CommandContext) {
+async function operationInput(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'operation') throw new Error('Command is not operation-bound.');
 	const input = { path: {} as Record<string, unknown>, query: {} as Record<string, unknown>, body: {} as Record<string, unknown> };
 	for (const binding of invocation.command.execution.input) {
@@ -35,26 +38,49 @@ function operationInput(invocation: ParsedInvocation, context: CommandContext) {
 		if (value !== undefined) input[binding.target][binding.field] = value;
 	}
 	const operation = controlPlaneOperation(invocation.command.execution.operationId);
-	return { operation, input: { ...input, body: operation.descriptor.kind === 'read' ? undefined : input.body } };
+	if (operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
+		const file = resolve(context.cwd, input.body.file);
+		const parsed = parseYaml(await readFile(file, 'utf8'));
+		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Seed file must contain one portable seed bundle object.'), { category: 'invalid_input', code: 'seed_bundle_file_invalid' });
+		delete input.body.file;
+		input.body.bundle = parsed;
+	}
+	return { operation, input: { ...input, body: Object.keys(input.body).length ? input.body : undefined } };
 }
 
 export async function runOperator(invocation: ParsedInvocation, context: CommandContext) {
 	const execution = invocation.command.execution;
 	if (execution.kind === 'unavailable') throw Object.assign(new Error(execution.reason), { category: 'policy_blocked', code: execution.code });
 	if (execution.kind !== 'operation') throw Object.assign(new Error(`No CLI handler is installed for ${execution.handlerId}.`), { category: 'policy_blocked', code: 'local_handler_unavailable' });
-	const { operation, input } = operationInput(invocation, context);
+	const { operation, input } = await operationInput(invocation, context);
 	if (invocation.options.plan === true) return { operationId: operation.descriptor.operationId, input, mutation: false };
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
-	const { client } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
+	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
 	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: randomUUID(), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };
+	const finalize = async (response: unknown) => {
+		const value = response as Record<string, unknown>;
+		if (operation.descriptor.operationId === 'providers.connect') {
+			const enrollmentToken = typeof value.enrollmentToken === 'string' ? value.enrollmentToken : null;
+			if (!enrollmentToken || !context.providerEnrollmentHandoff) throw Object.assign(new Error('The control plane did not return a usable local provider enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_invalid' });
+			const receipt = await context.providerEnrollmentHandoff({ action: 'begin', ...value, enrollmentToken,
+				controlPlaneUrl: profile.baseUrl, controlPlaneAudience: profile.baseUrl, serverProfile: profile.serverId });
+			return { teamId: value.teamId, connectionState: 'approval_required', provider: receipt };
+		}
+		if (operation.descriptor.operationId === 'providers.requests.approve' && context.providerEnrollmentHandoff) {
+			const metadata = value.metadata && typeof value.metadata === 'object' ? value.metadata as Record<string, unknown> : {};
+			const connectionId = typeof metadata.connectionId === 'string' ? metadata.connectionId : null;
+			if (connectionId) return { ...value, provider: await context.providerEnrollmentHandoff({ action: 'complete', connectionId }) };
+		}
+		return response;
+	};
 	try {
-		return await client.invoke(operation, input, options);
+		return await finalize(await client.invoke(operation, input, options));
 	} catch (error) {
 		const required = error instanceof ControlPlaneClientError ? error.problem.inputRequired : undefined;
 		if (!required) throw error;
 		const approved = invocation.options.yes === true || (context.interactiveUi && context.confirm ? await context.confirm(required.prompt, 'no') : false);
 		if (!approved) throw Object.assign(new Error(required.prompt), { category: 'confirmation_required', code: 'confirmation_required' });
 		options.headers['x-treeseed-confirmation'] = encodeConfirmationState(required.confirmation);
-		return client.invoke(operation, input, options);
+		return finalize(await client.invoke(operation, input, options));
 	}
 }
