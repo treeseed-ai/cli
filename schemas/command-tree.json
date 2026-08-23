@@ -2085,6 +2085,321 @@
       ]
     },
     {
+      "nodeType": "branch",
+      "segment": "projects",
+      "description": "Projects operations.",
+      "children": [
+        {
+          "nodeType": "branch",
+          "segment": "treedx",
+          "description": "Treedx operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treedx.library.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "bind",
+              "description": "Bind the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.bind",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.bind/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treedx.library.bind",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "connectionId",
+                    "source": "option",
+                    "name": "connection",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treedx.health.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "diagnose",
+              "description": "Diagnose the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.diagnose/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treedx.service.contract",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "capabilities",
+              "description": "Capabilities the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.capabilities/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treedx.capabilities.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "branch",
+              "segment": "workspaces",
+              "description": "Workspaces operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "list",
+                  "description": "List the selected resource.",
+                  "kind": "read",
+                  "arguments": [
+                    {
+                      "name": "project",
+                      "description": "project identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.command.list/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "treedx.workspaces.list",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "projectId",
+                        "source": "argument",
+                        "name": "project",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "query",
+                        "field": "status",
+                        "source": "option",
+                        "name": "status",
+                        "required": false,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "query",
+                        "field": "limit",
+                        "source": "option",
+                        "name": "limit",
+                        "required": false,
+                        "transform": "integer"
+                      },
+                      {
+                        "target": "query",
+                        "field": "cursor",
+                        "source": "option",
+                        "name": "cursor",
+                        "required": false,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "show",
+                  "description": "Show the selected resource.",
+                  "kind": "read",
+                  "arguments": [
+                    {
+                      "name": "workspace",
+                      "description": "workspace identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.command.show/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "treedx.workspaces.show",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "projectId",
+                        "source": "context",
+                        "name": "project",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "path",
+                        "field": "workspaceId",
+                        "source": "argument",
+                        "name": "workspace",
+                        "required": true,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "abandon",
+                  "description": "Abandon the selected resource.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "workspace",
+                      "description": "workspace identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.abandon",
+                    "confirmation": "destructive"
+                  },
+                  "resultSchemaId": "treeseed.command.abandon/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "treedx.workspaces.abandon",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "projectId",
+                        "source": "context",
+                        "name": "project",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "path",
+                        "field": "workspaceId",
+                        "source": "argument",
+                        "name": "workspace",
+                        "required": true,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "nodeType": "leaf",
       "segment": "save",
       "description": "Save the selected resource.",
