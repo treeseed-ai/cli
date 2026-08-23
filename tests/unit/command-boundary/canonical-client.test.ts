@@ -91,6 +91,57 @@ test('seed plan derives the path identity from the uploaded portable bundle', as
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('body-bearing catalog operations receive an empty object when no fields are supplied', async () => {
+	const invocations: Array<{ operationId: string; input: any }> = [];
+	const exit = await runCommandLine(['seeds', 'verify', 'treeseed', '--json'], {
+		interactiveUi: false,
+		operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { verified: false }; },
+		write() {},
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(invocations, [{
+		operationId: 'seeds.verify',
+		input: { path: { name: 'treeseed' }, query: {}, body: {} },
+	}]);
+});
+
+test('provider enrollment hands the unwrapped API receipt to trusted local custody', async () => {
+	let requestBody = '';
+	const server = createServer((request, response) => {
+		request.on('data', (chunk) => { requestBody += String(chunk); });
+		request.on('end', () => {
+			response.setHeader('content-type', 'application/json');
+			response.end(JSON.stringify({ data: { teamId: 'team-1', enrollmentToken: 'one-time' } }));
+		});
+	});
+	await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept));
+	const address = server.address();
+	if (!address || typeof address === 'string') throw new Error('Test server did not bind.');
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-provider-enrollment-'));
+	const env = { TREESEED_CONFIG_HOME: root };
+	try {
+		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` };
+		saveServerProfile(profile, env);
+		saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
+		const handoffs: Record<string, unknown>[] = [];
+		const output: string[] = [];
+		const exit = await runCommandLine(['providers', 'connect', '--server', 'test', '--team', 'team-1', '--yes', '--json'], {
+			env, interactiveUi: false,
+			providerEnrollmentHandoff: async (input) => { handoffs.push(input); return { requestId: 'request-1' }; },
+			write: (value) => output.push(value),
+		});
+		assert.equal(exit, 0);
+		assert.equal(requestBody, '{}');
+		assert.equal(handoffs[0]?.enrollmentToken, 'one-time');
+		assert.deepEqual(JSON.parse(output[0]!).result, {
+			teamId: 'team-1', connectionState: 'approval_required', provider: { requestId: 'request-1' },
+		});
+	} finally {
+		await new Promise<void>((accept, reject) => server.close((error) => error ? reject(error) : accept()));
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
 test('unavailable commands fail closed before network or filesystem mutation', async () => {
 	const output: string[] = [];
 	let invocations = 0;
