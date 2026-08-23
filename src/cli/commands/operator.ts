@@ -70,7 +70,10 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
 	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: randomUUID(), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };
 	const finalize = async (response: unknown) => {
-		const value = response as Record<string, unknown>;
+		const envelope = response && typeof response === 'object' ? response as Record<string, unknown> : {};
+		const value = envelope.data && typeof envelope.data === 'object'
+			? envelope.data as Record<string, unknown>
+			: envelope;
 		if (operation.descriptor.operationId === 'providers.connect') {
 			const enrollmentToken = typeof value.enrollmentToken === 'string' ? value.enrollmentToken : null;
 			if (!enrollmentToken || !context.providerEnrollmentHandoff) throw Object.assign(new Error('The control plane did not return a usable local provider enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_invalid' });
