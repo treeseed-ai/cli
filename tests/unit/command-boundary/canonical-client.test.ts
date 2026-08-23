@@ -75,6 +75,21 @@ test('seed commands upload parsed portable bundles instead of API-local paths', 
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('seed plan derives the path identity from the uploaded portable bundle', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-seed-plan-'));
+	const file = resolve(root, 'treeseed.yaml');
+	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v2\nname: treeseed\nversion: 1\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources:\n  teams: []\n  memberships: []\n  projects: []\n  repositories: []\nruntime:\n  capacityProviders: []\n`);
+	const invocations: any[] = [];
+	try {
+		const exit = await runCommandLine(['seeds', 'plan', file, '--json'], { interactiveUi: false,
+			operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { planned: true }; }, write() {} });
+		assert.equal(exit, 0);
+		assert.equal(invocations[0]?.operationId, 'seeds.plan');
+		assert.equal(invocations[0]?.input.path.name, 'treeseed');
+		assert.equal(invocations[0]?.input.body.bundle.name, 'treeseed');
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('unavailable commands fail closed before network or filesystem mutation', async () => {
 	const output: string[] = [];
 	let invocations = 0;
