@@ -54,7 +54,10 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 	for (const binding of deferred) if (input[binding.target][binding.field] === undefined) {
 		throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });
 	}
-	return { operation, input: { ...input, body: Object.keys(input.body).length ? input.body : undefined } };
+	const body = Object.keys(input.body).length
+		? input.body
+		: operation.schema.body.safeParse(undefined).success ? undefined : {};
+	return { operation, input: { ...input, body } };
 }
 
 export async function runOperator(invocation: ParsedInvocation, context: CommandContext) {

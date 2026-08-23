@@ -91,6 +91,20 @@ test('seed plan derives the path identity from the uploaded portable bundle', as
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('body-bearing catalog operations receive an empty object when no fields are supplied', async () => {
+	const invocations: Array<{ operationId: string; input: any }> = [];
+	const exit = await runCommandLine(['seeds', 'verify', 'treeseed', '--json'], {
+		interactiveUi: false,
+		operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { verified: false }; },
+		write() {},
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(invocations, [{
+		operationId: 'seeds.verify',
+		input: { path: { name: 'treeseed' }, query: {}, body: {} },
+	}]);
+});
+
 test('unavailable commands fail closed before network or filesystem mutation', async () => {
 	const output: string[] = [];
 	let invocations = 0;
