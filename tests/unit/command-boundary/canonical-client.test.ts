@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -29,7 +29,35 @@ test('leaf commands expose only catalog-derived high-level options', () => {
 	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--plan']);
 	assert.deepEqual(byName.get('plans show'), ['--server', '--json']);
 	assert.deepEqual(byName.get('agents show'), ['--server', '--project', '--json']);
+	assert.deepEqual(byName.get('host status'), ['--server', '--json']);
 	assert.equal(commandSpecs.some((command) => command.options.some((option) => option.flag === '--execute' || option.flag === '--market')), false);
+});
+
+test('host commands preserve the SDK handler boundary and stable envelope', async () => {
+	const calls: unknown[] = []; const output: string[] = [];
+	const exit = await runCommandLine(['host', 'component', 'status', 'agent', '--server', 'lab', '--json'], {
+		interactiveUi: false, hostInvoke: async (input) => { calls.push(input); return { componentId: 'agent', healthy: true }; }, write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(calls, [{ handlerId: 'local.host.component.status', arguments: ['agent'], options: {} }]);
+	assert.deepEqual(JSON.parse(output[0]!).result, { componentId: 'agent', healthy: true });
+});
+
+test('bootstrap enrollment stores credentials privately and never emits key material', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-')); const output: string[] = [];
+	try {
+		const exit = await runCommandLine(['host', 'bootstrap', 'enroll', '--server', 'https://manager.treeseed.localhost', '--yes', '--json'], {
+			env: { XDG_CONFIG_HOME: root }, interactiveUi: false,
+			hostInvoke: async () => ({ clientId: 'client-test', privateKey: 'PRIVATE', certificate: 'CERTIFICATE', certificateAuthority: 'CA' }),
+			write: (value) => output.push(value),
+		});
+		assert.equal(exit, 0);
+		const rendered = output[0]!;
+		assert.doesNotMatch(rendered, /PRIVATE|CERTIFICATE/u);
+		const directory = resolve(root, 'treeseed', 'hosts', 'local');
+		assert.equal(readFileSync(resolve(directory, 'client.key'), 'utf8'), 'PRIVATE');
+		assert.equal(existsSync(resolve(directory, 'client.crt')), true);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('removed legacy commands are unknown without mutation', async () => {
