@@ -8,6 +8,7 @@ import { runSecrets } from './commands/secrets.js';
 import type { CommandContext, CommandFailure, ParsedInvocation, Writer } from './types.js';
 import { promptText } from './support/prompts.js';
 import { handoffProviderEnrollment } from './support/provider-enrollment.js';
+import { renderHumanCommandResult } from './support/human-renderer.js';
 
 function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 	(stream === 'stderr' ? process.stderr : process.stdout).write(`${output}\n`);
@@ -60,7 +61,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 
 function print(context: CommandContext, value: unknown, ok = true) {
 	if (context.outputFormat === 'json') context.write(JSON.stringify(value, null, 2), ok ? 'stdout' : 'stderr');
-	else if (ok) context.write(typeof value === 'string' ? value : JSON.stringify(value, null, 2), 'stdout');
+	else if (ok) context.write(typeof value === 'string' ? value : renderHumanCommandResult(value), 'stdout');
 	else {
 		const message = value && typeof value === 'object' && 'error' in value ? (value as { error?: { message?: string } }).error?.message : null;
 		context.write(message ?? String(value), 'stderr');

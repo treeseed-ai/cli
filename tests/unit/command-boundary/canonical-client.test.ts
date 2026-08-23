@@ -162,8 +162,9 @@ test('JSON device login keeps human approval instructions off stdout', async () 
 		response.end(JSON.stringify(request.url === '/oauth/device_authorization'
 			? { device_code: 'device-a', user_code: 'ABCD-EFGH', verification_uri: `${baseUrl}/approve`,
 				verification_uri_complete: `${baseUrl}/approve?user_code=ABCD-EFGH`, expires_in: 60, interval: 0 }
-			: { token_type: 'Bearer', access_token: 'access-a', refresh_token: 'refresh-a', expires_in: 600,
-				scope: 'treeseed:read', audience: baseUrl, principal: { id: 'user-a' } }));
+			: request.url === '/oauth/token' ? { token_type: 'Bearer', access_token: 'access-a', refresh_token: 'refresh-a', expires_in: 600,
+				scope: 'treeseed:read', audience: baseUrl }
+				: { data: { principal: { id: 'user-a', displayName: 'Adrian Webb' }, teams: [] } }));
 	});
 	await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept));
 	const address = server.address();
@@ -182,6 +183,7 @@ test('JSON device login keeps human approval instructions off stdout', async () 
 		const stdout = output.filter(({ stream }) => stream === 'stdout');
 		assert.equal(stdout.length, 1);
 		assert.equal(JSON.parse(stdout[0]!.value).ok, true);
+		assert.equal(JSON.parse(stdout[0]!.value).result.principal.displayName, 'Adrian Webb');
 	} finally {
 		await new Promise<void>((accept, reject) => server.close((error) => error ? reject(error) : accept()));
 		rmSync(root, { recursive: true, force: true });

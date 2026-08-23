@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type { OAuthScope } from '@treeseed/sdk/operator-contracts';
-import { ControlPlaneClientError } from '@treeseed/sdk/control-plane-client';
+import { ControlPlaneClient, ControlPlaneClientError } from '@treeseed/sdk/control-plane-client';
+import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { CONTROL_PLANE_CLI_CLIENT_ID, createControlPlaneClient } from '../support/client.js';
 import { clearServerSession, saveServerProfile, saveServerSession } from '../support/server-custody.js';
@@ -25,9 +26,13 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 			try {
 				const token = await client.exchangeDeviceCode(CONTROL_PLANE_CLI_CLIENT_ID, authorization.deviceCode);
 				const expiresAt = new Date(Date.now() + token.expiresIn * 1_000).toISOString();
+				const authenticatedClient = new ControlPlaneClient({ profile, accessToken: token.accessToken, userAgent: 'trsd' });
+				const current = await authenticatedClient.invoke(CONTROL_PLANE_OPERATIONS.accounts.current, { path: {}, query: {}, body: undefined });
+				const principal = current.data && typeof current.data === 'object' && 'principal' in current.data
+					? current.data.principal as typeof token.principal : token.principal;
 				saveServerProfile(profile, context.env);
-				saveServerSession({ serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken, expiresAt, principal: token.principal }, context.env);
-				return { serverId: profile.serverId, principal: token.principal ?? null, expiresAt, scopes: token.scope };
+				saveServerSession({ serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken, expiresAt, principal }, context.env);
+				return { serverId: profile.serverId, principal: principal ?? null, expiresAt, scopes: token.scope };
 			} catch (error) {
 				const state = pollingState(error);
 				if (state === 'failed') throw error;
