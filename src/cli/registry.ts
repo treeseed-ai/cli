@@ -32,6 +32,7 @@ const contextOptions: OptionSpec[] = [
 function optionNames(path: string[], leaf: CommandLeafDescriptor) {
 	const names = new Set(['json']);
 	if (leaf.execution.kind === 'operation' || leaf.execution.kind === 'protocol') names.add('server');
+	if (path[0] === 'host') names.add('server');
 	if (leaf.execution.kind === 'operation') for (const binding of leaf.execution.input) if (binding.source === 'option' || binding.source === 'context') names.add(binding.name);
 	if (leaf.kind === 'mutation' && leaf.authorization?.confirmation && leaf.authorization.confirmation !== 'never') names.add('yes');
 	return names;

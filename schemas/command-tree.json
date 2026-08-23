@@ -280,6 +280,457 @@
     },
     {
       "nodeType": "branch",
+      "segment": "host",
+      "description": "Host operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.status/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.status"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "doctor",
+          "description": "Doctor the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.doctor/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.doctor"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "plan",
+          "description": "Plan the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.plan/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.plan"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "apply",
+          "description": "Apply the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.apply",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.apply/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.apply"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "reconcile",
+          "description": "Reconcile the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.reconcile",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.reconcile/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.reconcile"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "events",
+          "description": "Events the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.events/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.events"
+          }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "update",
+          "description": "Update operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.update.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "check",
+              "description": "Check the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.check",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.check/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.update.check"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "apply",
+              "description": "Apply the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.apply",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.apply/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.update.apply"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "channel",
+              "description": "Channel the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "track",
+                  "description": "track identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.channel",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.channel/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.update.channel"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "pause",
+              "description": "Pause the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.pause",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.pause/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.update.pause"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "resume",
+              "description": "Resume the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.resume",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.resume/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.update.resume"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "component",
+          "description": "Component operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.component.list"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "component",
+                  "description": "component identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.component.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "enable",
+              "description": "Enable the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "component",
+                  "description": "component identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.enable",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.enable/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.component.enable"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "disable",
+              "description": "Disable the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "component",
+                  "description": "component identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.disable",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.command.disable/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.component.disable"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "aliases",
+          "description": "Aliases operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.aliases.list"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "recovery",
+          "description": "Recovery operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.recovery.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "retry",
+              "description": "Retry the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.retry",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.retry/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.recovery.retry"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "restore",
+              "description": "Restore the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "generation",
+                  "description": "generation identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.restore",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.command.restore/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.recovery.restore"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "bootstrap",
+          "description": "Bootstrap operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.bootstrap.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "enroll",
+              "description": "Enroll the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.enroll",
+                "confirmation": "credential"
+              },
+              "resultSchemaId": "treeseed.command.enroll/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.bootstrap.enroll"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
       "segment": "agents",
       "description": "Agents operations.",
       "children": [

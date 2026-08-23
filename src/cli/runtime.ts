@@ -5,6 +5,7 @@ import { runOperator } from './commands/operator.js';
 import { parseInvocation } from './parser.js';
 import { isCommandBranch, resolveCommand } from './registry.js';
 import { runSecrets } from './commands/secrets.js';
+import { runHost } from './commands/host.js';
 import type { CommandContext, CommandFailure, ParsedInvocation, Writer } from './types.js';
 import { promptText } from './support/prompts.js';
 import { handoffProviderEnrollment } from './support/provider-enrollment.js';
@@ -16,7 +17,7 @@ function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 
 export function createCommandContext(overrides: Partial<CommandContext> = {}): CommandContext {
 	const env = overrides.env ?? process.env;
-	const context: CommandContext = { cwd: overrides.cwd ?? process.cwd(), env, write: overrides.write ?? defaultWrite as Writer, outputFormat: overrides.outputFormat ?? 'human', interactiveUi: overrides.interactiveUi ?? true, prompt: overrides.prompt, confirm: overrides.confirm, operationInvoke: overrides.operationInvoke,
+	const context: CommandContext = { cwd: overrides.cwd ?? process.cwd(), env, write: overrides.write ?? defaultWrite as Writer, outputFormat: overrides.outputFormat ?? 'human', interactiveUi: overrides.interactiveUi ?? true, prompt: overrides.prompt, confirm: overrides.confirm, operationInvoke: overrides.operationInvoke, hostInvoke: overrides.hostInvoke,
 		providerEnrollmentHandoff: overrides.providerEnrollmentHandoff ?? ((input) => handoffProviderEnrollment(input, env)) };
 	if (!context.confirm && context.interactiveUi) context.confirm = async (question) => /^y(?:es)?$/iu.test(await promptText(context, `${question} [y/N] `));
 	return context;
@@ -56,6 +57,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.options.plan === true && ['auth', 'secrets'].includes(invocation.command.path[0]!)) return { action: invocation.command.name, mutation: false, authority: 'local_credential_custody' };
 	if (invocation.command.execution.kind === 'protocol') return runAuth(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'host') return runHost(invocation, context);
 	return runOperator(invocation, context);
 }
 
