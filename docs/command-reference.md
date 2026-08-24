@@ -177,6 +177,103 @@ Execution: `local.host.events`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
+## trsd host config
+
+Config operations.
+
+### trsd host config show
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Execution: `local.host.config.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host config plan <file>
+
+Plan the selected resource.
+
+Operation: read. Result schema: `treeseed.command.plan/v1`.
+Execution: `local.host.config.plan`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host config apply <file>
+
+Apply the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.apply/v1`.
+Execution: `local.host.config.apply`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host config adopt <file>
+
+Adopt the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.adopt/v1`.
+Execution: `local.host.config.adopt`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--confirm`: Confirm replacement of the installed configuration identity.
+
+### trsd host topology
+
+Topology the selected resource.
+
+Operation: read. Result schema: `treeseed.command.topology/v1`.
+Execution: `local.host.topology`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host connections
+
+Connections the selected resource.
+
+Operation: read. Result schema: `treeseed.command.connections/v1`.
+Execution: `local.host.connections`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd host provider
+
+Provider operations.
+
+### trsd host provider status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.provider.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd host fleet
+
+Fleet operations.
+
+### trsd host fleet status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.fleet.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
 ## trsd host update
 
 Update operations.

@@ -47,7 +47,7 @@ function categorized(error: unknown): CommandFailure {
 }
 
 async function confirmed(invocation: ParsedInvocation, context: CommandContext) {
-	if (invocation.command.confirmation === 'never' || invocation.options.plan === true || invocation.options.yes === true || invocation.command.execution.kind === 'operation') return true;
+	if (invocation.command.confirmation === 'never' || invocation.options.plan === true || invocation.options.yes === true || invocation.options.confirm === true || invocation.command.execution.kind === 'operation') return true;
 	if (!context.interactiveUi || !context.confirm) return false;
 	return context.confirm(`Execute governed operation \`${invocation.command.name}\`?`, 'no');
 }

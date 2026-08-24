@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.12",
+  "version": "0.13.0-rc.13",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -49,7 +49,7 @@
     "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.27",
+    "@treeseed/sdk": "0.13.0-rc.31",
     "yaml": "2.8.1"
   },
   "overrides": {
