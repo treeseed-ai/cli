@@ -43,6 +43,23 @@ test('host commands preserve the SDK handler boundary and stable envelope', asyn
 	assert.deepEqual(JSON.parse(output[0]!).result, { componentId: 'agent', healthy: true });
 });
 
+test('host configuration adoption sends validated content and requires explicit confirmation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-config-'));
+	const file = resolve(root, 'host.json');
+	writeFileSync(file, JSON.stringify({ schemaVersion: 'treeseed.host/v1', configurationId: 'development-workstation', generation: 1, host: { id: 'workstation-01', role: 'integrated', architecture: 'amd64' }, runtime: { management: 'managed' }, updates: { defaultTrack: 'development', stable: { metadataPollSeconds: 86400, maintenanceWindow: { weekday: 'sunday', localTime: '03:00', jitterMinutes: 20 } }, development: { pollSeconds: 60 } }, components: {}, network: { manager: { binding: '127.0.0.1:4790', aliases: [], sans: [], trustedLanCidrs: [] } }, fleet: { rolloutGroup: 'development-workstation', receiptReporting: { enabled: false, intervalSeconds: 300 } }, secrets: {} }));
+	const calls: any[] = [];
+	try {
+		const blocked = await runCommandLine(['host', 'config', 'adopt', file, '--json'], { interactiveUi: false, hostInvoke: async (value) => calls.push(value), write() {} });
+		assert.equal(blocked, 1);
+		const accepted = await runCommandLine(['host', 'config', 'adopt', file, '--confirm', '--json'], { interactiveUi: false, hostInvoke: async (value) => { calls.push(value); return { adopted: true }; }, write() {} });
+		assert.equal(accepted, 0);
+		assert.equal(calls[0]?.handlerId, 'local.host.config.adopt');
+		assert.equal(calls[0]?.options.confirm, true);
+		assert.equal(calls[0]?.configuration.configurationId, 'development-workstation');
+		assert.deepEqual(calls[0]?.arguments, []);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('bootstrap enrollment stores credentials privately and never emits key material', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-')); const output: string[] = [];
 	try {

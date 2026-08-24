@@ -5,6 +5,12 @@ import { storeHostEnrollment, type HostEnrollment } from '../support/host-custod
 function input(invocation: ParsedInvocation) {
 	if (invocation.command.execution.kind !== 'local') throw new Error('Host command is not locally bound.');
 	const { server: _server, json: _json, yes: _yes, ...options } = invocation.options;
+	if (invocation.command.name.startsWith('host config ') && invocation.command.name !== 'host config show') {
+		const file = invocation.arguments[0];
+		if (!file) throw new Error('A host configuration file is required.');
+		const configuration = hostConfigurationSchema.parse(JSON.parse(readFileSync(resolve(file), 'utf8')));
+		return { handlerId: invocation.command.execution.handlerId, arguments: [], options, configuration };
+	}
 	return { handlerId: invocation.command.execution.handlerId, arguments: invocation.arguments, options };
 }
 
@@ -21,3 +27,6 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 	if (context.hostInvoke) return context.hostInvoke(command);
 	return invokeHostManager(command, typeof invocation.options.server === 'string' ? invocation.options.server : undefined, context.env);
 }
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { hostConfigurationSchema } from '@treeseed/sdk/deployment';
