@@ -373,6 +373,163 @@
         },
         {
           "nodeType": "branch",
+          "segment": "config",
+          "description": "Config operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.config.show"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "plan",
+              "description": "Plan the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.plan/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.config.plan"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "apply",
+              "description": "Apply the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.apply",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.apply/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.config.apply"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "adopt",
+              "description": "Adopt the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--confirm",
+                  "description": "Confirm replacement of the installed configuration identity.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.adopt",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.adopt/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.config.adopt"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "topology",
+          "description": "Topology the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.topology/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.topology"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "connections",
+          "description": "Connections the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.connections/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.connections"
+          }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "provider",
+          "description": "Provider operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.provider.status"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "fleet",
+          "description": "Fleet operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.fleet.status"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
           "segment": "update",
           "description": "Update operations.",
           "children": [
