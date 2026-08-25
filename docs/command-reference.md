@@ -1419,6 +1419,218 @@ Control-plane operation: `treedx.workspaces.abandon`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd library
+
+Library operations.
+
+### trsd library show <project>
+
+Show project library knowledge.
+
+Operation: read. Result schema: `treeseed.command.library.show/v1`.
+Execution: `local.library.show`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--ref <value>`: Exact commit or protected library ref.
+
+### trsd library status <project>
+
+Status project library knowledge.
+
+Operation: read. Result schema: `treeseed.command.library.status/v1`.
+Execution: `local.library.status`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--ref <value>`: Exact commit or protected library ref.
+
+### trsd library paths <project>
+
+Paths project library knowledge.
+
+Operation: read. Result schema: `treeseed.command.library.paths/v1`.
+Execution: `local.library.paths`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--ref <value>`: Exact commit or protected library ref.
+- `--prefix <value>`: Repository-relative path prefix.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+
+### trsd library read <project> <path>
+
+Read project library knowledge.
+
+Operation: read. Result schema: `treeseed.command.library.read/v1`.
+Execution: `local.library.read`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--ref <value>`: Exact commit or protected library ref.
+
+### trsd library search <project> <query>
+
+Search project library knowledge.
+
+Operation: read. Result schema: `treeseed.command.library.search/v1`.
+Execution: `local.library.search`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--ref <value>`: Exact commit or protected library ref.
+- `--path <value>`: Restrict search to a repository-relative path.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+
+### trsd library query <project> <query>
+
+Query project library knowledge.
+
+Operation: read. Result schema: `treeseed.command.library.query/v1`.
+Execution: `local.library.query`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--ref <value>`: Exact commit or protected library ref.
+- `--model <value>`: TreeDX content model.
+- `--input <value>`: YAML or JSON query body.
+
+### trsd library context <project> <query>
+
+Context project library knowledge.
+
+Operation: read. Result schema: `treeseed.command.library.context/v1`.
+Execution: `local.library.context`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--ref <value>`: Exact commit or protected library ref.
+- `--max-items <value>`: Maximum context items.
+- `--max-tokens <value>`: Maximum context tokens.
+
+## trsd library workspace
+
+Workspace operations.
+
+### trsd library workspace create <project>
+
+Create the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.create/v1`.
+Control-plane operation: `knowledge.workspaces.create`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--request <value>`: Replay-safe UUID request identity.
+
+### trsd library workspace show <workspace>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `knowledge.workspaces.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd library workspace read <workspace> <path>
+
+Read a file from a governed library workspace.
+
+Operation: read. Result schema: `treeseed.command.library.workspace.read/v1`.
+Control-plane operation: `knowledge.workspaces.content.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd library workspace diff <workspace>
+
+Diff the selected resource.
+
+Operation: read. Result schema: `treeseed.command.diff/v1`.
+Control-plane operation: `knowledge.workspaces.diff`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd library workspace write <workspace>
+
+Write the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.write/v1`.
+Control-plane operation: `knowledge.workspaces.content.update`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: YAML or JSON draft body.
+
+### trsd library workspace submit <workspace>
+
+Submit the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.submit/v1`.
+Control-plane operation: `knowledge.workspaces.submit`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--version <value>`: Expected workspace version.
+- `--message <value>`: Commit message.
+- `--notes <value>`: Review notes.
+- `--context-digest <value>`: Verified editorial context digest.
+
+### trsd library workspace abandon <workspace>
+
+Abandon the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.abandon/v1`.
+Control-plane operation: `knowledge.workspaces.abandon`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--version <value>`: Expected workspace version.
+
+## trsd library reviews
+
+Reviews operations.
+
+### trsd library reviews list
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `knowledge.reviews.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd library reviews decide <review>
+
+Decide the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.decide/v1`.
+Control-plane operation: `knowledge.reviews.decide`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: YAML or JSON review decision.
+
+### trsd library reviews publish <review>
+
+Publish the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.publish/v1`.
+Control-plane operation: `knowledge.reviews.publish`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: Optional YAML or JSON publication body.
+
 ### trsd save
 
 Save the selected resource.

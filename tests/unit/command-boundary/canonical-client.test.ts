@@ -47,7 +47,7 @@ test('host commands preserve the SDK handler boundary and stable envelope', asyn
 test('host configuration adoption sends validated content and requires explicit confirmation', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-config-'));
 	const file = resolve(root, 'host.json');
-	writeFileSync(file, JSON.stringify({ schemaVersion: 'treeseed.host/v1', configurationId: 'development-workstation', generation: 1, host: { id: 'workstation-01', role: 'integrated', architecture: 'amd64' }, runtime: { management: 'managed' }, updates: { defaultTrack: 'development', stable: { metadataPollSeconds: 86400, maintenanceWindow: { weekday: 'sunday', localTime: '03:00', jitterMinutes: 20 } }, development: { pollSeconds: 60 } }, components: {}, network: { manager: { binding: '127.0.0.1:4790', aliases: [], sans: [], trustedLanCidrs: [] } }, fleet: { rolloutGroup: 'development-workstation', receiptReporting: { enabled: false, intervalSeconds: 300 } }, secrets: {} }));
+	writeFileSync(file, JSON.stringify({ schemaVersion: 'treeseed.host/v1', configurationId: 'development-workstation', generation: 1, host: { id: 'workstation-01', role: 'integrated', architecture: 'amd64' }, runtime: { management: 'managed', environment: 'development', dataRoot: resolve(root, '.treeseed/data') }, updates: { defaultTrack: 'development', stable: { metadataPollSeconds: 86400, maintenanceWindow: { weekday: 'sunday', localTime: '03:00', jitterMinutes: 20 } }, development: { pollSeconds: 60 } }, components: {}, network: { manager: { binding: '127.0.0.1:4790', aliases: [], sans: [], trustedLanCidrs: [] } }, fleet: { rolloutGroup: 'development-workstation', receiptReporting: { enabled: false, intervalSeconds: 300 } }, secrets: {} }));
 	const calls: any[] = [];
 	try {
 		const blocked = await runCommandLine(['host', 'config', 'adopt', file, '--json'], { interactiveUi: false, hostInvoke: async (value) => calls.push(value), write() {} });
@@ -123,10 +123,27 @@ test('remote commands invoke exactly one SDK operation without a URL', async () 
 	assert.deepEqual(invocations, [{ operationId: 'capacity.status', input: { path: { teamId: 'team-1' }, query: {}, body: undefined } }]);
 });
 
+test('library commands resolve project slugs and the bound TreeDX repository', async () => {
+	const invocations: Array<{ operationId: string; input: any }> = []; const output: string[] = [];
+	const exit = await runCommandLine(['library', 'read', 'sdk', 'agents/guide-steward.md', '--ref', 'refs/heads/staging', '--json'], {
+		interactiveUi: false,
+		operationInvoke: async (operationId, input) => {
+			invocations.push({ operationId, input });
+			if (operationId === 'projects.list') return { data: { items: [{ id: 'project-sdk', slug: 'sdk', name: 'SDK' }] } };
+			if (operationId === 'treedx.library.show') return { data: { repositoryId: 'repo-sdk', contentRepositoryRef: 'refs/heads/staging', contentPath: '.' } };
+			return { data: { files: [{ path: 'agents/guide-steward.md', content: 'agent' }], resolvedRef: 'a'.repeat(40) } };
+		}, write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(invocations.map((entry) => entry.operationId), ['projects.list', 'treedx.library.show', 'treedx.repositories.files.read']);
+	assert.deepEqual(invocations[2]!.input, { path: { projectId: 'project-sdk', repoId: 'repo-sdk' }, query: {}, body: { ref: 'refs/heads/staging', paths: ['agents/guide-steward.md'], encoding: 'utf8', parseFrontmatter: true } });
+	assert.equal(JSON.parse(output[0]!).result.files[0].path, 'agents/guide-steward.md');
+});
+
 test('seed commands upload parsed portable bundles instead of API-local paths', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-seed-'));
 	const file = resolve(root, 'treeseed.yaml');
-	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v2\nname: treeseed\nversion: 1\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources:\n  teams: []\n  memberships: []\n  projects: []\n  repositories: []\nruntime:\n  capacityProviders: []\n`);
+	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v3\nname: treeseed\nversion: 1\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources:\n  teams: []\n  memberships: []\n  projects: []\n  repositories: []\nruntime:\n  capacityProviders: []\n`);
 	const invocations: Array<{ operationId: string; input: any }> = [];
 	try {
 		const exit = await runCommandLine(['seeds', 'validate', file, '--json'], { cwd: root, interactiveUi: false,
@@ -134,7 +151,7 @@ test('seed commands upload parsed portable bundles instead of API-local paths', 
 		assert.equal(exit, 0);
 		assert.equal(invocations[0]?.operationId, 'seeds.validate');
 		assert.deepEqual(invocations[0]?.input.path, {});
-		assert.equal(invocations[0]?.input.body.bundle.schemaVersion, 'treeseed.seed-bundle/v2');
+		assert.equal(invocations[0]?.input.body.bundle.schemaVersion, 'treeseed.seed-bundle/v3');
 		assert.equal('file' in invocations[0]?.input.body, false);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -142,7 +159,7 @@ test('seed commands upload parsed portable bundles instead of API-local paths', 
 test('seed plan derives the path identity from the uploaded portable bundle', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-seed-plan-'));
 	const file = resolve(root, 'treeseed.yaml');
-	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v2\nname: treeseed\nversion: 1\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources:\n  teams: []\n  memberships: []\n  projects: []\n  repositories: []\nruntime:\n  capacityProviders: []\n`);
+	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v3\nname: treeseed\nversion: 1\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources:\n  teams: []\n  memberships: []\n  projects: []\n  repositories: []\nruntime:\n  capacityProviders: []\n`);
 	const invocations: any[] = [];
 	try {
 		const exit = await runCommandLine(['seeds', 'plan', file, '--json'], { interactiveUi: false,

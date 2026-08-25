@@ -7,6 +7,7 @@ import { isCommandBranch, resolveCommand } from './registry.js';
 import { runSecrets } from './commands/secrets.js';
 import { runHost } from './commands/host.js';
 import { runUsers } from './commands/users.js';
+import { runLibrary } from './commands/library.js';
 import type { CommandContext, CommandFailure, ParsedInvocation, Writer } from './types.js';
 import { promptText } from './support/prompts.js';
 import { handoffProviderEnrollment } from './support/provider-enrollment.js';
@@ -60,6 +61,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind === 'protocol') return runAuth(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'host') return runHost(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'library') return runLibrary(invocation, context);
 	return runOperator(invocation, context);
 }
 
