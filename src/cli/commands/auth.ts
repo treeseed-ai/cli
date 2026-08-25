@@ -24,6 +24,16 @@ function pollingState(error: unknown) {
 	return 'failed' as const;
 }
 
+function record(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
+function principalIdentity(value: unknown) { const principal = record(value); return String(principal.id ?? principal.email ?? principal.username ?? ''); }
+function teamsFrom(value: unknown) {
+	const source = record(value); const values = Array.isArray(source.teams) ? source.teams : Array.isArray(source.items) ? source.items : [];
+	return values.map(record).flatMap((team) => {
+		const id = String(team.id ?? '').trim(); const slug = String(team.slug ?? '').trim(); const name = String(team.name ?? team.displayName ?? slug).trim();
+		return id && slug ? [{ id, slug, name }] : [];
+	});
+}
+
 export async function runAuth(invocation: ParsedInvocation, context: CommandContext) {
 	const { profile, session, client } = await createControlPlaneClient(invocation, context, false);
 	if (invocation.command.name === 'auth login') {
@@ -41,9 +51,14 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 				const current = await authenticatedClient.invoke(CONTROL_PLANE_OPERATIONS.accounts.current, { path: {}, query: {}, body: undefined });
 				const principal = current.data && typeof current.data === 'object' && 'principal' in current.data
 					? current.data.principal as typeof token.principal : token.principal;
+				const teams = teamsFrom(current.data);
+				const prior = session?.activeTeam;
+				const samePrincipal = principalIdentity(session?.principal) && principalIdentity(session?.principal) === principalIdentity(principal);
+				const activeTeam = samePrincipal && prior && teams.some((team) => team.id === prior.id)
+					? teams.find((team) => team.id === prior.id)! : teams.length === 1 ? teams[0]! : null;
 				saveServerProfile(profile, context.env);
-				saveServerSession({ serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken, expiresAt, principal }, context.env);
-				return { serverId: profile.serverId, principal: principal ?? null, expiresAt, scopes: token.scope };
+				saveServerSession({ serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken, expiresAt, principal, activeTeam }, context.env);
+				return { serverId: profile.serverId, principal: principal ?? null, activeTeam, expiresAt, scopes: token.scope };
 			} catch (error) {
 				const state = pollingState(error);
 				if (state === 'failed') throw error;

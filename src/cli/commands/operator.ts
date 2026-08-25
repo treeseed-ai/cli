@@ -2,10 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { controlPlaneOperation, encodeConfirmationState, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
-import { ControlPlaneClientError } from '@treeseed/sdk/control-plane-client';
+import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
+import { ControlPlaneClientError, defaultLocalControlPlaneServer, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { createControlPlaneClient } from '../support/client.js';
+import { loadServerRegistry, loadServerSession } from '../support/server-custody.js';
+
+function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
+	const local = defaultLocalControlPlaneServer(context.env as Record<string, string | undefined>);
+	const stored = loadServerRegistry(context.env);
+	const registry = { version: 1 as const, activeServerId: stored.activeServerId || local.serverId, servers: [...stored.servers.filter((entry) => entry.serverId !== local.serverId), local] };
+	const selector = typeof invocation.options.server === 'string' ? invocation.options.server : undefined;
+	return loadServerSession(resolveControlPlaneServer(selector, registry).serverId, context.env)?.activeTeam?.id;
+}
 
 function sourceValue(binding: CommandInputBinding, invocation: ParsedInvocation, context: CommandContext) {
 	if (binding.source === 'argument') {
@@ -13,7 +22,7 @@ function sourceValue(binding: CommandInputBinding, invocation: ParsedInvocation,
 		return index < 0 ? undefined : invocation.arguments[index];
 	}
 	if (binding.source === 'option') return invocation.options[binding.name];
-	if (binding.name === 'team') return invocation.options.team ?? context.env.TREESEED_TEAM_ID;
+	if (binding.name === 'team') return invocation.options.team ?? context.env.TREESEED_TEAM_ID ?? activeTeam(invocation, context);
 	if (binding.name === 'project') return invocation.options.project ?? context.env.TREESEED_PROJECT_ID;
 	return invocation.options[binding.name] ?? context.env[`TREESEED_${binding.name.replace(/([a-z])([A-Z])/gu, '$1_$2').toUpperCase()}_ID`];
 }
@@ -89,6 +98,20 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (execution.kind === 'unavailable') throw Object.assign(new Error(execution.reason), { category: 'policy_blocked', code: execution.code });
 	if (execution.kind !== 'operation') throw Object.assign(new Error(`No CLI handler is installed for ${execution.handlerId}.`), { category: 'policy_blocked', code: 'local_handler_unavailable' });
 	const { operation, input } = await operationInput(invocation, context);
+	if (operation.descriptor.operationId === 'communications.send') {
+		const message = String(input.body?.message ?? '');
+		const addresses = parseCommunicationAddresses(message);
+		if (!addresses.length) throw Object.assign(new Error('Address at least one project agent in the message.'), { category: 'invalid_input', code: 'communication_recipient_required' });
+		const project = String(input.body?.projectId ?? '').toLowerCase();
+		const projectIsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(project);
+		for (const address of addresses) if (address.projectSlug && !projectIsUuid && address.projectSlug !== project) throw Object.assign(
+			new Error(`${address.address} does not belong to the selected project ${project}.`), { category: 'conflict', code: 'communication_target_project_mismatch' });
+		const compatibility = Array.isArray(invocation.options.to) ? invocation.options.to.map(String) : invocation.options.to ? [String(invocation.options.to)] : [];
+		const mentioned = new Set(addresses.flatMap((address) => [address.agentSlug, `${address.projectSlug ?? project}/${address.agentSlug}`, address.address.slice(1)]));
+		for (const target of compatibility) if (!mentioned.has(target.replace(/^@/u, '').toLowerCase())) throw Object.assign(
+			new Error(`Deprecated --to target ${target} is not addressed in the message.`), { category: 'invalid_input', code: 'communication_to_not_mentioned' });
+		if (input.body) input.body.recipients = compatibility.length ? compatibility : undefined;
+	}
 	if (invocation.options.plan === true) return { operationId: operation.descriptor.operationId, input, mutation: false };
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
@@ -159,7 +182,8 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	};
 	const waitForCommunication = async (response: unknown) => {
 		if (operation.descriptor.operationId !== 'communications.send') return response;
-		const seconds = Math.max(0, Math.min(3_600, Number(invocation.options.wait ?? 0) || 0));
+		const configured = invocation.options.noWait === true ? 0 : invocation.options.wait ?? invocation.options.timeout ?? 1_800;
+		const seconds = Math.max(0, Math.min(3_600, Number(configured) || 0));
 		if (!seconds) return response;
 		const initial = response && typeof response === 'object' ? response as Record<string, unknown> : {};
 		let value = recordData(initial); const sendId = typeof value.sendId === 'string' ? value.sendId : '';
@@ -171,6 +195,8 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 			const observed = await client.invoke(statusOperation, { path: { teamId, sendId }, query: {}, body: undefined });
 			value = recordData(observed as unknown as Record<string, unknown>);
 		}
+		if (!['complete', 'partial', 'failed'].includes(String(value.status))) throw Object.assign(
+			new Error(`Communication send did not finish within ${seconds} seconds.`), { category: 'provider_unavailable', code: 'communication_wait_timeout', partialResult: value });
 		return { data: value };
 	};
 	try {
