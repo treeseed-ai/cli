@@ -185,6 +185,25 @@ test('body-bearing catalog operations receive an empty object when no fields are
 	}]);
 });
 
+test('seed verify accepts a portable bundle path and derives its seed identity', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-seed-verify-'));
+	const file = resolve(root, 'treeseed.yaml');
+	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v3\nname: treeseed\nversion: 1\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources:\n  teams: []\n  memberships: []\n  projects: []\n  repositories: []\nruntime:\n  capacityProviders: []\n`);
+	const invocations: Array<{ operationId: string; input: any }> = [];
+	try {
+		const exit = await runCommandLine(['seeds', 'verify', file, '--json'], {
+			interactiveUi: false,
+			operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { verified: true }; },
+			write() {},
+		});
+		assert.equal(exit, 0);
+		assert.equal(invocations.length, 1);
+		assert.equal(invocations[0]?.operationId, 'seeds.verify');
+		assert.equal(invocations[0]?.input.path.name, 'treeseed');
+		assert.equal(invocations[0]?.input.body.bundle.name, 'treeseed');
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('provider enrollment hands the unwrapped API receipt to trusted local custody', async () => {
 	let requestBody = '';
 	const server = createServer((request, response) => {
