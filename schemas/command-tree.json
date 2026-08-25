@@ -3548,6 +3548,769 @@
       ]
     },
     {
+      "nodeType": "branch",
+      "segment": "library",
+      "description": "Library operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show project library knowledge.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "project",
+              "description": "project value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--ref",
+              "description": "Exact commit or protected library ref.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.library.show/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.library.show"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status project library knowledge.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "project",
+              "description": "project value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--ref",
+              "description": "Exact commit or protected library ref.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.library.status/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.library.status"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "paths",
+          "description": "Paths project library knowledge.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "project",
+              "description": "project value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--ref",
+              "description": "Exact commit or protected library ref.",
+              "type": "string"
+            },
+            {
+              "name": "--prefix",
+              "description": "Repository-relative path prefix.",
+              "type": "string"
+            },
+            {
+              "name": "--limit",
+              "description": "Page size.",
+              "type": "number"
+            },
+            {
+              "name": "--cursor",
+              "description": "Opaque page cursor.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.library.paths/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.library.paths"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "read",
+          "description": "Read project library knowledge.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "project",
+              "description": "project value.",
+              "required": true
+            },
+            {
+              "name": "path",
+              "description": "path value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--ref",
+              "description": "Exact commit or protected library ref.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.library.read/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.library.read"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "search",
+          "description": "Search project library knowledge.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "project",
+              "description": "project value.",
+              "required": true
+            },
+            {
+              "name": "query",
+              "description": "query value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--ref",
+              "description": "Exact commit or protected library ref.",
+              "type": "string"
+            },
+            {
+              "name": "--path",
+              "description": "Restrict search to a repository-relative path.",
+              "type": "string"
+            },
+            {
+              "name": "--limit",
+              "description": "Page size.",
+              "type": "number"
+            },
+            {
+              "name": "--cursor",
+              "description": "Opaque page cursor.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.library.search/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.library.search"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "query",
+          "description": "Query project library knowledge.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "project",
+              "description": "project value.",
+              "required": true
+            },
+            {
+              "name": "query",
+              "description": "query value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--ref",
+              "description": "Exact commit or protected library ref.",
+              "type": "string"
+            },
+            {
+              "name": "--model",
+              "description": "TreeDX content model.",
+              "type": "string"
+            },
+            {
+              "name": "--input",
+              "description": "YAML or JSON query body.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.library.query/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.library.query"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "context",
+          "description": "Context project library knowledge.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "project",
+              "description": "project value.",
+              "required": true
+            },
+            {
+              "name": "query",
+              "description": "query value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--ref",
+              "description": "Exact commit or protected library ref.",
+              "type": "string"
+            },
+            {
+              "name": "--max-items",
+              "description": "Maximum context items.",
+              "type": "number"
+            },
+            {
+              "name": "--max-tokens",
+              "description": "Maximum context tokens.",
+              "type": "number"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.library.context/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.library.context"
+          }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "workspace",
+          "description": "Workspace operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "create",
+              "description": "Create the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--request",
+                  "description": "Replay-safe UUID request identity.",
+                  "type": "string"
+                }
+              ],
+              "authorization": {
+                "capability": "command.create",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.create/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.workspaces.create",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "requestId",
+                    "source": "option",
+                    "name": "request",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "workspace",
+                  "description": "workspace identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.workspaces.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "workspaceId",
+                    "source": "argument",
+                    "name": "workspace",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "read",
+              "description": "Read a file from a governed library workspace.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "workspace",
+                  "description": "Workspace identity.",
+                  "required": true
+                },
+                {
+                  "name": "path",
+                  "description": "Repository-relative path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.library.workspace.read/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.workspaces.content.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "workspaceId",
+                    "source": "argument",
+                    "name": "workspace",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "path",
+                    "source": "argument",
+                    "name": "path",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "diff",
+              "description": "Diff the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "workspace",
+                  "description": "workspace identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.diff/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.workspaces.diff",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "workspaceId",
+                    "source": "argument",
+                    "name": "workspace",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "write",
+              "description": "Write the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "workspace",
+                  "description": "workspace identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--input",
+                  "description": "YAML or JSON draft body.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.write",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.write/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.workspaces.content.update",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "workspaceId",
+                    "source": "argument",
+                    "name": "workspace",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "file",
+                    "source": "option",
+                    "name": "input",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "submit",
+              "description": "Submit the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "workspace",
+                  "description": "workspace identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--version",
+                  "description": "Expected workspace version.",
+                  "type": "number",
+                  "required": true
+                },
+                {
+                  "name": "--message",
+                  "description": "Commit message.",
+                  "type": "string"
+                },
+                {
+                  "name": "--notes",
+                  "description": "Review notes.",
+                  "type": "string"
+                },
+                {
+                  "name": "--context-digest",
+                  "description": "Verified editorial context digest.",
+                  "type": "string"
+                }
+              ],
+              "authorization": {
+                "capability": "command.submit",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.submit/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.workspaces.submit",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "workspaceId",
+                    "source": "argument",
+                    "name": "workspace",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "version",
+                    "source": "option",
+                    "name": "version",
+                    "required": true,
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "body",
+                    "field": "message",
+                    "source": "option",
+                    "name": "message",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "notes",
+                    "source": "option",
+                    "name": "notes",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "contextDigest",
+                    "source": "option",
+                    "name": "contextDigest",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "abandon",
+              "description": "Abandon the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "workspace",
+                  "description": "workspace identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--version",
+                  "description": "Expected workspace version.",
+                  "type": "number",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.abandon",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.command.abandon/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.workspaces.abandon",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "workspaceId",
+                    "source": "argument",
+                    "name": "workspace",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "version",
+                    "source": "option",
+                    "name": "version",
+                    "required": true,
+                    "transform": "integer"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "reviews",
+          "description": "Reviews operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.reviews.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "status",
+                    "source": "option",
+                    "name": "status",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "required": false,
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "decide",
+              "description": "Decide the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "review",
+                  "description": "review identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--input",
+                  "description": "YAML or JSON review decision.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.decide",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.decide/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.reviews.decide",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "reviewId",
+                    "source": "argument",
+                    "name": "review",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "file",
+                    "source": "option",
+                    "name": "input",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "publish",
+              "description": "Publish the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "review",
+                  "description": "review identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--input",
+                  "description": "Optional YAML or JSON publication body.",
+                  "type": "string"
+                }
+              ],
+              "authorization": {
+                "capability": "command.publish",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.publish/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "knowledge.reviews.publish",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "reviewId",
+                    "source": "argument",
+                    "name": "review",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "file",
+                    "source": "option",
+                    "name": "input",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "nodeType": "leaf",
       "segment": "save",
       "description": "Save the selected resource.",

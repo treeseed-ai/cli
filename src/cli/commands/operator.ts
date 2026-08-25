@@ -51,6 +51,13 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 			input.path.name = (parsed as Record<string, unknown>).name;
 		}
 	}
+	if (!operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
+		const file = resolve(context.cwd, input.body.file);
+		const parsed = parseYaml(await readFile(file, 'utf8'));
+		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Input file must contain one YAML or JSON object.'), { category: 'invalid_input', code: 'command_input_file_invalid' });
+		delete input.body.file;
+		Object.assign(input.body, parsed);
+	}
 	for (const binding of deferred) if (input[binding.target][binding.field] === undefined) {
 		throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });
 	}
