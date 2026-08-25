@@ -1,8 +1,13 @@
 import { spawn } from 'node:child_process';
+import { invokeLocalHostManager } from './host-client.js';
 
-export async function handoffProviderEnrollment(payload: Record<string, unknown>, env: NodeJS.ProcessEnv) {
+export async function handoffProviderEnrollment(payload: Record<string, unknown>, env: NodeJS.ProcessEnv, localInvoke: (input: unknown) => Promise<unknown> = invokeLocalHostManager) {
 	const executable = env.TREESEED_PROVIDER_ENROLL_EXECUTABLE?.trim();
-	if (!executable) throw Object.assign(new Error('Local provider enrollment handoff is not configured. Set TREESEED_PROVIDER_ENROLL_EXECUTABLE to the trusted provider manager entrypoint.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_unavailable' });
+	if (!executable) return localInvoke({
+		handlerId: 'local.host.provider.enrollment',
+		arguments: [],
+		options: { payload: JSON.stringify(payload) },
+	}) as Promise<Record<string, unknown>>;
 	let args: string[] = [];
 	if (env.TREESEED_PROVIDER_ENROLL_ARGUMENTS) {
 		const parsed = JSON.parse(env.TREESEED_PROVIDER_ENROLL_ARGUMENTS);
