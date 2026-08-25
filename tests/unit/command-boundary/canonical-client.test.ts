@@ -60,6 +60,12 @@ test('host configuration adoption sends validated content and requires explicit 
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('host identity adoption is permanently bound to the protected local socket', async () => {
+	const { hostUsesProtectedLocalTransport } = await import('../../../src/cli/commands/host.ts');
+	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config adopt' } as any }), true);
+	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config apply' } as any }), false);
+});
+
 test('bootstrap enrollment stores credentials privately and never emits key material', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-')); const output: string[] = [];
 	try {
