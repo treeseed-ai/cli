@@ -135,11 +135,16 @@
               "name": "--plan",
               "description": "Return the exact proposed outcome without mutation.",
               "type": "boolean"
+            },
+            {
+              "name": "--timeout",
+              "description": "Maximum seconds to wait for device authorization.",
+              "type": "number"
             }
           ],
           "authorization": {
             "capability": "command.login",
-            "confirmation": "credential"
+            "confirmation": "never"
           },
           "resultSchemaId": "treeseed.command.login/v1",
           "execution": {
@@ -213,11 +218,16 @@
               "name": "--display-name",
               "description": "Human-readable display name.",
               "type": "string"
+            },
+            {
+              "name": "--timeout",
+              "description": "Maximum seconds to wait for registration.",
+              "type": "number"
             }
           ],
           "authorization": {
             "capability": "command.create",
-            "confirmation": "credential"
+            "confirmation": "never"
           },
           "resultSchemaId": "treeseed.command.create/v1",
           "execution": {

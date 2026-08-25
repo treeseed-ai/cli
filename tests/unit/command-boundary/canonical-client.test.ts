@@ -331,7 +331,7 @@ test('JSON device login keeps human approval instructions off stdout', async () 
 	const output: Array<{ value: string; stream?: string }> = [];
 	try {
 		saveServerProfile({ serverId: 'test', label: 'Test', baseUrl }, { TREESEED_CONFIG_HOME: root });
-		const exit = await runCommandLine(['auth', 'login', '--server', 'test', '--yes', '--json'], {
+		const exit = await runCommandLine(['auth', 'login', '--server', 'test', '--json'], {
 			env: { TREESEED_CONFIG_HOME: root }, interactiveUi: false,
 			write: (value, stream) => output.push({ value, stream }),
 		});

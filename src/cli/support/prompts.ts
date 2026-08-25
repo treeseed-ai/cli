@@ -13,7 +13,7 @@ export function promptHidden(question: string) {
 	return new Promise<string>((resolvePromise, reject) => {
 		if (!stdin.isTTY || !stdout.isTTY) { reject(new Error('Secret input requires an interactive TTY.')); return; }
 		let value = '';
-		const cleanup = () => { stdin.removeListener('data', onData); stdin.setRawMode(false); stdout.write('\n'); };
+		const cleanup = () => { stdin.removeListener('data', onData); stdin.setRawMode(false); stdin.pause(); stdout.write('\n'); };
 		const onData = (chunk: Buffer | string) => {
 			for (const char of String(chunk)) {
 				if (char === '\n' || char === '\r') { cleanup(); resolvePromise(value); return; }

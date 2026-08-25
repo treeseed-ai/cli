@@ -7,6 +7,15 @@ import { CONTROL_PLANE_CLI_CLIENT_ID, createControlPlaneClient } from '../suppor
 import { clearServerSession, saveServerProfile, saveServerSession } from '../support/server-custody.js';
 
 const DEFAULT_SCOPES: OAuthScope[] = ['treeseed:read', 'treeseed:knowledge:write', 'treeseed:governance:write', 'treeseed:projects:write', 'treeseed:execution'];
+const DEFAULT_LOGIN_TIMEOUT_SECONDS = 300;
+
+function configuredLoginTimeoutSeconds(invocation: ParsedInvocation, context: CommandContext) {
+	const configured = invocation.options.timeout ?? context.env.TREESEED_CLI_LOGIN_TIMEOUT_SECONDS
+		?? context.env.TREESEED_CLI_OPERATION_TIMEOUT_SECONDS ?? DEFAULT_LOGIN_TIMEOUT_SECONDS;
+	const value = Number(configured);
+	if (!Number.isFinite(value) || value <= 0 || value > 3_600) throw Object.assign(new Error('--timeout must be between 1 and 3600 seconds.'), { category: 'invalid_input', code: 'invalid_timeout' });
+	return value;
+}
 
 function pollingState(error: unknown) {
 	if (!(error instanceof ControlPlaneClientError)) return 'failed' as const;
@@ -18,9 +27,11 @@ function pollingState(error: unknown) {
 export async function runAuth(invocation: ParsedInvocation, context: CommandContext) {
 	const { profile, session, client } = await createControlPlaneClient(invocation, context, false);
 	if (invocation.command.name === 'auth login') {
-		const authorization = await client.authorizeDevice(CONTROL_PLANE_CLI_CLIENT_ID, DEFAULT_SCOPES);
+		const configuredTimeout = configuredLoginTimeoutSeconds(invocation, context);
+		const authorization = await client.authorizeDevice(CONTROL_PLANE_CLI_CLIENT_ID, DEFAULT_SCOPES, AbortSignal.timeout(configuredTimeout * 1_000));
 		context.write(`Open ${authorization.verificationUriComplete ?? authorization.verificationUri} and enter code ${authorization.userCode}.`, 'stderr');
-		const deadline = Date.now() + authorization.expiresIn * 1_000;
+		const timeoutSeconds = Math.min(configuredTimeout, authorization.expiresIn);
+		const deadline = Date.now() + timeoutSeconds * 1_000;
 		let interval = Math.max(1, authorization.interval) * 1_000;
 		while (Date.now() < deadline) {
 			try {
@@ -37,10 +48,10 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 				const state = pollingState(error);
 				if (state === 'failed') throw error;
 				if (state === 'slow_down') interval += 5_000;
-				await delay(interval);
+				await delay(Math.min(interval, Math.max(1, deadline - Date.now())));
 			}
 		}
-		throw Object.assign(new Error('Device authorization expired before approval.'), { category: 'authentication_required', code: 'device_authorization_expired' });
+		throw Object.assign(new Error(`Device authorization was not approved within ${timeoutSeconds} seconds.`), { category: 'authentication_required', code: 'device_authorization_timeout' });
 	}
 	if (invocation.command.name === 'auth logout') {
 		const token = session?.refreshToken ?? session?.accessToken;
