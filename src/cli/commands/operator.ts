@@ -93,11 +93,56 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
 	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: randomUUID(), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };
+	const invokeAuthorized = async (target: ReturnType<typeof controlPlaneOperation>, targetInput: { path: Record<string, unknown>; query: Record<string, unknown>; body?: Record<string, unknown> }) => {
+		const targetOptions = { idempotencyKey: randomUUID(), headers: {} as Record<string, string> };
+		try { return await client.invoke(target, targetInput, targetOptions); }
+		catch (error) {
+			const required = error instanceof ControlPlaneClientError ? error.problem.inputRequired : undefined;
+			if (!required || invocation.options.yes !== true) throw error;
+			targetOptions.headers['x-treeseed-confirmation'] = encodeConfirmationState(required.confirmation);
+			return client.invoke(target, targetInput, targetOptions);
+		}
+	};
+	const completeSeedProviderEnrollment = async (response: unknown, value: Record<string, unknown>) => {
+		if (!['seeds.apply', 'seeds.reconcile'].includes(operation.descriptor.operationId)) return response;
+		const result = value.result && typeof value.result === 'object' && !Array.isArray(value.result) ? value.result as Record<string, unknown> : {};
+		const closure = result.providerClosure && typeof result.providerClosure === 'object' && !Array.isArray(result.providerClosure) ? result.providerClosure as Record<string, unknown> : {};
+		const receipts = Array.isArray(closure.receipts) ? closure.receipts.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry)) : [];
+		const enrollments = receipts.filter((entry) => entry.status === 'enrollment_required');
+		if (!enrollments.length) return response;
+		if (!context.providerEnrollmentHandoff) throw Object.assign(new Error('The seeded local provider requires the protected host enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_unavailable' });
+		for (const enrollment of enrollments) {
+			if (enrollment.approval !== 'trusted-local-owner' || typeof enrollment.enrollmentToken !== 'string' || typeof enrollment.teamId !== 'string' || typeof enrollment.connectionId !== 'string') {
+				throw Object.assign(new Error('The seeded provider enrollment receipt is incomplete or not trusted-local-owner.'), { category: 'provider_unavailable', code: 'seed_provider_enrollment_invalid' });
+			}
+			const begun = await context.providerEnrollmentHandoff({ action: 'begin', ...enrollment,
+				controlPlaneUrl: profile.baseUrl, controlPlaneAudience: profile.baseUrl, serverProfile: profile.serverId });
+			const requestId = typeof begun.requestId === 'string' ? begun.requestId : null;
+			if (!requestId) throw Object.assign(new Error('The local provider did not return a registration request for automatic seed approval.'), { category: 'provider_unavailable', code: 'seed_provider_registration_missing' });
+			await invokeAuthorized(controlPlaneOperation('providers.requests.approve'), {
+				path: { teamId: enrollment.teamId, requestId }, query: {}, body: { teamAlias: enrollment.key },
+			});
+			await context.providerEnrollmentHandoff({ action: 'complete', connectionId: enrollment.connectionId });
+		}
+		const timeoutSeconds = Math.max(10, Math.min(600, Number(context.env.TREESEED_SEED_PROVIDER_TIMEOUT_SECONDS ?? 120) || 120));
+		const deadline = Date.now() + timeoutSeconds * 1_000;
+		const reconcile = controlPlaneOperation('seeds.reconcile');
+		while (Date.now() < deadline) {
+			await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(1_000, Math.max(1, deadline - Date.now()))));
+			const observed = await invokeAuthorized(reconcile, input);
+			const observedValue = recordData(observed as Record<string, unknown>);
+			const observedResult = observedValue.result && typeof observedValue.result === 'object' && !Array.isArray(observedValue.result) ? observedValue.result as Record<string, unknown> : {};
+			const observedClosure = observedResult.providerClosure && typeof observedResult.providerClosure === 'object' && !Array.isArray(observedResult.providerClosure) ? observedResult.providerClosure as Record<string, unknown> : {};
+			if (observedClosure.status === 'verified') return observed;
+		}
+		throw Object.assign(new Error(`The seeded capacity provider did not become execution-ready within ${timeoutSeconds} seconds.`), { category: 'provider_unavailable', code: 'seed_provider_readiness_timeout' });
+	};
 	const finalize = async (response: unknown) => {
 		const envelope = response && typeof response === 'object' ? response as Record<string, unknown> : {};
 		const value = envelope.data && typeof envelope.data === 'object'
 			? envelope.data as Record<string, unknown>
 			: envelope;
+		if (['seeds.apply', 'seeds.reconcile'].includes(operation.descriptor.operationId)) return completeSeedProviderEnrollment(response, value);
 		if (operation.descriptor.operationId === 'providers.connect') {
 			const enrollmentToken = typeof value.enrollmentToken === 'string' ? value.enrollmentToken : null;
 			if (!enrollmentToken || !context.providerEnrollmentHandoff) throw Object.assign(new Error('The control plane did not return a usable local provider enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_invalid' });

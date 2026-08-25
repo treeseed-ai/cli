@@ -257,6 +257,35 @@ test('provider enrollment hands the unwrapped API receipt to trusted local custo
 	}
 });
 
+test('seed apply enrolls, owner-approves, and waits for execution-ready provider closure', async () => {
+	const paths: string[] = [];
+	const server = createServer((request, response) => {
+		request.resume(); request.on('end', () => {
+			paths.push(request.url ?? ''); response.setHeader('content-type', 'application/json');
+			if (request.url?.endsWith('/apply')) response.end(JSON.stringify({ data: { seed: 'treeseed', result: { providerClosure: { status: 'waiting_provider', receipts: [{
+				key: 'capacity-provider:treeseed/local', status: 'enrollment_required', approval: 'trusted-local-owner', teamId: 'team-1', connectionId: 'local-team-1', enrollmentToken: 'one-time',
+			}] } } } }));
+			else if (request.url?.includes('/capacity-provider-requests/')) response.end(JSON.stringify({ data: { status: 'approved' } }));
+			else response.end(JSON.stringify({ data: { seed: 'treeseed', result: { providerClosure: { status: 'verified', receipts: [{ status: 'verified' }] } } } }));
+		});
+	});
+	await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept));
+	const address = server.address(); if (!address || typeof address === 'string') throw new Error('Test server did not bind.');
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-seed-provider-')); const file = resolve(root, 'treeseed.yaml');
+	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v3\nname: treeseed\nversion: 4\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources: { teams: [], memberships: [], projects: [], repositories: [] }\nruntime: { capacityProviders: [] }\n`);
+	const env = { TREESEED_CONFIG_HOME: root, TREESEED_SEED_PROVIDER_TIMEOUT_SECONDS: '10' };
+	try {
+		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` }; saveServerProfile(profile, env); saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
+		const handoffs: Record<string, unknown>[] = []; const output: string[] = [];
+		const exit = await runCommandLine(['seeds', 'apply', file, '--server', 'test', '--yes', '--json'], { env, interactiveUi: false,
+			providerEnrollmentHandoff: async (input) => { handoffs.push(input); return input.action === 'begin' ? { requestId: 'request-1' } : { status: 'connected' }; }, write: (value) => output.push(value) });
+		assert.equal(exit, 0); assert.deepEqual(handoffs.map((entry) => entry.action), ['begin', 'complete']);
+		assert.equal(paths.some((path) => path.includes('/capacity-provider-requests/request-1/approve')), true);
+		assert.equal(paths.some((path) => path.endsWith('/reconcile')), true);
+		assert.equal(JSON.parse(output[0]!).result.result.providerClosure.status, 'verified');
+	} finally { await new Promise<void>((accept, reject) => server.close((error) => error ? reject(error) : accept())); rmSync(root, { recursive: true, force: true }); }
+});
+
 test('provider enrollment defaults to the protected local manager socket contract', async () => {
 	const requests: unknown[] = [];
 	const result = await handoffProviderEnrollment({ action: 'complete', connectionId: 'local-team' }, {}, async (input) => {
