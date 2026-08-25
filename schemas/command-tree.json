@@ -185,6 +185,50 @@
     },
     {
       "nodeType": "branch",
+      "segment": "users",
+      "description": "Users operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "create",
+          "description": "Create a local TreeSeed user with a securely prompted password.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--email",
+              "description": "Email address for the new user.",
+              "type": "string"
+            },
+            {
+              "name": "--username",
+              "description": "Unique username for the new user.",
+              "type": "string"
+            },
+            {
+              "name": "--display-name",
+              "description": "Human-readable display name.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "command.create",
+            "confirmation": "credential"
+          },
+          "resultSchemaId": "treeseed.command.create/v1",
+          "execution": {
+            "kind": "protocol",
+            "handlerId": "protocol.accounts.create"
+          }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
       "segment": "secrets",
       "description": "Secrets operations.",
       "children": [
