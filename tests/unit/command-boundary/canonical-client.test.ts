@@ -140,6 +140,22 @@ test('library commands resolve project slugs and the bound TreeDX repository', a
 	assert.equal(JSON.parse(output[0]!).result.files[0].path, 'agents/guide-steward.md');
 });
 
+test('library status checks the search index at the configured library ref', async () => {
+	const invocations: Array<{ operationId: string; input: any }> = []; const output: string[] = [];
+	const exit = await runCommandLine(['library', 'status', 'sdk', '--json'], {
+		interactiveUi: false,
+		operationInvoke: async (operationId, input) => {
+			invocations.push({ operationId, input });
+			if (operationId === 'projects.list') return { data: { items: [{ id: 'project-sdk', slug: 'sdk', name: 'SDK' }] } };
+			if (operationId === 'treedx.library.show') return { data: { repositoryId: 'repo-sdk', contentRepositoryRef: 'refs/remotes/origin/staging', contentPath: '.' } };
+			return { data: { ok: true } };
+		}, write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	const index = invocations.find((entry) => entry.operationId === 'treedx.repositories.search.index.status');
+	assert.deepEqual(index?.input.query, { ref: 'refs/remotes/origin/staging' });
+});
+
 test('seed commands upload parsed portable bundles instead of API-local paths', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-seed-'));
 	const file = resolve(root, 'treeseed.yaml');
