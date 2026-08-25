@@ -4,9 +4,9 @@ This file is generated from the accepted `@treeseed/sdk/operator-contracts` comm
 
 ### trsd send <channel> <message>
 
-Send a message to project agents through a team discussion channel.
+Send a message to addressed project agents in a team discussion topic.
 
-Operation: mutation. Result schema: `treeseed.communication-send-receipt/v1`.
+Operation: mutation. Result schema: `treeseed.communication-send-receipt/v2`.
 Control-plane operation: `communications.send`.
 
 - `--server <value>`: Control-plane server profile or URL.
@@ -14,9 +14,10 @@ Control-plane operation: `communications.send`.
 - `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
-- `--to <value>`: Agent target; use project/agent when names may be ambiguous.
-- `--topic <value>`: Optional discussion topic.
-- `--wait <value>`: Seconds to wait for durable responses.
+- `--to <value>`: Deprecated validation-only address list.
+- `--timeout <value>`: Maximum seconds to wait for the complete response chain.
+- `--no-wait`: Return immediately after durable admission.
+- `--wait <value>`: Deprecated wait duration in seconds.
 
 ## trsd auth
 
@@ -73,6 +74,42 @@ Execution: `protocol.accounts.create`.
 - `--username <value>`: Unique username for the new user.
 - `--display-name <value>`: Human-readable display name.
 - `--timeout <value>`: Maximum seconds to wait for registration.
+
+## trsd teams
+
+Teams operations.
+
+### trsd teams list
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `teams.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd teams current
+
+Show the active team for this authenticated server session.
+
+Operation: read. Result schema: `treeseed.command.teams.current/v1`.
+Execution: `local.teams.current`.
+
+- `--json`: Emit the stable JSON envelope.
+
+### trsd teams use <team>
+
+Select the active team for this authenticated server session.
+
+Operation: mutation. Result schema: `treeseed.command.teams.use/v1`.
+Execution: `local.teams.use`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd secrets
 

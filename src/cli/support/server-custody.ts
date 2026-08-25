@@ -103,6 +103,17 @@ export function loadServerSession(serverId: string, env: NodeJS.ProcessEnv) {
 	return readState(env).sessions.find((session) => session.serverId === serverId) ?? null;
 }
 
+export function loadActiveTeam(serverId: string, env: NodeJS.ProcessEnv) {
+	return loadServerSession(serverId, env)?.activeTeam ?? null;
+}
+
+export function saveActiveTeam(serverId: string, team: { id: string; slug: string; name: string }, env: NodeJS.ProcessEnv) {
+	const session = loadServerSession(serverId, env);
+	if (!session?.accessToken) throw Object.assign(new Error(`Not logged in to ${serverId}.`), { category: 'authentication_required', code: 'authentication_required' });
+	saveServerSession({ ...session, activeTeam: team }, env);
+	return team;
+}
+
 export function saveServerSession(session: ControlPlaneServerSession, env: NodeJS.ProcessEnv) {
 	const state = readState(env);
 	writeState({ version: 1, sessions: [...state.sessions.filter((entry) => entry.serverId !== session.serverId), session].sort((left, right) => left.serverId.localeCompare(right.serverId)) }, env);
@@ -116,7 +127,7 @@ export function clearServerSession(serverId: string, env: NodeJS.ProcessEnv) {
 export function inspectServerCustody(env: NodeJS.ProcessEnv) {
 	const location = paths(env);
 	const sessions = existsSync(location.sessions) ? readState(env).sessions : [];
-	return { root: location.root, encrypted: existsSync(location.sessions), keyPresent: existsSync(location.key), servers: sessions.map((session) => ({ serverId: session.serverId, audience: session.audience, expiresAt: session.expiresAt ?? null, principal: session.principal ?? null })) };
+	return { root: location.root, encrypted: existsSync(location.sessions), keyPresent: existsSync(location.key), servers: sessions.map((session) => ({ serverId: session.serverId, audience: session.audience, expiresAt: session.expiresAt ?? null, principal: session.principal ?? null, activeTeam: session.activeTeam ?? null })) };
 }
 
 export function rotateServerCustodyKey(env: NodeJS.ProcessEnv) {

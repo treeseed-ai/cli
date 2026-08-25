@@ -5,17 +5,17 @@
     {
       "nodeType": "leaf",
       "segment": "send",
-      "description": "Send a message to project agents through a team discussion channel.",
+      "description": "Send a message to addressed project agents in a team discussion topic.",
       "kind": "mutation",
       "arguments": [
         {
           "name": "channel",
-          "description": "Team discussion channel.",
+          "description": "Team discussion-topic channel.",
           "required": true
         },
         {
           "name": "message",
-          "description": "Markdown message to send.",
+          "description": "Markdown message containing agent addresses.",
           "required": true
         }
       ],
@@ -27,36 +27,42 @@
         },
         {
           "name": "--team",
-          "description": "Team identity or slug.",
+          "description": "One-command team override.",
           "type": "string"
         },
         {
           "name": "--project",
-          "description": "Default project for unqualified agent names.",
-          "type": "string"
+          "description": "Project for agent resolution and the topic stream.",
+          "type": "string",
+          "required": true
         },
         {
           "name": "--to",
-          "description": "Agent target; use project/agent when names may be ambiguous.",
+          "description": "Deprecated validation-only address list.",
           "type": "string[]"
         },
         {
-          "name": "--topic",
-          "description": "Optional discussion topic.",
-          "type": "string"
+          "name": "--timeout",
+          "description": "Maximum seconds to wait for the complete response chain.",
+          "type": "number",
+          "defaultValue": 1800
+        },
+        {
+          "name": "--no-wait",
+          "description": "Return immediately after durable admission.",
+          "type": "boolean"
         },
         {
           "name": "--wait",
-          "description": "Seconds to wait for durable responses.",
-          "type": "number",
-          "defaultValue": 0
+          "description": "Deprecated wait duration in seconds.",
+          "type": "number"
         }
       ],
       "authorization": {
         "capability": "agents.execute",
         "confirmation": "never"
       },
-      "resultSchemaId": "treeseed.communication-send-receipt/v1",
+      "resultSchemaId": "treeseed.communication-send-receipt/v2",
       "execution": {
         "kind": "operation",
         "operationId": "communications.send",
@@ -90,7 +96,7 @@
             "field": "projectId",
             "source": "context",
             "name": "project",
-            "required": false,
+            "required": true,
             "transform": "identity"
           },
           {
@@ -103,17 +109,9 @@
           },
           {
             "target": "body",
-            "field": "topic",
+            "field": "timeoutSeconds",
             "source": "option",
-            "name": "topic",
-            "required": false,
-            "transform": "identity"
-          },
-          {
-            "target": "body",
-            "field": "waitSeconds",
-            "source": "option",
-            "name": "wait",
+            "name": "timeout",
             "required": false,
             "transform": "integer"
           }
@@ -233,6 +231,90 @@
           "execution": {
             "kind": "protocol",
             "handlerId": "protocol.accounts.create"
+          }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "teams",
+      "description": "Teams operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "teams.list",
+            "input": [
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "current",
+          "description": "Show the active team for this authenticated server session.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.teams.current/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.teams.current"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "use",
+          "description": "Select the active team for this authenticated server session.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "team",
+              "description": "Team UUID or unambiguous slug.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "teams.read",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.teams.use/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.teams.use"
           }
         }
       ]

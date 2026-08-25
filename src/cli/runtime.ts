@@ -8,6 +8,7 @@ import { runSecrets } from './commands/secrets.js';
 import { runHost } from './commands/host.js';
 import { runUsers } from './commands/users.js';
 import { runLibrary } from './commands/library.js';
+import { runTeams } from './commands/teams.js';
 import type { CommandContext, CommandFailure, ParsedInvocation, Writer } from './types.js';
 import { promptText } from './support/prompts.js';
 import { handoffProviderEnrollment } from './support/provider-enrollment.js';
@@ -26,7 +27,7 @@ export function createCommandContext(overrides: Partial<CommandContext> = {}): C
 }
 
 function envelope(invocation: ParsedInvocation, ok: boolean, result: unknown, failure?: CommandFailure) {
-	return createCommandResult({ commandPath: invocation.command.path, mode: invocation.options.plan === true ? 'plan' : 'execute', ok, result: ok ? result : null, error: failure ?? null, warnings: [], blockers: failure ? [{ code: failure.code, message: failure.message }] : [], receipts: [], nextActions: [] });
+	return createCommandResult({ commandPath: invocation.command.path, mode: invocation.options.plan === true ? 'plan' : 'execute', ok, result: result ?? null, error: failure ?? null, warnings: [], blockers: failure ? [{ code: failure.code, message: failure.message }] : [], receipts: [], nextActions: [] });
 }
 
 function failure(category: CommandErrorCategory, code: string, message: string): CommandFailure { return { category, code, message }; }
@@ -58,6 +59,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (!(await confirmed(invocation, context))) throw Object.assign(new Error('Interactive confirmation is required, or pass --yes for authorized automation.'), { category: 'confirmation_required', code: 'confirmation_required' });
 	if (invocation.options.plan === true && ['auth', 'secrets'].includes(invocation.command.path[0]!)) return { action: invocation.command.name, mutation: false, authority: 'local_credential_custody' };
 	if (invocation.command.path[0] === 'users') return runUsers(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'teams') return runTeams(invocation, context);
 	if (invocation.command.execution.kind === 'protocol') return runAuth(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'host') return runHost(invocation, context);
@@ -67,7 +69,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 
 function print(context: CommandContext, value: unknown, ok = true) {
 	if (context.outputFormat === 'json') context.write(JSON.stringify(value, null, 2), ok ? 'stdout' : 'stderr');
-	else if (ok) context.write(typeof value === 'string' ? value : renderHumanCommandResult(value), 'stdout');
+	else if (ok) context.write(typeof value === 'string' ? value : renderHumanCommandResult(value, { color: Boolean(process.stdout.isTTY && !context.env.NO_COLOR), width: Number(context.env.COLUMNS) || process.stdout.columns || 100 }), 'stdout');
 	else {
 		const message = value && typeof value === 'object' && 'error' in value ? (value as { error?: { message?: string } }).error?.message : null;
 		context.write(message ?? String(value), 'stderr');
@@ -98,6 +100,12 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 		print(context, envelope(invocation, true, result)); return 0;
 	} catch (error) {
 		const failed = categorized(error);
-		print(context, envelope(invocation, false, null, failed), false); return 1;
+		const partial = error && typeof error === 'object' && 'partialResult' in error ? (error as { partialResult?: unknown }).partialResult : null;
+		const failedEnvelope = envelope(invocation, false, partial, failed);
+		if (context.outputFormat === 'human' && invocation.command.name === 'send' && partial) {
+			context.write(renderHumanCommandResult({ ...failedEnvelope, ok: true }, { color: Boolean(process.stdout.isTTY && !context.env.NO_COLOR), width: Number(context.env.COLUMNS) || process.stdout.columns || 100 }), 'stdout');
+			context.write(failed.message, 'stderr');
+		} else print(context, failedEnvelope, false);
+		return 1;
 	}
 }

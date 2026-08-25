@@ -15,14 +15,29 @@ test('registry exactly matches the SDK command tree', () => {
 	assert.equal(commandSpecs.some((command) => command.name.includes(':')), false);
 });
 
-test('send maps project-qualified recipients to the catalog without raw routes', async () => {
+test('send derives and validates project-qualified recipients without raw routes', async () => {
 	const calls: Array<{ operationId: string; input: unknown }> = []; const output: string[] = [];
-	const exit = await runCommandLine(['send', 'engineering', 'How should this work?', '--team', 'team-1', '--project', 'project-sdk', '--to', 'sdk/architect', '--json'], {
+	const exit = await runCommandLine(['send', 'engineering', '@sdk/architect\n\nHow should this work?', '--team', 'team-1', '--project', 'sdk', '--to', 'sdk/architect', '--no-wait', '--json'], {
 		interactiveUi: false, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { sendId: 'send-1', status: 'queued' } }; }, write: (value) => output.push(value),
 	});
 	assert.equal(exit, 0);
-	assert.deepEqual(calls, [{ operationId: 'communications.send', input: { path: { teamId: 'team-1', channel: 'engineering' }, query: {}, body: { message: 'How should this work?', projectId: 'project-sdk', recipients: ['sdk/architect'] } } }]);
+	assert.deepEqual(calls, [{ operationId: 'communications.send', input: { path: { teamId: 'team-1', channel: 'engineering' }, query: {}, body: { message: '@sdk/architect\n\nHow should this work?', projectId: 'sdk', recipients: ['sdk/architect'] } } }]);
 	assert.equal(JSON.parse(output[0]!).result.sendId, 'send-1');
+});
+
+test('teams use persists the active team and team commands inherit it', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-team-')); const output: string[] = [];
+	const env = { TREESEED_CONFIG_HOME: root, TREESEED_API_BASE_URL: 'http://127.0.0.1:3002' };
+	try {
+		saveServerSession({ serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'token', principal: { id: 'user-1' } as any }, env);
+		const invoke = async (operationId: string, input: any) => operationId === 'teams.list'
+			? { data: { items: [{ id: 'team-1', slug: 'treeseed', name: 'TreeSeed' }] } }
+			: { data: { operationId, teamId: input.path.teamId } };
+		assert.equal(await runCommandLine(['teams', 'use', 'treeseed', '--json'], { env, interactiveUi: false, operationInvoke: invoke, write: (value) => output.push(value) }), 0);
+		assert.equal(loadServerSession('local', env)?.activeTeam?.id, 'team-1');
+		assert.equal(await runCommandLine(['capacity', 'status', '--json'], { env, interactiveUi: false, operationInvoke: invoke, write: (value) => output.push(value) }), 0);
+		assert.equal(JSON.parse(output.at(-1)!).result.teamId, 'team-1');
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('leaf commands expose only catalog-derived high-level options', () => {

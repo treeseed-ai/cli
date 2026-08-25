@@ -25,7 +25,7 @@ export async function createControlPlaneClient(invocation: Pick<ParsedInvocation
 	if (requireAuth && session?.refreshToken && session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now() + 30_000) {
 		const token = await client.refreshAccessToken(CONTROL_PLANE_CLI_CLIENT_ID, session.refreshToken);
 		if (token.audience !== session.audience) throw Object.assign(new Error('Refreshed token audience does not match the stored server session.'), { category: 'authentication_required', code: 'oauth_audience_mismatch' });
-		session = { serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken ?? session.refreshToken, expiresAt: new Date(Date.now() + token.expiresIn * 1_000).toISOString(), principal: token.principal };
+		session = { serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken ?? session.refreshToken, expiresAt: new Date(Date.now() + token.expiresIn * 1_000).toISOString(), principal: token.principal, activeTeam: session.activeTeam ?? null };
 		saveServerSession(session, context.env);
 		client = new ControlPlaneClient({ profile, accessToken: session.accessToken, userAgent: 'trsd' });
 	}
