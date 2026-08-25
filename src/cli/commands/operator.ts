@@ -29,6 +29,17 @@ function transform(value: unknown, binding: CommandInputBinding) {
 	return value;
 }
 
+async function portableSeedBundle(fileValue: string, context: CommandContext) {
+	const file = resolve(context.cwd, fileValue);
+	const parsed = parseYaml(await readFile(file, 'utf8'));
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Seed file must contain one portable seed bundle object.'), { category: 'invalid_input', code: 'seed_bundle_file_invalid' });
+	return parsed as Record<string, unknown>;
+}
+
+function looksLikeSeedFile(value: string) {
+	return /(?:^|[/\\])[^/\\]+\.(?:json|ya?ml)$/iu.test(value);
+}
+
 async function operationInput(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'operation') throw new Error('Command is not operation-bound.');
 	const input = { path: {} as Record<string, unknown>, query: {} as Record<string, unknown>, body: {} as Record<string, unknown> };
@@ -40,9 +51,7 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 	}
 	const operation = controlPlaneOperation(invocation.command.execution.operationId);
 	if (operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
-		const file = resolve(context.cwd, input.body.file);
-		const parsed = parseYaml(await readFile(file, 'utf8'));
-		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Seed file must contain one portable seed bundle object.'), { category: 'invalid_input', code: 'seed_bundle_file_invalid' });
+		const parsed = await portableSeedBundle(input.body.file, context);
 		delete input.body.file;
 		input.body.bundle = parsed;
 		if (operation.descriptor.rest?.path.includes('{name}')
@@ -50,6 +59,14 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 			&& typeof (parsed as Record<string, unknown>).name === 'string') {
 			input.path.name = (parsed as Record<string, unknown>).name;
 		}
+	}
+	if (operation.descriptor.operationId === 'seeds.verify'
+		&& typeof input.path.name === 'string'
+		&& looksLikeSeedFile(input.path.name)) {
+		const parsed = await portableSeedBundle(input.path.name, context);
+		if (typeof parsed.name !== 'string' || !parsed.name.trim()) throw Object.assign(new Error('Seed file must declare a name.'), { category: 'invalid_input', code: 'seed_bundle_name_required' });
+		input.path.name = parsed.name;
+		input.body.bundle = parsed;
 	}
 	if (!operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
 		const file = resolve(context.cwd, input.body.file);
