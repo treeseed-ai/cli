@@ -42,17 +42,17 @@ export async function runLibrary(invocation: ParsedInvocation, context: CommandC
 	const library = data(libraryResponse);
 	const repoId = text(library.repositoryId);
 	if (!repoId) throw Object.assign(new Error('The project library has no TreeDX repository binding.'), { category: 'provider_unavailable', code: 'library_binding_unavailable' });
+	const ref = text(invocation.options.ref) ?? text(library.contentRepositoryRef) ?? 'refs/heads/staging';
 	const command = invocation.command.path[1];
 	if (command === 'show') return { project: matches[0], library };
 	if (command === 'status') {
 		const [repository, status, index] = await Promise.all([
 			invoke('treedx.repositories.show', { path: { projectId, repoId }, query: {} }),
 			invoke('treedx.repositories.status', { path: { projectId, repoId }, query: {} }),
-			invoke('treedx.repositories.search.index.status', { path: { projectId, repoId }, query: {} }),
+			invoke('treedx.repositories.search.index.status', { path: { projectId, repoId }, query: { ref } }),
 		]);
 		return { project: matches[0], library, repository: data(repository), status: data(status), searchIndex: data(index) };
 	}
-	const ref = text(invocation.options.ref) ?? text(library.contentRepositoryRef) ?? 'refs/heads/staging';
 	if (command === 'paths') {
 		const prefix = text(invocation.options.prefix)?.replace(/^\/+|\/+$/gu, '');
 		return invoke('treedx.repositories.paths.list', { path: { projectId, repoId }, query: {}, body: { ref, paths: [prefix ? `${prefix}/**` : '**'], kinds: ['blob'], limit: number(invocation.options.limit) ?? 100, ...(text(invocation.options.cursor) ? { cursor: text(invocation.options.cursor) } : {}) } });
