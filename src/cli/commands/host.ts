@@ -14,6 +14,10 @@ function input(invocation: ParsedInvocation) {
 	return { handlerId: invocation.command.execution.handlerId, arguments: invocation.arguments, options };
 }
 
+export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocation, 'command'>) {
+	return invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll';
+}
+
 export async function runHost(invocation: ParsedInvocation, context: CommandContext) {
 	const command = input(invocation);
 	if (invocation.options.plan === true && invocation.command.name === 'host bootstrap enroll') return { action: 'enroll', mutation: false, transport: 'local_socket' };
@@ -25,6 +29,7 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 		return storeHostEnrollment(enrollment, endpoint, context.env);
 	}
 	if (context.hostInvoke) return context.hostInvoke(command);
+	if (hostUsesProtectedLocalTransport(invocation)) return invokeLocalHostManager(command);
 	return invokeHostManager(command, typeof invocation.options.server === 'string' ? invocation.options.server : undefined, context.env);
 }
 import { readFileSync } from 'node:fs';
