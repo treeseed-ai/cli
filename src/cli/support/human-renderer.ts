@@ -63,6 +63,11 @@ export function renderHumanCommandResult(value: unknown) {
 			Array.isArray(result.scopes) ? `Scopes: ${result.scopes.map(scalar).join(', ')}` : ''].filter(Boolean).join('\n');
 	}
 	if (path === 'auth logout' && result) return `Logged out of ${scalar(result.serverId)}.`;
+	if (path === 'users create' && result) return [
+		`User registration accepted for ${scalar(result.email)}.`,
+		result.confirmationRequired ? 'Email confirmation is required before login.' : 'The user is ready to log in.',
+		result.nextAction ? `Next: ${scalar(result.nextAction)}` : '',
+	].filter(Boolean).join('\n');
 	if (path === 'auth status' && result) {
 		const name = principalName(result.principal);
 		const teams = Array.isArray(result.teams) ? result.teams.length : 0;

@@ -8,7 +8,7 @@ test('users create securely prompts twice and invokes the anonymous registration
 	const output: string[] = [];
 	const prompts = ['a sufficiently long password', 'a sufficiently long password'];
 	const calls: Array<{ operationId: string; input: any }> = [];
-	const exit = await runCommandLine([...identity, '--yes', '--json'], {
+	const exit = await runCommandLine([...identity, '--json'], {
 		interactiveUi: false,
 		promptSecret: async () => prompts.shift() ?? '',
 		operationInvoke: async (operationId, input) => {
@@ -43,11 +43,24 @@ test('users create plan never prompts or exposes a password', async () => {
 	assert.equal('password' in result.input, false);
 });
 
+test('users create prints an explicit success result in human mode', async () => {
+	const output: string[] = [];
+	const prompts = ['a sufficiently long password', 'a sufficiently long password'];
+	const exit = await runCommandLine(identity, {
+		interactiveUi: false,
+		promptSecret: async () => prompts.shift() ?? '',
+		operationInvoke: async () => ({ data: { confirmationRequired: true, email: 'adrian.webb@knowledge.coop' } }),
+		write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.match(output[0]!, /User registration accepted for adrian\.webb@knowledge\.coop\./u);
+});
+
 test('users create rejects mismatched passwords without invoking the API or leaking either value', async () => {
 	const output: string[] = [];
 	const prompts = ['first secret value', 'second secret value'];
 	let invocations = 0;
-	const exit = await runCommandLine([...identity, '--yes', '--json'], {
+	const exit = await runCommandLine([...identity, '--json'], {
 		interactiveUi: false,
 		promptSecret: async () => prompts.shift() ?? '',
 		operationInvoke: async () => { invocations += 1; },
@@ -57,4 +70,17 @@ test('users create rejects mismatched passwords without invoking the API or leak
 	assert.equal(invocations, 0);
 	assert.equal(JSON.parse(output[0]!).error.code, 'password_mismatch');
 	assert.doesNotMatch(output[0]!, /first secret|second secret/u);
+});
+
+test('users create fails deterministically when registration exceeds the configured timeout', async () => {
+	const output: string[] = [];
+	const prompts = ['a sufficiently long password', 'a sufficiently long password'];
+	const exit = await runCommandLine([...identity, '--timeout', '1', '--json'], {
+		interactiveUi: false,
+		promptSecret: async () => prompts.shift() ?? '',
+		operationInvoke: async () => new Promise(() => undefined),
+		write: (value) => output.push(value),
+	});
+	assert.equal(exit, 1);
+	assert.equal(JSON.parse(output[0]!).error.code, 'user_creation_timeout');
 });

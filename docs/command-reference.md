@@ -30,9 +30,9 @@ Operation: mutation. Result schema: `treeseed.command.login/v1`.
 Execution: `protocol.oauth.device.login`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--timeout <value>`: Maximum seconds to wait for device authorization.
 
 ### trsd auth logout
 
@@ -67,12 +67,12 @@ Operation: mutation. Result schema: `treeseed.command.create/v1`.
 Execution: `protocol.accounts.create`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--email <value>`: Email address for the new user.
 - `--username <value>`: Unique username for the new user.
 - `--display-name <value>`: Human-readable display name.
+- `--timeout <value>`: Maximum seconds to wait for registration.
 
 ## trsd secrets
 
