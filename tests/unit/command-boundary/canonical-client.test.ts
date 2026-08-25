@@ -63,6 +63,7 @@ test('host configuration adoption sends validated content and requires explicit 
 test('host identity adoption is permanently bound to the protected local socket', async () => {
 	const { hostUsesProtectedLocalTransport } = await import('../../../src/cli/commands/host.ts');
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config adopt' } as any }), true);
+	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host reset' } as any }), true);
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config apply' } as any }), false);
 });
 

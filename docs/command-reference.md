@@ -473,6 +473,19 @@ Execution: `local.host.bootstrap.enroll`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+### trsd host reset
+
+Stop managed components, erase their state, and reconcile a fresh unseeded platform.
+
+Operation: mutation. Result schema: `treeseed.command.reset/v1`.
+Execution: `local.host.reset`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--confirm`: Confirm deletion of all manager-owned component data and receipts.
+
 ## trsd agents
 
 Agents operations.

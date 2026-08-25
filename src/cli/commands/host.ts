@@ -15,7 +15,7 @@ function input(invocation: ParsedInvocation) {
 }
 
 export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocation, 'command'>) {
-	return invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll';
+	return invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll' || invocation.command.name === 'host reset';
 }
 
 export async function runHost(invocation: ParsedInvocation, context: CommandContext) {

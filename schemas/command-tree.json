@@ -883,6 +883,33 @@
               }
             }
           ]
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "reset",
+          "description": "Stop managed components, erase their state, and reconcile a fresh unseeded platform.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--confirm",
+              "description": "Confirm deletion of all manager-owned component data and receipts.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.reset",
+            "confirmation": "irreversible"
+          },
+          "resultSchemaId": "treeseed.command.reset/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.reset"
+          }
         }
       ]
     },
