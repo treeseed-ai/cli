@@ -7,6 +7,7 @@ import test from 'node:test';
 import { listCommandPaths, TREESEED_COMMAND_TREE_V1 } from '@treeseed/sdk/operator-contracts';
 import { commandSpecs } from '../../../src/cli/registry.ts';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
+import { handoffProviderEnrollment } from '../../../src/cli/support/provider-enrollment.ts';
 import { loadServerSession, saveServerProfile, saveServerSession } from '../../../src/cli/support/server-custody.ts';
 
 test('registry exactly matches the SDK command tree', () => {
@@ -202,6 +203,16 @@ test('provider enrollment hands the unwrapped API receipt to trusted local custo
 		await new Promise<void>((accept, reject) => server.close((error) => error ? reject(error) : accept()));
 		rmSync(root, { recursive: true, force: true });
 	}
+});
+
+test('provider enrollment defaults to the protected local manager socket contract', async () => {
+	const requests: unknown[] = [];
+	const result = await handoffProviderEnrollment({ action: 'complete', connectionId: 'local-team' }, {}, async (input) => {
+		requests.push(input);
+		return { connectionId: 'local-team', state: 'connected' };
+	});
+	assert.deepEqual(requests, [{ handlerId: 'local.host.provider.enrollment', arguments: [], options: { payload: '{"action":"complete","connectionId":"local-team"}' } }]);
+	assert.deepEqual(result, { connectionId: 'local-team', state: 'connected' });
 });
 
 test('unavailable commands fail closed before network or filesystem mutation', async () => {
