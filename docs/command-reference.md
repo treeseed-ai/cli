@@ -55,6 +55,25 @@ Control-plane operation: `accounts.current.show`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
+## trsd users
+
+Users operations.
+
+### trsd users create
+
+Create a local TreeSeed user with a securely prompted password.
+
+Operation: mutation. Result schema: `treeseed.command.create/v1`.
+Execution: `protocol.accounts.create`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--email <value>`: Email address for the new user.
+- `--username <value>`: Unique username for the new user.
+- `--display-name <value>`: Human-readable display name.
+
 ## trsd secrets
 
 Secrets operations.
