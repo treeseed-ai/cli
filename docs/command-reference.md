@@ -165,6 +165,119 @@ Execution: `local.secrets.rotate`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd dev
+
+Dev operations.
+
+## trsd dev session
+
+Session operations.
+
+### trsd dev session start <manifest>
+
+Start a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.start/v1`.
+Execution: `local.dev.session.start`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--actor <value>`: Audited development-session actor.
+- `--lease-seconds <value>`: Requested bounded lease duration.
+
+### trsd dev session stop
+
+Stop a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.stop/v1`.
+Execution: `local.dev.session.stop`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Development session identity.
+- `--restore`: Restore released routes and targets.
+
+### trsd dev use <selection>
+
+Use a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.use/v1`.
+Execution: `local.dev.use`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Development session identity.
+- `--target <value>`: Additional project.target=mode selections.
+
+### trsd dev rebuild <target>
+
+Rebuild a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.rebuild/v1`.
+Execution: `local.dev.rebuild`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Development session identity.
+
+### trsd dev status
+
+Status a local development session.
+
+Operation: read. Result schema: `treeseed.command.dev.status/v1`.
+Execution: `local.dev.status`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--session <value>`: Development session identity.
+- `--all`: Include stopped and expired sessions.
+
+### trsd dev logs
+
+Logs a local development session.
+
+Operation: read. Result schema: `treeseed.command.dev.logs/v1`.
+Execution: `local.dev.logs`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--session <value>`: Development session identity.
+- `--target <value>`: Development target identity.
+- `--follow`: Follow target logs.
+
+### trsd dev plan
+
+Plan a local development session.
+
+Operation: read. Result schema: `treeseed.command.dev.plan/v1`.
+Execution: `local.dev.plan`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--session <value>`: Development session identity.
+- `--affected`: Show the smallest affected closure.
+
+### trsd dev freeze
+
+Freeze a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.freeze/v1`.
+Execution: `local.dev.freeze`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Development session identity.
+- `--allow-dirty`: Create a non-promotable dirty-source candidate.
+
+### trsd dev verify
+
+Verify a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.verify/v1`.
+Execution: `local.dev.verify`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Development session identity.
+- `--candidate <value>`: Candidate identity.
+
 ## trsd host
 
 Host operations.

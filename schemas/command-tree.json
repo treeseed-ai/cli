@@ -416,6 +416,302 @@
     },
     {
       "nodeType": "branch",
+      "segment": "dev",
+      "description": "Dev operations.",
+      "children": [
+        {
+          "nodeType": "branch",
+          "segment": "session",
+          "description": "Session operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "start",
+              "description": "Start a local development session.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "manifest",
+                  "description": "manifest value.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--actor",
+                  "description": "Audited development-session actor.",
+                  "type": "string"
+                },
+                {
+                  "name": "--lease-seconds",
+                  "description": "Requested bounded lease duration.",
+                  "type": "number"
+                }
+              ],
+              "authorization": {
+                "capability": "development.start",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.dev.start/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.dev.session.start"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "stop",
+              "description": "Stop a local development session.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--session",
+                  "description": "Development session identity.",
+                  "type": "string"
+                },
+                {
+                  "name": "--restore",
+                  "description": "Restore released routes and targets.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "development.stop",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.dev.stop/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.dev.session.stop"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "use",
+          "description": "Use a local development session.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "selection",
+              "description": "selection value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            },
+            {
+              "name": "--target",
+              "description": "Additional project.target=mode selections.",
+              "type": "string[]"
+            }
+          ],
+          "authorization": {
+            "capability": "development.use",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.dev.use/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.use"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "rebuild",
+          "description": "Rebuild a local development session.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "target",
+              "description": "target value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "development.rebuild",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.dev.rebuild/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.rebuild"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status a local development session.",
+          "kind": "read",
+          "options": [
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            },
+            {
+              "name": "--all",
+              "description": "Include stopped and expired sessions.",
+              "type": "boolean"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.dev.status/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.status"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "logs",
+          "description": "Logs a local development session.",
+          "kind": "read",
+          "options": [
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            },
+            {
+              "name": "--target",
+              "description": "Development target identity.",
+              "type": "string"
+            },
+            {
+              "name": "--follow",
+              "description": "Follow target logs.",
+              "type": "boolean"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.dev.logs/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.logs"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "plan",
+          "description": "Plan a local development session.",
+          "kind": "read",
+          "options": [
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            },
+            {
+              "name": "--affected",
+              "description": "Show the smallest affected closure.",
+              "type": "boolean"
+            }
+          ],
+          "resultSchemaId": "treeseed.command.dev.plan/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.plan"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "freeze",
+          "description": "Freeze a local development session.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            },
+            {
+              "name": "--allow-dirty",
+              "description": "Create a non-promotable dirty-source candidate.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "development.freeze",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.dev.freeze/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.freeze"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "verify",
+          "description": "Verify a local development session.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            },
+            {
+              "name": "--candidate",
+              "description": "Candidate identity.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "development.verify",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.dev.verify/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.verify"
+          }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
       "segment": "host",
       "description": "Host operations.",
       "children": [
