@@ -408,14 +408,18 @@ test('JSON device login keeps human approval instructions off stdout', async () 
 	baseUrl = `http://127.0.0.1:${address.port}`;
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-device-'));
 	const output: Array<{ value: string; stream?: string }> = [];
+	const opened: string[] = [];
 	try {
 		saveServerProfile({ serverId: 'test', label: 'Test', baseUrl }, { TREESEED_CONFIG_HOME: root });
 		const exit = await runCommandLine(['auth', 'login', '--server', 'test', '--json'], {
 			env: { TREESEED_CONFIG_HOME: root }, interactiveUi: false,
 			write: (value, stream) => output.push({ value, stream }),
+			openExternal: async (url) => { opened.push(url); return true; },
 		});
 		assert.equal(exit, 0, JSON.stringify(output));
-		assert.match(output.find(({ stream }) => stream === 'stderr')!.value, /ABCD-EFGH/u);
+		assert.deepEqual(opened, [`${baseUrl}/approve?user_code=ABCD-EFGH`]);
+		assert.match(output.filter(({ stream }) => stream === 'stderr').map(({ value }) => value).join('\n'), /Opened your default browser/u);
+		assert.match(output.filter(({ stream }) => stream === 'stderr').map(({ value }) => value).join('\n'), /another computer.*ABCD-EFGH/u);
 		const stdout = output.filter(({ stream }) => stream === 'stdout');
 		assert.equal(stdout.length, 1);
 		assert.equal(JSON.parse(stdout[0]!.value).ok, true);

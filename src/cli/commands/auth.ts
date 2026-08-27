@@ -39,7 +39,12 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 	if (invocation.command.name === 'auth login') {
 		const configuredTimeout = configuredLoginTimeoutSeconds(invocation, context);
 		const authorization = await client.authorizeDevice(CONTROL_PLANE_CLI_CLIENT_ID, DEFAULT_SCOPES, AbortSignal.timeout(configuredTimeout * 1_000));
-		context.write(`Open ${authorization.verificationUriComplete ?? authorization.verificationUri} and enter code ${authorization.userCode}.`, 'stderr');
+		const verificationUrl = authorization.verificationUriComplete ?? authorization.verificationUri;
+		const opened = await Promise.resolve(context.openExternal?.(verificationUrl)).catch(() => false) ?? false;
+		if (opened) context.write('Opened your default browser. Follow the instructions there.', 'stderr');
+		else context.write('A browser could not be opened automatically.', 'stderr');
+		const codeFallback = authorization.verificationUriComplete ? '' : ` and enter code ${authorization.userCode}`;
+		context.write(`To authorize from this or another computer, open ${verificationUrl}${codeFallback}.`, 'stderr');
 		const timeoutSeconds = Math.min(configuredTimeout, authorization.expiresIn);
 		const deadline = Date.now() + timeoutSeconds * 1_000;
 		let interval = Math.max(1, authorization.interval) * 1_000;
