@@ -50,7 +50,7 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.47",
+    "@treeseed/sdk": "0.13.0-rc.48",
     "yaml": "2.8.1"
   },
   "overrides": {
