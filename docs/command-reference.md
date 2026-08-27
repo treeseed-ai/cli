@@ -1569,6 +1569,186 @@ Control-plane operation: `treedx.workspaces.abandon`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd ai
+
+Ai operations.
+
+### trsd ai status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `treeai.qualification.get.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd ai mode
+
+Mode operations.
+
+### trsd ai mode show
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `treeai.qualification.get.mode`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai mode set <mode>
+
+Set the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.set/v1`.
+Control-plane operation: `treeai.qualification.post.mode`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd ai inference
+
+Inference operations.
+
+### trsd ai inference models
+
+Models the selected resource.
+
+Operation: read. Result schema: `treeseed.command.models/v1`.
+Control-plane operation: `treeai.inference.get.models`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai inference jobs
+
+Jobs the selected resource.
+
+Operation: read. Result schema: `treeseed.command.jobs/v1`.
+Control-plane operation: `treeai.inference.get.jobs`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai inference rollback
+
+Rollback the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.rollback/v1`.
+Control-plane operation: `treeai.inference.post.deployments.rollback`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd ai training
+
+Training operations.
+
+### trsd ai training libraries
+
+Libraries the selected resource.
+
+Operation: read. Result schema: `treeseed.command.libraries/v1`.
+Control-plane operation: `treeai.training.get.libraries`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai training jobs
+
+Jobs the selected resource.
+
+Operation: read. Result schema: `treeseed.command.jobs/v1`.
+Control-plane operation: `treeai.training.get.jobs`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai training runs
+
+Runs the selected resource.
+
+Operation: read. Result schema: `treeseed.command.runs/v1`.
+Control-plane operation: `treeai.training.get.library.runs`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd ai lab
+
+Lab operations.
+
+### trsd ai lab status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `treeai.lab.get.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai lab agents
+
+Agents the selected resource.
+
+Operation: read. Result schema: `treeseed.command.agents/v1`.
+Control-plane operation: `treeai.lab.get.agents`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai lab libraries
+
+Libraries the selected resource.
+
+Operation: read. Result schema: `treeseed.command.libraries/v1`.
+Control-plane operation: `treeai.lab.get.libraries`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd ai qualify
+
+Qualify operations.
+
+### trsd ai qualify status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `treeai.qualification.get.qualification.profile`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd ai qualify run
+
+Run the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.run/v1`.
+Control-plane operation: `treeai.qualification.post.qualification.campaigns`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd ai qualify campaigns
+
+Campaigns the selected resource.
+
+Operation: read. Result schema: `treeseed.command.campaigns/v1`.
+Control-plane operation: `treeai.qualification.get.qualification.campaigns`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
 ## trsd library
 
 Library operations.

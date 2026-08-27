@@ -3937,6 +3937,411 @@
     },
     {
       "nodeType": "branch",
+      "segment": "ai",
+      "description": "Ai operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "status",
+          "description": "Status the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.status/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "treeai.qualification.get.status",
+            "input": [
+              {
+                "target": "path",
+                "field": "nodeId",
+                "source": "context",
+                "name": "node",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "mode",
+          "description": "Mode operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.qualification.get.mode",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "set",
+              "description": "Set the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "mode",
+                  "description": "mode identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.set",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.set/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.qualification.post.mode",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "mode",
+                    "source": "argument",
+                    "name": "mode",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "inference",
+          "description": "Inference operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "models",
+              "description": "Models the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.models/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.inference.get.models",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "jobs",
+              "description": "Jobs the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.jobs/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.inference.get.jobs",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "rollback",
+              "description": "Rollback the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.rollback",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.command.rollback/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.inference.post.deployments.rollback",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "training",
+          "description": "Training operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "libraries",
+              "description": "Libraries the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.libraries/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.training.get.libraries",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "jobs",
+              "description": "Jobs the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.jobs/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.training.get.jobs",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "runs",
+              "description": "Runs the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.runs/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.training.get.library.runs",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "lab",
+          "description": "Lab operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.lab.get.status",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "agents",
+              "description": "Agents the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.agents/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.lab.get.agents",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "libraries",
+              "description": "Libraries the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.libraries/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.lab.get.libraries",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "qualify",
+          "description": "Qualify operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.qualification.get.qualification.profile",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "run",
+              "description": "Run the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.run",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.run/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.qualification.post.qualification.campaigns",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "campaigns",
+              "description": "Campaigns the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.campaigns/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "treeai.qualification.get.qualification.campaigns",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
       "segment": "library",
       "description": "Library operations.",
       "children": [
