@@ -46,10 +46,11 @@
     "pack:artifact": "node --import tsx ./scripts/packages/pack-package-artifact.ts",
     "release:check-tag": "node --import tsx ./scripts/packages/assert-release-tag-version.ts",
     "release:verify": "node --import tsx ./scripts/packages/release-verify.ts",
-    "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
+    "release:publish": "node --import tsx ./scripts/packages/publish-package.ts",
+    "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.40",
+    "@treeseed/sdk": "0.13.0-rc.47",
     "yaml": "2.8.1"
   },
   "overrides": {
