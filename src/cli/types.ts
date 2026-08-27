@@ -12,6 +12,7 @@ export interface CommandContext {
 	prompt?: (question: string) => Promise<string> | string;
 	promptSecret?: (question: string) => Promise<string> | string;
 	confirm?: (question: string, defaultValue?: 'yes' | 'no') => Promise<boolean> | boolean;
+	openExternal?: (url: string) => Promise<boolean> | boolean;
 	operationInvoke?: (operationId: string, input: unknown) => Promise<unknown>;
 	hostInvoke?: (input: { handlerId: string; arguments: string[]; options: Record<string, string | string[] | boolean | undefined> }) => Promise<unknown>;
 	providerEnrollmentHandoff?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
