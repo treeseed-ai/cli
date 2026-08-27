@@ -20,7 +20,7 @@ interface ProjectSelection { manifest: string; worktree?: string; targets?: Arra
 
 interface DevelopmentStatusRecord {
 	session: {
-		targets: Array<{ projectId: string; targetId: string; mode: 'released' | 'candidate' | 'live' }>;
+		targets: Array<{ projectId: string; targetId: string; mode: 'released' | 'candidate' | 'live'; generation: number; health?: string }>;
 		repositories: Array<{ projectId: string; worktree: string }>;
 	};
 	runtimes: DevelopmentRuntime[];
@@ -51,10 +51,11 @@ function sha512Integrity(value: Buffer) { return `sha512-${createHash('sha512').
 
 function git(root: string, args: string[]) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim(); }
 
-function repositoryClosure(runtime: DevelopmentRuntime, worktree: string) {
-	const status = git(worktree, ['status', '--porcelain=v1', '--untracked-files=all']);
+function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
+	const pathspec = excludedPaths.length ? ['--', '.', ...excludedPaths.map((path) => `:(exclude)${path}`)] : [];
+	const status = git(worktree, ['status', '--porcelain=v1', '--untracked-files=all', ...pathspec]);
 	const branch = git(worktree, ['branch', '--show-current']) || null;
-	return { projectId: runtime.project.id, repository: runtime.project.repository, worktree, commit: git(worktree, ['rev-parse', 'HEAD']), branch, dirty: Boolean(status), dirtyDigest: status ? sha256(`${status}\n${git(worktree, ['diff', '--binary', 'HEAD'])}`) : null, recipeDigest: sha256(JSON.stringify(runtime)) };
+	return { projectId: runtime.project.id, repository: runtime.project.repository, worktree, commit: git(worktree, ['rev-parse', 'HEAD']), branch, dirty: Boolean(status), dirtyDigest: status ? sha256(`${status}\n${git(worktree, ['diff', '--binary', 'HEAD', ...pathspec])}`) : null, recipeDigest: sha256(JSON.stringify(runtime)) };
 }
 
 function projectSelections(file: string): ProjectSelection[] {
@@ -281,6 +282,24 @@ function artifactPaths(pattern: string, root: string) {
 	return readdirSync(directory).filter((name) => expression.test(name)).map((name) => resolve(directory, name));
 }
 
+function compatibilityAttestations(repositories: Array<{ worktree: string }>) {
+	return repositories.flatMap(({ worktree }) => {
+		const path = resolve(worktree, '.treeseed/standards/compatibility-attestation.json');
+		if (!existsSync(path)) return [];
+		const bytes = readFileSync(path), value = JSON.parse(bytes.toString('utf8')) as { contractId?: unknown; result?: { sufficient?: unknown; required?: unknown } };
+		if (typeof value.contractId !== 'string' || value.result?.sufficient !== true || !['none', 'patch', 'minor', 'major'].includes(String(value.result?.required))) throw new Error(`Compatibility attestation is invalid or insufficient: ${path}.`);
+		return [{ contractId: value.contractId, digest: sha256(bytes), compatible: true, minimumBump: value.result.required as 'none' | 'patch' | 'minor' | 'major' }];
+	});
+}
+
+function withFreezeLock<T>(env: NodeJS.ProcessEnv, sessionId: string, action: () => Promise<T>) {
+	const lock = resolve(developmentStateRoot(env), sessionId, 'freeze.lock');
+	mkdirSync(dirname(lock), { recursive: true, mode: 0o700 });
+	let descriptor: number;
+	try { descriptor = openSync(lock, 'wx', 0o600); } catch { throw new Error(`Candidate freeze is already active for ${sessionId}.`); }
+	return action().finally(() => { closeSync(descriptor); rmSync(lock, { force: true }); });
+}
+
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
 	const manifest = resolve(context.cwd, invocation.arguments[0]!); const projects = loadRuntimes(manifest);
 	const now = new Date(), requestedLease = Number(invocation.options.leaseSeconds ?? 14_400), leaseSeconds = Math.max(60, Math.min(86_400, requestedLease));
@@ -327,16 +346,17 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 }
 
 async function freeze(invocation: ParsedInvocation, context: CommandContext) {
-	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string }> }; runtimes: DevelopmentRuntime[] };
-	const source = record.session.repositories.map((repository) => {
+	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
+	return withFreezeLock(context.env, sessionId, async () => {
+		const source = record.session.repositories.map((repository) => {
 		const runtime = record.runtimes.find((entry) => entry.project.id === repository.projectId);
 		if (!runtime) throw new Error(`Development runtime is missing for ${repository.projectId}.`);
 		return repositoryClosure(runtime, repository.worktree);
-	});
-	const dirty = source.some((entry) => entry.dirty);
-	if (dirty && invocation.options.allowDirty !== true) throw new Error('Freeze found dirty source; pass --allow-dirty to create a non-promotable candidate.');
-	const artifacts: Array<{ projectId: string; targetId: string; kind: string; identity: string; digest: string; integrity?: string }> = [];
-	for (const runtime of record.runtimes) for (const target of runtime.targets) if (target.freeze && record.session.targets.some((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id && selected.mode !== 'released')) {
+		});
+		const dirty = source.some((entry) => entry.dirty);
+		if (dirty && invocation.options.allowDirty !== true) throw new Error('Freeze found dirty source; pass --allow-dirty to create a non-promotable candidate.');
+		const artifacts: Array<{ projectId: string; targetId: string; kind: string; identity: string; digest: string; integrity?: string }> = [];
+		for (const runtime of record.runtimes) for (const target of runtime.targets) if (target.freeze && record.session.targets.some((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id && selected.mode !== 'released')) {
 		const repository = record.session.repositories.find((entry) => entry.projectId === runtime.project.id)!;
 		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: target.freeze.operation.cwd ? resolve(repository.worktree, target.freeze.operation.cwd) : repository.worktree, env: { ...context.env, ...target.freeze.operation.environment }, stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
 		if (result.status !== 0) throw new Error(`Freeze failed for ${runtime.project.id}.${target.id}.`);
@@ -344,14 +364,16 @@ async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: contractOperation.cwd ? resolve(repository.worktree, contractOperation.cwd) : repository.worktree, env: { ...context.env, ...contractOperation.environment }, stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
 			if (contract.status !== 0) throw new Error(`Contract generation failed for ${runtime.project.id}.${target.id}.`);
 		}
-		for (const pattern of target.freeze.artifacts) for (const path of artifactPaths(pattern, repository.worktree)) { const bytes = readFileSync(path); artifacts.push({ projectId: runtime.project.id, targetId: target.id, kind: target.freeze.kind, identity: basename(path), digest: sha256(bytes), ...(target.freeze.kind === 'npm-package' ? { integrity: sha512Integrity(bytes) } : {}) }); }
-	}
-	if (!artifacts.length) throw new Error('Selected development closure produced no declared freeze artifacts.');
-	const candidateId = `candidate-${randomUUID().slice(0, 12)}`;
-	const candidate = developmentCandidateSchema.parse({ schemaVersion: 'treeseed.development-candidate/v1', candidateId, sessionId, createdAt: new Date().toISOString(), source, artifacts, configurationDigest: sha256(JSON.stringify(record.runtimes)), dependencyGenerations: {}, compatibilityAttestations: [], verification: { status: 'pending', operations: [], completedAt: null }, promotable: false });
-	const path = resolve(developmentStateRoot(context.env), sessionId, `${candidateId}.json`); mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, `${JSON.stringify(candidate, null, 2)}\n`, { mode: 0o600 }); state.candidates.push(path); saveState(state, context.env);
-	await invoke(context, 'local.dev.candidate.register', { sessionId, candidate });
-	return { candidate, receipt: path };
+		for (const pattern of target.freeze.artifacts) for (const path of artifactPaths(pattern, repository.worktree)) { const bytes = readFileSync(path); artifacts.push({ projectId: runtime.project.id, targetId: target.id, kind: target.freeze.kind, identity: relative(repository.worktree, path), digest: sha256(bytes), ...(target.freeze.kind === 'npm-package' ? { integrity: sha512Integrity(bytes) } : {}) }); }
+		}
+		if (!artifacts.length) throw new Error('Selected development closure produced no declared freeze artifacts.');
+		const candidateId = `candidate-${randomUUID().slice(0, 12)}`;
+		const dependencyGenerations = Object.fromEntries(record.session.targets.map((target) => [`${target.projectId}.${target.targetId}`, target.generation]));
+		const candidate = developmentCandidateSchema.parse({ schemaVersion: 'treeseed.development-candidate/v1', candidateId, sessionId, createdAt: new Date().toISOString(), source, artifacts, configurationDigest: sha256(JSON.stringify(record.runtimes)), dependencyGenerations, compatibilityAttestations: compatibilityAttestations(record.session.repositories), verification: { status: 'pending', operations: [], completedAt: null }, promotable: false });
+		const path = resolve(developmentStateRoot(context.env), sessionId, `${candidateId}.json`); mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, `${JSON.stringify(candidate, null, 2)}\n`, { mode: 0o600 }); state.candidates.push(path); saveState(state, context.env);
+		await invoke(context, 'local.dev.candidate.register', { sessionId, candidate });
+		return { candidate, receipt: path };
+	});
 }
 
 async function verifyCandidate(invocation: ParsedInvocation, context: CommandContext) {
@@ -364,9 +386,21 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 	for (const artifact of candidate.artifacts) {
 		const runtime = record.runtimes.find((entry) => entry.project.id === artifact.projectId), target = runtime?.targets.find((entry) => entry.id === artifact.targetId), repository = record.session.repositories.find((entry) => entry.projectId === artifact.projectId);
 		if (!target?.operations.verify || !repository) continue;
+		const artifactPath = resolve(repository.worktree, artifact.identity);
+		const artifactRelative = relative(repository.worktree, artifactPath);
+		if (artifactRelative.startsWith('..') || isAbsolute(artifactRelative)) throw new Error(`Candidate artifact identity escapes its source repository: ${artifact.identity}.`);
+		if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification: ${artifact.identity}.`);
 		const operation = target.operations.verify, result = spawnSync(operation.command, operation.args, { cwd: operation.cwd ? resolve(repository.worktree, operation.cwd) : repository.worktree, env: { ...context.env, ...operation.environment }, stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
 		operations.push(`${artifact.projectId}.${artifact.targetId}:${operation.command} ${operation.args.join(' ')}`);
 		if (result.status !== 0) throw new Error(`Candidate verification failed for ${artifact.projectId}.${artifact.targetId}.`);
+		if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate verification rebuilt or changed sealed artifact ${artifact.identity}.`);
+	}
+	if (!operations.length) throw new Error('Candidate verification requires at least one declared verification operation.');
+	for (const source of candidate.source) {
+		const runtime = record.runtimes.find((entry) => entry.project.id === source.projectId);
+		const repository = record.session.repositories.find((entry) => entry.projectId === source.projectId);
+		const artifactPaths = candidate.artifacts.filter((artifact) => artifact.projectId === source.projectId).map((artifact) => artifact.identity);
+		if (!runtime || !repository || JSON.stringify(repositoryClosure(runtime, repository.worktree, artifactPaths)) !== JSON.stringify(source)) throw new Error(`Candidate source changed after freeze: ${source.projectId}.`);
 	}
 	const verified = developmentCandidateSchema.parse({ ...candidate, verification: { status: 'passed', operations, completedAt: new Date().toISOString() }, promotable: !candidate.source.some((source) => source.dirty) });
 	writeFileSync(selected, `${JSON.stringify(verified, null, 2)}\n`, { mode: 0o600 }); await invoke(context, 'local.dev.candidate.register', { sessionId, candidate: verified }); return { candidate: verified, receipt: selected };

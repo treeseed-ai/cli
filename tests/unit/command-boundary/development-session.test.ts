@@ -91,3 +91,46 @@ test('package rebuild waits for a new marker-complete atomic generation', async 
 		assert.equal(await waiting, resolve(overlay, 'generation-2'));
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('freeze binds completed generations and attestations while verify rejects artifact substitution', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-candidate-'));
+	const stateRoot = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-candidate-state-'));
+	const packageManifest = resolve(root, 'treeseed.package.yaml'), sessionManifest = resolve(root, 'development.session.yaml');
+	const output: string[] = [];
+	try {
+		mkdirSync(resolve(root, 'scripts'), { recursive: true });
+		writeFileSync(resolve(root, 'scripts/freeze.mjs'), "import { writeFileSync } from 'node:fs'; writeFileSync('candidate.bin', 'sealed-candidate');\n");
+		writeFileSync(resolve(root, 'scripts/verify.mjs'), "process.stdout.write('verified\\n');\n");
+		mkdirSync(resolve(root, '.treeseed/standards'), { recursive: true });
+		writeFileSync(resolve(root, '.treeseed/standards/compatibility-attestation.json'), `${JSON.stringify({ contractId: '@treeseed/admin/browser', result: { sufficient: true, required: 'patch' } })}\n`);
+		writeFileSync(packageManifest, `${manifest.replace(
+			"operations:\n        start: { command: npm, args: [run, dev], environment: {}, timeoutSeconds: 600 }",
+			"operations:\n        start: { command: npm, args: [run, dev], environment: {}, timeoutSeconds: 600 }\n        verify: { command: node, args: [scripts/verify.mjs], environment: {}, timeoutSeconds: 60 }",
+		).replace(
+			"promotion: { liveAdmissible: false, candidateRequiresVerification: true }",
+			"freeze:\n        kind: archive\n        operation: { command: node, args: [scripts/freeze.mjs], environment: {}, timeoutSeconds: 60 }\n        artifacts: [candidate.bin]\n        contractOperations: []\n      promotion: { liveAdmissible: false, candidateRequiresVerification: true }",
+		)}\n`);
+		writeFileSync(sessionManifest, `projects:\n  - manifest: treeseed.package.yaml\n    worktree: .\n    targets:\n      - { id: web, mode: candidate }\n`);
+		execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		let record: any, registered: any;
+		const hostInvoke = async (input: any) => {
+			const payload = JSON.parse(input.options.payload);
+			if (input.handlerId === 'local.dev.session.start') { record = { session: payload.session, runtimes: payload.runtimes }; record.session.targets[0].generation = 7; return record; }
+			if (input.handlerId === 'local.dev.status') return record;
+			if (input.handlerId === 'local.dev.candidate.register') { registered = payload.candidate; return record; }
+			throw new Error(`Unexpected manager call ${input.handlerId}`);
+		};
+		const context = { cwd: root, env: { ...process.env, XDG_STATE_HOME: stateRoot, USER: 'tester' }, interactiveUi: false, hostInvoke, write: (value: string) => output.push(value) };
+		assert.equal(await runCommandLine(['dev', 'session', 'start', sessionManifest, '--json'], context), 0);
+		assert.equal(await runCommandLine(['dev', 'freeze', '--json'], context), 0, output.at(-1));
+		assert.equal(registered.dependencyGenerations['admin.web'], 7);
+		assert.equal(registered.compatibilityAttestations[0].contractId, '@treeseed/admin/browser');
+		assert.equal(registered.promotable, false);
+		assert.equal(await runCommandLine(['dev', 'verify', '--json'], context), 0);
+		assert.equal(registered.promotable, true);
+		writeFileSync(resolve(root, 'candidate.bin'), 'substituted');
+		assert.equal(await runCommandLine(['dev', 'verify', '--json'], context), 1);
+		assert.match(output.at(-1)!, /artifact custody failed/u);
+	} finally { rmSync(root, { recursive: true, force: true }); rmSync(stateRoot, { recursive: true, force: true }); }
+});
