@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
-import { developmentOperationEnvironment, relativeOverlayTarget } from '../../../src/cli/commands/development.ts';
+import { developmentOperationEnvironment, relativeOverlayTarget, waitForNewPackageOverlay } from '../../../src/cli/commands/development.ts';
 
 const manifest = `schemaVersion: treeseed.package/v1
 development:
@@ -75,4 +75,19 @@ test('development operations receive portable workspace identity and overlays us
 	const target = relativeOverlayTarget(link, overlay);
 	assert.equal(target.startsWith('/'), false);
 	assert.equal(resolve(resolve(link, '..'), target), resolve(overlay, 'current'));
+});
+
+test('package rebuild waits for a new marker-complete atomic generation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-overlay-')), overlay = resolve(root, 'overlay');
+	try {
+		mkdirSync(resolve(overlay, 'generation-1'), { recursive: true });
+		symlinkSync(resolve(overlay, 'generation-1'), resolve(overlay, 'current'));
+		const target = { id: 'package', ready: { kind: 'marker', path: 'dist/.complete.json', timeoutSeconds: 2 } } as any;
+		const waiting = waitForNewPackageOverlay(target, root, overlay, resolve(overlay, 'generation-1'));
+		setTimeout(() => {
+			mkdirSync(resolve(root, 'dist'), { recursive: true }); writeFileSync(resolve(root, 'dist/.complete.json'), '{}');
+			mkdirSync(resolve(overlay, 'generation-2')); symlinkSync(resolve(overlay, 'generation-2'), resolve(overlay, '.next')); renameSync(resolve(overlay, '.next'), resolve(overlay, 'current'));
+		}, 50);
+		assert.equal(await waiting, resolve(overlay, 'generation-2'));
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
