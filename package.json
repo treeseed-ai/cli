@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.24",
+  "version": "0.13.0-rc.25",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
