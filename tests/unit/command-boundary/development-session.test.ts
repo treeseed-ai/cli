@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
+import { developmentOperationEnvironment, relativeOverlayTarget } from '../../../src/cli/commands/development.ts';
 
 const manifest = `schemaVersion: treeseed.package/v1
 development:
@@ -60,4 +61,18 @@ test('development session start uses one protected manager command and private l
 		const payload = JSON.parse((calls[0] as { options: { payload: string } }).options.payload);
 		assert.equal(payload.runtimes[0].project.id, 'admin'); assert.equal(payload.session.targets[0].mode, 'released');
 	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('development operations receive portable workspace identity and overlays use relative links', () => {
+	const state = { manifest: '/workspace/development.session.yaml', sessionId: 'session-1' };
+	const environment = developmentOperationEnvironment(state, '/workspace/packages/api', 'live', { PATH: '/usr/bin' }, { TREESEED_API_BASE_URL: 'https://api.treeseed.localhost' });
+	assert.equal(environment.TREESEED_DEVELOPMENT_WORKSPACE_ROOT, '/workspace');
+	assert.equal(environment.TREESEED_DEVELOPMENT_WORKTREE, '/workspace/packages/api');
+	assert.equal(environment.TREESEED_DEVELOPMENT_SESSION_ID, 'session-1');
+	assert.equal(environment.TREESEED_API_BASE_URL, 'https://api.treeseed.localhost');
+	const link = '/workspace/packages/api/node_modules/@treeseed/sdk';
+	const overlay = '/workspace/packages/sdk/.treeseed/cache/development-sessions/session-1/package';
+	const target = relativeOverlayTarget(link, overlay);
+	assert.equal(target.startsWith('/'), false);
+	assert.equal(resolve(resolve(link, '..'), target), resolve(overlay, 'current'));
 });

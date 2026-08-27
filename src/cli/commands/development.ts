@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { developmentCandidateSchema, developmentRuntimeSchema, type DevelopmentRuntime, type DevelopmentTarget } from '@treeseed/sdk/development';
 import { parse as parseYaml } from 'yaml';
@@ -100,6 +100,16 @@ function operationForMode(target: DevelopmentTarget, mode: string) {
 	return target.operations.start ?? null;
 }
 
+export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
+	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
+}
+
+function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
+	const root = operation.cwd ? resolve(worktree, operation.cwd) : worktree;
+	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
+	if (result.status !== 0) throw new Error(`Development operation failed: ${operation.command} ${operation.args.join(' ')}.`);
+}
+
 function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
 	const operation = operationForMode(target, mode);
 	if (!operation) return null;
@@ -111,7 +121,7 @@ function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, t
 	mkdirSync(dirname(log), { recursive: true, mode: 0o700 });
 	const descriptor = openSync(log, 'a', 0o600);
 	try {
-		const child = spawn(operation.command, operation.args, { cwd: root, env: { ...env, ...resolvedEnvironment, ...operation.environment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode }, detached: true, stdio: ['ignore', descriptor, descriptor] });
+		const child = spawn(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), detached: true, stdio: ['ignore', descriptor, descriptor] });
 		child.unref(); if (!child.pid) throw new Error(`Failed to start ${key}.`);
 		return state.processes[key] = { pid: child.pid, projectId: runtime.project.id, targetId: target.id, log };
 	} finally { closeSync(descriptor); }
@@ -139,6 +149,7 @@ async function stopProcesses(state: LocalSessionState) {
 	while (Date.now() < deadline && running.some((processState) => { try { process.kill(processState.pid, 0); return true; } catch { return false; } })) await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
 	for (const processState of running) { try { process.kill(-processState.pid, 'SIGKILL'); } catch { /* process exited during the grace period */ } }
 	state.processes = {};
+	return running;
 }
 
 function restoreOverlays(state: LocalSessionState, projectId?: string, removeGenerations = true) {
@@ -179,8 +190,12 @@ function installPackageOverlay(state: LocalSessionState, record: { session: { re
 		if (existsSync(backup)) throw new Error(`Stale development overlay backup blocks ${link}.`);
 		let retained: string | null = null;
 		try { lstatSync(link); renameSync(link, backup); retained = backup; } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-		symlinkSync(resolve(overlayRoot, 'current'), link, 'dir'); state.overlays.push({ projectId: runtime.project.id, packageName, link, backup: retained, overlayRoot });
+		symlinkSync(relativeOverlayTarget(link, overlayRoot), link, 'dir'); state.overlays.push({ projectId: runtime.project.id, packageName, link, backup: retained, overlayRoot });
 	}
+}
+
+export function relativeOverlayTarget(link: string, overlayRoot: string) {
+	return relative(dirname(link), resolve(overlayRoot, 'current'));
 }
 
 function startPackageSynchronizer(state: LocalSessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, env: NodeJS.ProcessEnv) {
@@ -238,10 +253,15 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 		if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 		if (selection.mode === 'released') {
 			const processState = state.processes[`${selection.projectId}.${selection.targetId}`];
-			if (processState) { try { process.kill(-processState.pid, 'SIGTERM'); } catch { /* already stopped */ } delete state.processes[`${selection.projectId}.${selection.targetId}`]; }
+			if (processState) {
+				await stopProcesses({ ...state, processes: { [`${selection.projectId}.${selection.targetId}`]: processState } });
+				delete state.processes[`${selection.projectId}.${selection.targetId}`];
+			}
+			if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env);
 			restoreOverlays(state, selection.projectId);
 		} else {
 			const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: selection.projectId, targetId: selection.targetId }) as { environment?: NodeJS.ProcessEnv };
+			if (target.operations.setup) runOneShotOperation(state, target.operations.setup, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			saveState(state, context.env);
 			if (target.kind === 'package-watch') {
@@ -307,7 +327,10 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId);
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
-		await stopProcesses(state); restoreOverlays(state); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
+		const running = await stopProcesses(state);
+		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
+		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env);
+		restoreOverlays(state); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
 	}
 	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });
 	if (invocation.command.name === 'dev plan') return invoke(context, 'local.dev.plan', { sessionId, selected: [] });
