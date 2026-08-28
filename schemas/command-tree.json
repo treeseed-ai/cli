@@ -3973,24 +3973,14 @@
               "kind": "read",
               "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
-                "kind": "operation",
-                "operationId": "treeai.qualification.get.mode",
-                "input": [
-                  {
-                    "target": "path",
-                    "field": "nodeId",
-                    "source": "context",
-                    "name": "node",
-                    "required": true,
-                    "transform": "identity"
-                  }
-                ]
+                "kind": "local",
+                "handlerId": "local.host.ai.mode.show"
               }
             },
             {
               "nodeType": "leaf",
               "segment": "set",
-              "description": "Set the selected resource.",
+              "description": "Transition the exclusive AI GPU resource to awake or sleep.",
               "kind": "mutation",
               "arguments": [
                 {
@@ -4004,34 +3994,26 @@
                   "name": "--plan",
                   "description": "Return the exact proposed outcome without mutation.",
                   "type": "boolean"
+                },
+                {
+                  "name": "--idempotency-key",
+                  "description": "Replay-safe transition identity.",
+                  "type": "string"
+                },
+                {
+                  "name": "--drain-timeout",
+                  "description": "Maximum drain wait in seconds.",
+                  "type": "number"
                 }
               ],
               "authorization": {
-                "capability": "command.set",
+                "capability": "host.ai.mode",
                 "confirmation": "authority"
               },
-              "resultSchemaId": "treeseed.command.set/v1",
+              "resultSchemaId": "treeseed.ai-mode-transition-receipt/v1",
               "execution": {
-                "kind": "operation",
-                "operationId": "treeai.qualification.post.mode",
-                "input": [
-                  {
-                    "target": "path",
-                    "field": "nodeId",
-                    "source": "context",
-                    "name": "node",
-                    "required": true,
-                    "transform": "identity"
-                  },
-                  {
-                    "target": "body",
-                    "field": "mode",
-                    "source": "argument",
-                    "name": "mode",
-                    "required": true,
-                    "transform": "identity"
-                  }
-                ]
+                "kind": "local",
+                "handlerId": "local.host.ai.mode.set"
               }
             }
           ]
