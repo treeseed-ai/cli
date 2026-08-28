@@ -59,6 +59,16 @@ test('host commands preserve the SDK handler boundary and stable envelope', asyn
 	assert.deepEqual(JSON.parse(output[0]!).result, { componentId: 'agent', healthy: true });
 });
 
+test('AI mode commands use the same bounded host-manager authority', async () => {
+	const calls: unknown[] = []; const output: string[] = [];
+	const exit = await runCommandLine(['ai', 'mode', 'set', 'sleep', '--idempotency-key', 'cycle-1', '--drain-timeout', '120', '--yes', '--json'], {
+		interactiveUi: false, hostInvoke: async (input) => { calls.push(input); return { state: 'succeeded', to: 'sleep' }; }, write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(calls, [{ handlerId: 'local.host.ai.mode.set', arguments: ['sleep'], options: { idempotencyKey: 'cycle-1', drainTimeout: '120' } }]);
+	assert.equal(JSON.parse(output[0]!).result.to, 'sleep');
+});
+
 test('host configuration adoption sends validated content and requires explicit confirmation', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-config-'));
 	const file = resolve(root, 'host.json');

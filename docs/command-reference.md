@@ -1592,22 +1592,24 @@ Mode operations.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
-Control-plane operation: `treeai.qualification.get.mode`.
+Execution: `local.host.ai.mode.show`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd ai mode set <mode>
 
-Set the selected resource.
+Transition the exclusive AI GPU resource to awake or sleep.
 
-Operation: mutation. Result schema: `treeseed.command.set/v1`.
-Control-plane operation: `treeai.qualification.post.mode`.
+Operation: mutation. Result schema: `treeseed.ai-mode-transition-receipt/v1`.
+Execution: `local.host.ai.mode.set`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--idempotency-key <value>`: Replay-safe transition identity.
+- `--drain-timeout <value>`: Maximum drain wait in seconds.
 
 ## trsd ai inference
 

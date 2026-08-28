@@ -64,7 +64,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'teams') return runTeams(invocation, context);
 	if (invocation.command.execution.kind === 'protocol') return runAuth(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
-	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'host') return runHost(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.execution.handlerId.startsWith('local.host.')) return runHost(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'dev') return runDevelopment(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'library') return runLibrary(invocation, context);
 	return runOperator(invocation, context);
