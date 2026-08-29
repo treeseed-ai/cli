@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.31",
+  "version": "0.13.0-rc.32",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -56,6 +56,12 @@
     "string-width": "^8.2.2",
     "yaml": "2.9.0"
   },
+  "bundledDependencies": [
+    "ink",
+    "react",
+    "string-width",
+    "yaml"
+  ],
   "overrides": {
     "@treeseed/sdk": "$@treeseed/sdk"
   },
