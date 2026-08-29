@@ -2,22 +2,88 @@
 
 This file is generated from the accepted `@treeseed/sdk/operator-contracts` command tree. Do not edit it by hand.
 
-### trsd send <channel> <message>
+### trsd inbox
 
-Send a message to addressed project agents in a team discussion topic.
+Open the active team governance inbox.
 
-Operation: mutation. Result schema: `treeseed.communication-send-receipt/v2`.
+Operation: read. Result schema: `treeseed.inbox-session/v1`.
+Execution: `local.inbox`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--project <value>`: Initial project filter.
+- `--type <value>`: Initial proposal, question, or all filter.
+- `--all`: Include completed and decided items.
+
+### trsd send [channel] [message]
+
+Send a message or open the interactive team topic browser.
+
+Operation: mutation. Result schema: `treeseed.communication-send-receipt/v4`.
 Control-plane operation: `communications.send`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--to <value>`: Deprecated validation-only address list.
-- `--timeout <value>`: Maximum seconds to wait for the complete response chain.
+- `--timeout <value>`: Optional maximum seconds to listen for the complete response chain.
 - `--no-wait`: Return immediately after durable admission.
 - `--wait <value>`: Deprecated wait duration in seconds.
+- `--json-stream`: Emit ordered communication events as NDJSON.
+- `--diagnostics <value>`: Diagnostic detail: metadata or full.
+
+## trsd topics
+
+Topics operations.
+
+### trsd topics list
+
+List discussion topics and active listeners.
+
+Operation: read. Result schema: `treeseed.communication-topic-page/v1`.
+Control-plane operation: `communications.topics.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd topics show <topic>
+
+Show a discussion topic and its listeners.
+
+Operation: read. Result schema: `treeseed.communication-topic/v1`.
+Control-plane operation: `communications.topics.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd topics subscribe <topic> <agent>
+
+Subscribe an agent to a discussion topic.
+
+Operation: mutation. Result schema: `treeseed.communication-topic-subscription-receipt/v1`.
+Control-plane operation: `communications.topics.subscriptions.put`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd topics unsubscribe <topic> <agent>
+
+Remove an agent subscription from a discussion topic.
+
+Operation: mutation. Result schema: `treeseed.communication-topic-subscription-receipt/v1`.
+Control-plane operation: `communications.topics.subscriptions.delete`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd auth
 
@@ -425,6 +491,159 @@ Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
 Execution: `local.host.provider.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd host storage
+
+Storage operations.
+
+### trsd host storage status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.storage.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host storage connect <backend>
+
+Connect the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.connect/v1`.
+Execution: `local.host.storage.connect`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--account-id <value>`: Optional Cloudflare account ID when the bootstrap authority reaches multiple accounts.
+
+### trsd host storage reconcile
+
+Reconcile the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.reconcile/v1`.
+Execution: `local.host.storage.reconcile`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host storage rotate <backend>
+
+Rotate the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.rotate/v1`.
+Execution: `local.host.storage.rotate`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd host security
+
+Security operations.
+
+### trsd host security plan
+
+Plan the selected resource.
+
+Operation: read. Result schema: `treeseed.command.plan/v1`.
+Execution: `local.host.security.plan`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host security initialize
+
+Initialize the encrypted provider volume, application keys, and offline recovery bundle.
+
+Operation: mutation. Result schema: `treeseed.command.initialize/v1`.
+Execution: `local.host.security.initialize`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--recovery-bundle <value>`: Absolute path for the new encrypted offline recovery bundle.
+- `--confirm`: Confirm provider-state migration and volume formatting.
+
+### trsd host security status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.security.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host security verify
+
+Verify the selected resource.
+
+Operation: read. Result schema: `treeseed.command.verify/v1`.
+Execution: `local.host.security.verify`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host security rotate <target>
+
+Rotate the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.rotate/v1`.
+Execution: `local.host.security.rotate`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--recovery-bundle <value>`: Absolute path to the currently authenticated recovery bundle.
+- `--new-recovery-bundle <value>`: Absolute non-existing path for the replacement recovery bundle.
+- `--confirm`: Confirm creation and activation of a new key generation.
+
+## trsd host security recovery
+
+Recovery operations.
+
+### trsd host security recovery verify
+
+Authenticate and inventory an offline recovery bundle without revealing secrets.
+
+Operation: read. Result schema: `treeseed.host-recovery-verification/v1`.
+Execution: `local.host.security.recovery.verify`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--bundle <value>`: Absolute recovery bundle path.
+
+## trsd host sandbox
+
+Sandbox operations.
+
+### trsd host sandbox status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.sandbox.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host sandbox doctor
+
+Doctor the selected resource.
+
+Operation: read. Result schema: `treeseed.command.doctor/v1`.
+Execution: `local.host.sandbox.doctor`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.

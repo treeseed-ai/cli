@@ -19,7 +19,7 @@ function walkFiles(root) {
 	return files;
 }
 
-const publishableSourceFiles = walkFiles(srcRoot).filter((filePath) => filePath.endsWith('.ts') && !filePath.endsWith('.d.ts') && !filePath.endsWith('/types.ts'));
+const publishableSourceFiles = walkFiles(srcRoot).filter((filePath) => /\.tsx?$/u.test(filePath) && !filePath.endsWith('.d.ts') && !filePath.endsWith('/types.ts'));
 
 function ensureDir(filePath) {
 	mkdirSync(dirname(filePath), { recursive: true });
@@ -30,7 +30,7 @@ function rewriteRuntimeSpecifiers(contents) {
 }
 
 async function compileModule(filePath) {
-	const outputFile = resolve(distRoot, relative(srcRoot, filePath).replace(/\.ts$/u, '.js'));
+	const outputFile = resolve(distRoot, relative(srcRoot, filePath).replace(/\.tsx?$/u, '.js'));
 	ensureDir(outputFile);
 	await build({
 		entryPoints: [filePath],

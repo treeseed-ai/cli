@@ -4,19 +4,47 @@
   "commands": [
     {
       "nodeType": "leaf",
+      "segment": "inbox",
+      "description": "Open the active team governance inbox.",
+      "kind": "read",
+      "options": [
+        {
+          "name": "--project",
+          "description": "Initial project filter.",
+          "type": "string"
+        },
+        {
+          "name": "--type",
+          "description": "Initial proposal, question, or all filter.",
+          "type": "string"
+        },
+        {
+          "name": "--all",
+          "description": "Include completed and decided items.",
+          "type": "boolean"
+        }
+      ],
+      "resultSchemaId": "treeseed.inbox-session/v1",
+      "execution": {
+        "kind": "local",
+        "handlerId": "local.inbox"
+      }
+    },
+    {
+      "nodeType": "leaf",
       "segment": "send",
-      "description": "Send a message to addressed project agents in a team discussion topic.",
+      "description": "Send a message or open the interactive team topic browser.",
       "kind": "mutation",
       "arguments": [
         {
           "name": "channel",
-          "description": "Team discussion-topic channel.",
-          "required": true
+          "description": "Optional team discussion topic to preselect.",
+          "required": false
         },
         {
           "name": "message",
           "description": "Markdown message containing agent addresses.",
-          "required": true
+          "required": false
         }
       ],
       "options": [
@@ -31,21 +59,14 @@
           "type": "string"
         },
         {
-          "name": "--project",
-          "description": "Project for agent resolution and the topic stream.",
-          "type": "string",
-          "required": true
-        },
-        {
           "name": "--to",
           "description": "Deprecated validation-only address list.",
           "type": "string[]"
         },
         {
           "name": "--timeout",
-          "description": "Maximum seconds to wait for the complete response chain.",
-          "type": "number",
-          "defaultValue": 1800
+          "description": "Optional maximum seconds to listen for the complete response chain.",
+          "type": "number"
         },
         {
           "name": "--no-wait",
@@ -56,13 +77,23 @@
           "name": "--wait",
           "description": "Deprecated wait duration in seconds.",
           "type": "number"
+        },
+        {
+          "name": "--json-stream",
+          "description": "Emit ordered communication events as NDJSON.",
+          "type": "boolean"
+        },
+        {
+          "name": "--diagnostics",
+          "description": "Diagnostic detail: metadata or full.",
+          "type": "string"
         }
       ],
       "authorization": {
         "capability": "agents.execute",
         "confirmation": "never"
       },
-      "resultSchemaId": "treeseed.communication-send-receipt/v2",
+      "resultSchemaId": "treeseed.communication-send-receipt/v4",
       "execution": {
         "kind": "operation",
         "operationId": "communications.send",
@@ -80,7 +111,7 @@
             "field": "channel",
             "source": "argument",
             "name": "channel",
-            "required": true,
+            "required": false,
             "transform": "identity"
           },
           {
@@ -88,15 +119,7 @@
             "field": "message",
             "source": "argument",
             "name": "message",
-            "required": true,
-            "transform": "identity"
-          },
-          {
-            "target": "body",
-            "field": "projectId",
-            "source": "context",
-            "name": "project",
-            "required": true,
+            "required": false,
             "transform": "identity"
           },
           {
@@ -117,6 +140,231 @@
           }
         ]
       }
+    },
+    {
+      "nodeType": "branch",
+      "segment": "topics",
+      "description": "Topics operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List discussion topics and active listeners.",
+          "kind": "read",
+          "options": [
+            {
+              "name": "--status",
+              "description": "Topic status.",
+              "type": "string"
+            },
+            {
+              "name": "--limit",
+              "description": "Maximum topics.",
+              "type": "number"
+            },
+            {
+              "name": "--cursor",
+              "description": "Pagination cursor.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.communication-topic-page/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "communications.topics.list",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show a discussion topic and its listeners.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "topic",
+              "description": "Discussion topic.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.communication-topic/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "communications.topics.show",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "channel",
+                "source": "argument",
+                "name": "topic",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "subscribe",
+          "description": "Subscribe an agent to a discussion topic.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "topic",
+              "description": "Discussion topic.",
+              "required": true
+            },
+            {
+              "name": "agent",
+              "description": "@project/agent handle.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "agents.execute",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.communication-topic-subscription-receipt/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "communications.topics.subscriptions.put",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "channel",
+                "source": "argument",
+                "name": "topic",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "agent",
+                "source": "argument",
+                "name": "agent",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "unsubscribe",
+          "description": "Remove an agent subscription from a discussion topic.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "topic",
+              "description": "Discussion topic.",
+              "required": true
+            },
+            {
+              "name": "agent",
+              "description": "@project/agent handle.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "agents.execute",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.communication-topic-subscription-receipt/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "communications.topics.subscriptions.delete",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "channel",
+                "source": "argument",
+                "name": "topic",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "agent",
+                "source": "argument",
+                "name": "agent",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "nodeType": "branch",
@@ -892,7 +1140,7 @@
               ],
               "authorization": {
                 "capability": "command.adopt",
-                "confirmation": "authority"
+                "confirmation": "destructive"
               },
               "resultSchemaId": "treeseed.command.adopt/v1",
               "execution": {
@@ -938,6 +1186,285 @@
               "execution": {
                 "kind": "local",
                 "handlerId": "local.host.provider.status"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "storage",
+          "description": "Storage operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.storage.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "connect",
+              "description": "Connect the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "backend",
+                  "description": "backend identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--account-id",
+                  "description": "Optional Cloudflare account ID when the bootstrap authority reaches multiple accounts.",
+                  "type": "string"
+                }
+              ],
+              "authorization": {
+                "capability": "command.connect",
+                "confirmation": "credential"
+              },
+              "resultSchemaId": "treeseed.command.connect/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.storage.connect"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "reconcile",
+              "description": "Reconcile the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.reconcile",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.reconcile/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.storage.reconcile"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "rotate",
+              "description": "Rotate the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "backend",
+                  "description": "backend identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.rotate",
+                "confirmation": "credential"
+              },
+              "resultSchemaId": "treeseed.command.rotate/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.storage.rotate"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "security",
+          "description": "Security operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "plan",
+              "description": "Plan the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.plan/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.security.plan"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "initialize",
+              "description": "Initialize the encrypted provider volume, application keys, and offline recovery bundle.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--recovery-bundle",
+                  "description": "Absolute path for the new encrypted offline recovery bundle.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--confirm",
+                  "description": "Confirm provider-state migration and volume formatting.",
+                  "type": "boolean",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.initialize",
+                "confirmation": "credential"
+              },
+              "resultSchemaId": "treeseed.command.initialize/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.security.initialize"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.security.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "verify",
+              "description": "Verify the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.verify/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.security.verify"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "rotate",
+              "description": "Rotate the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "target",
+                  "description": "target identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--recovery-bundle",
+                  "description": "Absolute path to the currently authenticated recovery bundle.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--new-recovery-bundle",
+                  "description": "Absolute non-existing path for the replacement recovery bundle.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--confirm",
+                  "description": "Confirm creation and activation of a new key generation.",
+                  "type": "boolean",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.rotate",
+                "confirmation": "credential"
+              },
+              "resultSchemaId": "treeseed.command.rotate/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.security.rotate"
+              }
+            },
+            {
+              "nodeType": "branch",
+              "segment": "recovery",
+              "description": "Recovery operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "verify",
+                  "description": "Authenticate and inventory an offline recovery bundle without revealing secrets.",
+                  "kind": "read",
+                  "options": [
+                    {
+                      "name": "--bundle",
+                      "description": "Absolute recovery bundle path.",
+                      "type": "string",
+                      "required": true
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.host-recovery-verification/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.security.recovery.verify"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "sandbox",
+          "description": "Sandbox operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Status the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.sandbox.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "doctor",
+              "description": "Doctor the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.doctor/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.sandbox.doctor"
               }
             }
           ]
@@ -2824,7 +3351,7 @@
               },
               {
                 "target": "body",
-                "field": "profile",
+                "field": "profileId",
                 "source": "option",
                 "name": "profile",
                 "required": false,
@@ -2840,7 +3367,7 @@
               },
               {
                 "target": "body",
-                "field": "start",
+                "field": "startsAt",
                 "source": "option",
                 "name": "start",
                 "required": false,
@@ -2848,7 +3375,7 @@
               },
               {
                 "target": "body",
-                "field": "end",
+                "field": "endsAt",
                 "source": "option",
                 "name": "end",
                 "required": false,
@@ -2856,7 +3383,7 @@
               },
               {
                 "target": "body",
-                "field": "duration",
+                "field": "durationSeconds",
                 "source": "option",
                 "name": "duration",
                 "required": false,
@@ -2864,11 +3391,11 @@
               },
               {
                 "target": "body",
-                "field": "objective",
+                "field": "objectiveFilters",
                 "source": "option",
                 "name": "objective",
                 "required": false,
-                "transform": "identity"
+                "transform": "csv"
               }
             ]
           }
@@ -2912,7 +3439,7 @@
               },
               {
                 "target": "body",
-                "field": "digest",
+                "field": "preflightDigest",
                 "source": "option",
                 "name": "digest",
                 "required": true,

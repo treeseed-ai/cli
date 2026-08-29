@@ -1,5 +1,7 @@
 # @treeseed/cli
 
+`trsd inbox` and interactive `trsd send` share TreeSeed's full-screen terminal workbench: mouse and keyboard navigation, responsive panes, syntax-highlighted Markdown, stable selection during live updates, and reliable terminal cleanup. The inbox defaults to unresolved questions and proposals and keeps private feedback and proposal-revision drafts on the server.
+
 `@treeseed/cli` publishes one executable: `trsd`. It is the human and automation interface to TreeSeed's authoritative control-plane API.
 
 The CLI accepts high-level intent, renders read projections, and returns durable receipts. It does not let clients author derived capacity plans, assignments, leases, reservations, settlements, or repository integration records.
@@ -51,6 +53,12 @@ trsd workdays list --team treeseed --json
 ```
 
 Commands default to the local control plane at `http://127.0.0.1:3002`. `TREESEED_API_BASE_URL` overrides that address. Server profiles and encrypted OAuth sessions are owned locally by the CLI; control-plane behavior remains API-owned.
+
+## Team discussions
+
+`trsd send` opens the active team's topic browser; `trsd send <topic>` opens it with a topic selected. The workbench keeps per-topic composers and recipient selections, shows all listeners and lifecycle events, and can export the visible transcript to Markdown. `trsd send <topic> <message>` remains the one-shot form.
+
+Messages address agents across the active team without a project option. `@sdk/architect` selects one exact project agent; `@architect` expands to every chat-enabled Architect in the team. The one-shot command listens until the full required and optional response chain settles, unless the user presses Ctrl+C, supplies `--timeout`, or chooses `--no-wait`. Human output streams only each `@project/agent` handle, response time, highlighted Markdown, and a strong separator; `--json` retains the complete automation receipt.
 
 ## Workdays and capacity
 

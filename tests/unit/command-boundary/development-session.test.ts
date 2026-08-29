@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
-import { developmentOperationEnvironment, relativeOverlayTarget, waitForNewPackageOverlay } from '../../../src/cli/commands/development.ts';
+import { developmentCliEntrypointPath, developmentOperationEnvironment, relativeOverlayTarget, selectDevelopmentCli, waitForNewPackageOverlay } from '../../../src/cli/commands/development.ts';
 
 const manifest = `schemaVersion: treeseed.package/v1
 development:
@@ -75,6 +75,18 @@ test('development operations receive portable workspace identity and overlays us
 	const target = relativeOverlayTarget(link, overlay);
 	assert.equal(target.startsWith('/'), false);
 	assert.equal(resolve(resolve(link, '..'), target), resolve(overlay, 'current'));
+});
+
+test('development CLI selection is an atomic, removable launcher input', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-selection-')), entrypoint = resolve(root, 'generation/dist/cli/main.js');
+	try {
+		mkdirSync(resolve(entrypoint, '..'), { recursive: true }); writeFileSync(entrypoint, 'export {};\n');
+		const env = { XDG_STATE_HOME: resolve(root, 'state') };
+		selectDevelopmentCli(env, { entrypoint, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+		assert.match(execFileSync('cat', [developmentCliEntrypointPath(env)], { encoding: 'utf8' }), new RegExp(`^treeseed\\.development-cli-selection/v1\\n\\d+\\n${entrypoint.replaceAll('/', '\\/')}\\n$`, 'u'));
+		selectDevelopmentCli(env, null);
+		assert.throws(() => execFileSync('cat', [developmentCliEntrypointPath(env)], { stdio: 'ignore' }));
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('package rebuild waits for a new marker-complete atomic generation', async () => {
