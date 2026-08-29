@@ -10,6 +10,7 @@ import { runUsers } from './commands/users.js';
 import { runLibrary } from './commands/library.js';
 import { runTeams } from './commands/teams.js';
 import { runDevelopment } from './commands/development.js';
+import { runInbox } from './commands/inbox.js';
 import type { CommandContext, CommandFailure, ParsedInvocation, Writer } from './types.js';
 import { promptText } from './support/prompts.js';
 import { handoffProviderEnrollment } from './support/provider-enrollment.js';
@@ -52,7 +53,8 @@ function categorized(error: unknown): CommandFailure {
 }
 
 async function confirmed(invocation: ParsedInvocation, context: CommandContext) {
-	if (invocation.command.confirmation === 'never' || invocation.options.plan === true || invocation.options.yes === true || invocation.options.confirm === true || invocation.command.execution.kind === 'operation') return true;
+	const requiresPrompt = invocation.command.confirmation === 'destructive' || invocation.command.confirmation === 'irreversible';
+	if (!requiresPrompt || invocation.options.plan === true || invocation.options.yes === true || invocation.options.confirm === true || invocation.command.execution.kind === 'operation') return true;
 	if (!context.interactiveUi || !context.confirm) return false;
 	return context.confirm(`Execute governed operation \`${invocation.command.name}\`?`, 'no');
 }
@@ -67,12 +69,16 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind === 'local' && invocation.command.execution.handlerId.startsWith('local.host.')) return runHost(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'dev') return runDevelopment(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'library') return runLibrary(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'inbox') return runInbox(invocation, context);
 	return runOperator(invocation, context);
 }
 
 function print(context: CommandContext, value: unknown, ok = true) {
 	if (context.outputFormat === 'json') context.write(JSON.stringify(value, null, 2), ok ? 'stdout' : 'stderr');
-	else if (ok) context.write(typeof value === 'string' ? value : renderHumanCommandResult(value, { color: Boolean(process.stdout.isTTY && !context.env.NO_COLOR), width: Number(context.env.COLUMNS) || process.stdout.columns || 100 }), 'stdout');
+	else if (ok) {
+		const rendered = typeof value === 'string' ? value : renderHumanCommandResult(value, { color: Boolean(process.stdout.isTTY && !context.env.NO_COLOR), width: Number(context.env.COLUMNS) || process.stdout.columns || 100 });
+		if (rendered) context.write(rendered, 'stdout');
+	}
 	else {
 		const message = value && typeof value === 'object' && 'error' in value ? (value as { error?: { message?: string } }).error?.message : null;
 		context.write(message ?? String(value), 'stderr');
@@ -105,7 +111,9 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 		const failed = categorized(error);
 		const partial = error && typeof error === 'object' && 'partialResult' in error ? (error as { partialResult?: unknown }).partialResult : null;
 		const failedEnvelope = envelope(invocation, false, partial, failed);
-		if (context.outputFormat === 'human' && invocation.command.name === 'send' && partial) {
+		if (invocation.options.jsonStream === true) {
+			context.write(JSON.stringify({ schemaVersion: 'treeseed.communication-stream-error/v1', error: failed, partialResult: partial }), 'stderr');
+		} else if (context.outputFormat === 'human' && invocation.command.name === 'send' && partial) {
 			context.write(renderHumanCommandResult({ ...failedEnvelope, ok: true }, { color: Boolean(process.stdout.isTTY && !context.env.NO_COLOR), width: Number(context.env.COLUMNS) || process.stdout.columns || 100 }), 'stdout');
 			context.write(failed.message, 'stderr');
 		} else print(context, failedEnvelope, false);

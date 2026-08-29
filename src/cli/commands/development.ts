@@ -7,6 +7,12 @@ import { developmentCandidateSchema, developmentRuntimeSchema, type DevelopmentR
 import { parse as parseYaml } from 'yaml';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { invokeLocalHostManager } from '../support/host-client.js';
+import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
+import { dependentReactions, installPackageOverlay, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
+import { artifactPaths, compatibilityAttestations, withFreezeLock } from './development-support/candidate.js';
+export { relativeOverlayTarget, waitForNewPackageOverlay } from './development-support/overlays.js';
+
+export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
 
 interface LocalSessionState {
 	sessionId: string;
@@ -24,12 +30,6 @@ interface DevelopmentStatusRecord {
 		repositories: Array<{ projectId: string; worktree: string }>;
 	};
 	runtimes: DevelopmentRuntime[];
-}
-
-function developmentStateRoot(env: NodeJS.ProcessEnv) {
-	const base = env.XDG_STATE_HOME ?? (env.HOME ? resolve(env.HOME, '.local', 'state') : null);
-	if (!base) throw new Error('HOME or XDG_STATE_HOME is required for development-session custody.');
-	return resolve(base, 'treeseed', 'development');
 }
 
 function statePath(env: NodeJS.ProcessEnv) { return resolve(developmentStateRoot(env), 'current.json'); }
@@ -105,7 +105,8 @@ function selectedTarget(record: unknown, projectId: string, targetId: string) {
 function operationForMode(target: DevelopmentTarget, mode: string) {
 	if (mode === 'released') return null;
 	if (target.kind === 'package-watch') return target.operations.watch ?? target.operations.build ?? null;
-	if (target.kind === 'rebuild-restart' || mode === 'candidate') return target.operations.build ?? target.operations.start ?? null;
+	if (target.kind === 'rebuild-restart') return target.operations.start ?? null;
+	if (mode === 'candidate') return target.operations.build ?? target.operations.start ?? null;
 	return target.operations.start ?? null;
 }
 
@@ -149,157 +150,6 @@ async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds:
 	throw new Error(`Readiness timed out for ${target.id}.`);
 }
 
-async function stopProcesses(state: LocalSessionState) {
-	const running = Object.values(state.processes);
-	for (const processState of running) {
-		try { process.kill(-processState.pid, 'SIGTERM'); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
-	}
-	const deadline = Date.now() + 5_000;
-	while (Date.now() < deadline && running.some((processState) => { try { process.kill(processState.pid, 0); return true; } catch { return false; } })) await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
-	for (const processState of running) { try { process.kill(-processState.pid, 'SIGKILL'); } catch { /* process exited during the grace period */ } }
-	state.processes = {};
-	return running;
-}
-
-function restoreOverlays(state: LocalSessionState, projectId?: string, removeGenerations = true) {
-	const retained: LocalSessionState['overlays'] = [];
-	for (const overlay of state.overlays ?? []) {
-		if (projectId && overlay.projectId !== projectId) { retained.push(overlay); continue; }
-		if (existsSync(overlay.link) || (() => { try { lstatSync(overlay.link); return true; } catch { return false; } })()) rmSync(overlay.link, { recursive: true, force: true });
-		if (overlay.backup && existsSync(overlay.backup)) renameSync(overlay.backup, overlay.link);
-	}
-	if (removeGenerations) for (const overlayRoot of new Set((state.overlays ?? []).filter((overlay) => !projectId || overlay.projectId === projectId).map((overlay) => overlay.overlayRoot))) {
-		rmSync(overlayRoot, { recursive: true, force: true }); rmSync(dirname(overlayRoot), { recursive: true, force: true });
-	}
-	state.overlays = retained;
-}
-
-function affectedConsumers(runtimes: DevelopmentRuntime[], projectId: string, targetId: string) {
-	const affected = new Set([`${projectId}.${targetId}`]), queue = [...affected];
-	while (queue.length) {
-		const selected = queue.shift()!;
-		for (const runtime of runtimes) for (const target of runtime.targets) for (const dependency of target.dependencies) {
-			if (`${dependency.id}.${dependency.target}` !== selected || dependency.reaction === 'none') continue;
-			const key = `${runtime.project.id}.${target.id}`; if (!affected.has(key)) { affected.add(key); queue.push(key); }
-		}
-	}
-	return new Set([...affected].slice(1).map((key) => key.split('.')[0]!));
-}
-
-function installPackageOverlay(state: LocalSessionState, record: { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] }, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, overlayRoot: string) {
-	if (target.kind !== 'package-watch') return;
-	const packageName = (JSON.parse(readFileSync(resolve(worktree, 'package.json'), 'utf8')) as { name?: string }).name;
-	if (!packageName) throw new Error(`${runtime.project.id} package overlay has no package name.`);
-	restoreOverlays(state, runtime.project.id, false);
-	for (const consumerId of affectedConsumers(record.runtimes, runtime.project.id, target.id)) {
-		const consumer = record.session.repositories.find((entry) => entry.projectId === consumerId); if (!consumer) continue;
-		const link = resolve(consumer.worktree, 'node_modules', ...packageName.split('/'));
-		const backup = `${link}.treeseed-release-${state.sessionId}`;
-		mkdirSync(dirname(link), { recursive: true });
-		if (existsSync(backup)) throw new Error(`Stale development overlay backup blocks ${link}.`);
-		let retained: string | null = null;
-		try { lstatSync(link); renameSync(link, backup); retained = backup; } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-		symlinkSync(relativeOverlayTarget(link, overlayRoot), link, 'dir'); state.overlays.push({ projectId: runtime.project.id, packageName, link, backup: retained, overlayRoot });
-	}
-}
-
-export function relativeOverlayTarget(link: string, overlayRoot: string) {
-	return relative(dirname(link), resolve(overlayRoot, 'current'));
-}
-
-function startPackageSynchronizer(state: LocalSessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, env: NodeJS.ProcessEnv) {
-	const key = `overlay-sync.${runtime.project.id}.${target.id}`, overlayRoot = resolve(worktree, '.treeseed', 'cache', 'development-sessions', state.sessionId, target.id);
-	const existing = state.processes[key]; if (existing) { try { process.kill(existing.pid, 0); return overlayRoot; } catch { delete state.processes[key]; } }
-	const compiledModule = fileURLToPath(new URL('../development/package-overlay-sync.js', import.meta.url));
-	const sourceModule = fileURLToPath(new URL('../development/package-overlay-sync.ts', import.meta.url));
-	const module = existsSync(compiledModule) ? compiledModule : sourceModule, moduleArguments = existsSync(compiledModule) ? [module] : ['--import', 'tsx', module];
-	const log = resolve(developmentStateRoot(env), state.sessionId, `${key}.log`);
-	mkdirSync(dirname(log), { recursive: true, mode: 0o700 }); const descriptor = openSync(log, 'a', 0o600);
-	try {
-		if (target.ready.kind !== 'marker') throw new Error(`${key} requires marker readiness.`);
-		const child = spawn(process.execPath, [...moduleArguments, worktree, overlayRoot, JSON.stringify(target.outputs.map((output) => output.path)), target.ready.path], { cwd: worktree, env, detached: true, stdio: ['ignore', descriptor, descriptor] });
-		child.unref(); if (!child.pid) throw new Error(`Failed to start ${key}.`); state.processes[key] = { pid: child.pid, projectId: runtime.project.id, targetId: target.id, log };
-	} finally { closeSync(descriptor); }
-	return overlayRoot;
-}
-
-async function waitForPackageOverlay(target: DevelopmentTarget, worktree: string, overlayRoot: string) {
-	const timeout = target.ready.kind === 'marker' ? target.ready.timeoutSeconds : 120, deadline = Date.now() + timeout * 1_000;
-	while (Date.now() < deadline) {
-		const markerReady = target.ready.kind !== 'marker' || existsSync(resolve(worktree, target.ready.path));
-		if (markerReady && existsSync(resolve(overlayRoot, 'current'))) return;
-		await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
-	}
-	throw new Error(`Completed package generation timed out for ${target.id}.`);
-}
-
-function overlayGeneration(overlayRoot: string) {
-	const current = resolve(overlayRoot, 'current');
-	try { return resolve(dirname(current), readlinkSync(current)); } catch { return null; }
-}
-
-export async function waitForNewPackageOverlay(target: DevelopmentTarget, worktree: string, overlayRoot: string, previous: string | null) {
-	const timeout = target.ready.kind === 'marker' ? target.ready.timeoutSeconds : 120, deadline = Date.now() + timeout * 1_000;
-	while (Date.now() < deadline) {
-		const current = overlayGeneration(overlayRoot);
-		const markerReady = target.ready.kind !== 'marker' || existsSync(resolve(worktree, target.ready.path));
-		if (markerReady && current && current !== previous) return current;
-		await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
-	}
-	throw new Error(`A new completed package generation timed out for ${target.id}; the previous generation remains selected.`);
-}
-
-async function stopProcess(state: LocalSessionState, key: string) {
-	const processState = state.processes[key];
-	if (!processState) return;
-	try { process.kill(-processState.pid, 'SIGTERM'); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
-	const deadline = Date.now() + 5_000;
-	while (Date.now() < deadline) {
-		try { process.kill(processState.pid, 0); } catch { break; }
-		await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
-	}
-	try { process.kill(-processState.pid, 'SIGKILL'); } catch { /* it exited during the grace period */ }
-	delete state.processes[key];
-}
-
-function dependentReactions(runtimes: DevelopmentRuntime[], projectId: string, targetId: string) {
-	const result: Array<{ runtime: DevelopmentRuntime; target: DevelopmentTarget; reaction: string }> = [], queued = [`${projectId}.${targetId}`], seen = new Set(queued);
-	while (queued.length) {
-		const selected = queued.shift()!;
-		for (const runtime of runtimes) for (const target of runtime.targets) for (const dependency of target.dependencies) {
-			if (`${dependency.id}.${dependency.target}` !== selected || dependency.reaction === 'none') continue;
-			const key = `${runtime.project.id}.${target.id}`;
-			if (seen.has(key)) continue;
-			seen.add(key); queued.push(key); result.push({ runtime, target, reaction: dependency.reaction });
-		}
-	}
-	return result;
-}
-
-function artifactPaths(pattern: string, root: string) {
-	if (!pattern.includes('*')) return [resolve(root, pattern)];
-	const directory = resolve(root, dirname(pattern)), expression = new RegExp(`^${basename(pattern).replaceAll('.', '\\.').replaceAll('*', '.*')}$`, 'u');
-	return readdirSync(directory).filter((name) => expression.test(name)).map((name) => resolve(directory, name));
-}
-
-function compatibilityAttestations(repositories: Array<{ worktree: string }>) {
-	return repositories.flatMap(({ worktree }) => {
-		const path = resolve(worktree, '.treeseed/standards/compatibility-attestation.json');
-		if (!existsSync(path)) return [];
-		const bytes = readFileSync(path), value = JSON.parse(bytes.toString('utf8')) as { contractId?: unknown; result?: { sufficient?: unknown; required?: unknown } };
-		if (typeof value.contractId !== 'string' || value.result?.sufficient !== true || !['none', 'patch', 'minor', 'major'].includes(String(value.result?.required))) throw new Error(`Compatibility attestation is invalid or insufficient: ${path}.`);
-		return [{ contractId: value.contractId, digest: sha256(bytes), compatible: true, minimumBump: value.result.required as 'none' | 'patch' | 'minor' | 'major' }];
-	});
-}
-
-function withFreezeLock<T>(env: NodeJS.ProcessEnv, sessionId: string, action: () => Promise<T>) {
-	const lock = resolve(developmentStateRoot(env), sessionId, 'freeze.lock');
-	mkdirSync(dirname(lock), { recursive: true, mode: 0o700 });
-	let descriptor: number;
-	try { descriptor = openSync(lock, 'wx', 0o600); } catch { throw new Error(`Candidate freeze is already active for ${sessionId}.`); }
-	return action().finally(() => { closeSync(descriptor); rmSync(lock, { force: true }); });
-}
-
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
 	const manifest = resolve(context.cwd, invocation.arguments[0]!); const projects = loadRuntimes(manifest);
 	const now = new Date(), requestedLease = Number(invocation.options.leaseSeconds ?? 14_400), leaseSeconds = Math.max(60, Math.min(86_400, requestedLease));
@@ -314,7 +164,7 @@ async function startSession(invocation: ParsedInvocation, context: CommandContex
 
 async function useTargets(invocation: ParsedInvocation, context: CommandContext) {
 	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId);
-	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { expiresAt: string; repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
 	const selections = [invocation.arguments[0]!, ...(Array.isArray(invocation.options.target) ? invocation.options.target : [])].map(parseSelection);
 	if (invocation.options.plan === true) return { sessionId, selections, mutation: false };
 	for (const selection of selections) {
@@ -329,15 +179,18 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 			}
 			if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env);
 			restoreOverlays(state, selection.projectId);
+			if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, null);
 		} else {
 			const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: selection.projectId, targetId: selection.targetId }) as { environment?: NodeJS.ProcessEnv };
 			if (target.operations.setup) runOneShotOperation(state, target.operations.setup, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			if (target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			saveState(state, context.env);
 			if (target.kind === 'package-watch') {
 				const overlayRoot = startPackageSynchronizer(state, runtime, target, repository.worktree, context.env);
 				saveState(state, context.env);
 				await waitForPackageOverlay(target, repository.worktree, overlayRoot); installPackageOverlay(state, record, runtime, target, repository.worktree, overlayRoot); saveState(state, context.env);
+				if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, { entrypoint: resolve(overlayRoot, 'current', 'dist', 'cli', 'main.js'), expiresAt: record.session.expiresAt });
 			} else await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
 		}
 		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
@@ -445,7 +298,7 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 	else if (target.kind === 'rebuild-restart') {
 		if (!target.operations.build) throw new Error(`${selection.projectId}.${selection.targetId} does not declare a build operation.`);
 		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env);
-		await markRebuilt(context, sessionId, selection.projectId, selection.targetId, mode, target);
+		await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 	} else await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 	const manual: string[] = [];
 	for (const dependent of dependentReactions(record.runtimes, selection.projectId, selection.targetId)) {
@@ -473,7 +326,7 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 		const running = await stopProcesses(state);
 		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
 		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env);
-		restoreOverlays(state); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
+		restoreOverlays(state); selectDevelopmentCli(context.env, null); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
 	}
 	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });
 	if (invocation.command.name === 'dev plan') return invoke(context, 'local.dev.plan', { sessionId, selected: [] });

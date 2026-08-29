@@ -63,22 +63,23 @@ function markdown(value: string, options: RenderOptions = {}) {
 	}).join('\n');
 }
 
-function panel(title: string, body: string, options: RenderOptions) {
-	const width = Math.max(40, Math.min(160, Number(options.width) || 100));
-	const border = '─'.repeat(Math.max(2, width - 4 - title.length));
-	return [`┌─ ${sanitize(title)} ${border}`, ...body.split('\n').map((line) => `│ ${line}`), `└${'─'.repeat(width - 1)}`];
+function responseTime(value: unknown) {
+	const date = new Date(String(value ?? ''));
+	if (!Number.isFinite(date.getTime())) return String(value ?? '');
+	return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }).format(date);
 }
 
-function communicationPanels(result: Record<string, unknown>, options: RenderOptions) {
+export function renderCommunicationResponses(result: Record<string, unknown>, options: RenderOptions = {}) {
 	const responses = Array.isArray(result.responses) ? result.responses.filter((value) => value && typeof value === 'object') as Record<string, unknown>[] : [];
-	const stream = result.projectStream && typeof result.projectStream === 'object' ? result.projectStream as Record<string, unknown> : {};
-	const heading = `Topic ${scalar(result.channel)} · ${scalar(stream.projectSlug)} · ${scalar(result.status)} · ${responses.length}/${Array.isArray(result.targets) ? result.targets.length : 0} outcomes`;
-	const source = panel('You', markdown(String(result.sourceMessage ?? ''), options), options);
-	const panels = responses.flatMap((response) => {
-		const title = `@${scalar(stream.projectSlug)}/${scalar(response.agentSlug)} · ${scalar(response.requirement)} · ${scalar(response.status)}`;
-		return panel(title, markdown(String(response.markdown ?? ''), options), options);
-	});
-	return [heading, ...source, ...panels, responses.length ? '' : 'No agent outcomes have completed yet.', `Send: ${scalar(result.sendId)}`].filter((line, index, all) => line !== '' || index < all.length - 1).join('\n');
+	const targets = Array.isArray(result.targets) ? result.targets.map((value) => value && typeof value === 'object' ? value as Record<string, unknown> : {}) : [];
+	const width = Math.max(48, Math.min(160, Number(options.width) || 100));
+	const separator = ansi(options.color === true, '2;36', '═'.repeat(width));
+	return responses.map((response) => {
+		const target = targets.find((candidate) => candidate.projectId === response.projectId && candidate.agentSlug === response.agentSlug) ?? {};
+		const handle = `@${scalar(target.projectSlug ?? response.projectId)}/${scalar(response.agentSlug)}`;
+		const heading = `${ansi(options.color === true, '1;36', handle)}   ${ansi(options.color === true, '2', responseTime(response.createdAt))}`;
+		return `${heading}\n\n${markdown(String(response.markdown ?? ''), options)}\n\n${separator}`;
+	}).join('\n\n\n');
 }
 
 export function renderHumanCommandResult(value: unknown, options: RenderOptions = {}) {
@@ -105,7 +106,8 @@ export function renderHumanCommandResult(value: unknown, options: RenderOptions 
 	}
 	if (path === 'teams current' && result) { const team = result.team as Record<string, unknown>; return `Active team: ${scalar(team.name)} (${scalar(team.slug)})\nTeam ID: ${scalar(team.id)}`; }
 	if (path === 'teams use' && result && result.team) { const team = result.team as Record<string, unknown>; return `Active team set to ${scalar(team.name)} (${scalar(team.slug)}).`; }
-	if (path === 'send' && result) return communicationPanels(result, options);
+	if (path === 'inbox' && result?.interactiveSession === true) return '';
+	if (path === 'send' && result) return result.humanStreamed === true || result.interactiveSession === true ? '' : renderCommunicationResponses(result, options);
 	const rendered = lines(envelope.result);
 	const warnings = Array.isArray(envelope.warnings) && envelope.warnings.length ? [`Warnings: ${envelope.warnings.map(scalar).join('; ')}`] : [];
 	const next = Array.isArray(envelope.nextActions) && envelope.nextActions.length ? ['Next actions:', ...envelope.nextActions.map((item) => `- ${scalar(item)}`)] : [];

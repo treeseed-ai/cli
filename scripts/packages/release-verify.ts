@@ -216,7 +216,7 @@ function assertPackageDependencyShape() {
 		dependencies?: Record<string, string>;
 	};
 	const dependencyNames = Object.keys(packageJson.dependencies ?? {}).sort();
-	const expectedDependencies = ['@treeseed/sdk', 'yaml'];
+	const expectedDependencies = ['@treeseed/sdk', 'ink', 'react', 'string-width', 'yaml'];
 	if (dependencyNames.join(',') !== expectedDependencies.join(',')) {
 		throw new Error(`CLI runtime dependencies must be exactly ${expectedDependencies.join(', ')}. Found: ${dependencyNames.join(', ') || '(none)'}`);
 	}

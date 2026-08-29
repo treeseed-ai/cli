@@ -5,8 +5,10 @@ import { parse as parseYaml } from 'yaml';
 import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
 import { ControlPlaneClientError, defaultLocalControlPlaneServer, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
 import type { CommandContext, ParsedInvocation } from '../types.js';
+import { runInteractiveChat } from '../communication/interactive-chat.js';
 import { createControlPlaneClient } from '../support/client.js';
 import { loadServerRegistry, loadServerSession } from '../support/server-custody.js';
+import { renderCommunicationResponses } from '../support/human-renderer.js';
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 	const local = defaultLocalControlPlaneServer(context.env as Record<string, string | undefined>);
@@ -98,16 +100,13 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (execution.kind === 'unavailable') throw Object.assign(new Error(execution.reason), { category: 'policy_blocked', code: execution.code });
 	if (execution.kind !== 'operation') throw Object.assign(new Error(`No CLI handler is installed for ${execution.handlerId}.`), { category: 'policy_blocked', code: 'local_handler_unavailable' });
 	const { operation, input } = await operationInput(invocation, context);
+	if (operation.descriptor.operationId === 'communications.send' && !input.body?.message) return runInteractiveChat(invocation, context, String(input.path.teamId), typeof input.path.channel === 'string' ? input.path.channel : undefined);
 	if (operation.descriptor.operationId === 'communications.send') {
 		const message = String(input.body?.message ?? '');
 		const addresses = parseCommunicationAddresses(message);
-		if (!addresses.length) throw Object.assign(new Error('Address at least one project agent in the message.'), { category: 'invalid_input', code: 'communication_recipient_required' });
-		const project = String(input.body?.projectId ?? '').toLowerCase();
-		const projectIsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(project);
-		for (const address of addresses) if (address.projectSlug && !projectIsUuid && address.projectSlug !== project) throw Object.assign(
-			new Error(`${address.address} does not belong to the selected project ${project}.`), { category: 'conflict', code: 'communication_target_project_mismatch' });
+		if (!addresses.length) throw Object.assign(new Error('Address at least one team agent in the message.'), { category: 'invalid_input', code: 'communication_recipient_required' });
 		const compatibility = Array.isArray(invocation.options.to) ? invocation.options.to.map(String) : invocation.options.to ? [String(invocation.options.to)] : [];
-		const mentioned = new Set(addresses.flatMap((address) => [address.agentSlug, `${address.projectSlug ?? project}/${address.agentSlug}`, address.address.slice(1)]));
+		const mentioned = new Set(addresses.flatMap((address) => [address.agentSlug, address.projectSlug ? `${address.projectSlug}/${address.agentSlug}` : '', address.address.slice(1)]).filter(Boolean));
 		for (const target of compatibility) if (!mentioned.has(target.replace(/^@/u, '').toLowerCase())) throw Object.assign(
 			new Error(`Deprecated --to target ${target} is not addressed in the message.`), { category: 'invalid_input', code: 'communication_to_not_mentioned' });
 		if (input.body) input.body.recipients = compatibility.length ? compatibility : undefined;
@@ -116,6 +115,9 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
 	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: randomUUID(), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };
+	if (operation.descriptor.concurrency.required && input.body?.version !== undefined) {
+		options.headers[operation.descriptor.concurrency.writeHeader] = `"${String(input.body.version)}"`;
+	}
 	const invokeAuthorized = async (target: ReturnType<typeof controlPlaneOperation>, targetInput: { path: Record<string, unknown>; query: Record<string, unknown>; body?: Record<string, unknown> }) => {
 		const targetOptions = { idempotencyKey: randomUUID(), headers: {} as Record<string, string> };
 		try { return await client.invoke(target, targetInput, targetOptions); }
@@ -182,22 +184,50 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	};
 	const waitForCommunication = async (response: unknown) => {
 		if (operation.descriptor.operationId !== 'communications.send') return response;
-		const configured = invocation.options.noWait === true ? 0 : invocation.options.wait ?? invocation.options.timeout ?? 1_800;
-		const seconds = Math.max(0, Math.min(3_600, Number(configured) || 0));
-		if (!seconds) return response;
+		if (invocation.options.noWait === true) return response;
+		const configured = invocation.options.wait ?? invocation.options.timeout;
+		const seconds = configured === undefined ? null : Math.max(0, Math.min(3_600, Number(configured) || 0));
+		if (seconds === 0) return response;
 		const initial = response && typeof response === 'object' ? response as Record<string, unknown> : {};
 		let value = recordData(initial); const sendId = typeof value.sendId === 'string' ? value.sendId : '';
 		const teamId = typeof input.path.teamId === 'string' ? input.path.teamId : '';
 		if (!sendId || !teamId) return response;
-		const statusOperation = controlPlaneOperation('communications.sends.show'); const deadline = Date.now() + seconds * 1_000;
-		while (Date.now() < deadline && !['complete', 'partial', 'failed'].includes(String(value.status))) {
-			await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(1_000, Math.max(1, deadline - Date.now()))));
-			const observed = await client.invoke(statusOperation, { path: { teamId, sendId }, query: {}, body: undefined });
+		const displayed = new Set<string>();
+		const display = (current: Record<string, unknown>) => {
+			if (context.outputFormat !== 'human' || invocation.options.jsonStream === true) return;
+			const fresh = (Array.isArray(current.responses) ? current.responses : []).filter((candidate) => {
+				const item = candidate && typeof candidate === 'object' ? candidate as Record<string, unknown> : {};
+				const key = `${String(item.projectId ?? '')}/${String(item.invocationId ?? '')}`;
+				if (displayed.has(key)) return false; displayed.add(key); return true;
+			});
+			if (fresh.length) context.write(renderCommunicationResponses({ ...current, responses: fresh }, {
+				color: Boolean(process.stdout.isTTY && !context.env.NO_COLOR), width: Number(context.env.COLUMNS) || process.stdout.columns || 100,
+			}), 'stdout');
+		};
+		display(value);
+		if (invocation.options.jsonStream === true) for (const event of (Array.isArray(value.events) ? value.events : [])) {
+			const item = event && typeof event === 'object' ? event as Record<string, unknown> : {}; const key = String(item.id ?? '');
+			if (key && !displayed.has(`event:${key}`)) { displayed.add(`event:${key}`); context.write(JSON.stringify({ schemaVersion: 'treeseed.communication-event/v1', event: item }), 'stdout'); }
+		}
+		const statusOperation = controlPlaneOperation('communications.sends.show'); const deadline = seconds === null ? null : Date.now() + seconds * 1_000;
+		while ((deadline === null || Date.now() < deadline) && !['complete', 'partial', 'failed'].includes(String(value.status))) {
+			await new Promise((resolvePromise) => setTimeout(resolvePromise, deadline === null ? 1_000 : Math.min(1_000, Math.max(1, deadline - Date.now()))));
+			// Chat sessions may outlive the short-lived OAuth access token. Recreate
+			// the client at each long poll so server custody can refresh it without
+			// interrupting the topic stream.
+			const { client: pollingClient } = await createControlPlaneClient(invocation, context, true);
+			const observed = await pollingClient.invoke(statusOperation, { path: { teamId, sendId }, query: { diagnostics: invocation.options.diagnostics }, body: undefined });
 			value = recordData(observed as unknown as Record<string, unknown>);
+			if (invocation.options.jsonStream === true) for (const event of (Array.isArray(value.events) ? value.events : [])) {
+				const item = event && typeof event === 'object' ? event as Record<string, unknown> : {}; const key = String(item.id ?? '');
+				if (key && !displayed.has(`event:${key}`)) { displayed.add(`event:${key}`); context.write(JSON.stringify({ schemaVersion: 'treeseed.communication-event/v1', event: item }), 'stdout'); }
+			}
+			display(value);
 		}
 		if (!['complete', 'partial', 'failed'].includes(String(value.status))) throw Object.assign(
 			new Error(`Communication send did not finish within ${seconds} seconds.`), { category: 'provider_unavailable', code: 'communication_wait_timeout', partialResult: value });
-		return { data: value };
+		if (invocation.options.jsonStream === true) context.write(JSON.stringify({ schemaVersion: 'treeseed.communication-stream-complete/v1', result: value }), 'stdout');
+		return { data: context.outputFormat === 'human' ? { ...value, humanStreamed: true } : value };
 	};
 	try {
 		return await finalize(await waitForCommunication(await client.invoke(operation, input, options)));

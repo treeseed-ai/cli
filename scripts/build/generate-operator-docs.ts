@@ -15,7 +15,7 @@ function markdown(nodes: CommandNodeDescriptor[], parent: string[] = []): string
 		const path = [...parent, node.segment];
 		if (node.nodeType === 'branch') return [`## trsd ${path.join(' ')}`, '', node.description, '', ...markdown(node.children, path)];
 		const command = commandIndex.get(path.join(' '));
-		const args = (node.arguments ?? []).map((argument) => ` <${argument.name}>`).join('');
+		const args = (node.arguments ?? []).map((argument) => argument.required ? ` <${argument.name}>` : ` [${argument.name}]`).join('');
 		const options = (command?.options ?? []).map((option) => `- \`${option.flag}${option.kind === 'boolean' ? '' : ' <value>'}\`: ${option.description}`);
 		const execution = node.execution.kind === 'operation' ? `Control-plane operation: \`${node.execution.operationId}\`.` : node.execution.kind === 'unavailable' ? `Availability: fail-closed (\`${node.execution.code}\`). ${node.execution.reason}` : `Execution: \`${node.execution.handlerId}\`.`;
 		return [

@@ -15,13 +15,13 @@ test('registry exactly matches the SDK command tree', () => {
 	assert.equal(commandSpecs.some((command) => command.name.includes(':')), false);
 });
 
-test('send derives and validates project-qualified recipients without raw routes', async () => {
+test('send derives project-qualified recipients without a project option or raw routes', async () => {
 	const calls: Array<{ operationId: string; input: unknown }> = []; const output: string[] = [];
-	const exit = await runCommandLine(['send', 'engineering', '@sdk/architect\n\nHow should this work?', '--team', 'team-1', '--project', 'sdk', '--to', 'sdk/architect', '--no-wait', '--json'], {
+	const exit = await runCommandLine(['send', 'engineering', '@sdk/architect\n\nHow should this work?', '--team', 'team-1', '--to', 'sdk/architect', '--no-wait', '--json'], {
 		interactiveUi: false, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { sendId: 'send-1', status: 'queued' } }; }, write: (value) => output.push(value),
 	});
 	assert.equal(exit, 0);
-	assert.deepEqual(calls, [{ operationId: 'communications.send', input: { path: { teamId: 'team-1', channel: 'engineering' }, query: {}, body: { message: '@sdk/architect\n\nHow should this work?', projectId: 'sdk', recipients: ['sdk/architect'] } } }]);
+	assert.deepEqual(calls, [{ operationId: 'communications.send', input: { path: { teamId: 'team-1', channel: 'engineering' }, query: {}, body: { message: '@sdk/architect\n\nHow should this work?', recipients: ['sdk/architect'] } } }]);
 	assert.equal(JSON.parse(output[0]!).result.sendId, 'send-1');
 });
 
@@ -91,6 +91,50 @@ test('host identity adoption is permanently bound to the protected local socket'
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config adopt' } as any }), true);
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host reset' } as any }), true);
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config apply' } as any }), false);
+});
+
+test('host storage connect derives the active team and keeps bootstrap authority out of output', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-storage-')); const calls: any[] = []; const output: string[] = [];
+	const env = { TREESEED_CONFIG_HOME: root, TREESEED_API_BASE_URL: 'http://127.0.0.1:3002' };
+	try {
+		saveServerSession({ serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'session', principal: { id: 'user-1' } as any,
+			activeTeam: { id: '16549507-cebc-4a16-94c5-cf91defbd6a3', slug: 'treeseed', name: 'TreeSeed' } }, env);
+		const exit = await runCommandLine(['host', 'storage', 'connect', 'cloudflare-r2', '--json'], {
+			env, interactiveUi: false, promptSecret: async () => 'bootstrap-token-secret-value',
+			hostInvoke: async (input) => { calls.push(input); return { backend: 'cloudflare-r2', configured: true }; },
+			write: (value) => output.push(value),
+		});
+		assert.equal(exit, 0);
+		const payload = JSON.parse(calls[0].options.payload);
+		assert.deepEqual({ action: payload.action, backend: payload.backend, teamId: payload.teamId, teamSlug: payload.teamSlug }, {
+			action: 'connect', backend: 'cloudflare-r2', teamId: '16549507-cebc-4a16-94c5-cf91defbd6a3', teamSlug: 'treeseed',
+		});
+		assert.equal(payload.bootstrapToken, 'bootstrap-token-secret-value');
+		assert.doesNotMatch(output.join(''), /bootstrap-token-secret-value/u);
+		const progress: string[] = [];
+		assert.equal(await runCommandLine(['host', 'storage', 'connect', 'cloudflare-r2'], {
+			env, interactiveUi: true, promptSecret: async () => 'another-bootstrap-secret-value',
+			hostInvoke: async () => ({ backend: 'cloudflare-r2', configured: true }),
+			write: (value, stream) => { if (stream === 'stderr') progress.push(value); },
+		}), 0);
+		assert.match(progress.join(''), /Account API Tokens: Write/u);
+		assert.match(progress.join(''), /Provisioning storage/u);
+		assert.match(progress.join(''), /setup completed/u);
+		assert.doesNotMatch(progress.join(''), /another-bootstrap-secret-value/u);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('generic local confirmation is reserved for destructive operations', async () => {
+	let prompts = 0;
+	const confirm = async () => { prompts += 1; return true; };
+	assert.equal(await runCommandLine(['host', 'update', 'apply', '--json'], {
+		interactiveUi: true, confirm, hostInvoke: async () => ({ checked: true }), write() {},
+	}), 0);
+	assert.equal(prompts, 0);
+	assert.equal(await runCommandLine(['host', 'component', 'disable', 'api', '--json'], {
+		interactiveUi: true, confirm, hostInvoke: async () => ({ disabled: true }), write() {},
+	}), 0);
+	assert.equal(prompts, 1);
 });
 
 test('bootstrap enrollment stores credentials privately and never emits key material', async () => {

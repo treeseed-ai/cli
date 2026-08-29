@@ -2,16 +2,14 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 
-test('package has one executable and no runtime package dependency', () => {
+test('package has one executable and only its declared CLI runtime dependencies', () => {
 	const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 	assert.deepEqual(pkg.bin, { trsd: './dist/cli/main.js' });
 	assert.equal(pkg.exports, undefined);
 	assert.equal(pkg.types, undefined);
 	assert.equal(pkg.files.some((path: string) => path.startsWith('scripts/')), false);
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
-	assert.equal(pkg.dependencies.ink, undefined);
-	assert.equal(pkg.dependencies.react, undefined);
-	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.52', yaml: '2.8.1' });
+	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.55', ink: '^7.1.1', react: '^19.2.8', 'string-width': '^8.2.2', yaml: '2.9.0' });
 });
 
 test('built package contains executable runtime only', () => {
