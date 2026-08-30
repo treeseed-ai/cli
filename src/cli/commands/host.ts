@@ -22,10 +22,16 @@ This operation drains provider writers, creates and verifies the LUKS2 provider 
 creates an offline recovery bundle, installs the private Kata network and TLS relay,
 pulls the pinned guest image, and starts the root broker. It can take several minutes.
 
-You will enter two hidden values:
+You will enter a recovery passphrase. For model authentication, TreeSeed automatically
+uses an existing CODEX_HOME/auth.json or ~/.codex/auth.json ChatGPT subscription login
+when present. Otherwise it asks for an OpenAI service API key.
+
+Authentication is encrypted into host custody, injected only into each Kata assignment,
+and Codex runs with its workspace sandbox enabled. The host login is never printed.
+
+You will enter:
   - A new recovery-bundle passphrase (keep it offline; TreeSeed cannot recover it).
-  - An OpenAI service API key used only by the host model gateway. A Codex login cache
-    cannot be placed in assignment guests and is not accepted here.
+  - An OpenAI service API key only when no existing Codex subscription login is found.
 
 Progress is recorded in the host security receipt. Do not interrupt disk formatting or
 state migration after confirming the operation.
@@ -81,13 +87,22 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 		const recoveryPassphrase = (await ask('Recovery bundle passphrase: ')).trim();
 		if (recoveryPassphrase.length < 12) throw new Error('Recovery bundle passphrase must contain at least 12 characters.');
 		let modelProviderKey: string | undefined;
+		let codexAuthFile: string | undefined;
 		if (invocation.command.name.endsWith('initialize')) {
 			const confirmation = (await ask('Repeat recovery bundle passphrase: ')).trim();
 			if (confirmation !== recoveryPassphrase) throw new Error('Recovery bundle passphrases do not match.');
-			modelProviderKey = (await ask('OpenAI model gateway service API key: ')).trim();
-			if (modelProviderKey.length < 20) throw new Error('An OpenAI service API key is required for the assignment model gateway.');
+			const codexRoot = context.env.CODEX_HOME || (context.env.HOME ? resolve(context.env.HOME, '.codex') : '');
+			const candidate = codexRoot ? resolve(codexRoot, 'auth.json') : '';
+			if (candidate && existsSync(candidate)) {
+				codexAuthFile = candidate;
+				if (context.outputFormat === 'human') context.write('Using the existing Codex ChatGPT subscription login for assignment authentication.\n', 'stderr');
+			} else {
+				modelProviderKey = (await ask('OpenAI model gateway service API key: ')).trim();
+				if (modelProviderKey.length < 20) throw new Error('An OpenAI service API key is required when no Codex subscription login exists.');
+			}
 		}
-		return { handlerId: invocation.command.execution.handlerId, arguments: invocation.arguments, options: { ...options, payload: JSON.stringify({ bundle, recoveryPassphrase, ...(modelProviderKey ? { modelProviderKey } : {}) }) } };
+		return { handlerId: invocation.command.execution.handlerId, arguments: invocation.arguments, options: { ...options, payload: JSON.stringify({ bundle, recoveryPassphrase,
+			...(codexAuthFile ? { codexAuthFile } : modelProviderKey ? { modelProviderKey } : {}) }) } };
 	}
 	if (invocation.command.name.startsWith('host config ') && invocation.command.name !== 'host config show') {
 		const file = invocation.arguments[0];
@@ -129,6 +144,6 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 		return result;
 	} finally { clearInterval(progress); }
 }
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostConfigurationSchema } from '@treeseed/sdk/deployment';
