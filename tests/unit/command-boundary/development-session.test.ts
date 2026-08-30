@@ -63,6 +63,19 @@ test('development session start uses one protected manager command and private l
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('host runtime development planning is local and status uses the protected manager socket', async () => {
+	const output: string[] = [], calls: any[] = [];
+	const hostInvoke = async (input: any) => { calls.push(input); return { generationId: 'installed', status: 'installed' }; };
+	const context = { cwd: resolve(import.meta.dirname, '../../..'), interactiveUi: false, hostInvoke, write: (value: string) => output.push(value) };
+	assert.equal(await runCommandLine(['dev', 'host', 'activate', '../deployment', '--plan', '--json'], context), 0);
+	assert.equal(calls.length, 0);
+	assert.equal(JSON.parse(output[0]!).result.mutation, false);
+	assert.equal(await runCommandLine(['dev', 'host', 'status', '--json'], context), 0);
+	assert.equal(calls[0].handlerId, 'local.dev.host.status');
+	assert.equal(await runCommandLine(['dev', 'host', 'deactivate', '--plan', '--json'], context), 0);
+	assert.equal(calls.length, 1);
+});
+
 test('development operations receive portable workspace identity and overlays use relative links', () => {
 	const state = { manifest: '/workspace/development.session.yaml', sessionId: 'session-1' };
 	const environment = developmentOperationEnvironment(state, '/workspace/packages/api', 'live', { PATH: '/usr/bin' }, { TREESEED_API_BASE_URL: 'https://api.treeseed.localhost' });
