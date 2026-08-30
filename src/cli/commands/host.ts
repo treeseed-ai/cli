@@ -22,19 +22,12 @@ This operation drains provider writers, creates and verifies the LUKS2 provider 
 creates an offline recovery bundle, installs the private Kata network and TLS relay,
 pulls the pinned guest image, and starts the root broker. It can take several minutes.
 
-You will enter a recovery passphrase. For model authentication, TreeSeed automatically
-uses an existing CODEX_HOME/auth.json or ~/.codex/auth.json ChatGPT subscription login
-when present. Otherwise it asks for an OpenAI service API key.
-
-Authentication is encrypted into host custody, injected only into each Kata assignment,
-and Codex runs with its workspace sandbox enabled. The host login is never printed.
-
 You will enter:
   - A new recovery-bundle passphrase (keep it offline; TreeSeed cannot recover it).
-  - An OpenAI service API key only when no existing Codex subscription login is found.
 
 Progress is recorded in the host security receipt. Do not interrupt disk formatting or
-state migration after confirming the operation.
+state migration after confirming the operation. Execution-provider credentials are
+initialized separately through registered provider credential initializers.
 `;
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
@@ -48,6 +41,28 @@ function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 async function input(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'local') throw new Error('Host command is not locally bound.');
 	const { server: _server, json: _json, yes: _yes, ...options } = invocation.options;
+	if (invocation.command.name === 'host provider credentials initialize') {
+		const initializerId = invocation.arguments[0];
+		if (!initializerId) throw new Error('A registered provider credential initializer is required. Run `trsd host provider credentials list`.');
+		const listCommand = { handlerId: 'local.host.provider.credentials.list', arguments: [], options: {} };
+		const listed = await (context.hostInvoke ? context.hostInvoke(listCommand) : invokeLocalHostManager(listCommand)) as { initializers?: Array<{ id: string; displayName: string; description: string; sources: Array<{ id: string; label: string; kind: 'file' | 'secret'; prompt: string; suggestedPaths: string[] }> }> };
+		const initializer = listed.initializers?.find((candidate) => candidate.id === initializerId);
+		if (!initializer) throw new Error(`Provider credential initializer ${initializerId} is not registered.`);
+		const requestedSource = typeof invocation.options.source === 'string' ? invocation.options.source : undefined;
+		const expand = (path: string) => path.replace(/\$([A-Z][A-Z0-9_]*)/gu, (_match, name: string) => context.env[name] ?? '');
+		const discovered = initializer.sources.flatMap((source) => source.kind === 'file' ? source.suggestedPaths.map(expand).filter((path) => path && existsSync(path)).map((path) => ({ source, path })) : []).at(0);
+		const source = requestedSource ? initializer.sources.find((candidate) => candidate.id === requestedSource) : discovered?.source ?? initializer.sources.find((candidate) => candidate.kind === 'secret') ?? initializer.sources[0];
+		if (!source) throw new Error(`Provider credential initializer ${initializerId} has no usable sources.`);
+		if (context.outputFormat === 'human') context.write(`${initializer.displayName}\n${initializer.description}\nUsing credential source: ${source.label}\n`, 'stderr');
+		let secret: string;
+		if (source.kind === 'file') {
+			const suggested = discovered?.source.id === source.id ? discovered.path : undefined;
+			const path = suggested ?? String(context.prompt ? await context.prompt(`${source.prompt}: `) : '').trim();
+			if (!path || !existsSync(path)) throw new Error(`Credential file for ${source.label} does not exist.`);
+			secret = readFileSync(resolve(path), 'utf8');
+		} else secret = (context.promptSecret ? String(await context.promptSecret(`${source.prompt}: `)) : await promptHidden(`${source.prompt}: `)).trim();
+		return { handlerId: invocation.command.execution.handlerId, arguments: [initializerId], options: { ...options, payload: JSON.stringify({ sourceId: source.id, secret }) } };
+	}
 	if (invocation.command.name.startsWith('host storage ')) {
 		const team = activeTeam(invocation, context);
 		if (!team) throw Object.assign(new Error('Select an active team with `trsd teams use <team>` before configuring host storage.'), { category: 'ambiguous_context', code: 'active_team_required' });
@@ -86,23 +101,11 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 		const ask = async (question: string) => context.promptSecret ? String(await context.promptSecret(question)) : promptHidden(question);
 		const recoveryPassphrase = (await ask('Recovery bundle passphrase: ')).trim();
 		if (recoveryPassphrase.length < 12) throw new Error('Recovery bundle passphrase must contain at least 12 characters.');
-		let modelProviderKey: string | undefined;
-		let codexAuthFile: string | undefined;
 		if (invocation.command.name.endsWith('initialize')) {
 			const confirmation = (await ask('Repeat recovery bundle passphrase: ')).trim();
 			if (confirmation !== recoveryPassphrase) throw new Error('Recovery bundle passphrases do not match.');
-			const codexRoot = context.env.CODEX_HOME || (context.env.HOME ? resolve(context.env.HOME, '.codex') : '');
-			const candidate = codexRoot ? resolve(codexRoot, 'auth.json') : '';
-			if (candidate && existsSync(candidate)) {
-				codexAuthFile = candidate;
-				if (context.outputFormat === 'human') context.write('Using the existing Codex ChatGPT subscription login for assignment authentication.\n', 'stderr');
-			} else {
-				modelProviderKey = (await ask('OpenAI model gateway service API key: ')).trim();
-				if (modelProviderKey.length < 20) throw new Error('An OpenAI service API key is required when no Codex subscription login exists.');
-			}
 		}
-		return { handlerId: invocation.command.execution.handlerId, arguments: invocation.arguments, options: { ...options, payload: JSON.stringify({ bundle, recoveryPassphrase,
-			...(codexAuthFile ? { codexAuthFile } : modelProviderKey ? { modelProviderKey } : {}) }) } };
+		return { handlerId: invocation.command.execution.handlerId, arguments: invocation.arguments, options: { ...options, payload: JSON.stringify({ bundle, recoveryPassphrase }) } };
 	}
 	if (invocation.command.name.startsWith('host config ') && invocation.command.name !== 'host config show') {
 		const file = invocation.arguments[0];
@@ -116,7 +119,8 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocation, 'command'>) {
 	return invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll'
 		|| invocation.command.name === 'host reset' || invocation.command.name.startsWith('host storage ')
-		|| invocation.command.name.startsWith('host security ') || invocation.command.name.startsWith('host sandbox ');
+		|| invocation.command.name.startsWith('host security ') || invocation.command.name.startsWith('host sandbox ')
+		|| invocation.command.name.startsWith('host provider credentials ');
 }
 
 export async function runHost(invocation: ParsedInvocation, context: CommandContext) {
@@ -132,15 +136,20 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 	const invoke = () => context.hostInvoke ? context.hostInvoke(command)
 		: hostUsesProtectedLocalTransport(invocation) ? invokeLocalHostManager(command)
 			: invokeHostManager(command, typeof invocation.options.server === 'string' ? invocation.options.server : undefined, context.env);
-	const tracksStorageProgress = context.outputFormat === 'human' && invocation.options.plan !== true
-		&& ['host storage connect', 'host storage reconcile', 'host storage rotate'].includes(invocation.command.name);
-	if (!tracksStorageProgress) return invoke();
-	context.write('Connecting Cloudflare R2. Provisioning storage, securing credentials, and reconciling the host...\n', 'stderr');
+	const progressLabel = context.outputFormat === 'human' && invocation.options.plan !== true ? ({
+		'host storage connect': 'Connecting Cloudflare R2. Provisioning storage, securing credentials, and reconciling the host',
+		'host storage reconcile': 'Reconciling Cloudflare R2 storage',
+		'host storage rotate': 'Rotating Cloudflare R2 storage credentials',
+		'host security initialize': 'Initializing encrypted provider storage and the Kata sandbox broker',
+		'host provider credentials initialize': 'Encrypting and activating the registered provider credential',
+	} as Record<string, string>)[invocation.command.name] : undefined;
+	if (!progressLabel) return invoke();
+	context.write(`${progressLabel}...\n`, 'stderr');
 	const started = Date.now();
-	const progress = setInterval(() => context.write(`Still working on Cloudflare R2 setup (${Math.floor((Date.now() - started) / 1_000)}s elapsed)...\n`, 'stderr'), 10_000);
+	const progress = setInterval(() => context.write(`Still working (${Math.floor((Date.now() - started) / 1_000)}s elapsed)...\n`, 'stderr'), 10_000);
 	try {
 		const result = await invoke();
-		context.write('Cloudflare R2 storage setup completed.\n', 'stderr');
+		context.write(invocation.command.name.startsWith('host storage ') ? 'Cloudflare R2 storage setup completed.\n' : 'Completed.\n', 'stderr');
 		return result;
 	} finally { clearInterval(progress); }
 }

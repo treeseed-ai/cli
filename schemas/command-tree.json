@@ -1317,6 +1317,69 @@
                 "kind": "local",
                 "handlerId": "local.host.provider.status"
               }
+            },
+            {
+              "nodeType": "branch",
+              "segment": "credentials",
+              "description": "Credentials operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "list",
+                  "description": "List the selected resource.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.command.list/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.credentials.list"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "status",
+                  "description": "Status the selected resource.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.command.status/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.credentials.status"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "initialize",
+                  "description": "Initialize an execution-provider credential through its registered host initializer.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "initializer",
+                      "description": "initializer identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    },
+                    {
+                      "name": "--source",
+                      "description": "Registered credential source to use instead of automatic selection.",
+                      "type": "string"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.initialize",
+                    "confirmation": "credential"
+                  },
+                  "resultSchemaId": "treeseed.command.initialize/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.credentials.initialize"
+                  }
+                }
+              ]
             }
           ]
         },

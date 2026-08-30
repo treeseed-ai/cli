@@ -525,6 +525,43 @@ Execution: `local.host.provider.status`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
+## trsd host provider credentials
+
+Credentials operations.
+
+### trsd host provider credentials list
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Execution: `local.host.provider.credentials.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host provider credentials status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.provider.credentials.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host provider credentials initialize <initializer>
+
+Initialize an execution-provider credential through its registered host initializer.
+
+Operation: mutation. Result schema: `treeseed.command.initialize/v1`.
+Execution: `local.host.provider.credentials.initialize`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--source <value>`: Registered credential source to use instead of automatic selection.
+
 ## trsd host storage
 
 Storage operations.
