@@ -106,6 +106,19 @@ export function renderHumanCommandResult(value: unknown, options: RenderOptions 
 	}
 	if (path === 'teams current' && result) { const team = result.team as Record<string, unknown>; return `Active team: ${scalar(team.name)} (${scalar(team.slug)})\nTeam ID: ${scalar(team.id)}`; }
 	if (path === 'teams use' && result && result.team) { const team = result.team as Record<string, unknown>; return `Active team set to ${scalar(team.name)} (${scalar(team.slug)}).`; }
+	if (path === 'host security initialize' && result) {
+		const receipt = result.receipt && typeof result.receipt === 'object' ? result.receipt as Record<string, unknown> : {};
+		const sandbox = receipt.sandbox && typeof receipt.sandbox === 'object' ? receipt.sandbox as Record<string, unknown> : {};
+		const providerVolume = receipt.providerVolume && typeof receipt.providerVolume === 'object' ? receipt.providerVolume as Record<string, unknown> : {};
+		const ready = sandbox.brokerReady === true && receipt.state === 'known-good';
+		return [ready ? 'Host security initialized.' : 'Host encryption initialized; sandbox readiness still needs attention.',
+			`Encrypted provider volume: ${providerVolume.encrypted === true && result.verified === true ? 'verified' : 'not verified'}`,
+			`Recovery bundle: ${result.recoveryBundleVerified === true ? 'verified' : 'not verified'}`,
+			`Kata sandbox broker: ${ready ? 'ready' : 'not ready'}`,
+			receipt.receiptId ? `Receipt: ${scalar(receipt.receiptId)}` : '',
+			ready ? '' : 'Next: run `trsd host sandbox doctor`.',
+		].filter(Boolean).join('\n');
+	}
 	if (path === 'inbox' && result?.interactiveSession === true) return '';
 	if (path === 'send' && result) return result.humanStreamed === true || result.interactiveSession === true ? '' : renderCommunicationResponses(result, options);
 	const rendered = lines(envelope.result);
