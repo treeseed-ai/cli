@@ -368,6 +368,136 @@
     },
     {
       "nodeType": "branch",
+      "segment": "capabilities",
+      "description": "Capabilities operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List standardized services in the active capability ontology.",
+          "kind": "read",
+          "options": [
+            {
+              "name": "--family",
+              "description": "Capability family filter.",
+              "type": "string"
+            },
+            {
+              "name": "--namespace",
+              "description": "Namespace filter.",
+              "type": "string"
+            },
+            {
+              "name": "--status",
+              "description": "Definition status.",
+              "type": "string"
+            },
+            {
+              "name": "--limit",
+              "description": "Maximum definitions.",
+              "type": "number"
+            },
+            {
+              "name": "--cursor",
+              "description": "Pagination cursor.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.capability-page/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "capabilities.list",
+            "input": [
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "family",
+                "source": "option",
+                "name": "family",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "namespace",
+                "source": "option",
+                "name": "namespace",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show one standardized capability definition.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "capability",
+              "description": "Namespaced capability ID.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--version",
+              "description": "Exact semantic version.",
+              "type": "string"
+            }
+          ],
+          "resultSchemaId": "treeseed.capability-definition/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "capabilities.show",
+            "input": [
+              {
+                "target": "path",
+                "field": "capabilityId",
+                "source": "argument",
+                "name": "capability",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "version",
+                "source": "option",
+                "name": "version",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
       "segment": "auth",
       "description": "Auth operations.",
       "children": [

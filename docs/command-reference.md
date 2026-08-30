@@ -85,6 +85,36 @@ Control-plane operation: `communications.topics.subscriptions.delete`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd capabilities
+
+Capabilities operations.
+
+### trsd capabilities list
+
+List standardized services in the active capability ontology.
+
+Operation: read. Result schema: `treeseed.capability-page/v1`.
+Control-plane operation: `capabilities.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+- `--family <value>`: Capability family filter.
+- `--namespace <value>`: Namespace filter.
+
+### trsd capabilities show <capability>
+
+Show one standardized capability definition.
+
+Operation: read. Result schema: `treeseed.capability-definition/v1`.
+Control-plane operation: `capabilities.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--version <value>`: Exact semantic version.
+
 ## trsd auth
 
 Auth operations.
