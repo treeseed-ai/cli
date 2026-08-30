@@ -19,6 +19,16 @@ test('generic human output renders labels and values without JSON punctuation', 
 	assert.doesNotMatch(output, /[{}]/u);
 });
 
+test('host security initialization is summarized without dumping its receipt', () => {
+	const output = renderHumanCommandResult({ commandPath: ['host', 'security', 'initialize'], ok: true, result: {
+		verified: true, recoveryBundleVerified: true, receipt: { receiptId: 'security-test', state: 'known-good', sandbox: { brokerReady: true, guestImageDigests: ['sha256:a', 'sha256:a'] }, providerVolume: { encrypted: true } },
+	} });
+	assert.match(output, /Host security initialized\./u);
+	assert.match(output, /Kata sandbox broker: ready/u);
+	assert.match(output, /Receipt: security-test/u);
+	assert.doesNotMatch(output, /Guest Image Digests|Schema Version|sha256:a/u);
+});
+
 test('communication responses render as separated Markdown messages without redundant state', () => {
 	const output = renderHumanCommandResult({ commandPath: ['send'], ok: true, result: {
 		channel: 'engineering', status: 'complete', sendId: 'send-1',
