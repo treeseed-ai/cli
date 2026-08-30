@@ -10,6 +10,7 @@ import { invokeLocalHostManager } from '../support/host-client.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
 import { dependentReactions, installPackageOverlay, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
 import { artifactPaths, compatibilityAttestations, withFreezeLock } from './development-support/candidate.js';
+import { runHostDevelopment } from './development-support/host-runtime.js';
 export { relativeOverlayTarget, waitForNewPackageOverlay } from './development-support/overlays.js';
 
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
@@ -318,6 +319,7 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 }
 
 export async function runDevelopment(invocation: ParsedInvocation, context: CommandContext) {
+	if (invocation.command.name.startsWith('dev host ')) return runHostDevelopment(invocation, context);
 	if (invocation.command.name === 'dev session start') return startSession(invocation, context);
 	if (invocation.command.name === 'dev use') return useTargets(invocation, context);
 	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId);

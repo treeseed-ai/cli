@@ -799,6 +799,80 @@
       "children": [
         {
           "nodeType": "branch",
+          "segment": "host",
+          "description": "Host operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "activate",
+              "description": "Build and activate a local host-runtime development generation.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "worktree",
+                  "description": "Deployment worktree (defaults to the current workspace deployment package).",
+                  "required": false
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--guest-image",
+                  "description": "Optional exact sandbox guest image digest to bind while activating.",
+                  "type": "string"
+                }
+              ],
+              "authorization": {
+                "capability": "development.activate",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.dev.host.activate/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.dev.host.activate"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Show the active local host-runtime development generation.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.dev.host.status/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.dev.host.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "deactivate",
+              "description": "Restore the installed host runtime.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "development.deactivate",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.dev.host.deactivate/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.dev.host.deactivate"
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
           "segment": "session",
           "description": "Session operations.",
           "children": [

@@ -265,6 +265,40 @@ Execution: `local.secrets.rotate`.
 
 Dev operations.
 
+## trsd dev host
+
+Host operations.
+
+### trsd dev host activate [worktree]
+
+Build and activate a local host-runtime development generation.
+
+Operation: mutation. Result schema: `treeseed.command.dev.host.activate/v1`.
+Execution: `local.dev.host.activate`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--guest-image <value>`: Optional exact sandbox guest image digest to bind while activating.
+
+### trsd dev host status
+
+Show the active local host-runtime development generation.
+
+Operation: read. Result schema: `treeseed.command.dev.host.status/v1`.
+Execution: `local.dev.host.status`.
+
+- `--json`: Emit the stable JSON envelope.
+
+### trsd dev host deactivate
+
+Restore the installed host runtime.
+
+Operation: mutation. Result schema: `treeseed.command.dev.host.deactivate/v1`.
+Execution: `local.dev.host.deactivate`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
 ## trsd dev session
 
 Session operations.
