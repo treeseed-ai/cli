@@ -63,8 +63,8 @@ export async function runHostDevelopment(invocation: ParsedInvocation, context: 
 	if (invocation.command.name !== 'dev host activate') throw new Error(`Unsupported host development command ${invocation.command.name}.`);
 	const worktree = resolve(String(invocation.arguments[0] ?? defaultWorktree(context.cwd)));
 	const packagePath = resolve(worktree, 'package.json');
-	if (!existsSync(packagePath) || basename(worktree) !== 'deployment') throw new Error('Host development activation requires the Deployment package worktree.');
 	if (invocation.options.plan === true) return { action: 'activate', worktree, guestImageDigest: invocation.options.guestImage ?? null, mutation: false };
+	if (!existsSync(packagePath) || basename(worktree) !== 'deployment') throw new Error('Host development activation requires the Deployment package worktree.');
 	context.write('Building the local host runtime…', 'stdout');
 	execFileSync('npm', ['run', 'build'], { cwd: worktree, env: context.env, stdio: 'inherit' });
 	const manifest = hostDevelopmentRuntimeManifest(worktree);
