@@ -3,7 +3,7 @@ import { invokeHostManager, invokeLocalHostManager } from '../support/host-clien
 import { storeHostEnrollment, type HostEnrollment } from '../support/host-custody.js';
 import { defaultLocalControlPlaneServer, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
 import { loadServerRegistry, loadServerSession } from '../support/server-custody.js';
-import { promptHidden } from '../support/prompts.js';
+import { promptHidden, promptText } from '../support/prompts.js';
 
 const cloudflareSetupGuide = `Cloudflare R2 setup
 
@@ -41,6 +41,32 @@ function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 async function input(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'local') throw new Error('Host command is not locally bound.');
 	const { server: _server, json: _json, yes: _yes, ...options } = invocation.options;
+	if (invocation.command.name === 'host initialize') {
+		const profile = invocation.options.profile;
+		if (typeof profile !== 'string' || !/^[a-z][a-z0-9.-]{1,63}$/u.test(profile)) throw new Error('Host initialize requires a valid --profile identity.');
+		if (invocation.options.plan === true) return { handlerId: invocation.command.execution.handlerId, arguments: [], options: { plan: true, profile } };
+		if (invocation.options.confirm !== true || invocation.options.yes !== true) {
+			throw Object.assign(new Error('Host initialize execution requires both --confirm and --yes after reviewing the plan.'), { category: 'confirmation_required', code: 'confirmation_required' });
+		}
+		const planCommand = { handlerId: invocation.command.execution.handlerId, arguments: [], options: { plan: true, profile } };
+		const planned = await (context.hostInvoke ? context.hostInvoke(planCommand) : invokeLocalHostManager(planCommand)) as { inputs?: Array<{ name: string; required: boolean; sensitive: boolean; description: string }> };
+		const values: Record<string, string> = {};
+		for (const descriptor of planned.inputs ?? []) {
+			if (!/^[a-z][A-Za-z0-9]{1,63}$/u.test(descriptor.name)) throw new Error('Host initialization plan contains an invalid input descriptor.');
+			const question = `${descriptor.description}: `;
+			const value = descriptor.sensitive
+				? String(context.promptSecret ? await context.promptSecret(question) : await promptHidden(question)).trim()
+				: await promptText(context, question);
+			if (!value && descriptor.required) throw new Error(`Required host initialization input ${descriptor.name} was not provided.`);
+			if (descriptor.name === 'controlPlaneUrl' && value) {
+				let url: URL;
+				try { url = new URL(value); } catch { throw new Error('Control-plane URL must be a valid HTTPS URL.'); }
+				if (url.protocol !== 'https:') throw new Error('Control-plane URL must use HTTPS.');
+			}
+			if (value) values[descriptor.name] = value;
+		}
+		return { handlerId: invocation.command.execution.handlerId, arguments: [], options: { profile, confirm: true, payload: JSON.stringify({ profile, inputs: values }) } };
+	}
 	if (invocation.command.name === 'host uninstall' && invocation.options.plan !== true) {
 		if (invocation.options.confirm !== true || invocation.options.yes !== true) {
 			throw Object.assign(new Error('Host uninstall execution requires both --confirm and --yes after reviewing the plan.'), {
@@ -129,7 +155,7 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 }
 
 export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocation, 'command'>) {
-	return invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll'
+	return invocation.command.name === 'host initialize' || invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll'
 		|| invocation.command.name === 'host reset' || invocation.command.name === 'host uninstall' || invocation.command.name.startsWith('host storage ')
 		|| invocation.command.name.startsWith('host security ') || invocation.command.name.startsWith('host sandbox ')
 		|| invocation.command.name.startsWith('host provider credentials ');
@@ -149,6 +175,7 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 		: hostUsesProtectedLocalTransport(invocation) ? invokeLocalHostManager(command)
 			: invokeHostManager(command, typeof invocation.options.server === 'string' ? invocation.options.server : undefined, context.env);
 	const progressLabel = context.outputFormat === 'human' && invocation.options.plan !== true ? ({
+		'host initialize': 'Initializing the selected TreeSeed host profile',
 		'host storage connect': 'Connecting Cloudflare R2. Provisioning storage, securing credentials, and reconciling the host',
 		'host storage reconcile': 'Reconciling Cloudflare R2 storage',
 		'host storage rotate': 'Rotating Cloudflare R2 storage credentials',
