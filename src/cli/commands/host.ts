@@ -12,7 +12,7 @@ Create a bootstrap API token at https://dash.cloudflare.com/profile/api-tokens w
   - Workers R2 Storage: Write
   - Account resources: the Cloudflare account that will own this team's library
 
-TreeSeed will create a private team bucket, create narrower runtime tokens, store all
+TreeSeed will create the private control-plane environment bucket, create narrower runtime tokens, store all
 credentials in manager custody, and reconcile the host. The bootstrap token is hidden
 while entered and is never passed on the command line.
 `;
@@ -67,7 +67,8 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 		const team = activeTeam(invocation, context);
 		if (!team) throw Object.assign(new Error('Select an active team with `trsd teams use <team>` before configuring host storage.'), { category: 'ambiguous_context', code: 'active_team_required' });
 		const backend = invocation.arguments[0];
-		if ((invocation.command.name === 'host storage connect' || invocation.command.name === 'host storage rotate') && backend !== 'cloudflare-r2') {
+		if ((invocation.command.name === 'host storage connect' || invocation.command.name === 'host storage rotate'
+			|| invocation.command.name === 'host storage reset') && backend !== 'cloudflare-r2') {
 			throw new Error('The only supported host storage backend is cloudflare-r2.');
 		}
 		let bootstrapToken: string | undefined;
@@ -79,9 +80,13 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 			if (bootstrapToken.length < 16) throw new Error('Cloudflare deployment bootstrap token is invalid.');
 		}
 		const action = invocation.command.name.slice('host storage '.length);
+		const environment = invocation.command.name === 'host storage reset' ? String(invocation.options.environment ?? '') : undefined;
+		if (invocation.command.name === 'host storage reset' && environment !== 'production' && environment !== 'staging') {
+			throw new Error('Host storage reset requires --environment production or --environment staging.');
+		}
 		return { handlerId: invocation.command.execution.handlerId, arguments: [], options: { ...options,
 			payload: JSON.stringify({ action, backend: 'cloudflare-r2', teamId: team.id, teamSlug: team.slug,
-				accountId: typeof invocation.options.accountId === 'string' ? invocation.options.accountId : undefined, bootstrapToken }) } };
+				environment, accountId: typeof invocation.options.accountId === 'string' ? invocation.options.accountId : undefined, bootstrapToken }) } };
 	}
 	if (invocation.command.name === 'host security initialize' || invocation.command.name === 'host security recovery verify' || invocation.command.name === 'host security rotate') {
 		if (invocation.command.name === 'host security rotate') {
@@ -140,6 +145,7 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 		'host storage connect': 'Connecting Cloudflare R2. Provisioning storage, securing credentials, and reconciling the host',
 		'host storage reconcile': 'Reconciling Cloudflare R2 storage',
 		'host storage rotate': 'Rotating Cloudflare R2 storage credentials',
+		'host storage reset': 'Emptying and recreating the selected Cloudflare R2 bucket',
 		'host security initialize': 'Initializing encrypted provider storage and the Kata sandbox broker',
 		'host provider credentials initialize': 'Encrypting and activating the registered provider credential',
 	} as Record<string, string>)[invocation.command.name] : undefined;

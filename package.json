@@ -50,7 +50,7 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.59",
+    "@treeseed/sdk": "0.13.0-rc.60",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",

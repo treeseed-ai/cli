@@ -676,6 +676,19 @@ Execution: `local.host.storage.rotate`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+### trsd host storage reset <backend>
+
+Reset the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.reset/v1`.
+Execution: `local.host.storage.reset`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--environment <value>`: Exact storage environment to empty and recreate.
+
 ## trsd host security
 
 Security operations.
