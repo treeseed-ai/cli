@@ -487,6 +487,20 @@ Execution: `local.dev.verify`.
 
 Host operations.
 
+### trsd host initialize
+
+Initialize the generic host foundation from an immutable catalog-bound profile.
+
+Operation: mutation. Result schema: `treeseed.host-initialization-result/v1`.
+Execution: `local.host.initialize`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--profile <value>`: Catalog-bound host initialization profile.
+- `--confirm`: Confirm installation of the reviewed profile plan.
+
 ### trsd host status
 
 Status the selected resource.

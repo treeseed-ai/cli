@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.41",
+  "version": "0.13.0-rc.42",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -50,7 +50,7 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.64",
+    "@treeseed/sdk": "0.13.0-rc.65",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",

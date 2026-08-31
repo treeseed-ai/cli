@@ -1392,6 +1392,44 @@
       "children": [
         {
           "nodeType": "leaf",
+          "segment": "initialize",
+          "description": "Initialize the generic host foundation from an immutable catalog-bound profile.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--profile",
+              "description": "Catalog-bound host initialization profile.",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "--confirm",
+              "description": "Confirm installation of the reviewed profile plan.",
+              "type": "boolean"
+            },
+            {
+              "name": "--yes",
+              "description": "Confirm non-interactive execution after reviewing the plan.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.initialize",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.host-initialization-result/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.initialize"
+          }
+        },
+        {
+          "nodeType": "leaf",
           "segment": "status",
           "description": "Status the selected resource.",
           "kind": "read",
