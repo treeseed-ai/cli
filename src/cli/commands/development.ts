@@ -328,6 +328,12 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 	const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
 	if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 	const mode = selected.mode as 'candidate' | 'live';
+	if (invocation.options.plan === true) return {
+		sessionId,
+		target: `${selection.projectId}.${selection.targetId}`,
+		mode,
+		mutation: false,
+	};
 	if (target.kind === 'package-watch') await rebuildPackage({ state, runtime, target, worktree: repository.worktree, mode, context });
 	else if (target.kind === 'rebuild-restart') {
 		if (!target.operations.build) throw new Error(`${selection.projectId}.${selection.targetId} does not declare a build operation.`);
