@@ -41,6 +41,13 @@ function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 async function input(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'local') throw new Error('Host command is not locally bound.');
 	const { server: _server, json: _json, yes: _yes, ...options } = invocation.options;
+	if (invocation.command.name === 'host uninstall' && invocation.options.plan !== true) {
+		if (invocation.options.confirm !== true || invocation.options.yes !== true) {
+			throw Object.assign(new Error('Host uninstall execution requires both --confirm and --yes after reviewing the plan.'), {
+				category: 'confirmation_required', code: 'confirmation_required',
+			});
+		}
+	}
 	if (invocation.command.name === 'host provider credentials initialize') {
 		const initializerId = invocation.arguments[0];
 		if (!initializerId) throw new Error('A registered provider credential initializer is required. Run `trsd host provider credentials list`.');
@@ -123,7 +130,7 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 
 export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocation, 'command'>) {
 	return invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll'
-		|| invocation.command.name === 'host reset' || invocation.command.name.startsWith('host storage ')
+		|| invocation.command.name === 'host reset' || invocation.command.name === 'host uninstall' || invocation.command.name.startsWith('host storage ')
 		|| invocation.command.name.startsWith('host security ') || invocation.command.name.startsWith('host sandbox ')
 		|| invocation.command.name.startsWith('host provider credentials ');
 }
