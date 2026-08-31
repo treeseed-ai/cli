@@ -106,8 +106,9 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 	try {
 		const response = await execute(invocation, context);
 		const api = response && typeof response === 'object' ? response as { ok?: boolean; payload?: unknown; code?: string; error?: string } : null;
-		if (api?.ok === false) { const failed = failure('policy_blocked', api.code ?? 'control_plane_rejected', api.error ?? 'The control plane rejected the operation.'); print(context, envelope(invocation, false, null, failed), false); return 1; }
-		const result = api && 'payload' in api ? api.payload : response && typeof response === 'object' && 'data' in response ? (response as { data: unknown }).data : response;
+		const operationResponse = invocation.command.execution.kind === 'operation';
+		if (operationResponse && api?.ok === false) { const failed = failure('policy_blocked', api.code ?? 'control_plane_rejected', api.error ?? 'The control plane rejected the operation.'); print(context, envelope(invocation, false, null, failed), false); return 1; }
+		const result = operationResponse && api && 'payload' in api ? api.payload : response && typeof response === 'object' && 'data' in response ? (response as { data: unknown }).data : response;
 		print(context, envelope(invocation, true, result)); return 0;
 	} catch (error) {
 		if (context.env.TREESEED_DEBUG_STACK === '1' && error instanceof Error && error.stack) context.write(error.stack, 'stderr');

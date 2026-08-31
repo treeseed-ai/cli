@@ -12,14 +12,31 @@ test('platform verify works from a clean declarative clone without packages or a
 	const root = mkdtempSync(resolve(tmpdir(), 'platform-cli-'));
 	try {
 		execFileSync('git', ['init'], { cwd: root, stdio: 'ignore' });
+		mkdirSync(resolve(root, 'seeds'));
 		writeFileSync(resolve(root, 'README.md'), '# Portable Platform\n');
 		writeFileSync(resolve(root, 'treeseed.site.yaml'), 'development:\n  local:\n    inventory: { source: seed, path: seeds/inventory.yaml }\n');
+		writeFileSync(resolve(root, 'seeds/inventory.yaml'), 'schemaVersion: treeseed.seed-bundle/v3\nresources:\n  projects: []\n  repositories: []\n');
 		execFileSync('git', ['add', '.'], { cwd: root, stdio: 'ignore' });
 		const target = capture();
-		assert.equal(await runCommandLine(['platform', 'verify', '--json'], { cwd: root, interactiveUi: false, write: target.write }), 0);
+		assert.equal(await runCommandLine(['platform', 'verify', '--json'], { cwd: root, interactiveUi: false, write: target.write }), 0, target.output.join('\n'));
 		const envelope = JSON.parse(target.output[0]!);
 		assert.equal(envelope.result.ok, true);
 		assert.equal(envelope.result.profiles.length, 0);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('platform verify preserves local policy diagnostics instead of masking them as a control-plane rejection', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'platform-cli-'));
+	try {
+		execFileSync('git', ['init'], { cwd: root, stdio: 'ignore' });
+		writeFileSync(resolve(root, 'package.json'), '{}\n');
+		execFileSync('git', ['add', '.'], { cwd: root, stdio: 'ignore' });
+		const target = capture();
+		assert.equal(await runCommandLine(['platform', 'verify', '--json'], { cwd: root, interactiveUi: false, write: target.write }), 1);
+		const envelope = JSON.parse(target.output[0]!);
+		assert.equal(envelope.error.code, 'platform_verification_failed');
+		assert.equal(envelope.result.diagnostics[0].code, 'content_root_forbidden');
+		assert.notEqual(envelope.error.code, 'control_plane_rejected');
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
