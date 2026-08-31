@@ -14,7 +14,11 @@ function verify(invocation: ParsedInvocation, context: CommandContext) {
 	const profiles = loadPlatformProfiles(root);
 	const selected = values(invocation.options.profile);
 	if (selected.length) resolveProfileProjects(profiles, selected);
-	return { ...verifyPlatformRepository(root), profiles: selected };
+	const result = { ...verifyPlatformRepository(root), profiles: selected };
+	if (!result.ok) throw Object.assign(new Error('Platform repository verification failed.'), {
+		category: 'policy_blocked', code: 'platform_verification_failed', partialResult: result,
+	});
+	return result;
 }
 
 function workset(invocation: ParsedInvocation, context: CommandContext) {
