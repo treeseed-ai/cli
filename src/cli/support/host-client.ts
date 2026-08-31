@@ -32,8 +32,10 @@ function invoke(options: Parameters<typeof requestHttp>[0], body: string, secure
 	});
 }
 
-export function invokeLocalHostManager(input: unknown) {
-	return invoke({ socketPath: managerSocket }, JSON.stringify(input), false);
+export function invokeLocalHostManager(input: unknown, socketPath = managerSocket) {
+	// Development operations may spend minutes building between manager calls.
+	// A closed idle Unix-socket connection must never be reused for the next call.
+	return invoke({ socketPath, agent: false }, JSON.stringify(input), false);
 }
 
 export function invokeHostManager(input: unknown, server: string | undefined, env: NodeJS.ProcessEnv) {

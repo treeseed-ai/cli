@@ -108,6 +108,7 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 		const result = api && 'payload' in api ? api.payload : response && typeof response === 'object' && 'data' in response ? (response as { data: unknown }).data : response;
 		print(context, envelope(invocation, true, result)); return 0;
 	} catch (error) {
+		if (context.env.TREESEED_DEBUG_STACK === '1' && error instanceof Error && error.stack) context.write(error.stack, 'stderr');
 		const failed = categorized(error);
 		const partial = error && typeof error === 'object' && 'partialResult' in error ? (error as { partialResult?: unknown }).partialResult : null;
 		const failedEnvelope = envelope(invocation, false, partial, failed);
