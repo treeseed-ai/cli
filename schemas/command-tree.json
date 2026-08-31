@@ -794,6 +794,152 @@
     },
     {
       "nodeType": "branch",
+      "segment": "platform",
+      "description": "Platform operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "verify",
+          "description": "Verify a declarative Platform repository without package checkouts or a control-plane API.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "root",
+              "description": "Platform root; defaults to the current directory.",
+              "required": false
+            }
+          ],
+          "options": [
+            {
+              "name": "--profile",
+              "description": "Composable profile to verify.",
+              "type": "string[]"
+            },
+            {
+              "name": "--json",
+              "description": "Emit the stable command-result envelope.",
+              "type": "boolean"
+            }
+          ],
+          "resultSchemaId": "treeseed.platform-verification/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.platform.verify"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "workset",
+          "description": "Plan or safely materialize exact primary source checkouts beneath packages/.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--apply",
+              "description": "Apply the frozen workset plan.",
+              "type": "boolean"
+            },
+            {
+              "name": "--yes",
+              "description": "Confirm the planned checkout mutations.",
+              "type": "boolean"
+            },
+            {
+              "name": "--profile",
+              "description": "Composable source profile; repeat to union profiles.",
+              "type": "string[]"
+            },
+            {
+              "name": "--project",
+              "description": "Explicit project slug; repeat to select projects.",
+              "type": "string[]"
+            },
+            {
+              "name": "--exclude",
+              "description": "Project slug to exclude; repeat as needed.",
+              "type": "string[]"
+            },
+            {
+              "name": "--json",
+              "description": "Emit the stable command-result envelope.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "development.workset",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.platform-workset-result/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.platform.workset"
+          }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "project",
+          "description": "Project operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "create",
+              "description": "Plan or reconcile a project, repository, template, library binding, and live inventory without writing application source into Platform Git.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "slug",
+                  "description": "Portable project slug.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--apply",
+                  "description": "Apply the accepted creation plan.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--yes",
+                  "description": "Confirm authority-bearing project creation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--template",
+                  "description": "Published template identity.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--json",
+                  "description": "Emit the stable command-result envelope.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "projects.create",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.platform-project-create-result/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.platform.project.create"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
       "segment": "dev",
       "description": "Dev operations.",
       "children": [

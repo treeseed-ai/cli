@@ -11,6 +11,7 @@ import { runLibrary } from './commands/library.js';
 import { runTeams } from './commands/teams.js';
 import { runDevelopment } from './commands/development.js';
 import { runInbox } from './commands/inbox.js';
+import { runPlatform } from './commands/platform/index.js';
 import type { CommandContext, CommandFailure, ParsedInvocation, Writer } from './types.js';
 import { promptText } from './support/prompts.js';
 import { handoffProviderEnrollment } from './support/provider-enrollment.js';
@@ -70,6 +71,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'dev') return runDevelopment(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'library') return runLibrary(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'inbox') return runInbox(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'platform') return runPlatform(invocation, context);
 	return runOperator(invocation, context);
 }
 
