@@ -193,7 +193,7 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 				await stopProcesses({ ...state, processes: { [`${selection.projectId}.${selection.targetId}`]: processState } });
 				delete state.processes[`${selection.projectId}.${selection.targetId}`];
 			}
-			if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env);
+			if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 			restoreOverlays(state, selection.projectId);
 			if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, null);
 		} else {
@@ -295,7 +295,7 @@ async function rebuildPackage(input: { state: LocalSessionState; runtime: Develo
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
 	await stopProcess(state, key);
-	if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env);
+	if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 	startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
 	saveState(state, context.env);
@@ -359,7 +359,7 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
 		const running = await stopProcesses(state);
 		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
-		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env);
+		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 		restoreOverlays(state); selectDevelopmentCli(context.env, null); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
 	}
 	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });

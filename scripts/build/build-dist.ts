@@ -5,6 +5,8 @@ import { packageRoot } from '../packages/package-tools.ts';
 
 const srcRoot = resolve(packageRoot, 'src');
 const distRoot = resolve(packageRoot, 'dist');
+const stagingRoot = resolve(packageRoot, `.treeseed-dist-${process.pid}`);
+const backupRoot = resolve(packageRoot, '.treeseed-dist-previous');
 
 function walkFiles(root) {
 	const files = [];
@@ -30,7 +32,7 @@ function rewriteRuntimeSpecifiers(contents) {
 }
 
 async function compileModule(filePath) {
-	const outputFile = resolve(distRoot, relative(srcRoot, filePath).replace(/\.tsx?$/u, '.js'));
+	const outputFile = resolve(stagingRoot, relative(srcRoot, filePath).replace(/\.tsx?$/u, '.js'));
 	ensureDir(outputFile);
 	await build({
 		entryPoints: [filePath],
@@ -43,7 +45,7 @@ async function compileModule(filePath) {
 	writeFileSync(outputFile, rewriteRuntimeSpecifiers(readFileSync(outputFile, 'utf8')), 'utf8');
 }
 
-rmSync(distRoot, { recursive: true, force: true });
+rmSync(stagingRoot, { recursive: true, force: true });
 
 for (const filePath of publishableSourceFiles) {
 	await compileModule(filePath);
@@ -53,6 +55,13 @@ if (existsSync(resolve(packageRoot, 'README.md'))) {
 	copyFileSync(resolve(packageRoot, 'README.md'), resolve(distRoot, '..', 'README.md'));
 }
 
-const marker = resolve(distRoot, '.treeseed-build-complete.json'), temporaryMarker = `${marker}.new`;
-writeFileSync(temporaryMarker, `${JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' })}\n`);
-renameSync(temporaryMarker, marker);
+const marker = resolve(stagingRoot, '.treeseed-build-complete.json');
+writeFileSync(marker, `${JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' })}\n`);
+rmSync(backupRoot, { recursive: true, force: true });
+if (existsSync(distRoot)) renameSync(distRoot, backupRoot);
+try { renameSync(stagingRoot, distRoot); }
+catch (error) {
+	if (existsSync(backupRoot) && !existsSync(distRoot)) renameSync(backupRoot, distRoot);
+	throw error;
+}
+rmSync(backupRoot, { recursive: true, force: true });
