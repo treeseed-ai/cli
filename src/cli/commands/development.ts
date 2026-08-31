@@ -297,6 +297,7 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 	await stopProcess(state, key);
 	if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
+	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
 	startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
 	saveState(state, context.env);
 	await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, key);

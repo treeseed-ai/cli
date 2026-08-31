@@ -1634,6 +1634,41 @@
                 "kind": "local",
                 "handlerId": "local.host.storage.rotate"
               }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "reset",
+              "description": "Reset the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "backend",
+                  "description": "backend identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--environment",
+                  "description": "Exact storage environment to empty and recreate.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.reset",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.command.reset/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.storage.reset"
+              }
             }
           ]
         },
