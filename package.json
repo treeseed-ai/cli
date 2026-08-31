@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.35",
+  "version": "0.13.0-rc.36",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -72,7 +72,7 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
-	"bin": {
-		"trsd": "./dist/cli/main.js"
-	}
+  "bin": {
+    "trsd": "./dist/cli/main.js"
+  }
 }
