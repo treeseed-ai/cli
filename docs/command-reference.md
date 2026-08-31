@@ -1063,6 +1063,20 @@ Execution: `local.host.reset`.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--confirm`: Confirm deletion of all manager-owned component data and receipts.
 
+### trsd host uninstall
+
+Plan or remove every inventoried TreeSeed-owned host resource while preserving unrelated infrastructure and source repositories.
+
+Operation: mutation. Result schema: `treeseed.host-uninstall-result/v1`.
+Execution: `local.host.uninstall`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--confirm`: Confirm removal of the reviewed TreeSeed resource inventory.
+- `--purge-security`: Separately select destruction of encrypted state, credentials, users, and groups.
+
 ## trsd agents
 
 Agents operations.

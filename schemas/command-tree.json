@@ -2394,6 +2394,43 @@
             "kind": "local",
             "handlerId": "local.host.reset"
           }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "uninstall",
+          "description": "Plan or remove every inventoried TreeSeed-owned host resource while preserving unrelated infrastructure and source repositories.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--confirm",
+              "description": "Confirm removal of the reviewed TreeSeed resource inventory.",
+              "type": "boolean"
+            },
+            {
+              "name": "--purge-security",
+              "description": "Separately select destruction of encrypted state, credentials, users, and groups.",
+              "type": "boolean"
+            },
+            {
+              "name": "--yes",
+              "description": "Confirm non-interactive execution after reviewing the plan.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.uninstall",
+            "confirmation": "irreversible"
+          },
+          "resultSchemaId": "treeseed.host-uninstall-result/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.uninstall"
+          }
         }
       ]
     },
