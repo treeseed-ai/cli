@@ -34,13 +34,19 @@ function publish(root: string, overlayRoot: string, outputs: string[], generatio
 
 export async function synchronizePackageOverlay(root: string, overlayRoot: string, outputs: string[], marker: string, intervalMs = 250) {
 	mkdirSync(overlayRoot, { recursive: true, mode: 0o700 });
-	let observed = '', stable = '', published = '', generation = 0;
+	let observed = '', stable = '', published = '', generation = 0, lastFailure = '';
 	while (true) {
 		try {
 			observed = signature(root, outputs, marker);
 			if (observed && observed === stable && observed !== published) { generation += 1; publish(root, overlayRoot, outputs, generation); published = observed; }
-			stable = observed;
-		} catch { /* keep the prior completed generation while a build is incomplete */ }
+			stable = observed; lastFailure = '';
+		} catch (error) {
+			// Keep the prior completed generation while a build is incomplete, but do
+			// not turn a persistent publication defect into an opaque readiness timeout.
+			const message = error instanceof Error ? error.message : String(error);
+			if (message !== lastFailure) process.stderr.write(`Package overlay publication deferred: ${message}\n`);
+			lastFailure = message;
+		}
 		await new Promise((resolvePromise) => setTimeout(resolvePromise, intervalMs));
 	}
 }

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
-import { developmentCliEntrypointPath, developmentOperationEnvironment, relativeOverlayTarget, selectDevelopmentCli, waitForNewPackageOverlay } from '../../../src/cli/commands/development.ts';
+import { developmentCliEntrypointPath, developmentOperationEnvironment, relativeOverlayTarget, selectDevelopmentCli, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from '../../../src/cli/commands/development.ts';
 
 const manifest = `schemaVersion: treeseed.package/v1
 development:
@@ -115,6 +115,27 @@ test('package rebuild waits for a new marker-complete atomic generation', async 
 		}, 50);
 		assert.equal(await waiting, resolve(overlay, 'generation-2'));
 	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('package synchronizer launches the CLI development module and publishes a completed generation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-overlay-sync-'));
+	const stateRoot = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-overlay-state-'));
+	const state = { sessionId: 'session-test', processes: {} as Record<string, any>, overlays: [] as any[] };
+	try {
+		writeFileSync(resolve(root, 'package.json'), '{"name":"@treeseed/test-overlay"}\n');
+		mkdirSync(resolve(root, 'dist'), { recursive: true });
+		writeFileSync(resolve(root, 'dist/index.js'), 'export const ready = true;\n');
+		writeFileSync(resolve(root, 'dist/.complete.json'), '{}\n');
+		const runtime = { project: { id: 'sdk' } } as any;
+		const target = { id: 'package', ready: { kind: 'marker', path: 'dist/.complete.json', timeoutSeconds: 2 }, outputs: [{ path: 'dist' }] } as any;
+		const overlay = startPackageSynchronizer(state, runtime, target, root, { ...process.env, XDG_STATE_HOME: stateRoot });
+		const deadline = Date.now() + 2_000;
+		while (!existsSync(resolve(overlay, 'current')) && Date.now() < deadline) await new Promise((accept) => setTimeout(accept, 25));
+		assert.equal(existsSync(resolve(overlay, 'current', 'dist/index.js')), true, readFileSync(state.processes['overlay-sync.sdk.package']!.log, 'utf8'));
+	} finally {
+		await stopProcess(state, 'overlay-sync.sdk.package');
+		rmSync(root, { recursive: true, force: true }); rmSync(stateRoot, { recursive: true, force: true });
+	}
 });
 
 test('freeze binds completed generations and attestations while verify rejects artifact substitution', async () => {

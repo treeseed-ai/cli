@@ -69,12 +69,16 @@ export function relativeOverlayTarget(link: string, overlayRoot: string) {
 	return relative(dirname(link), resolve(overlayRoot, 'current'));
 }
 
-export function startPackageSynchronizer(state: OverlaySessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, env: NodeJS.ProcessEnv) {
+export function startPackageSynchronizer(state: OverlaySessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, env: NodeJS.ProcessEnv, cliWorktree?: string) {
 	const key = `overlay-sync.${runtime.project.id}.${target.id}`, overlayRoot = resolve(worktree, '.treeseed', 'cache', 'development-sessions', state.sessionId, target.id);
 	const existing = state.processes[key]; if (existing) { try { process.kill(existing.pid, 0); return overlayRoot; } catch { delete state.processes[key]; } }
-	const compiledModule = fileURLToPath(new URL('../development/package-overlay-sync.js', import.meta.url));
-	const sourceModule = fileURLToPath(new URL('../development/package-overlay-sync.ts', import.meta.url));
-	const module = existsSync(compiledModule) ? compiledModule : sourceModule, moduleArguments = existsSync(compiledModule) ? [module] : ['--import', 'tsx', module];
+	const installedCompiledModule = fileURLToPath(new URL('../../development/package-overlay-sync.js', import.meta.url));
+	const worktreeCompiledModule = cliWorktree ? resolve(cliWorktree, 'dist/cli/development/package-overlay-sync.js') : '';
+	const worktreeSourceModule = cliWorktree ? resolve(cliWorktree, 'src/cli/development/package-overlay-sync.ts') : '';
+	const compiledModule = worktreeCompiledModule && existsSync(worktreeCompiledModule) ? worktreeCompiledModule : installedCompiledModule;
+	const sourceModule = worktreeSourceModule && existsSync(worktreeSourceModule) ? worktreeSourceModule : fileURLToPath(new URL('../../development/package-overlay-sync.ts', import.meta.url));
+	const module = existsSync(compiledModule) ? compiledModule : sourceModule;
+	const moduleArguments = existsSync(compiledModule) ? [module] : ['--import', import.meta.resolve('tsx'), module];
 	const log = resolve(developmentStateRoot(env), state.sessionId, `${key}.log`);
 	mkdirSync(dirname(log), { recursive: true, mode: 0o700 }); const descriptor = openSync(log, 'a', 0o600);
 	try {
@@ -95,7 +99,7 @@ export async function waitForPackageOverlay(target: DevelopmentTarget, worktree:
 	throw new Error(`Completed package generation timed out for ${target.id}.`);
 }
 
-function overlayGeneration(overlayRoot: string) {
+export function overlayGeneration(overlayRoot: string) {
 	const current = resolve(overlayRoot, 'current');
 	try { return resolve(dirname(current), readlinkSync(current)); } catch { return null; }
 }
@@ -137,4 +141,3 @@ export function dependentReactions(runtimes: DevelopmentRuntime[], projectId: st
 	}
 	return result;
 }
-

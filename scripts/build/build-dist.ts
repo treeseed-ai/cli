@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { packageRoot } from '../packages/package-tools.ts';
@@ -52,3 +52,7 @@ for (const filePath of publishableSourceFiles) {
 if (existsSync(resolve(packageRoot, 'README.md'))) {
 	copyFileSync(resolve(packageRoot, 'README.md'), resolve(distRoot, '..', 'README.md'));
 }
+
+const marker = resolve(distRoot, '.treeseed-build-complete.json'), temporaryMarker = `${marker}.new`;
+writeFileSync(temporaryMarker, `${JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' })}\n`);
+renameSync(temporaryMarker, marker);

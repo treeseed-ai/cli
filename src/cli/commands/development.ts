@@ -8,10 +8,10 @@ import { parse as parseYaml } from 'yaml';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { invokeLocalHostManager } from '../support/host-client.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
-import { dependentReactions, installPackageOverlay, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
+import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
 import { artifactPaths, compatibilityAttestations, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
-export { relativeOverlayTarget, waitForNewPackageOverlay } from './development-support/overlays.js';
+export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
 
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
 
@@ -138,8 +138,23 @@ function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, t
 	} finally { closeSync(descriptor); }
 }
 
-async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds: number) {
-	if (!target.endpoints.length || target.ready.kind === 'marker' || target.ready.kind === 'process') return;
+function operationIsRunning(state: LocalSessionState, key: string) {
+	const existing = state.processes[key]; if (!existing) return false;
+	try { process.kill(existing.pid, 0); return true; } catch { delete state.processes[key]; return false; }
+}
+
+async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds: number, state?: LocalSessionState, key?: string) {
+	if (target.ready.kind === 'process') {
+		if (!state || !key) throw new Error(`Process readiness for ${target.id} requires tracked process state.`);
+		const deadline = Date.now() + timeoutSeconds * 1_000;
+		while (Date.now() < deadline) {
+			if (!operationIsRunning(state, key)) throw new Error(`Development process ${key} exited before becoming ready.`);
+			await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
+		}
+		if (!operationIsRunning(state, key)) throw new Error(`Development process ${key} exited before becoming ready.`);
+		return;
+	}
+	if (!target.endpoints.length || target.ready.kind === 'marker') return;
 	const endpoint = target.endpoints[0]!, deadline = Date.now() + timeoutSeconds * 1_000;
 	while (Date.now() < deadline) {
 		try {
@@ -184,15 +199,17 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 		} else {
 			const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: selection.projectId, targetId: selection.targetId }) as { environment?: NodeJS.ProcessEnv };
 			if (target.operations.setup) runOneShotOperation(state, target.operations.setup, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
-			if (target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			const running = operationIsRunning(state, `${runtime.project.id}.${target.id}`);
+			if (target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			saveState(state, context.env);
 			if (target.kind === 'package-watch') {
-				const overlayRoot = startPackageSynchronizer(state, runtime, target, repository.worktree, context.env);
+				const cliWorktree = record.session.repositories.find((entry) => entry.projectId === 'cli')?.worktree;
+				const overlayRoot = startPackageSynchronizer(state, runtime, target, repository.worktree, context.env, cliWorktree);
 				saveState(state, context.env);
 				await waitForPackageOverlay(target, repository.worktree, overlayRoot); installPackageOverlay(state, record, runtime, target, repository.worktree, overlayRoot); saveState(state, context.env);
 				if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, { entrypoint: resolve(overlayRoot, 'current', 'dist', 'cli', 'main.js'), expiresAt: record.session.expiresAt });
-			} else await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
+			} else await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, `${runtime.project.id}.${target.id}`);
 		}
 		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	}
@@ -275,15 +292,30 @@ async function rebuildPackage(input: { state: LocalSessionState; runtime: Develo
 	await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
 
-async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext }) {
+async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
 	await stopProcess(state, key);
 	if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env);
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 	startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
 	saveState(state, context.env);
-	await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
-	await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
+	await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, key);
+	if (input.recordGeneration !== false) await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
+}
+
+async function restart(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
+	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+	const selected = record.session.targets.find((entry) => entry.projectId === selection.projectId && entry.targetId === selection.targetId);
+	if (!selected || selected.mode === 'released') throw new Error(`${selection.projectId}.${selection.targetId} is not selected for local development.`);
+	const { runtime, target } = selectedTarget(record, selection.projectId, selection.targetId);
+	if (target.kind === 'package-watch') throw new Error('Package-watch targets rebuild atomically and do not support restart.');
+	const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
+	if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
+	await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode: selected.mode as 'candidate' | 'live', context, recordGeneration: false });
+	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode });
+	saveState(state, context.env);
+	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
 
 async function rebuild(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
@@ -339,6 +371,7 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 	if (invocation.command.name === 'dev rebuild') {
 		return rebuild(invocation, context, state, sessionId);
 	}
+	if (invocation.command.name === 'dev restart') return restart(invocation, context, state, sessionId);
 	if (invocation.command.name === 'dev freeze') return freeze(invocation, context);
 	if (invocation.command.name === 'dev verify') return verifyCandidate(invocation, context);
 	throw new Error(`Unsupported development command ${invocation.command.name}.`);

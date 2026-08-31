@@ -299,6 +299,24 @@ Execution: `local.dev.host.deactivate`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd dev host guest
+
+Guest operations.
+
+## trsd dev host guest image
+
+Image operations.
+
+### trsd dev host guest image import <image>
+
+Import a locally built provider sandbox image into the Kata development runtime.
+
+Operation: mutation. Result schema: `treeseed.command.dev.host.guest-image.import/v1`.
+Execution: `local.dev.host.guest-image.import`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
 ## trsd dev session
 
 Session operations.
@@ -345,6 +363,17 @@ Rebuild a local development session.
 
 Operation: mutation. Result schema: `treeseed.command.dev.rebuild/v1`.
 Execution: `local.dev.rebuild`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Development session identity.
+
+### trsd dev restart <target>
+
+Restart a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.restart/v1`.
+Execution: `local.dev.restart`.
 
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.

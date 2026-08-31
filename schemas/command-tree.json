@@ -868,6 +868,49 @@
                 "kind": "local",
                 "handlerId": "local.dev.host.deactivate"
               }
+            },
+            {
+              "nodeType": "branch",
+              "segment": "guest",
+              "description": "Guest operations.",
+              "children": [
+                {
+                  "nodeType": "branch",
+                  "segment": "image",
+                  "description": "Image operations.",
+                  "children": [
+                    {
+                      "nodeType": "leaf",
+                      "segment": "import",
+                      "description": "Import a locally built provider sandbox image into the Kata development runtime.",
+                      "kind": "mutation",
+                      "arguments": [
+                        {
+                          "name": "image",
+                          "description": "Local treeseed/sandbox-*:local image reference.",
+                          "required": true
+                        }
+                      ],
+                      "options": [
+                        {
+                          "name": "--plan",
+                          "description": "Return the exact proposed outcome without mutation.",
+                          "type": "boolean"
+                        }
+                      ],
+                      "authorization": {
+                        "capability": "development.activate",
+                        "confirmation": "never"
+                      },
+                      "resultSchemaId": "treeseed.command.dev.host.guest-image.import/v1",
+                      "execution": {
+                        "kind": "local",
+                        "handlerId": "local.dev.host.guest-image.import"
+                      }
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -1020,6 +1063,40 @@
           "execution": {
             "kind": "local",
             "handlerId": "local.dev.rebuild"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "restart",
+          "description": "Restart a local development session.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "target",
+              "description": "target value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "development.restart",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.dev.restart/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.restart"
           }
         },
         {
