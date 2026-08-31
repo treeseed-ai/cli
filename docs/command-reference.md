@@ -261,6 +261,52 @@ Execution: `local.secrets.rotate`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd platform
+
+Platform operations.
+
+### trsd platform verify [root]
+
+Verify a declarative Platform repository without package checkouts or a control-plane API.
+
+Operation: read. Result schema: `treeseed.platform-verification/v1`.
+Execution: `local.platform.verify`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--profile <value>`: Composable profile to verify.
+
+### trsd platform workset
+
+Plan or safely materialize exact primary source checkouts beneath packages/.
+
+Operation: mutation. Result schema: `treeseed.platform-workset-result/v1`.
+Execution: `local.platform.workset`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--apply`: Apply the frozen workset plan.
+- `--yes`: Confirm the planned checkout mutations.
+- `--profile <value>`: Composable source profile; repeat to union profiles.
+- `--project <value>`: Explicit project slug; repeat to select projects.
+- `--exclude <value>`: Project slug to exclude; repeat as needed.
+
+## trsd platform project
+
+Project operations.
+
+### trsd platform project create <slug>
+
+Plan or reconcile a project, repository, template, library binding, and live inventory without writing application source into Platform Git.
+
+Operation: mutation. Result schema: `treeseed.platform-project-create-result/v1`.
+Execution: `local.platform.project.create`.
+
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--apply`: Apply the accepted creation plan.
+- `--template <value>`: Published template identity.
+
 ## trsd dev
 
 Dev operations.
