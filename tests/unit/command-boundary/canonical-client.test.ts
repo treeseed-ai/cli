@@ -46,6 +46,9 @@ test('leaf commands expose only catalog-derived high-level options', () => {
 	assert.deepEqual(byName.get('plans show'), ['--server', '--json']);
 	assert.deepEqual(byName.get('agents show'), ['--server', '--project', '--json']);
 	assert.deepEqual(byName.get('host status'), ['--server', '--json']);
+	assert.deepEqual(byName.get('host provider environment set'), ['--server', '--yes', '--json', '--plan', '--stdin']);
+	assert.deepEqual(byName.get('providers registration code rotate'), ['--server', '--team', '--yes', '--json', '--plan']);
+	assert.deepEqual(byName.get('providers environments grant'), ['--server', '--team', '--yes', '--json', '--plan', '--input']);
 	assert.equal(commandSpecs.some((command) => command.options.some((option) => option.flag === '--execute' || option.flag === '--market')), false);
 });
 

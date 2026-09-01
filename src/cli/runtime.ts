@@ -24,7 +24,7 @@ function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 
 export function createCommandContext(overrides: Partial<CommandContext> = {}): CommandContext {
 	const env = overrides.env ?? process.env;
-	const context: CommandContext = { cwd: overrides.cwd ?? process.cwd(), env, write: overrides.write ?? defaultWrite as Writer, outputFormat: overrides.outputFormat ?? 'human', interactiveUi: overrides.interactiveUi ?? true, prompt: overrides.prompt, promptSecret: overrides.promptSecret, confirm: overrides.confirm, openExternal: overrides.openExternal ?? openBrowser, operationInvoke: overrides.operationInvoke, hostInvoke: overrides.hostInvoke,
+	const context: CommandContext = { cwd: overrides.cwd ?? process.cwd(), env, write: overrides.write ?? defaultWrite as Writer, outputFormat: overrides.outputFormat ?? 'human', interactiveUi: overrides.interactiveUi ?? true, prompt: overrides.prompt, promptSecret: overrides.promptSecret, readStdin: overrides.readStdin, confirm: overrides.confirm, openExternal: overrides.openExternal ?? openBrowser, operationInvoke: overrides.operationInvoke, hostInvoke: overrides.hostInvoke,
 		providerEnrollmentHandoff: overrides.providerEnrollmentHandoff ?? ((input) => handoffProviderEnrollment(input, env)) };
 	if (!context.confirm && context.interactiveUi) context.confirm = async (question) => /^y(?:es)?$/iu.test(await promptText(context, `${question} [y/N] `));
 	return context;

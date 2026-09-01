@@ -685,6 +685,101 @@ Execution: `local.host.provider.credentials.initialize`.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--source <value>`: Registered credential source to use instead of automatic selection.
 
+## trsd host provider environment
+
+Provider-local environment profile operations.
+
+### trsd host provider environment list
+
+List provider-local environment profiles without values.
+
+Operation: read. Result schema: `treeseed.provider-environment-profile-page/v1`.
+Execution: `local.host.provider.environment.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host provider environment show <profile>
+
+show a provider-local environment profile.
+
+Operation: read. Result schema: `treeseed.provider-environment-profile/v1`.
+Execution: `local.host.provider.environment.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host provider environment status <profile>
+
+status a provider-local environment profile.
+
+Operation: read. Result schema: `treeseed.provider-environment-profile/v1`.
+Execution: `local.host.provider.environment.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host provider environment set <profile> <name>
+
+Set one provider-local environment value through a hidden prompt or standard input.
+
+Operation: mutation. Result schema: `treeseed.provider-environment-profile/v1`.
+Execution: `local.host.provider.environment.set`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--stdin`: Read the replacement value from standard input instead of the hidden prompt.
+
+### trsd host provider environment import <profile>
+
+Import provider-local environment values from an env file.
+
+Operation: mutation. Result schema: `treeseed.provider-environment-profile/v1`.
+Execution: `local.host.provider.environment.import`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--env-file <value>`: Local env file whose values remain under provider custody.
+
+### trsd host provider environment unset <profile> <name>
+
+Remove one provider-local environment value.
+
+Operation: mutation. Result schema: `treeseed.provider-environment-profile/v1`.
+Execution: `local.host.provider.environment.unset`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host provider environment rotate <profile> <name>
+
+Replace one provider-local environment value and advance its generation.
+
+Operation: mutation. Result schema: `treeseed.provider-environment-profile/v1`.
+Execution: `local.host.provider.environment.rotate`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--stdin`: Read the replacement value from standard input instead of the hidden prompt.
+
+### trsd host provider environment verify <profile>
+
+verify a provider-local environment profile.
+
+Operation: read. Result schema: `treeseed.provider-environment-profile/v1`.
+Execution: `local.host.provider.environment.verify`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
 ## trsd host storage
 
 Storage operations.
@@ -1278,6 +1373,107 @@ Control-plane operation: `providers.disconnect`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--reason <value>`: Audited operator reason.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd providers registration
+
+Team provider registration operations.
+
+## trsd providers registration code
+
+Team provider registration-code operations.
+
+### trsd providers registration code status
+
+status provider environment authority.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Control-plane operation: `providers.registration.code.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd providers registration code reveal
+
+reveal provider environment authority.
+
+Operation: mutation. Result schema: `treeseed.command.reveal/v1`.
+Control-plane operation: `providers.registration.code.reveal`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd providers registration code rotate
+
+rotate provider environment authority.
+
+Operation: mutation. Result schema: `treeseed.command.rotate/v1`.
+Control-plane operation: `providers.registration.code.rotate`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd providers environments
+
+Provider environment descriptor and grant operations.
+
+### trsd providers environments list <provider>
+
+list provider environment authority.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `providers.environment.profiles.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd providers environments show <provider> <profile>
+
+show provider environment authority.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `providers.environment.profiles.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd providers environments grant <assignment>
+
+grant provider environment authority.
+
+Operation: mutation. Result schema: `treeseed.command.grant/v1`.
+Control-plane operation: `providers.environment.grants.put`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: Digest-bound environment grant document.
+
+### trsd providers environments revoke <assignment>
+
+revoke provider environment authority.
+
+Operation: mutation. Result schema: `treeseed.command.revoke/v1`.
+Control-plane operation: `providers.environment.grants.revoke`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.

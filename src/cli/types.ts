@@ -11,6 +11,7 @@ export interface CommandContext {
 	interactiveUi: boolean;
 	prompt?: (question: string) => Promise<string> | string;
 	promptSecret?: (question: string) => Promise<string> | string;
+	readStdin?: () => Promise<string> | string;
 	confirm?: (question: string, defaultValue?: 'yes' | 'no') => Promise<boolean> | boolean;
 	openExternal?: (url: string) => Promise<boolean> | boolean;
 	operationInvoke?: (operationId: string, input: unknown) => Promise<unknown>;
