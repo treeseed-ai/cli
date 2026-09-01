@@ -2199,7 +2199,7 @@ Operation: read. Result schema: `treeseed.command.library.show/v1`.
 Execution: `local.library.show`.
 
 - `--json`: Emit the stable JSON envelope.
-- `--ref <value>`: Earlier historical revision; omit for the current library.
+- `--ref <value>`: Exact commit or protected library ref.
 
 ### trsd library status <project>
 
@@ -2209,7 +2209,7 @@ Operation: read. Result schema: `treeseed.command.library.status/v1`.
 Execution: `local.library.status`.
 
 - `--json`: Emit the stable JSON envelope.
-- `--ref <value>`: Earlier historical revision; omit for the current library.
+- `--ref <value>`: Exact commit or protected library ref.
 
 ### trsd library paths <project>
 
@@ -2219,7 +2219,7 @@ Operation: read. Result schema: `treeseed.command.library.paths/v1`.
 Execution: `local.library.paths`.
 
 - `--json`: Emit the stable JSON envelope.
-- `--ref <value>`: Earlier historical revision; omit for the current library.
+- `--ref <value>`: Exact commit or protected library ref.
 - `--prefix <value>`: Repository-relative path prefix.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
@@ -2232,7 +2232,7 @@ Operation: read. Result schema: `treeseed.command.library.read/v1`.
 Execution: `local.library.read`.
 
 - `--json`: Emit the stable JSON envelope.
-- `--ref <value>`: Earlier historical revision; omit for the current library.
+- `--ref <value>`: Exact commit or protected library ref.
 
 ### trsd library search <project> <query>
 
@@ -2242,7 +2242,7 @@ Operation: read. Result schema: `treeseed.command.library.search/v1`.
 Execution: `local.library.search`.
 
 - `--json`: Emit the stable JSON envelope.
-- `--ref <value>`: Earlier historical revision; omit for the current library.
+- `--ref <value>`: Exact commit or protected library ref.
 - `--path <value>`: Restrict search to a repository-relative path.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
@@ -2255,7 +2255,7 @@ Operation: read. Result schema: `treeseed.command.library.query/v1`.
 Execution: `local.library.query`.
 
 - `--json`: Emit the stable JSON envelope.
-- `--ref <value>`: Earlier historical revision; omit for the current library.
+- `--ref <value>`: Exact commit or protected library ref.
 - `--model <value>`: TreeDX content model.
 - `--input <value>`: YAML or JSON query body.
 
@@ -2267,7 +2267,7 @@ Operation: read. Result schema: `treeseed.command.library.context/v1`.
 Execution: `local.library.context`.
 
 - `--json`: Emit the stable JSON envelope.
-- `--ref <value>`: Earlier historical revision; omit for the current library.
+- `--ref <value>`: Exact commit or protected library ref.
 - `--max-items <value>`: Maximum context items.
 - `--max-tokens <value>`: Maximum context tokens.
 

@@ -73,6 +73,7 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 				category: 'confirmation_required', code: 'confirmation_required',
 			});
 		}
+		options.yes = true;
 	}
 	if (invocation.command.name === 'host provider credentials initialize') {
 		const initializerId = invocation.arguments[0];

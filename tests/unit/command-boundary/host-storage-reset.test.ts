@@ -64,5 +64,5 @@ test('host uninstall preserves explicit security purge authorization', async () 
 		write() {},
 	});
 	assert.equal(exit, 0);
-	assert.deepEqual(calls, [{ handlerId: 'local.host.uninstall', arguments: [], options: { confirm: true, purgeSecurity: true } }]);
+	assert.deepEqual(calls, [{ handlerId: 'local.host.uninstall', arguments: [], options: { confirm: true, purgeSecurity: true, yes: true } }]);
 });
