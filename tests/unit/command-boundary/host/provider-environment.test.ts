@@ -45,6 +45,18 @@ test('provider environment set uses hidden input and never emits the value', asy
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host provider environment set' } as any }), true);
 });
 
+test('provider environment list accepts no profile argument', async () => {
+	const calls: any[] = [];
+	const exit = await runCommandLine(['host', 'provider', 'environment', 'list', '--json'], {
+		interactiveUi: false,
+		hostInvoke: async (input) => { calls.push(input); return { profiles: [] }; },
+		write() {},
+	});
+	assert.equal(exit, 0);
+	assert.equal(calls[0].handlerId, 'local.host.provider.environment.list');
+	assert.deepEqual(calls[0].arguments, []);
+});
+
 test('provider environment rotation accepts standard input without a plaintext argument', async () => {
 	const calls: any[] = [];
 	const exit = await runCommandLine(['host', 'provider', 'environment', 'rotate', 'runtime', 'API_TOKEN', '--stdin', '--json'], {
