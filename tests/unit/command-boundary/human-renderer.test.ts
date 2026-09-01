@@ -19,6 +19,18 @@ test('generic human output renders labels and values without JSON punctuation', 
 	assert.doesNotMatch(output, /[{}]/u);
 });
 
+test('library read displays exact file content and provenance', () => {
+	const output = renderHumanCommandResult({ commandPath: ['library', 'read'], ok: true, result: { result: {
+		resolvedRef: 'abc123', files: [{ logicalPath: 'objectives/core', sourcePath: 'objectives/core.md',
+			content: '---\ntitle: Core objective\n---\n\n# Direction\n\nBuild **carefully**.' }],
+	} } });
+	assert.match(output, /objectives\/core\.md \(objectives\/core\)/u);
+	assert.match(output, /Ref: abc123/u);
+	assert.match(output, /title: Core objective/u);
+	assert.match(output, /# Direction/u);
+	assert.match(output, /Build carefully\./u);
+});
+
 test('host security initialization is summarized without dumping its receipt', () => {
 	const output = renderHumanCommandResult({ commandPath: ['host', 'security', 'initialize'], ok: true, result: {
 		verified: true, recoveryBundleVerified: true, receipt: { receiptId: 'security-test', state: 'known-good', sandbox: { brokerReady: true, guestImageDigests: ['sha256:a', 'sha256:a'] }, providerVolume: { encrypted: true } },

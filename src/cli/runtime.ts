@@ -7,7 +7,7 @@ import { isCommandBranch, resolveCommand } from './registry.js';
 import { runSecrets } from './commands/secrets.js';
 import { runHost } from './commands/host.js';
 import { runUsers } from './commands/users.js';
-import { runLibrary } from './commands/library.js';
+import { resolveActiveTeamLibraryProject, runLibrary } from './commands/library.js';
 import { runTeams } from './commands/teams.js';
 import { runDevelopment } from './commands/development.js';
 import { runInbox } from './commands/inbox.js';
@@ -70,6 +70,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind === 'local' && invocation.command.execution.handlerId.startsWith('local.host.')) return runHost(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'dev') return runDevelopment(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'library') return runLibrary(invocation, context);
+	if (invocation.command.path.join(' ') === 'library workspace create') await resolveActiveTeamLibraryProject(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'inbox') return runInbox(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'platform') return runPlatform(invocation, context);
 	return runOperator(invocation, context);

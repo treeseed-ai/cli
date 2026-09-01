@@ -82,6 +82,21 @@ export function renderCommunicationResponses(result: Record<string, unknown>, op
 	}).join('\n\n\n');
 }
 
+function renderLibraryRead(result: Record<string, unknown>, options: RenderOptions = {}) {
+	const payload = result.result && typeof result.result === 'object' && !Array.isArray(result.result)
+		? result.result as Record<string, unknown> : result;
+	const files = Array.isArray(payload.files) ? payload.files : payload.file && typeof payload.file === 'object' ? [payload.file] : [];
+	const ref = payload.resolvedRef ?? payload.ref;
+	return files.map((value) => {
+		const file = value as Record<string, unknown>;
+		const source = scalar(file.sourcePath ?? file.path);
+		const logical = file.logicalPath && file.logicalPath !== file.sourcePath ? ` (${scalar(file.logicalPath)})` : '';
+		const heading = `${ansi(options.color === true, '1;36', source)}${ansi(options.color === true, '2', logical)}`;
+		const provenance = ref ? ansi(options.color === true, '2', `Ref: ${scalar(ref)}`) : '';
+		return [heading, provenance, '', markdown(String(file.content ?? file.body ?? ''), options)].filter((line, index) => line || index >= 2).join('\n');
+	}).join(`\n\n${ansi(options.color === true, '2;36', '═'.repeat(Math.max(48, Math.min(160, Number(options.width) || 100))))}\n\n`);
+}
+
 export function renderHumanCommandResult(value: unknown, options: RenderOptions = {}) {
 	if (!value || typeof value !== 'object') return scalar(value);
 	const envelope = value as { commandPath?: string[]; ok?: boolean; result?: unknown; warnings?: unknown[]; nextActions?: unknown[] };
@@ -121,6 +136,7 @@ export function renderHumanCommandResult(value: unknown, options: RenderOptions 
 	}
 	if (path === 'inbox' && result?.interactiveSession === true) return '';
 	if (path === 'send' && result) return result.humanStreamed === true || result.interactiveSession === true ? '' : renderCommunicationResponses(result, options);
+	if (path === 'library read' && result) return renderLibraryRead(result, options) || 'No file content was returned.';
 	const rendered = lines(envelope.result);
 	const warnings = Array.isArray(envelope.warnings) && envelope.warnings.length ? [`Warnings: ${envelope.warnings.map(scalar).join('; ')}`] : [];
 	const next = Array.isArray(envelope.nextActions) && envelope.nextActions.length ? ['Next actions:', ...envelope.nextActions.map((item) => `- ${scalar(item)}`)] : [];
