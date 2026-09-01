@@ -1715,6 +1715,225 @@
                   }
                 }
               ]
+            },
+            {
+              "nodeType": "branch",
+              "segment": "environment",
+              "description": "Provider-local environment profile operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "list",
+                  "description": "List provider-local environment profiles without values.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.provider-environment-profile-page/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.list"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "show",
+                  "description": "show a provider-local environment profile.",
+                  "kind": "read",
+                  "arguments": [
+                    {
+                      "name": "profile",
+                      "description": "Provider-local environment profile.",
+                      "required": true
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.provider-environment-profile/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.show"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "status",
+                  "description": "status a provider-local environment profile.",
+                  "kind": "read",
+                  "arguments": [
+                    {
+                      "name": "profile",
+                      "description": "Provider-local environment profile.",
+                      "required": true
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.provider-environment-profile/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.status"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "set",
+                  "description": "Set one provider-local environment value through a hidden prompt or standard input.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "profile",
+                      "description": "Provider-local environment profile.",
+                      "required": true
+                    },
+                    {
+                      "name": "name",
+                      "description": "Environment variable name.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    },
+                    {
+                      "name": "--stdin",
+                      "description": "Read the replacement value from standard input instead of the hidden prompt.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "host.provider.environment.write",
+                    "confirmation": "credential"
+                  },
+                  "resultSchemaId": "treeseed.provider-environment-profile/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.set"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "import",
+                  "description": "Import provider-local environment values from an env file.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "profile",
+                      "description": "Provider-local environment profile.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    },
+                    {
+                      "name": "--env-file",
+                      "description": "Local env file whose values remain under provider custody.",
+                      "type": "string",
+                      "required": true
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "host.provider.environment.write",
+                    "confirmation": "credential"
+                  },
+                  "resultSchemaId": "treeseed.provider-environment-profile/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.import"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "unset",
+                  "description": "Remove one provider-local environment value.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "profile",
+                      "description": "Provider-local environment profile.",
+                      "required": true
+                    },
+                    {
+                      "name": "name",
+                      "description": "Environment variable name.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "host.provider.environment.write",
+                    "confirmation": "destructive"
+                  },
+                  "resultSchemaId": "treeseed.provider-environment-profile/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.unset"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "rotate",
+                  "description": "Replace one provider-local environment value and advance its generation.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "profile",
+                      "description": "Provider-local environment profile.",
+                      "required": true
+                    },
+                    {
+                      "name": "name",
+                      "description": "Environment variable name.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    },
+                    {
+                      "name": "--stdin",
+                      "description": "Read the replacement value from standard input instead of the hidden prompt.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "host.provider.environment.write",
+                    "confirmation": "credential"
+                  },
+                  "resultSchemaId": "treeseed.provider-environment-profile/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.rotate"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "verify",
+                  "description": "verify a provider-local environment profile.",
+                  "kind": "read",
+                  "arguments": [
+                    {
+                      "name": "profile",
+                      "description": "Provider-local environment profile.",
+                      "required": true
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.provider-environment-profile/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.environment.verify"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -2961,6 +3180,326 @@
               }
             ]
           }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "registration",
+          "description": "Team provider registration operations.",
+          "children": [
+            {
+              "nodeType": "branch",
+              "segment": "code",
+              "description": "Team provider registration-code operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "status",
+                  "description": "status provider environment authority.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.command.status/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "providers.registration.code.status",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "teamId",
+                        "source": "context",
+                        "name": "team",
+                        "required": true,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "reveal",
+                  "description": "reveal provider environment authority.",
+                  "kind": "mutation",
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.reveal",
+                    "confirmation": "credential"
+                  },
+                  "resultSchemaId": "treeseed.command.reveal/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "providers.registration.code.reveal",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "teamId",
+                        "source": "context",
+                        "name": "team",
+                        "required": true,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "rotate",
+                  "description": "rotate provider environment authority.",
+                  "kind": "mutation",
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.rotate",
+                    "confirmation": "credential"
+                  },
+                  "resultSchemaId": "treeseed.command.rotate/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "providers.registration.code.rotate",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "teamId",
+                        "source": "context",
+                        "name": "team",
+                        "required": true,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "environments",
+          "description": "Provider environment descriptor and grant operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "list provider environment authority.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "provider",
+                  "description": "Provider identity.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.list/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "providers.environment.profiles.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "providerId",
+                    "source": "argument",
+                    "name": "provider",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "status",
+                    "source": "option",
+                    "name": "status",
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "show provider environment authority.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "provider",
+                  "description": "Provider identity.",
+                  "required": true
+                },
+                {
+                  "name": "profile",
+                  "description": "Profile identity.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "providers.environment.profiles.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "providerId",
+                    "source": "argument",
+                    "name": "provider",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "profileId",
+                    "source": "argument",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "grant",
+              "description": "grant provider environment authority.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "assignment",
+                  "description": "Assignment identity.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--input",
+                  "description": "Digest-bound environment grant document.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.grant",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.grant/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "providers.environment.grants.put",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "assignmentId",
+                    "source": "argument",
+                    "name": "assignment",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "file",
+                    "source": "option",
+                    "name": "input",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "revoke",
+              "description": "revoke provider environment authority.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "assignment",
+                  "description": "Assignment identity.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.revoke",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.command.revoke/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "providers.environment.grants.revoke",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "assignmentId",
+                    "source": "argument",
+                    "name": "assignment",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
         },
         {
           "nodeType": "branch",

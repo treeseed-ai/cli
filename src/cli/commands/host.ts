@@ -4,6 +4,9 @@ import { storeHostEnrollment, type HostEnrollment } from '../support/host-custod
 import { defaultLocalControlPlaneServer, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
 import { loadServerRegistry, loadServerSession } from '../support/server-custody.js';
 import { promptHidden, promptText } from '../support/prompts.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { hostConfigurationSchema } from '@treeseed/sdk/deployment';
 
 const cloudflareSetupGuide = `Cloudflare R2 setup
 
@@ -38,9 +41,45 @@ function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 	return loadServerSession(resolveControlPlaneServer(selector, registry).serverId, context.env)?.activeTeam ?? null;
 }
 
+async function standardInput(context: CommandContext) {
+	if (context.readStdin) return String(await context.readStdin()).replace(/\r?\n$/u, '');
+	let value = '';
+	process.stdin.setEncoding('utf8');
+	for await (const chunk of process.stdin) value += String(chunk);
+	return value.replace(/\r?\n$/u, '');
+}
+
+async function providerEnvironmentInput(invocation: ParsedInvocation, context: CommandContext, options: Record<string, string | string[] | boolean | undefined>) {
+	const [profileId, name] = invocation.arguments;
+	if (!profileId) throw Object.assign(new Error('A provider-local environment profile is required.'), { category: 'invalid_input', code: 'provider_environment_profile_required' });
+	if (invocation.command.name === 'host provider environment import') {
+		if (invocation.options.plan === true) return { handlerId: invocation.command.execution.kind === 'local' ? invocation.command.execution.handlerId : '', arguments: [profileId], options };
+		const file = invocation.options.envFile;
+		if (typeof file !== 'string' || !file) throw Object.assign(new Error('--env-file is required.'), { category: 'invalid_input', code: 'provider_environment_file_required' });
+		const source = readFileSync(resolve(context.cwd, file), 'utf8');
+		if (Buffer.byteLength(source) > 1_048_576) throw Object.assign(new Error('Provider environment files cannot exceed 1 MiB.'), { category: 'invalid_input', code: 'provider_environment_file_too_large' });
+		delete options.envFile;
+		return { handlerId: invocation.command.execution.kind === 'local' ? invocation.command.execution.handlerId : '', arguments: [profileId], options: { ...options, payload: JSON.stringify({ profileId, envFile: source }) } };
+	}
+	if (!['host provider environment set', 'host provider environment rotate', 'host provider environment unset'].includes(invocation.command.name)) {
+		return { handlerId: invocation.command.execution.kind === 'local' ? invocation.command.execution.handlerId : '', arguments: invocation.arguments, options };
+	}
+	if (!name) throw Object.assign(new Error('An environment variable name is required.'), { category: 'invalid_input', code: 'provider_environment_name_required' });
+	if (invocation.options.plan === true || invocation.command.name.endsWith(' unset')) {
+		return { handlerId: invocation.command.execution.kind === 'local' ? invocation.command.execution.handlerId : '', arguments: [profileId, name], options: { ...options, payload: JSON.stringify({ profileId, name }) } };
+	}
+	const value = invocation.options.stdin === true
+		? await standardInput(context)
+		: String(context.promptSecret ? await context.promptSecret(`${name}: `) : await promptHidden(`${name}: `));
+	if (!value) throw Object.assign(new Error('Environment values cannot be empty; use unset to remove a value.'), { category: 'invalid_input', code: 'provider_environment_value_required' });
+	delete options.stdin;
+	return { handlerId: invocation.command.execution.kind === 'local' ? invocation.command.execution.handlerId : '', arguments: [profileId, name], options: { ...options, payload: JSON.stringify({ profileId, name, value }) } };
+}
+
 async function input(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'local') throw new Error('Host command is not locally bound.');
 	const { server: _server, json: _json, yes: _yes, ...options } = invocation.options;
+	if (invocation.command.name.startsWith('host provider environment ')) return providerEnvironmentInput(invocation, context, options);
 	if (invocation.command.name === 'host initialize') {
 		const profile = invocation.options.profile;
 		if (typeof profile !== 'string' || !/^[a-z][a-z0-9.-]{1,63}$/u.test(profile)) throw new Error('Host initialize requires a valid --profile identity.');
@@ -170,7 +209,7 @@ export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocatio
 	return invocation.command.name === 'host initialize' || invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll'
 		|| invocation.command.name === 'host reset' || invocation.command.name === 'host uninstall' || invocation.command.name.startsWith('host storage ')
 		|| invocation.command.name.startsWith('host security ') || invocation.command.name.startsWith('host sandbox ')
-		|| invocation.command.name.startsWith('host provider credentials ');
+		|| invocation.command.name.startsWith('host provider credentials ') || invocation.command.name.startsWith('host provider environment ');
 }
 
 export async function runHost(invocation: ParsedInvocation, context: CommandContext) {
@@ -205,6 +244,3 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 		return result;
 	} finally { clearInterval(progress); }
 }
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { hostConfigurationSchema } from '@treeseed/sdk/deployment';

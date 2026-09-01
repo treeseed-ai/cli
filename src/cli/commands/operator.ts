@@ -124,6 +124,25 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (operation.descriptor.concurrency.required && input.body?.version !== undefined) {
 		options.headers[operation.descriptor.concurrency.writeHeader] = `"${String(input.body.version)}"`;
 	}
+	if (operation.descriptor.concurrency.required && !options.headers[operation.descriptor.concurrency.writeHeader]) {
+		const reads: Record<string, string> = {
+			'providers.registration.code.rotate': 'providers.registration.code.status',
+			'providers.environment.grants.put': 'providers.environment.grants.show',
+			'providers.environment.grants.revoke': 'providers.environment.grants.show',
+		};
+		const readId = reads[operation.descriptor.operationId];
+		if (readId) {
+			let evidence: { meta?: Record<string, unknown> } | null = null;
+			try { evidence = await client.invoke(controlPlaneOperation(readId), { path: input.path, query: {}, body: undefined }); }
+			catch (error) {
+				if (!(error instanceof ControlPlaneClientError) || error.status !== 404 || operation.descriptor.operationId !== 'providers.environment.grants.put') throw error;
+			}
+			const value = evidence?.meta?.etag;
+			if (typeof value === 'string' && value) options.headers[operation.descriptor.concurrency.writeHeader] = value;
+			else if (!evidence && operation.descriptor.operationId === 'providers.environment.grants.put') options.headers[operation.descriptor.concurrency.writeHeader] = 'new';
+			else throw Object.assign(new Error('The control plane did not return exact concurrency evidence for this mutation.'), { category: 'stale_preflight', code: 'concurrency_evidence_missing' });
+		}
+	}
 	const invokeAuthorized = async (target: ReturnType<typeof controlPlaneOperation>, targetInput: { path: Record<string, unknown>; query: Record<string, unknown>; body?: Record<string, unknown> }) => {
 		const targetOptions = { idempotencyKey: randomUUID(), headers: {} as Record<string, string> };
 		try { return await client.invoke(target, targetInput, targetOptions); }
