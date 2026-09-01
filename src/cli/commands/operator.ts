@@ -40,9 +40,16 @@ function transform(value: unknown, binding: CommandInputBinding) {
 	return value;
 }
 
+async function inputDocument(fileValue: string, context: CommandContext) {
+	if (fileValue !== '-') return readFile(resolve(context.cwd, fileValue), 'utf8');
+	let source = '';
+	process.stdin.setEncoding('utf8');
+	for await (const chunk of process.stdin) source += String(chunk);
+	return source;
+}
+
 async function portableSeedBundle(fileValue: string, context: CommandContext) {
-	const file = resolve(context.cwd, fileValue);
-	const parsed = parseYaml(await readFile(file, 'utf8'));
+	const parsed = parseYaml(await inputDocument(fileValue, context));
 	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Seed file must contain one portable seed bundle object.'), { category: 'invalid_input', code: 'seed_bundle_file_invalid' });
 	return parsed as Record<string, unknown>;
 }
@@ -80,8 +87,7 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		input.body.bundle = parsed;
 	}
 	if (!operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
-		const file = resolve(context.cwd, input.body.file);
-		const parsed = parseYaml(await readFile(file, 'utf8'));
+		const parsed = parseYaml(await inputDocument(input.body.file, context));
 		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Input file must contain one YAML or JSON object.'), { category: 'invalid_input', code: 'command_input_file_invalid' });
 		delete input.body.file;
 		Object.assign(input.body, parsed);

@@ -15,13 +15,44 @@ const number = (value: unknown) => value === undefined ? undefined : Number(valu
 async function inputFile(invocation: ParsedInvocation, context: CommandContext) {
 	const file = text(invocation.options.input);
 	if (!file) return {};
-	const parsed = parseYaml(await readFile(resolve(context.cwd, file), 'utf8'));
+	let source = '';
+	if (file === '-') {
+		process.stdin.setEncoding('utf8');
+		for await (const chunk of process.stdin) source += String(chunk);
+	} else source = await readFile(resolve(context.cwd, file), 'utf8');
+	const parsed = parseYaml(source);
 	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Library input must be one YAML or JSON object.'), { category: 'invalid_input', code: 'library_input_invalid' });
 	return parsed as Record<string, unknown>;
 }
 
+export async function resolveActiveTeamLibraryProject(invocation: ParsedInvocation, context: CommandContext) {
+	if (context.operationInvoke) return;
+	const requestedProject = String(invocation.arguments[0] ?? '');
+	if (!requestedProject) return;
+	const realClient = await createControlPlaneClient(invocation, context, true);
+	const activeTeamId = realClient.session.activeTeam?.id;
+	let cursor: string | undefined;
+	const matches: Record<string, any>[] = [];
+	do {
+		const response = data(await realClient.client.invoke(controlPlaneOperation('projects.list'), {
+			path: {}, query: { limit: 200, ...(cursor ? { cursor } : {}) },
+		}));
+		for (const project of response.items ?? []) if ([project.id, project.slug].includes(requestedProject)
+			&& (!activeTeamId || String(project.teamId ?? project.team_id ?? '') === activeTeamId)) matches.push(project);
+		cursor = text(response.page?.nextCursor ?? response.nextCursor);
+	} while (cursor && matches.length < 2);
+	if (matches.length !== 1) {
+		const code = matches.length ? 'project_ambiguous' : 'project_not_found';
+		throw Object.assign(new Error(matches.length ? `Project ${requestedProject} is ambiguous.` : `Project ${requestedProject} was not found.`), {
+			category: matches.length ? 'ambiguous_context' : 'not_found', code,
+		});
+	}
+	invocation.arguments[0] = String(matches[0]!.id);
+}
+
 export async function runLibrary(invocation: ParsedInvocation, context: CommandContext) {
 	const realClient = context.operationInvoke ? null : await createControlPlaneClient(invocation, context, true);
+	const activeTeamId = realClient?.session?.activeTeam?.id;
 	const invoke = async (operationId: string, input: Input) => context.operationInvoke
 		? context.operationInvoke(operationId, input)
 		: realClient!.client.invoke(controlPlaneOperation(operationId), input);
@@ -30,7 +61,8 @@ export async function runLibrary(invocation: ParsedInvocation, context: CommandC
 	const matches: Record<string, any>[] = [];
 	do {
 		const response = data(await invoke('projects.list', { path: {}, query: { limit: 200, ...(cursor ? { cursor } : {}) } }));
-		for (const project of response.items ?? []) if ([project.id, project.slug].includes(requestedProject)) matches.push(project);
+		for (const project of response.items ?? []) if ([project.id, project.slug].includes(requestedProject)
+			&& (!activeTeamId || String(project.teamId ?? project.team_id ?? '') === activeTeamId)) matches.push(project);
 		cursor = text(response.page?.nextCursor ?? response.nextCursor);
 	} while (cursor && matches.length < 2);
 	if (matches.length !== 1) {

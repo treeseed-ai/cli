@@ -298,9 +298,14 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 	if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
-	startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
-	saveState(state, context.env);
-	await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, key);
+	if (!target.operations.start && target.kind === 'rebuild-restart' && target.operations.build) {
+		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
+		await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
+	} else {
+		startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
+		saveState(state, context.env);
+		await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, key);
+	}
 	if (input.recordGeneration !== false) await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
 
@@ -337,8 +342,13 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 	if (target.kind === 'package-watch') await rebuildPackage({ state, runtime, target, worktree: repository.worktree, mode, context });
 	else if (target.kind === 'rebuild-restart') {
 		if (!target.operations.build) throw new Error(`${selection.projectId}.${selection.targetId} does not declare a build operation.`);
-		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env);
-		await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
+		const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
+		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env, resolved.environment ?? {});
+		if (target.operations.start) await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
+		else {
+			await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
+			await markRebuilt(context, sessionId, runtime.project.id, target.id, mode, target);
+		}
 	} else await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 	const manual: string[] = [];
 	for (const dependent of dependentReactions(record.runtimes, selection.projectId, selection.targetId)) {

@@ -5469,7 +5469,7 @@
           "options": [
             {
               "name": "--ref",
-              "description": "Exact commit or protected library ref.",
+              "description": "Earlier historical revision; omit for the current library.",
               "type": "string"
             }
           ],
@@ -5494,7 +5494,7 @@
           "options": [
             {
               "name": "--ref",
-              "description": "Exact commit or protected library ref.",
+              "description": "Earlier historical revision; omit for the current library.",
               "type": "string"
             }
           ],
@@ -5519,7 +5519,7 @@
           "options": [
             {
               "name": "--ref",
-              "description": "Exact commit or protected library ref.",
+              "description": "Earlier historical revision; omit for the current library.",
               "type": "string"
             },
             {
@@ -5564,7 +5564,7 @@
           "options": [
             {
               "name": "--ref",
-              "description": "Exact commit or protected library ref.",
+              "description": "Earlier historical revision; omit for the current library.",
               "type": "string"
             }
           ],
@@ -5594,7 +5594,7 @@
           "options": [
             {
               "name": "--ref",
-              "description": "Exact commit or protected library ref.",
+              "description": "Earlier historical revision; omit for the current library.",
               "type": "string"
             },
             {
@@ -5639,7 +5639,7 @@
           "options": [
             {
               "name": "--ref",
-              "description": "Exact commit or protected library ref.",
+              "description": "Earlier historical revision; omit for the current library.",
               "type": "string"
             },
             {
@@ -5679,7 +5679,7 @@
           "options": [
             {
               "name": "--ref",
-              "description": "Exact commit or protected library ref.",
+              "description": "Earlier historical revision; omit for the current library.",
               "type": "string"
             },
             {
