@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
 
-const identity = ['users', 'create', '--email', 'adrian.webb@knowledge.coop', '--username', 'adrian', '--display-name', 'Adrian Webb'];
+const identity = ['users', 'create', '--email', 'operator@example.test', '--username', 'operator', '--display-name', 'Test Operator'];
 
 test('users create securely prompts twice and invokes the anonymous registration operation', async () => {
 	const output: string[] = [];
@@ -13,13 +13,13 @@ test('users create securely prompts twice and invokes the anonymous registration
 		promptSecret: async () => prompts.shift() ?? '',
 		operationInvoke: async (operationId, input) => {
 			calls.push({ operationId, input });
-			return { data: { confirmationRequired: true, email: 'adrian.webb@knowledge.coop' } };
+			return { data: { confirmationRequired: true, email: 'operator@example.test' } };
 		},
 		write: (value) => output.push(value),
 	});
 	assert.equal(exit, 0);
 	assert.equal(calls[0]?.operationId, 'accounts.register');
-	assert.deepEqual(calls[0]?.input, { path: {}, query: {}, body: { email: 'adrian.webb@knowledge.coop', username: 'adrian', displayName: 'Adrian Webb', password: 'a sufficiently long password' } });
+	assert.deepEqual(calls[0]?.input, { path: {}, query: {}, body: { email: 'operator@example.test', username: 'operator', displayName: 'Test Operator', password: 'a sufficiently long password' } });
 	assert.doesNotMatch(output[0]!, /sufficiently long password/u);
 	assert.match(JSON.parse(output[0]!).result.nextAction, /mail\.treeseed\.localhost/u);
 });
@@ -49,11 +49,11 @@ test('users create prints an explicit success result in human mode', async () =>
 	const exit = await runCommandLine(identity, {
 		interactiveUi: false,
 		promptSecret: async () => prompts.shift() ?? '',
-		operationInvoke: async () => ({ data: { confirmationRequired: true, email: 'adrian.webb@knowledge.coop' } }),
+		operationInvoke: async () => ({ data: { confirmationRequired: true, email: 'operator@example.test' } }),
 		write: (value) => output.push(value),
 	});
 	assert.equal(exit, 0);
-	assert.match(output[0]!, /User registration accepted for adrian\.webb@knowledge\.coop\./u);
+	assert.match(output[0]!, /User registration accepted for operator@example\.test\./u);
 });
 
 test('users create rejects mismatched passwords without invoking the API or leaking either value', async () => {
