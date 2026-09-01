@@ -49,7 +49,16 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 			throw Object.assign(new Error('Host initialize execution requires both --confirm and --yes after reviewing the plan.'), { category: 'confirmation_required', code: 'confirmation_required' });
 		}
 		const planCommand = { handlerId: invocation.command.execution.handlerId, arguments: [], options: { plan: true, profile } };
-		const planned = await (context.hostInvoke ? context.hostInvoke(planCommand) : invokeLocalHostManager(planCommand)) as { inputs?: Array<{ name: string; required: boolean; sensitive: boolean; description: string }> };
+		const planned = await (context.hostInvoke ? context.hostInvoke(planCommand) : invokeLocalHostManager(planCommand)) as {
+			hostId?: unknown; catalog?: { release?: unknown; generation?: unknown; digest?: unknown };
+			inputs?: Array<{ name: string; required: boolean; sensitive: boolean; description: string }>;
+		};
+		if (typeof planned.hostId !== 'string' || !/^[a-z][a-z0-9.-]{1,63}$/u.test(planned.hostId)) throw new Error('Host initialization plan contains an invalid runtime host identity.');
+		if (!planned.catalog || typeof planned.catalog.release !== 'string' || !planned.catalog.release
+			|| !Number.isInteger(planned.catalog.generation) || Number(planned.catalog.generation) <= 0
+			|| typeof planned.catalog.digest !== 'string' || !/^sha256:[a-f0-9]{64}$/u.test(planned.catalog.digest)) {
+			throw new Error('Host initialization plan does not contain a valid immutable catalog binding.');
+		}
 		const values: Record<string, string> = {};
 		for (const descriptor of planned.inputs ?? []) {
 			if (!/^[a-z][A-Za-z0-9]{1,63}$/u.test(descriptor.name)) throw new Error('Host initialization plan contains an invalid input descriptor.');
@@ -65,7 +74,9 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 			}
 			if (value) values[descriptor.name] = value;
 		}
-		return { handlerId: invocation.command.execution.handlerId, arguments: [], options: { profile, confirm: true, payload: JSON.stringify({ profile, inputs: values }) } };
+		return { handlerId: invocation.command.execution.handlerId, arguments: [], options: { profile, confirm: true, payload: JSON.stringify({
+			profile, hostId: planned.hostId, catalog: { release: planned.catalog.release, generation: planned.catalog.generation, digest: planned.catalog.digest }, inputs: values,
+		}) } };
 	}
 	if (invocation.command.name === 'host uninstall' && invocation.options.plan !== true) {
 		if (invocation.options.confirm !== true || invocation.options.yes !== true) {
