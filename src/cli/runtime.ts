@@ -41,6 +41,7 @@ function categorized(error: unknown): CommandFailure {
 	if (value.category) return failure(value.category, value.code ?? 'command_failed', value.message ?? String(error));
 	const code = value.problem?.code ?? value.code ?? 'command_failed';
 	const message = value.problem?.detail ?? value.problem?.title ?? value.message ?? String(error);
+	if (code === 'host_security_initialization_required') return failure('policy_blocked', code, message);
 	if (code === 'confirmation_required' || code === 'confirmation_invalid') return failure('confirmation_required', code, message);
 	if (code === 'stale_preflight') return failure('stale_preflight', code, message);
 	if (value.status === 400 || value.status === 412) return failure('invalid_input', code, message);
