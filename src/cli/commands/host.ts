@@ -51,6 +51,9 @@ async function standardInput(context: CommandContext) {
 
 async function providerEnvironmentInput(invocation: ParsedInvocation, context: CommandContext, options: Record<string, string | string[] | boolean | undefined>) {
 	const [profileId, name] = invocation.arguments;
+	if (invocation.command.name === 'host provider environment list') {
+		return { handlerId: invocation.command.execution.kind === 'local' ? invocation.command.execution.handlerId : '', arguments: [], options };
+	}
 	if (!profileId) throw Object.assign(new Error('A provider-local environment profile is required.'), { category: 'invalid_input', code: 'provider_environment_profile_required' });
 	if (invocation.command.name === 'host provider environment import') {
 		if (invocation.options.plan === true) return { handlerId: invocation.command.execution.kind === 'local' ? invocation.command.execution.handlerId : '', arguments: [profileId], options };
