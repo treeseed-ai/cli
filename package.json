@@ -50,7 +50,7 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "github:treeseed-ai/sdk#c3d2164747f069a3a3c60d97eae32668dc29e813",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#400d936a531a234379c7bb2bc64cdf716bff1504",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",
