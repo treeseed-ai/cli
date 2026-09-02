@@ -9,7 +9,7 @@ test('package has one executable and only its declared CLI runtime dependencies'
 	assert.equal(pkg.types, undefined);
 	assert.equal(pkg.files.some((path: string) => path.startsWith('scripts/')), false);
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
-	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': 'github:treeseed-ai/sdk#bbc56dfdf5eb9a3ab4de642012256316b932782e', ink: '^7.1.1', react: '^19.2.8', 'string-width': '^8.2.2', yaml: '2.9.0' });
+	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.80', ink: '^7.1.1', react: '^19.2.8', 'string-width': '^8.2.2', yaml: '2.9.0' });
 });
 
 test('built package contains executable runtime only', () => {
