@@ -22,6 +22,8 @@ jobs:
           test -n "$run_id"
           gh run download "$run_id" --name "cli-candidate-${GITHUB_SHA}" --dir candidate
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build the exact Git-pinned SDK distribution
+        run: npm --prefix node_modules/@treeseed/sdk run build:dist
       - run: npm run release:check-tag
       - run: npm run release:custody -- verify candidate/release-evidence-v1.json
       - name: Capture stable tag before publication
