@@ -313,12 +313,13 @@ Topology operations.
 
 ### trsd platform topology plan <file>
 
-Plan Cloudflare and Railway reconciliation from a portable hosted-topology declaration.
+Plan Cloudflare and Railway reconciliation from a portable hosted-topology declaration or template.
 
 Operation: read. Result schema: `treeseed.hosted-topology-plan/v1`.
 Execution: `local.platform.topology.plan`.
 
 - `--json`: Emit the stable JSON envelope.
+- `--artifacts <value>`: Exact runtime artifact-input YAML or JSON required by a portable template.
 
 ### trsd platform topology apply <plan>
 

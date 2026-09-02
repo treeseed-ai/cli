@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -51,5 +52,20 @@ test('platform topology rejects cross-team custody before invoking the API', asy
 	try {
 		const exit = await runCommandLine(['platform', 'topology', 'plan', 'topology.yaml', '--json'], { cwd: root, env: { TREESEED_TEAM_ID: 'other-team' }, interactiveUi: false, write: (value) => output.push(value), operationInvoke: async () => { throw new Error('must not invoke'); } });
 		assert.equal(exit, 1); assert.equal(JSON.parse(output[0]!).error.code, 'topology_team_mismatch');
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('platform topology compiles a tracked portable template with runtime artifacts and active-team custody', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'platform-topology-template-cli-')), output: string[] = [], calls: any[] = [];
+	const template = { schemaVersion: 'treeseed.hosted-topology-template/v1', id: 'staging', deploymentId: 'treeseed-cloud', stackId: 'control-plane', environment: 'staging', mutation: 'approval-required', stateBackend: { connectionRef: 'cloudflare-state' }, providerConnections: { cloudflare: { connectionRef: 'cloudflare-hosting' } }, artifactBindings: { admin: { input: 'admin-pages', kind: 'archive' } }, resources: [{ id: 'admin', provider: 'cloudflare', kind: 'pages-application', dependsOn: [], parameters: { name: { input: 'admin-project-name' }, artifact: { artifact: 'admin' }, 'artifact-format': { literal: 'tar+gzip' }, 'production-branch': { input: 'production-branch' }, 'destination-dir': { literal: '.' } }, adoption: { mode: 'adopt-or-create', replacement: 'forbidden' } }] };
+	const artifacts = { schemaVersion: 'treeseed.hosted-topology-artifacts/v1', artifacts: { 'admin-pages': { kind: 'archive', format: 'tar+gzip', digest: `sha256:${'b'.repeat(64)}`, source: 'https://releases.example.test/admin.tgz' } } };
+	try {
+		writeFileSync(resolve(root, 'topology.yaml'), JSON.stringify(template)); writeFileSync(resolve(root, 'artifacts.json'), JSON.stringify(artifacts));
+		execFileSync('git', ['init', '-q', root]); execFileSync('git', ['-C', root, 'config', 'user.email', 'test@example.test']); execFileSync('git', ['-C', root, 'config', 'user.name', 'Test']); execFileSync('git', ['-C', root, 'add', 'topology.yaml']); execFileSync('git', ['-C', root, 'commit', '-qm', 'fixture']);
+		const commit = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+		const exit = await runCommandLine(['platform', 'topology', 'plan', 'topology.yaml', '--artifacts', 'artifacts.json', '--json'], { cwd: root, env: { TREESEED_TEAM_ID: teamId }, interactiveUi: false, write: (value) => output.push(value), operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: plan }; } });
+		assert.equal(exit, 0, output.join('\n')); assert.equal(calls[0].input.body.declaration.teamId, teamId); assert.equal(calls[0].input.body.declaration.platform.commit, commit); assert.equal(calls[0].input.body.declaration.artifacts.admin.kind, 'archive');
+		writeFileSync(resolve(root, 'topology.yaml'), `${JSON.stringify(template)}\n`);
+		assert.equal(await runCommandLine(['platform', 'topology', 'plan', 'topology.yaml', '--artifacts', 'artifacts.json', '--json'], { cwd: root, env: { TREESEED_TEAM_ID: teamId }, interactiveUi: false, write: (value) => output.push(value), operationInvoke: async () => { throw new Error('must not invoke'); } }), 1);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });

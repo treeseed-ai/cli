@@ -944,13 +944,20 @@
             {
               "nodeType": "leaf",
               "segment": "plan",
-              "description": "Plan Cloudflare and Railway reconciliation from a portable hosted-topology declaration.",
+              "description": "Plan Cloudflare and Railway reconciliation from a portable hosted-topology declaration or template.",
               "kind": "read",
               "arguments": [
                 {
                   "name": "file",
-                  "description": "Hosted topology YAML or JSON declaration.",
+                  "description": "Hosted topology YAML or JSON declaration or template.",
                   "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--artifacts",
+                  "description": "Exact runtime artifact-input YAML or JSON required by a portable template.",
+                  "type": "string"
                 }
               ],
               "resultSchemaId": "treeseed.hosted-topology-plan/v1",
