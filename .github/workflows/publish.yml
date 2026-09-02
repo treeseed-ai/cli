@@ -21,12 +21,8 @@ jobs:
           run_id="$(gh run list --workflow verify.yml --branch staging --commit "$GITHUB_SHA" --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
           test -n "$run_id"
           gh run download "$run_id" --name "cli-candidate-${GITHUB_SHA}" --dir candidate
-      - name: Download the sealed exact SDK candidate
-        run: ./scripts/build/hydrate-exact-sdk.sh candidate/sdk download
-        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Install the sealed exact SDK candidate
-        run: ./scripts/build/hydrate-exact-sdk.sh candidate/sdk install
+      - name: Install exact published dependency graph
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run release:check-tag
       - run: npm run release:custody -- verify candidate/release-evidence-v1.json
       - name: Capture stable tag before publication
