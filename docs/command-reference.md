@@ -307,6 +307,52 @@ Execution: `local.platform.project.create`.
 - `--apply`: Apply the accepted creation plan.
 - `--template <value>`: Published template identity.
 
+## trsd platform topology
+
+Topology operations.
+
+### trsd platform topology plan <file>
+
+Plan Cloudflare and Railway reconciliation from a portable hosted-topology declaration.
+
+Operation: read. Result schema: `treeseed.hosted-topology-plan/v1`.
+Execution: `local.platform.topology.plan`.
+
+- `--json`: Emit the stable JSON envelope.
+
+### trsd platform topology apply <plan>
+
+Apply an exact reviewed hosted-topology plan through the operations runner.
+
+Operation: mutation. Result schema: `treeseed.platform-operation/v1`.
+Execution: `local.platform.topology.apply`.
+
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--approval <value>`: Exact environment approval JSON file.
+
+### trsd platform topology status
+
+Read the latest hosted-topology operation and known-good receipt.
+
+Operation: read. Result schema: `treeseed.infrastructure.topology.status.output/v1`.
+Execution: `local.platform.topology.status`.
+
+- `--json`: Emit the stable JSON envelope.
+
+### trsd platform topology rollback <rollback>
+
+Restore exact prior hosted-topology state from a known-good receipt.
+
+Operation: mutation. Result schema: `treeseed.platform-operation/v1`.
+Execution: `local.platform.topology.rollback`.
+
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--approval <value>`: Exact rollback approval JSON file.
+
 ## trsd dev
 
 Dev operations.

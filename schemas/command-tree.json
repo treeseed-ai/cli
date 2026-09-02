@@ -935,6 +935,122 @@
               }
             }
           ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "topology",
+          "description": "Topology operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "plan",
+              "description": "Plan Cloudflare and Railway reconciliation from a portable hosted-topology declaration.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "Hosted topology YAML or JSON declaration.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.hosted-topology-plan/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.platform.topology.plan"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "apply",
+              "description": "Apply an exact reviewed hosted-topology plan through the operations runner.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "plan",
+                  "description": "Exact plan JSON file.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--approval",
+                  "description": "Exact environment approval JSON file.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--yes",
+                  "description": "Confirm the authority-bearing mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "infrastructure.write",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.platform-operation/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.platform.topology.apply"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "status",
+              "description": "Read the latest hosted-topology operation and known-good receipt.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.infrastructure.topology.status.output/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.platform.topology.status"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "rollback",
+              "description": "Restore exact prior hosted-topology state from a known-good receipt.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "rollback",
+                  "description": "Exact rollback JSON file.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--approval",
+                  "description": "Exact rollback approval JSON file.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--yes",
+                  "description": "Confirm the destructive rollback.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "infrastructure.write",
+                "confirmation": "destructive"
+              },
+              "resultSchemaId": "treeseed.platform-operation/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.platform.topology.rollback"
+              }
+            }
+          ]
         }
       ]
     },
