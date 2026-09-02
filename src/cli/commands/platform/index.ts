@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { applyPlatformWorkset, loadPlatformInventory, loadPlatformProfiles, planPlatformWorkset, projectCreatePlanSchema, resolveProfileProjects, verifyPlatformRepository } from '@treeseed/sdk/platform';
 import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
+import { hostedTopologyApprovalSchema, hostedTopologyDeclarationSchema, hostedTopologyPlanSchema, hostedTopologyRollbackApprovalSchema, hostedTopologyRollbackSchema } from '@treeseed/sdk/deployment';
 import type { CommandContext, ParsedInvocation } from '../../types.js';
 import { createControlPlaneClient } from '../../support/client.js';
 
@@ -76,9 +77,47 @@ async function projectCreate(invocation: ParsedInvocation, context: CommandConte
 	return payload(await invoke({ mode: 'apply', plan }, true));
 }
 
+function document(path: string, context: CommandContext) {
+	try { return parseYaml(readFileSync(resolve(context.cwd, path), 'utf8')); }
+	catch (error) { throw invalid('topology_document_invalid', `Unable to read topology document ${path}: ${error instanceof Error ? error.message : String(error)}`); }
+}
+
+async function topology(invocation: ParsedInvocation, context: CommandContext) {
+	const injected = context.operationInvoke;
+	let teamId = String(context.env.TREESEED_TEAM_ID ?? ''), invoke: (operation: any, input: unknown, mutation?: boolean) => Promise<unknown>;
+	if (injected) invoke = (operation, input) => injected(operation.descriptor.operationId, input);
+	else {
+		const { client, session } = await createControlPlaneClient(invocation, context, true);
+		teamId = String(session?.activeTeam?.id ?? '');
+		invoke = (operation, input: any, mutation = false) => client.invoke(operation, input, mutation ? { idempotencyKey: randomUUID(), headers: {} } : undefined);
+	}
+	if (!teamId) throw Object.assign(new Error('Select an active team with `trsd teams use <team>` before managing hosted topology.'), { category: 'ambiguous_context', code: 'active_team_required' });
+	const operations = CONTROL_PLANE_OPERATIONS.infrastructure.topology;
+	if (invocation.command.name === 'platform topology plan') {
+		const declaration = hostedTopologyDeclarationSchema.parse(document(invocation.arguments[0]!, context));
+		if (declaration.teamId !== teamId) throw invalid('topology_team_mismatch', 'The hosted topology declaration is not bound to the active team.');
+		return payload(await invoke(operations.plan, { path: { teamId }, query: {}, body: { declaration } }));
+	}
+	if (invocation.command.name === 'platform topology status') return payload(await invoke(operations.status, { path: { teamId }, query: {}, body: undefined }));
+	if (invocation.options.yes !== true) throw Object.assign(new Error('Hosted topology mutation requires --yes after reviewing the exact plan and approval.'), { category: 'confirmation_required', code: 'confirmation_required' });
+	const approvalPath = String(invocation.options.approval ?? '');
+	if (!approvalPath) throw invalid('topology_approval_required', '--approval is required.');
+	if (invocation.command.name === 'platform topology apply') {
+		const plan = hostedTopologyPlanSchema.parse(document(invocation.arguments[0]!, context));
+		const approval = hostedTopologyApprovalSchema.parse(document(approvalPath, context));
+		if (plan.teamId !== teamId || approval.teamId !== teamId) throw invalid('topology_team_mismatch', 'The hosted topology plan and approval must be bound to the active team.');
+		return payload(await invoke(operations.apply, { path: { teamId }, query: {}, body: { plan, approval } }, true));
+	}
+	const rollback = hostedTopologyRollbackSchema.parse(document(invocation.arguments[0]!, context));
+	const approval = hostedTopologyRollbackApprovalSchema.parse(document(approvalPath, context));
+	if (rollback.teamId !== teamId || approval.teamId !== teamId) throw invalid('topology_team_mismatch', 'The hosted topology rollback and approval must be bound to the active team.');
+	return payload(await invoke(operations.rollback, { path: { teamId }, query: {}, body: { rollback, approval } }, true));
+}
+
 export function runPlatform(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.name === 'platform verify') return verify(invocation, context);
 	if (invocation.command.name === 'platform workset') return workset(invocation, context);
 	if (invocation.command.name === 'platform project create') return projectCreate(invocation, context);
+	if (invocation.command.name.startsWith('platform topology ')) return topology(invocation, context);
 	throw invalid('platform_command_unknown', `Unsupported Platform command ${invocation.command.name}.`);
 }

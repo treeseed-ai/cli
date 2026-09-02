@@ -50,7 +50,7 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.70",
+    "@treeseed/sdk": "github:treeseed-ai/sdk#4936ec8652929683c5ad6d6fd5f7973cfa67299d",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",
@@ -62,9 +62,6 @@
     "string-width",
     "yaml"
   ],
-  "overrides": {
-    "@treeseed/sdk": "$@treeseed/sdk"
-  },
   "devDependencies": {
     "@types/node": "^24.6.0",
     "@types/react": "^19.2.14",
