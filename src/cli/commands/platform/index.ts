@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { applyPlatformWorkset, loadPlatformInventory, loadPlatformProfiles, planPlatformWorkset, projectCreatePlanSchema, resolveProfileProjects, verifyPlatformRepository } from '@treeseed/sdk/platform';
 import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
-import { hostedTopologyApprovalSchema, hostedTopologyDeclarationSchema, hostedTopologyPlanSchema, hostedTopologyRollbackApprovalSchema, hostedTopologyRollbackSchema } from '@treeseed/sdk/deployment';
+import { compileHostedTopologyTemplate, hostedTopologyApprovalSchema, hostedTopologyArtifactInputsSchema, hostedTopologyDeclarationSchema, hostedTopologyPlanSchema, hostedTopologyRollbackApprovalSchema, hostedTopologyRollbackSchema, hostedTopologyTemplateSchema } from '@treeseed/sdk/deployment';
 import type { CommandContext, ParsedInvocation } from '../../types.js';
 import { createControlPlaneClient } from '../../support/client.js';
 
@@ -82,6 +83,18 @@ function document(path: string, context: CommandContext) {
 	catch (error) { throw invalid('topology_document_invalid', `Unable to read topology document ${path}: ${error instanceof Error ? error.message : String(error)}`); }
 }
 
+function templatePlatformCommit(path: string, context: CommandContext) {
+	try {
+		const root = execFileSync('git', ['-C', context.cwd, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+		const target = resolve(context.cwd, path), relativePath = relative(root, target).replaceAll('\\', '/');
+		if (!relativePath || relativePath.startsWith('../')) throw new Error('Template is outside the Platform Git worktree.');
+		execFileSync('git', ['-C', root, 'ls-files', '--error-unmatch', '--', relativePath], { stdio: 'ignore' });
+		const status = execFileSync('git', ['-C', root, 'status', '--porcelain=v1', '--untracked-files=all', '--', relativePath], { encoding: 'utf8' }).trim();
+		if (status) throw new Error('Template differs from the exact Platform commit.');
+		return execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+	} catch (error) { throw invalid('topology_template_custody_invalid', error instanceof Error ? error.message : String(error)); }
+}
+
 async function topology(invocation: ParsedInvocation, context: CommandContext) {
 	const injected = context.operationInvoke;
 	let teamId = String(context.env.TREESEED_TEAM_ID ?? ''), invoke: (operation: any, input: unknown, mutation?: boolean) => Promise<unknown>;
@@ -94,7 +107,15 @@ async function topology(invocation: ParsedInvocation, context: CommandContext) {
 	if (!teamId) throw Object.assign(new Error('Select an active team with `trsd teams use <team>` before managing hosted topology.'), { category: 'ambiguous_context', code: 'active_team_required' });
 	const operations = CONTROL_PLANE_OPERATIONS.infrastructure.topology;
 	if (invocation.command.name === 'platform topology plan') {
-		const declaration = hostedTopologyDeclarationSchema.parse(document(invocation.arguments[0]!, context));
+		const path = invocation.arguments[0]!, source = document(path, context) as Record<string, unknown>, artifactPath = String(invocation.options.artifacts ?? '');
+		let declaration;
+		if (source.schemaVersion === 'treeseed.hosted-topology-template/v1') {
+			if (!artifactPath) throw invalid('topology_artifacts_required', '--artifacts is required for a hosted topology template.');
+			declaration = compileHostedTopologyTemplate({ template: hostedTopologyTemplateSchema.parse(source), teamId, platformCommit: templatePlatformCommit(path, context), artifacts: hostedTopologyArtifactInputsSchema.parse(document(artifactPath, context)).artifacts });
+		} else {
+			if (artifactPath) throw invalid('topology_artifacts_unexpected', '--artifacts is accepted only with a hosted topology template.');
+			declaration = hostedTopologyDeclarationSchema.parse(source);
+		}
 		if (declaration.teamId !== teamId) throw invalid('topology_team_mismatch', 'The hosted topology declaration is not bound to the active team.');
 		return payload(await invoke(operations.plan, { path: { teamId }, query: {}, body: { declaration } }));
 	}
