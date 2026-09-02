@@ -24,13 +24,12 @@ test('the executable drains complete output before exiting', () => {
 	assert.equal(main.includes('process.exitCode = await runCommandLine'), true);
 });
 
-test('candidate promotion installs the sealed exact SDK after lifecycle-disabled installation', () => {
+test('candidate promotion installs the exact registry SDK without lifecycle builds', () => {
 	const workflow = readFileSync('.github/workflows/publish.yml', 'utf8');
-	const download = workflow.indexOf('hydrate-exact-sdk.sh candidate/sdk download');
 	const install = workflow.indexOf('npm ci --ignore-scripts --no-audit --no-fund');
-	const hydrate = workflow.indexOf('hydrate-exact-sdk.sh candidate/sdk install');
 	const verify = workflow.indexOf('npm run release:custody -- verify');
-	assert.ok(download >= 0 && install > download && hydrate > install && verify > hydrate);
+	assert.equal(workflow.includes('hydrate-exact-sdk.sh'), false);
+	assert.ok(install >= 0 && verify > install);
 });
 
 test('source contains no legacy implementation residue', () => {
