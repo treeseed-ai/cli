@@ -66,10 +66,10 @@ async function projectCreate(invocation: ParsedInvocation, context: CommandConte
 	if (applying && invocation.options.yes !== true) throw Object.assign(new Error('Project creation apply requires --yes after reviewing the plan.'), { category: 'confirmation_required', code: 'confirmation_required' });
 	const template = templateLock(context.cwd, templateId);
 	let teamId = String(context.env.TREESEED_TEAM_ID ?? ''); let invoke: (body: Record<string, unknown>, apply: boolean) => Promise<unknown>;
-	if (context.operationInvoke) invoke = (body) => context.operationInvoke!('projects.create', { path: { teamId }, query: {}, body });
+	if (context.operationInvoke) invoke = (body) => context.operationInvoke!('projects.create', { path: { teamId }, query: {}, body }, { idempotencyKey: randomUUID() });
 	else {
 		const { client, session } = await createControlPlaneClient(invocation, context, true); teamId = String(session?.activeTeam?.id ?? '');
-		invoke = (body, apply) => client.invoke(CONTROL_PLANE_OPERATIONS.projects.create, { path: { teamId }, query: {}, body }, apply ? { idempotencyKey: randomUUID(), headers: {} } : undefined);
+		invoke = (body) => client.invoke(CONTROL_PLANE_OPERATIONS.projects.create, { path: { teamId }, query: {}, body }, { idempotencyKey: randomUUID(), headers: {} });
 	}
 	if (!teamId) throw Object.assign(new Error('Select an active team with `trsd teams use <team>` before creating a project.'), { category: 'ambiguous_context', code: 'active_team_required' });
 	const plan = projectCreatePlanSchema.parse(payload(await invoke({ mode: 'plan', target: { slug, template, repository: { name: slug, visibility: 'private' } } }, false)));

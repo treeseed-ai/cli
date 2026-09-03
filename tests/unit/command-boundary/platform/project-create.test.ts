@@ -22,9 +22,10 @@ test('platform project create plans through API authority without mutation', asy
 	try {
 		const exit = await runCommandLine(['platform', 'project', 'create', 'example-app', '--template', 'engineering', '--plan', '--json'], {
 			cwd: root, env: { TREESEED_TEAM_ID: 'team-1' }, interactiveUi: false, write: (value) => output.push(value),
-			operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: plan }; },
+			operationInvoke: async (operationId, input, options) => { calls.push({ operationId, input, options }); return { data: plan }; },
 		});
 		assert.equal(exit, 0, output.join('\n')); assert.equal(calls.length, 1); assert.equal(calls[0].input.body.mode, 'plan');
+		assert.match(calls[0].options.idempotencyKey, /^[0-9a-f-]{36}$/u);
 		assert.equal(JSON.parse(output[0]!).result.planDigest, digest);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -34,9 +35,11 @@ test('platform project create applies the exact API plan and never writes applic
 	try {
 		const exit = await runCommandLine(['platform', 'project', 'create', 'example-app', '--template', 'engineering', '--apply', '--yes', '--json'], {
 			cwd: root, env: { TREESEED_TEAM_ID: 'team-1' }, interactiveUi: false, write: (value) => output.push(value),
-			operationInvoke: async (operationId, input: any) => { calls.push({ operationId, input }); return input.body.mode === 'plan' ? { data: plan } : { data: { ...plan, schemaVersion: 'treeseed.platform-project-create-receipt/v1', projectId: 'project-1' } }; },
+			operationInvoke: async (operationId, input: any, options) => { calls.push({ operationId, input, options }); return input.body.mode === 'plan' ? { data: plan } : { data: { ...plan, schemaVersion: 'treeseed.platform-project-create-receipt/v1', projectId: 'project-1' } }; },
 		});
 		assert.equal(exit, 0, output.join('\n')); assert.deepEqual(calls.map((call) => call.input.body.mode), ['plan', 'apply']);
+		assert.equal(calls.every((call) => /^[0-9a-f-]{36}$/u.test(call.options.idempotencyKey)), true);
+		assert.notEqual(calls[0].options.idempotencyKey, calls[1].options.idempotencyKey);
 		assert.equal(calls[1].input.body.plan.planDigest, digest); assert.equal(JSON.parse(output[0]!).result.projectId, 'project-1');
 		assert.equal(await import('node:fs').then(({ existsSync }) => existsSync(resolve(root, 'packages/example-app'))), false);
 	} finally { rmSync(root, { recursive: true, force: true }); }
