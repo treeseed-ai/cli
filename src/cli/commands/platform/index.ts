@@ -5,9 +5,10 @@ import { relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { applyPlatformWorkset, loadPlatformInventory, loadPlatformProfiles, planPlatformWorkset, projectCreatePlanSchema, resolveProfileProjects, verifyPlatformRepository } from '@treeseed/sdk/platform';
 import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
-import { compileHostedTopologyTemplate, hostedTopologyApprovalSchema, hostedTopologyArtifactInputsSchema, hostedTopologyDeclarationSchema, hostedTopologyPlanSchema, hostedTopologyRollbackApprovalSchema, hostedTopologyRollbackSchema, hostedTopologyTemplateSchema } from '@treeseed/sdk/deployment';
+import { compileHostedTopologyTemplate, hostedTopologyApprovalSchema, hostedTopologyArtifactInputsSchema, hostedTopologyDeclarationSchema, hostedTopologyPlanSchema, hostedTopologyRollbackExecutionApprovalSchema, hostedTopologyRollbackExecutionSchema, hostedTopologyTemplateSchema } from '@treeseed/sdk/deployment';
 import type { CommandContext, ParsedInvocation } from '../../types.js';
 import { createControlPlaneClient } from '../../support/client.js';
+import { completeHostedTopologyOperation } from './hosted-vault.js';
 
 const values = (value: string | string[] | boolean | undefined) => Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
 const invalid = (code: string, message: string) => Object.assign(new Error(message), { category: 'invalid_input', code });
@@ -117,7 +118,7 @@ async function topology(invocation: ParsedInvocation, context: CommandContext) {
 			declaration = hostedTopologyDeclarationSchema.parse(source);
 		}
 		if (declaration.teamId !== teamId) throw invalid('topology_team_mismatch', 'The hosted topology declaration is not bound to the active team.');
-		return payload(await invoke(operations.plan, { path: { teamId }, query: {}, body: { declaration } }));
+		return completeHostedTopologyOperation(await invoke(operations.plan, { path: { teamId }, query: {}, body: { declaration } }), teamId, invoke, context);
 	}
 	if (invocation.command.name === 'platform topology status') return payload(await invoke(operations.status, { path: { teamId }, query: {}, body: undefined }));
 	if (invocation.options.yes !== true) throw Object.assign(new Error('Hosted topology mutation requires --yes after reviewing the exact plan and approval.'), { category: 'confirmation_required', code: 'confirmation_required' });
@@ -127,12 +128,17 @@ async function topology(invocation: ParsedInvocation, context: CommandContext) {
 		const plan = hostedTopologyPlanSchema.parse(document(invocation.arguments[0]!, context));
 		const approval = hostedTopologyApprovalSchema.parse(document(approvalPath, context));
 		if (plan.teamId !== teamId || approval.teamId !== teamId) throw invalid('topology_team_mismatch', 'The hosted topology plan and approval must be bound to the active team.');
-		return payload(await invoke(operations.apply, { path: { teamId }, query: {}, body: { plan, approval } }, true));
+		return completeHostedTopologyOperation(await invoke(operations.apply, { path: { teamId }, query: {}, body: { plan, approval } }, true), teamId, invoke, context);
 	}
-	const rollback = hostedTopologyRollbackSchema.parse(document(invocation.arguments[0]!, context));
-	const approval = hostedTopologyRollbackApprovalSchema.parse(document(approvalPath, context));
-	if (rollback.teamId !== teamId || approval.teamId !== teamId) throw invalid('topology_team_mismatch', 'The hosted topology rollback and approval must be bound to the active team.');
-	return payload(await invoke(operations.rollback, { path: { teamId }, query: {}, body: { rollback, approval } }, true));
+	const rollbackBundle = document(invocation.arguments[0]!, context) as Record<string, unknown>;
+	const execution = hostedTopologyRollbackExecutionSchema.parse(rollbackBundle.execution);
+	const sourcePlan = hostedTopologyPlanSchema.parse(rollbackBundle.sourcePlan);
+	const targetPlan = hostedTopologyPlanSchema.parse(rollbackBundle.targetPlan);
+	const approval = hostedTopologyRollbackExecutionApprovalSchema.parse(document(approvalPath, context));
+	if (execution.teamId !== teamId || sourcePlan.teamId !== teamId || targetPlan.teamId !== teamId || approval.teamId !== teamId)
+		throw invalid('topology_team_mismatch', 'The hosted topology rollback closure and approval must be bound to the active team.');
+	return completeHostedTopologyOperation(await invoke(operations.rollback, { path: { teamId }, query: {},
+		body: { execution, approval, sourcePlan, targetPlan } }, true), teamId, invoke, context);
 }
 
 export function runPlatform(invocation: ParsedInvocation, context: CommandContext) {

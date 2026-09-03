@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { authorizeHostedTopologyPlan, bindHostedStateBackend, hostedTopologyStateKey, planHostedTopology, planHostedTopologyRollback, verifyHostedTopologyReadback } from '@treeseed/sdk/deployment';
+import { authorizeHostedTopologyPlan, bindHostedStateBackend, hostedTopologyStateKey, planHostedTopology, planHostedTopologyRollback, planHostedTopologyRollbackExecution, verifyHostedTopologyReadback } from '@treeseed/sdk/deployment';
 import { runCommandLine } from '../../../../src/cli/runtime.ts';
 
 const teamId = 'team-treeseed';
@@ -17,17 +17,22 @@ const backend = bindHostedStateBackend({ schemaVersion: 'treeseed.hosted-state-b
 	connectionRef: 'cloudflare-state', bucket: 'treeseed-state', key: hostedTopologyStateKey(declaration), region: 'auto', endpoint: 'https://example.r2.cloudflarestorage.com', usePathStyle: true, encryptionKeyRef: 'state-key' });
 const plan = planHostedTopology({ declaration, observations: [], connections: {}, stateBackend: backend });
 const planApproval = { schemaVersion: 'treeseed.hosted-topology-approval/v1' as const, planDigest: plan.planDigest, teamId, deploymentId: plan.deploymentId, stackId: plan.stackId, environment: plan.environment, backendBindingDigest: backend.bindingDigest, decision: 'approved' as const, approvedBy: 'owner', approvedAt: now };
-const sourcePlan = authorizeHostedTopologyPlan(plan);
-const receipt = verifyHostedTopologyReadback({ plan: sourcePlan, previousResources: [], resources: [], completedAt: now });
+const authorizedPlan = authorizeHostedTopologyPlan(plan);
+const receipt = verifyHostedTopologyReadback({ plan: authorizedPlan, previousResources: [], resources: [], completedAt: now });
 const rollback = planHostedTopologyRollback(receipt);
-const rollbackApproval = { schemaVersion: 'treeseed.hosted-topology-rollback-approval/v1' as const, rollbackDigest: rollback.rollbackDigest, teamId, deploymentId: rollback.deploymentId, stackId: rollback.stackId, environment: rollback.environment, backendBindingDigest: rollback.backendBindingDigest, decision: 'approved' as const, approvedBy: 'owner', approvedAt: now };
+const targetPlan = planHostedTopology({ declaration, observations: [], connections: {}, stateBackend: backend });
+const execution = planHostedTopologyRollbackExecution({ rollback, sourceReceipt: receipt, sourcePlan: plan, targetPlan });
+const rollbackApproval = { schemaVersion: 'treeseed.hosted-topology-rollback-execution-approval/v1' as const,
+	executionDigest: execution.executionDigest, teamId, deploymentId: execution.deploymentId, stackId: execution.stackId,
+	environment: execution.environment, backendBindingDigest: execution.backendBindingDigest, decision: 'approved' as const,
+	approvedBy: 'owner', approvedAt: now };
 
 function fixture() {
 	const root = mkdtempSync(resolve(tmpdir(), 'platform-topology-cli-'));
 	writeFileSync(resolve(root, 'topology.yaml'), JSON.stringify(declaration));
 	writeFileSync(resolve(root, 'plan.json'), JSON.stringify(plan));
 	writeFileSync(resolve(root, 'plan-approval.json'), JSON.stringify(planApproval));
-	writeFileSync(resolve(root, 'rollback.json'), JSON.stringify(rollback));
+	writeFileSync(resolve(root, 'rollback.json'), JSON.stringify({ execution, sourcePlan: plan, targetPlan }));
 	writeFileSync(resolve(root, 'rollback-approval.json'), JSON.stringify(rollbackApproval));
 	return root;
 }

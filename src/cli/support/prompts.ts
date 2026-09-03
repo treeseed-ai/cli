@@ -9,6 +9,12 @@ export async function promptText(context: CommandContext, question: string) {
 	try { return (await prompt.question(question)).trim(); } finally { prompt.close(); }
 }
 
+export async function readStandardInput() {
+	let value = '';
+	for await (const chunk of stdin) value += String(chunk);
+	return value;
+}
+
 export function promptHidden(question: string) {
 	return new Promise<string>((resolvePromise, reject) => {
 		if (!stdin.isTTY || !stdout.isTTY) { reject(new Error('Secret input requires an interactive TTY.')); return; }
