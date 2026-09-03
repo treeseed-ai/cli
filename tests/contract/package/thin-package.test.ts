@@ -42,12 +42,14 @@ test('the executable drains complete output before exiting', () => {
 	assert.equal(main.includes('process.exitCode = await runCommandLine'), true);
 });
 
-test('candidate promotion installs the exact registry SDK without lifecycle builds', () => {
+test('candidate promotion uses staging while stable publication uses production', () => {
 	const workflow = readFileSync('.github/workflows/publish.yml', 'utf8');
 	const install = workflow.indexOf('npm ci --ignore-scripts --no-audit --no-fund');
 	const verify = workflow.indexOf('npm run release:custody -- verify');
 	assert.equal(workflow.includes('hydrate-exact-sdk.sh'), false);
 	assert.ok(install >= 0 && verify > install);
+	assert.match(workflow, /environment: \$\{\{ contains\(github\.ref_name, '-'\) && 'staging' \|\| 'production' \}\}/u);
+	assert.match(workflow, /candidate_branch=staging; else candidate_branch=main/u);
 });
 
 test('source contains no legacy implementation residue', () => {
