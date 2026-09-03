@@ -4,8 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chatTranscriptMarkdown, eventLine, prepareInteractiveMessage, type ChatLine } from './interactive-chat-model.js';
-import { enterWorkbench, leaveWorkbench, MarkdownEditor, MouseProvider, Panel, SelectableList, SelectionOverlay, Splitter, TimelineViewer, useTerminalSize, WorkbenchButton, WorkbenchModal } from '../tui/ink-workbench.js';
-import { topicSlug } from '../tui/index.js';
+import { enterWorkbench, leaveWorkbench, MarkdownEditor, MouseProvider, Panel, SelectableList, SelectionOverlay, Splitter, TimelineViewer, topicSlug, useTerminalSize, WorkbenchButton, WorkbenchModal } from '../application/ui-runtime.js';
 
 type Row=Record<string,any>;
 type Topic={id:string;slug:string;updatedAt:string;streams:Row[];listeners:Row[];provisional?:boolean};

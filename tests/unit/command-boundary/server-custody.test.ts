@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { controlPlaneServerRegistry } from '../../../src/cli/support/client.ts';
 import {
 	clearServerSession,
 	inspectServerCustody,
@@ -34,6 +35,19 @@ test('server profiles and encrypted OAuth sessions remain CLI-local and redacted
 		assert.equal(loadServerSession('test', env)?.refreshToken, 'secret-refresh');
 		clearServerSession('test', env);
 		assert.equal(loadServerSession('test', env), null);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test('saved local control-plane profile remains active unless the environment explicitly overrides it', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-local-profile-'));
+	try {
+		const env = { TREESEED_CONFIG_HOME: root };
+		saveServerProfile({ serverId: 'local', label: 'Local development edge', baseUrl: 'https://api.treeseed.localhost' }, env);
+		assert.equal(controlPlaneServerRegistry({ env }).servers.find((entry) => entry.serverId === 'local')?.baseUrl, 'https://api.treeseed.localhost');
+		const overridden = { ...env, TREESEED_API_BASE_URL: 'http://127.0.0.1:3002' };
+		assert.equal(controlPlaneServerRegistry({ env: overridden }).servers.find((entry) => entry.serverId === 'local')?.baseUrl, 'http://127.0.0.1:3002');
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

@@ -5,7 +5,7 @@ import { controlPlaneOperation } from '@treeseed/sdk/operator-contracts';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { createControlPlaneClient } from '../support/client.js';
 
-type Input = { path: Record<string, unknown>; query: Record<string, unknown>; body?: Record<string, unknown> };
+type Input = { path: Record<string, unknown>; query: Record<string, unknown>; body: unknown };
 
 const record = (value: unknown): Record<string, any> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
 const data = (value: unknown) => { const outer = record(value); return record(outer.data ?? outer); };
@@ -30,12 +30,13 @@ export async function resolveActiveTeamLibraryProject(invocation: ParsedInvocati
 	const requestedProject = String(invocation.arguments[0] ?? '');
 	if (!requestedProject) return;
 	const realClient = await createControlPlaneClient(invocation, context, true);
-	const activeTeamId = realClient.session.activeTeam?.id;
+	const activeTeamId = realClient.session?.activeTeam?.id;
 	let cursor: string | undefined;
 	const matches: Record<string, any>[] = [];
 	do {
 		const response = data(await realClient.client.invoke(controlPlaneOperation('projects.list'), {
 			path: {}, query: { limit: 200, ...(cursor ? { cursor } : {}) },
+			body: undefined,
 		}));
 		for (const project of response.items ?? []) if ([project.id, project.slug].includes(requestedProject)
 			&& (!activeTeamId || String(project.teamId ?? project.team_id ?? '') === activeTeamId)) matches.push(project);
@@ -60,7 +61,7 @@ export async function runLibrary(invocation: ParsedInvocation, context: CommandC
 	let cursor: string | undefined;
 	const matches: Record<string, any>[] = [];
 	do {
-		const response = data(await invoke('projects.list', { path: {}, query: { limit: 200, ...(cursor ? { cursor } : {}) } }));
+		const response = data(await invoke('projects.list', { path: {}, query: { limit: 200, ...(cursor ? { cursor } : {}) }, body: undefined }));
 		for (const project of response.items ?? []) if ([project.id, project.slug].includes(requestedProject)
 			&& (!activeTeamId || String(project.teamId ?? project.team_id ?? '') === activeTeamId)) matches.push(project);
 		cursor = text(response.page?.nextCursor ?? response.nextCursor);
@@ -70,7 +71,7 @@ export async function runLibrary(invocation: ParsedInvocation, context: CommandC
 		throw Object.assign(new Error(matches.length ? `Project ${requestedProject} is ambiguous.` : `Project ${requestedProject} was not found.`), { category: matches.length ? 'ambiguous_context' : 'not_found', code });
 	}
 	const projectId = String(matches[0]!.id);
-	const libraryResponse = await invoke('treedx.library.show', { path: { projectId }, query: {} });
+	const libraryResponse = await invoke('treedx.library.show', { path: { projectId }, query: {}, body: undefined });
 	const library = data(libraryResponse);
 	const repoId = text(library.repositoryId);
 	if (!repoId) throw Object.assign(new Error('The project library has no TreeDX repository binding.'), { category: 'provider_unavailable', code: 'library_binding_unavailable' });
@@ -79,9 +80,9 @@ export async function runLibrary(invocation: ParsedInvocation, context: CommandC
 	if (command === 'show') return { project: matches[0], library };
 	if (command === 'status') {
 		const [repository, status, index] = await Promise.all([
-			invoke('treedx.repositories.show', { path: { projectId, repoId }, query: {} }),
-			invoke('treedx.repositories.status', { path: { projectId, repoId }, query: {} }),
-			invoke('treedx.repositories.search.index.status', { path: { projectId, repoId }, query: { ref } }),
+			invoke('treedx.repositories.show', { path: { projectId, repoId }, query: {}, body: undefined }),
+			invoke('treedx.repositories.status', { path: { projectId, repoId }, query: {}, body: undefined }),
+			invoke('treedx.repositories.search.index.status', { path: { projectId, repoId }, query: { ref }, body: undefined }),
 		]);
 		return { project: matches[0], library, repository: data(repository), status: data(status), searchIndex: data(index) };
 	}

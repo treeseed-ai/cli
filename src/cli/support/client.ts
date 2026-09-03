@@ -9,15 +9,22 @@ import { loadServerRegistry, loadServerSession, saveServerSession } from './serv
 
 export const CONTROL_PLANE_CLI_CLIENT_ID = 'trsd';
 
-export async function createControlPlaneClient(invocation: Pick<ParsedInvocation, 'options'>, context: CommandContext, requireAuth = true, forceRefresh = false) {
-	const selector = typeof invocation.options.server === 'string' ? invocation.options.server : undefined;
+export function controlPlaneServerRegistry(context: Pick<CommandContext, 'env'>): ControlPlaneServerRegistry {
 	const stored = loadServerRegistry(context.env);
-	const local = defaultLocalControlPlaneServer(context.env as Record<string, string | undefined>);
-	const registry: ControlPlaneServerRegistry = {
+	const defaultLocal = defaultLocalControlPlaneServer(context.env as Record<string, string | undefined>);
+	const storedLocal = stored.servers.find((entry) => entry.serverId === defaultLocal.serverId);
+	const hasEnvironmentOverride = Boolean(context.env.TREESEED_API_BASE_URL?.trim());
+	const local = hasEnvironmentOverride || !storedLocal ? defaultLocal : storedLocal;
+	return {
 		version: 1,
 		activeServerId: stored.activeServerId || local.serverId,
 		servers: [...stored.servers.filter((entry) => entry.serverId !== local.serverId), local],
 	};
+}
+
+export async function createControlPlaneClient(invocation: Pick<ParsedInvocation, 'options'>, context: CommandContext, requireAuth = true, forceRefresh = false) {
+	const selector = typeof invocation.options.server === 'string' ? invocation.options.server : undefined;
+	const registry = controlPlaneServerRegistry(context);
 	const profile = resolveControlPlaneServer(selector, registry);
 	let session = loadServerSession(profile.serverId, context.env);
 	if (requireAuth && !session?.accessToken) throw Object.assign(new Error(`Not logged in to ${profile.serverId}. Run trsd auth login --server ${profile.serverId}.`), { category: 'authentication_required', code: 'authentication_required' });

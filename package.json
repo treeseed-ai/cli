@@ -37,6 +37,7 @@
     "test": "npm run build:dist && node --import tsx ./scripts/testing/run-tests.ts",
     "build:operator-docs": "node --import tsx ./scripts/build/generate-operator-docs.ts",
     "build:dist": "npm run build:operator-docs && node --import tsx ./scripts/build/build-dist.ts",
+    "dev:tui": "node --import tsx ./scripts/development/tui-watch.ts",
     "prepare": "node --import tsx ./scripts/support/prepare.ts",
     "prepack": "npm run build:dist",
     "verify:direct": "npm run release:verify && npm run pack:artifact",
@@ -50,7 +51,8 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.80",
+    "@treeseed/sdk": "0.13.0-rc.82",
+    "@treeseed/ui": ">=0.12.18-rc.11 <0.14.0",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",

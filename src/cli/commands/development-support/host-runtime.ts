@@ -35,6 +35,7 @@ export function hostDevelopmentRuntimeManifest(worktree: string) {
 		if (!path.startsWith(`${sdkRoot}/`)) return true;
 		const sdkPath = relative(sdkRoot, path);
 		return sdkPath === 'package.json' || sdkPath.startsWith('dist/deployment/') || sdkPath.startsWith('dist/development/')
+			|| sdkPath.startsWith('dist/capacity-provider/contracts/')
 			|| sdkPath === 'dist/capacity-provider/sandbox.js' || sdkPath === 'dist/capacity-provider/sandbox-contracts.js';
 	};
 	return [{ path: 'package.json', size: packageContent.byteLength, sha256: sha256(packageContent) }, ...roots.flatMap((root) => files(worktree, root, productionRuntimeFile))].sort((left, right) => left.path.localeCompare(right.path));

@@ -17,6 +17,8 @@ import { promptText } from './support/prompts.js';
 import { handoffProviderEnrollment } from './support/provider-enrollment.js';
 import { renderHumanCommandResult } from './support/human-renderer.js';
 import { openBrowser } from './support/open-browser.js';
+import { launchApplication } from './application/launch.js';
+import { resolveDevelopmentScene, type SurfaceKind, type WorkspaceId } from '@treeseed/ui/foundation';
 
 function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 	(stream === 'stderr' ? process.stderr : process.stdout).write(`${output}\n`);
@@ -91,7 +93,20 @@ function print(context: CommandContext, value: unknown, ok = true) {
 
 export async function runCommandLine(argv: string[], overrides: Partial<CommandContext> = {}) {
 	const context = createCommandContext({ ...overrides, outputFormat: argv.includes('--json') ? 'json' : overrides.outputFormat });
-	if (!argv.length || argv[0] === '--help' || argv[0] === '-h') { print(context, renderHelp()); return 0; }
+	if (!argv.length) {
+		if (context.interactiveUi && process.stdin.isTTY && process.stdout.isTTY) { await launchApplication(context); return 0; }
+		print(context, renderHelp()); return 0;
+	}
+	if (argv[0] === '--help' || argv[0] === '-h') { print(context, renderHelp()); return 0; }
+	if (['ui', 'team', 'chat', 'discover'].includes(argv[0]!)) {
+		const value = (flag: string) => { const index = argv.indexOf(flag); return index >= 0 ? argv[index + 1] : undefined; };
+		const sceneId = value('--scene');
+		const scene = sceneId ? resolveDevelopmentScene(sceneId) : undefined;
+		if (sceneId && !scene) throw Object.assign(new Error(`Unknown development scene: ${sceneId}`), { category: 'invalid_input', code: 'development_scene_unknown' });
+		const root = scene?.workspace ?? (argv[0] === 'ui' ? 'team' : argv[0] as WorkspaceId);
+		await launchApplication(context, { server: value('--server'), workspace: root, surface: scene?.surface ?? value('--surface') as SurfaceKind | undefined });
+		return 0;
+	}
 	if (argv[0] === 'help') { const path = argv.slice(1).join(' '); const output = renderHelp(path); print(context, output, !output.startsWith('Unknown')); return output.startsWith('Unknown') ? 1 : 0; }
 	const resolved = resolveCommand(argv);
 	if (!resolved) {
