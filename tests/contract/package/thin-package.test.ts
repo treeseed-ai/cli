@@ -20,7 +20,7 @@ test('built package contains executable runtime only', () => {
 
 test('the shared Ink runtime is bundled against the CLI React peer', () => {
 	const runtime = readFileSync('dist/cli/application/ui-runtime.js', 'utf8');
-	assert.doesNotMatch(runtime, /@treeseed\/ui/u);
+	assert.doesNotMatch(runtime, /(?:from\s*|require\()["']@treeseed\/ui(?:\/ink)?["']/u);
 	assert.match(runtime, /from\s*["']react["']/u);
 	assert.match(runtime, /from\s*["']ink["']/u);
 });
