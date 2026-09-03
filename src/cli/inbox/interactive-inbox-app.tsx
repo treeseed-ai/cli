@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, render, useApp, useInput } from 'ink';
 import { randomUUID } from 'node:crypto';
 import { InboxNavigation, inboxRow, preserveSelection, type InboxItem, type InboxSummary } from './inbox-state.js';
-import { enterWorkbench, leaveWorkbench, MarkdownEditor, MarkdownViewer, MouseProvider, Panel, SelectableList, SelectionOverlay, Splitter, useTerminalSize, WorkbenchButton } from '../tui/ink-workbench.js';
+import { enterWorkbench, leaveWorkbench, MarkdownEditor, MarkdownViewer, MouseProvider, Panel, SelectableList, SelectionOverlay, Splitter, useTerminalSize, WorkbenchButton } from '../application/ui-runtime.js';
 
 type Row=Record<string,any>;
 type Invoke=(id:string,input:{path:Row;query:Row;body:unknown},options?:Row)=>Promise<unknown>;

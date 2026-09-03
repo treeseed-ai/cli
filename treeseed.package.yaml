@@ -42,6 +42,7 @@ development:
       endpoints: []
       dependencies:
         - { id: sdk, target: package, locality: either, reaction: rebuild }
+        - { id: ui, target: package, locality: local, reaction: rebuild }
       statePolicy: stateless
       migrationPolicy: none
       secretRefs: {}

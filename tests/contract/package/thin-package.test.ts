@@ -9,13 +9,31 @@ test('package has one executable and only its declared CLI runtime dependencies'
 	assert.equal(pkg.types, undefined);
 	assert.equal(pkg.files.some((path: string) => path.startsWith('scripts/')), false);
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
-	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.80', ink: '^7.1.1', react: '^19.2.8', 'string-width': '^8.2.2', yaml: '2.9.0' });
+	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.82', ink: '^7.1.1', react: '^19.2.8', 'string-width': '^8.2.2', yaml: '2.9.0' });
+	assert.equal(pkg.devDependencies['@treeseed/ui'], '>=0.12.18-rc.12 <0.14.0');
 });
 
 test('built package contains executable runtime only', () => {
 	assert.equal(existsSync('dist/cli/main.js'), true);
 	assert.equal(existsSync('dist/cli/types.js'), false);
 	assert.equal(readdirSync('dist', { recursive: true }).some((path) => String(path).endsWith('.d.ts')), false);
+});
+
+test('the shared Ink runtime is bundled against the CLI React peer', () => {
+	const runtime = readFileSync('dist/cli/application/ui-runtime.js', 'utf8');
+	assert.doesNotMatch(runtime, /(?:from\s*|require\()["']@treeseed\/ui(?:\/ink)?["']/u);
+	assert.match(runtime, /from\s*["']react["']/u);
+	assert.match(runtime, /from\s*["']ink["']/u);
+});
+
+test('the integrated shell accepts deterministic shared development scenes', () => {
+	const runtime = readFileSync('src/cli/runtime.ts', 'utf8');
+	const help = readFileSync('src/cli/help.ts', 'utf8');
+	assert.match(runtime, /resolveDevelopmentScene\(sceneId\)/u);
+	assert.match(runtime, /scene\?\.workspace/u);
+	assert.match(runtime, /scene\?\.surface/u);
+	assert.match(runtime, /development_scene_unknown/u);
+	assert.match(help, /trsd ui --scene <scene>/u);
 });
 
 test('the executable drains complete output before exiting', () => {

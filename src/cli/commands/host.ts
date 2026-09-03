@@ -1,8 +1,9 @@
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { invokeHostManager, invokeLocalHostManager } from '../support/host-client.js';
 import { storeHostEnrollment, type HostEnrollment } from '../support/host-custody.js';
-import { defaultLocalControlPlaneServer, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
-import { loadServerRegistry, loadServerSession } from '../support/server-custody.js';
+import { resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
+import { controlPlaneServerRegistry } from '../support/client.js';
+import { loadServerSession } from '../support/server-custody.js';
 import { promptHidden, promptText } from '../support/prompts.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -34,9 +35,7 @@ initialized separately through registered provider credential initializers.
 `;
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
-	const local = defaultLocalControlPlaneServer(context.env as Record<string, string | undefined>);
-	const stored = loadServerRegistry(context.env);
-	const registry = { version: 1 as const, activeServerId: stored.activeServerId || local.serverId, servers: [...stored.servers.filter((entry) => entry.serverId !== local.serverId), local] };
+	const registry = controlPlaneServerRegistry(context);
 	const selector = typeof invocation.options.server === 'string' ? invocation.options.server : undefined;
 	return loadServerSession(resolveControlPlaneServer(selector, registry).serverId, context.env)?.activeTeam ?? null;
 }

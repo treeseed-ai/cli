@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import { runCommandLine } from '../../../src/cli/runtime.ts';
 import { developmentCliEntrypointPath, developmentOperationEnvironment, relativeOverlayTarget, selectDevelopmentCli, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from '../../../src/cli/commands/development.ts';
+import { hostDevelopmentRuntimeManifest } from '../../../src/cli/commands/development-support/host-runtime.ts';
 
 const manifest = `schemaVersion: treeseed.package/v1
 development:
@@ -74,6 +75,22 @@ test('host runtime development planning is local and status uses the protected m
 	assert.equal(calls[0].handlerId, 'local.dev.host.status');
 	assert.equal(await runCommandLine(['dev', 'host', 'deactivate', '--plan', '--json'], context), 0);
 	assert.equal(calls.length, 1);
+});
+
+test('host runtime includes the SDK capacity-provider contracts required by Deployment', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-runtime-'));
+	try {
+		for (const directory of ['dist', 'node_modules/@treeseed/sdk/dist/deployment', 'node_modules/@treeseed/sdk/dist/development', 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts', 'node_modules/yaml', 'node_modules/zod']) mkdirSync(resolve(root, directory), { recursive: true });
+		writeFileSync(resolve(root, 'package.json'), '{}\n');
+		writeFileSync(resolve(root, 'dist/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/package.json'), '{}\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/deployment/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/development/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/yaml/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/zod/index.js'), 'export {};\n');
+		assert.equal(hostDevelopmentRuntimeManifest(root).some((entry) => entry.path === 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts/index.js'), true);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('development operations receive portable workspace identity and overlays use relative links', () => {

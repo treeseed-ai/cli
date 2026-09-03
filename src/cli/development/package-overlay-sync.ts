@@ -29,7 +29,11 @@ function publish(root: string, overlayRoot: string, outputs: string[], generatio
 		const destination = resolve(target, output); mkdirSync(dirname(destination), { recursive: true }); cpSync(source, destination, { recursive: true });
 	}
 	rmSync(next, { force: true }); symlinkSync(target, next, 'dir'); renameSync(next, current);
-	for (const entry of readdirSync(overlayRoot)) if (entry.startsWith('generation-') && entry !== `generation-${generation}` && entry !== `generation-${generation - 1}`) rmSync(resolve(overlayRoot, entry), { recursive: true, force: true });
+	// Keep completed generations for the lifetime of the development session.
+	// Node, Astro, Tailwind, and native loaders may canonicalize the `current`
+	// symlink and retain that real path. Removing an older generation underneath
+	// a live consumer turns an otherwise valid hot rebuild into ENOENT. Session
+	// teardown already removes the bounded session overlay root in one operation.
 }
 
 export async function synchronizePackageOverlay(root: string, overlayRoot: string, outputs: string[], marker: string, intervalMs = 250) {

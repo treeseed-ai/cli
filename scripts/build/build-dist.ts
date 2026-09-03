@@ -34,12 +34,14 @@ function rewriteRuntimeSpecifiers(contents) {
 async function compileModule(filePath) {
 	const outputFile = resolve(stagingRoot, relative(srcRoot, filePath).replace(/\.tsx?$/u, '.js'));
 	ensureDir(outputFile);
+	const sharedUiRuntime = filePath.endsWith('/cli/application/ui-runtime.ts');
 	await build({
 		entryPoints: [filePath],
 		outfile: outputFile,
 		platform: 'node',
 		format: 'esm',
-		bundle: false,
+		bundle: sharedUiRuntime,
+		external: sharedUiRuntime ? ['react', 'react/*', 'ink', 'ink/*'] : undefined,
 		logLevel: 'silent',
 	});
 	writeFileSync(outputFile, rewriteRuntimeSpecifiers(readFileSync(outputFile, 'utf8')), 'utf8');

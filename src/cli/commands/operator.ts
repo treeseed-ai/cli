@@ -3,17 +3,16 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
-import { ControlPlaneClientError, defaultLocalControlPlaneServer, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
+import { ControlPlaneClientError, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
 import type { CommandContext, ParsedInvocation } from '../types.js';
+import { launchApplication } from '../application/launch.js';
 import { runInteractiveChat } from '../communication/interactive-chat.js';
-import { createControlPlaneClient } from '../support/client.js';
-import { loadServerRegistry, loadServerSession } from '../support/server-custody.js';
+import { controlPlaneServerRegistry, createControlPlaneClient } from '../support/client.js';
+import { loadServerSession } from '../support/server-custody.js';
 import { renderCommunicationResponses } from '../support/human-renderer.js';
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
-	const local = defaultLocalControlPlaneServer(context.env as Record<string, string | undefined>);
-	const stored = loadServerRegistry(context.env);
-	const registry = { version: 1 as const, activeServerId: stored.activeServerId || local.serverId, servers: [...stored.servers.filter((entry) => entry.serverId !== local.serverId), local] };
+	const registry = controlPlaneServerRegistry(context);
 	const selector = typeof invocation.options.server === 'string' ? invocation.options.server : undefined;
 	return loadServerSession(resolveControlPlaneServer(selector, registry).serverId, context.env)?.activeTeam?.id;
 }
@@ -106,7 +105,10 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (execution.kind === 'unavailable') throw Object.assign(new Error(execution.reason), { category: 'policy_blocked', code: execution.code });
 	if (execution.kind !== 'operation') throw Object.assign(new Error(`No CLI handler is installed for ${execution.handlerId}.`), { category: 'policy_blocked', code: 'local_handler_unavailable' });
 	const { operation, input } = await operationInput(invocation, context);
-	if (operation.descriptor.operationId === 'communications.send' && !input.body?.message) return runInteractiveChat(invocation, context, String(input.path.teamId), typeof input.path.channel === 'string' ? input.path.channel : undefined);
+	if (operation.descriptor.operationId === 'communications.send' && !input.body?.message) {
+		if (!context.interactiveUi || !process.stdin.isTTY || !process.stdout.isTTY || invocation.options.json || invocation.options.jsonStream) return runInteractiveChat(invocation, context, String(input.path.teamId), typeof input.path.channel === 'string' ? input.path.channel : undefined);
+		return launchApplication(context, { server: typeof invocation.options.server === 'string' ? invocation.options.server : undefined, workspace: 'chat' });
+	}
 	if (operation.descriptor.operationId === 'communications.send') {
 		const message = String(input.body?.message ?? '');
 		const addresses = parseCommunicationAddresses(message);
@@ -143,7 +145,7 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 			else throw Object.assign(new Error('The control plane did not return exact concurrency evidence for this mutation.'), { category: 'stale_preflight', code: 'concurrency_evidence_missing' });
 		}
 	}
-	const invokeAuthorized = async (target: ReturnType<typeof controlPlaneOperation>, targetInput: { path: Record<string, unknown>; query: Record<string, unknown>; body?: Record<string, unknown> }) => {
+	const invokeAuthorized = async (target: ReturnType<typeof controlPlaneOperation>, targetInput: { path: Record<string, unknown>; query: Record<string, unknown>; body: unknown }) => {
 		const targetOptions = { idempotencyKey: randomUUID(), headers: {} as Record<string, string> };
 		try { return await client.invoke(target, targetInput, targetOptions); }
 		catch (error) {
@@ -180,7 +182,7 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 		while (Date.now() < deadline) {
 			await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(1_000, Math.max(1, deadline - Date.now()))));
 			const observed = await invokeAuthorized(reconcile, input);
-			const observedValue = recordData(observed as Record<string, unknown>);
+			const observedValue = recordData(observed as unknown as Record<string, unknown>);
 			const observedResult = observedValue.result && typeof observedValue.result === 'object' && !Array.isArray(observedValue.result) ? observedValue.result as Record<string, unknown> : {};
 			const observedClosure = observedResult.providerClosure && typeof observedResult.providerClosure === 'object' && !Array.isArray(observedResult.providerClosure) ? observedResult.providerClosure as Record<string, unknown> : {};
 			if (observedClosure.status === 'verified') return observed;

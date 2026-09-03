@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cellWidth, fixedSidebarLayout, highlightedMarkdown, stableSelection, topicSlug, truncateCells, workbenchLayout } from '../../../src/cli/tui/index.ts';
+import { cellWidth, fixedSidebarLayout, highlightedMarkdown, stableSelection, topicSlug, truncateCells, workbenchLayout } from '@treeseed/ui/ink';
 import { chatTranscriptMarkdown, eventLine } from '../../../src/cli/communication/interactive-chat.ts';
 
 test('workbench geometry follows the wide wireframe and converts panes to tabs below 112 columns', () => {
