@@ -18,7 +18,7 @@ import { handoffProviderEnrollment } from './support/provider-enrollment.js';
 import { renderHumanCommandResult } from './support/human-renderer.js';
 import { openBrowser } from './support/open-browser.js';
 import { launchApplication } from './application/launch.js';
-import { resolveDevelopmentScene, type SurfaceKind, type WorkspaceId } from '@treeseed/ui/foundation';
+import { resolveDevelopmentScene, type SurfaceKind, type WorkspaceId } from './application/ui-runtime.js';
 
 function defaultWrite(output: string, stream: 'stdout' | 'stderr' = 'stdout') {
 	(stream === 'stderr' ? process.stderr : process.stdout).write(`${output}\n`);

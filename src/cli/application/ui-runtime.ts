@@ -7,3 +7,5 @@
  * local package-overlay development as well as in the published artifact.
  */
 export * from '@treeseed/ui/ink';
+export { resolveDevelopmentScene } from '@treeseed/ui/foundation';
+export type { SurfaceKind, WorkspaceId } from '@treeseed/ui/foundation';
