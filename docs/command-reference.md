@@ -323,7 +323,7 @@ Execution: `local.platform.topology.plan`.
 
 ### trsd platform topology apply <plan>
 
-Apply an exact reviewed hosted-topology plan through the operations runner.
+Apply an exact agent-authorized hosted-topology plan through the operations runner.
 
 Operation: mutation. Result schema: `treeseed.platform-operation/v1`.
 Execution: `local.platform.topology.apply`.
@@ -331,7 +331,6 @@ Execution: `local.platform.topology.apply`.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
-- `--approval <value>`: Exact environment approval JSON file.
 
 ### trsd platform topology status
 
@@ -352,7 +351,6 @@ Execution: `local.platform.topology.rollback`.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
-- `--approval <value>`: Exact rollback approval JSON file.
 
 ## trsd dev
 

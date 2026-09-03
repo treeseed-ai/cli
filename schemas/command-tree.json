@@ -969,7 +969,7 @@
             {
               "nodeType": "leaf",
               "segment": "apply",
-              "description": "Apply an exact reviewed hosted-topology plan through the operations runner.",
+              "description": "Apply an exact agent-authorized hosted-topology plan through the operations runner.",
               "kind": "mutation",
               "arguments": [
                 {
@@ -983,12 +983,6 @@
                   "name": "--plan",
                   "description": "Return the exact proposed outcome without mutation.",
                   "type": "boolean"
-                },
-                {
-                  "name": "--approval",
-                  "description": "Exact environment approval JSON file.",
-                  "type": "string",
-                  "required": true
                 },
                 {
                   "name": "--yes",
@@ -1034,12 +1028,6 @@
                   "name": "--plan",
                   "description": "Return the exact proposed outcome without mutation.",
                   "type": "boolean"
-                },
-                {
-                  "name": "--approval",
-                  "description": "Exact rollback approval JSON file.",
-                  "type": "string",
-                  "required": true
                 },
                 {
                   "name": "--yes",
