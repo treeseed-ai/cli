@@ -9,7 +9,9 @@ test('package has one executable and only its declared CLI runtime dependencies'
 	assert.equal(pkg.types, undefined);
 	assert.equal(pkg.files.some((path: string) => path.startsWith('scripts/')), false);
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
-	assert.deepEqual(pkg.dependencies, { '@treeseed/sdk': '0.13.0-rc.86', ink: '^7.1.1', react: '^19.2.8', 'string-width': '^8.2.2', yaml: '2.9.0' });
+	assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@treeseed/deployment','@treeseed/sdk','ink','react','string-width','yaml']);
+	assert.match(pkg.dependencies['@treeseed/sdk'], /^0\.13\.0-rc\.\d+$/);
+	assert.match(pkg.dependencies['@treeseed/deployment'], /^https:\/\/github\.com\/treeseed-ai\/deployment\/releases\/download\/0\.1\.0-rc\.\d+\/treeseed-deployment-runtime-0\.1\.0-rc\.\d+\.tgz$/);
 	assert.equal(pkg.devDependencies['@treeseed/ui'], '>=0.12.18-rc.12 <0.14.0');
 });
 

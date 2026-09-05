@@ -5,6 +5,7 @@ import { runOperator } from './commands/operator.js';
 import { parseInvocation } from './parser.js';
 import { isCommandBranch, resolveCommand } from './registry.js';
 import { runSecrets } from './commands/secrets.js';
+import { runServiceCredentials } from './commands/services/credentials.js';
 import { runHost } from './commands/host.js';
 import { runUsers } from './commands/users.js';
 import { resolveActiveTeamLibraryProject, runLibrary } from './commands/library.js';
@@ -72,6 +73,7 @@ async function execute(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'teams') return runTeams(invocation, context);
 	if (invocation.command.execution.kind === 'protocol') return runAuth(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'secrets') return runSecrets(invocation, context);
+	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'services') return runServiceCredentials(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.execution.handlerId.startsWith('local.host.')) return runHost(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'dev') return runDevelopment(invocation, context);
 	if (invocation.command.execution.kind === 'local' && invocation.command.path[0] === 'library') return runLibrary(invocation, context);

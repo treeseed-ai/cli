@@ -767,28 +767,194 @@
             "kind": "local",
             "handlerId": "local.secrets.lock"
           }
-        },
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "services",
+      "description": "Team service credentials.",
+      "children": [
         {
-          "nodeType": "leaf",
-          "segment": "rotate",
-          "description": "Rotate the selected resource.",
-          "kind": "mutation",
-          "options": [
+          "nodeType": "branch",
+          "segment": "credentials",
+          "description": "Manage credentials in core OpenBao.",
+          "children": [
             {
-              "name": "--plan",
-              "description": "Return the exact proposed outcome without mutation.",
-              "type": "boolean"
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "show an exact service credential profile.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "Service connection ID.",
+                  "required": true
+                },
+                {
+                  "name": "profile",
+                  "description": "Credential profile ID.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--team",
+                  "description": "Authorized team ID.",
+                  "type": "string"
+                }
+              ],
+              "authorization": {
+                "capability": "secrets.read",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.services.credentials.show/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.services.credentials.show"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "put",
+              "description": "put an exact service credential profile.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "Service connection ID.",
+                  "required": true
+                },
+                {
+                  "name": "profile",
+                  "description": "Credential profile ID.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--team",
+                  "description": "Authorized team ID.",
+                  "type": "string"
+                },
+                {
+                  "name": "--plan",
+                  "description": "Inspect the proposed operation without mutation or secret input.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--expected-version",
+                  "description": "Exact current credential version; zero for first creation.",
+                  "type": "number",
+                  "required": true
+                },
+                {
+                  "name": "--stdin",
+                  "description": "Read the credential field object as JSON from standard input.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "secrets.write",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.services.credentials.put/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.services.credentials.put"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "delete",
+              "description": "delete an exact service credential profile.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "Service connection ID.",
+                  "required": true
+                },
+                {
+                  "name": "profile",
+                  "description": "Credential profile ID.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--team",
+                  "description": "Authorized team ID.",
+                  "type": "string"
+                },
+                {
+                  "name": "--plan",
+                  "description": "Inspect the proposed operation without mutation or secret input.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--expected-version",
+                  "description": "Exact current credential version; zero for first creation.",
+                  "type": "number",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "secrets.write",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.services.credentials.delete/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.services.credentials.delete"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "validate",
+              "description": "validate an exact service credential profile.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "connection",
+                  "description": "Service connection ID.",
+                  "required": true
+                },
+                {
+                  "name": "profile",
+                  "description": "Credential profile ID.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--team",
+                  "description": "Authorized team ID.",
+                  "type": "string"
+                },
+                {
+                  "name": "--plan",
+                  "description": "Inspect the proposed operation without mutation or secret input.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--expected-version",
+                  "description": "Exact current credential version; zero for first creation.",
+                  "type": "number",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "secrets.write",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.services.credentials.validate/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.services.credentials.validate"
+              }
             }
-          ],
-          "authorization": {
-            "capability": "command.rotate",
-            "confirmation": "credential"
-          },
-          "resultSchemaId": "treeseed.command.rotate/v1",
-          "execution": {
-            "kind": "local",
-            "handlerId": "local.secrets.rotate"
-          }
+          ]
         }
       ]
     },
