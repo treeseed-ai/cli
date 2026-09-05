@@ -9,13 +9,16 @@ test('package has one executable and only its declared CLI runtime dependencies'
 	assert.equal(pkg.types, undefined);
 	assert.equal(pkg.files.some((path: string) => path.startsWith('scripts/')), false);
 	assert.equal(pkg.dependencies['@treeseed/agent'], undefined);
-	assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@treeseed/deployment','@treeseed/sdk','ink','react','string-width','yaml']);
+	assert.deepEqual(Object.keys(pkg.dependencies).sort(), ['@treeseed/sdk','ink','react','string-width','yaml']);
 	assert.match(pkg.dependencies['@treeseed/sdk'], /^0\.13\.0-rc\.\d+$/);
-	assert.match(pkg.dependencies['@treeseed/deployment'], /^https:\/\/github\.com\/treeseed-ai\/deployment\/releases\/download\/0\.1\.0-rc\.\d+\/treeseed-deployment-runtime-0\.1\.0-rc\.\d+\.tgz$/);
+	assert.match(pkg.devDependencies['@treeseed/deployment'], /^https:\/\/github\.com\/treeseed-ai\/deployment\/releases\/download\/0\.1\.0-rc\.\d+\/treeseed-deployment-runtime-0\.1\.0-rc\.\d+\.tgz$/);
 	assert.equal(pkg.devDependencies['@treeseed/ui'], '>=0.12.18-rc.12 <0.14.0');
 });
 
 test('built package contains executable runtime only', () => {
+	const custody = readFileSync('dist/cli/support/server-custody.js', 'utf8');
+	assert.doesNotMatch(custody, /from\s*["']@treeseed\/deployment/u);
+	assert.match(custody, /systemd-creds/u);
 	assert.equal(existsSync('dist/cli/main.js'), true);
 	assert.equal(existsSync('dist/cli/types.js'), false);
 	assert.equal(readdirSync('dist', { recursive: true }).some((path) => String(path).endsWith('.d.ts')), false);

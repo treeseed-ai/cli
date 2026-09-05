@@ -35,13 +35,14 @@ async function compileModule(filePath) {
 	const outputFile = resolve(stagingRoot, relative(srcRoot, filePath).replace(/\.tsx?$/u, '.js'));
 	ensureDir(outputFile);
 	const sharedUiRuntime = filePath.endsWith('/cli/application/ui-runtime.ts');
+	const sharedCustodyRuntime = filePath.endsWith('/cli/support/server-custody.ts');
 	await build({
 		entryPoints: [filePath],
 		outfile: outputFile,
 		platform: 'node',
 		format: 'esm',
-		bundle: sharedUiRuntime,
-		external: sharedUiRuntime ? ['react', 'react/*', 'ink', 'ink/*'] : undefined,
+		bundle: sharedUiRuntime || sharedCustodyRuntime,
+		external: sharedUiRuntime ? ['react', 'react/*', 'ink', 'ink/*'] : sharedCustodyRuntime ? ['@treeseed/sdk', '@treeseed/sdk/*'] : undefined,
 		logLevel: 'silent',
 	});
 	writeFileSync(outputFile, rewriteRuntimeSpecifiers(readFileSync(outputFile, 'utf8')), 'utf8');
