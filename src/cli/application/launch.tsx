@@ -46,9 +46,9 @@ export async function launchApplication(context: CommandContext, options: { serv
 		if (id !== 'providers.connect') return response;
 		const envelope = response && typeof response === 'object' && !Array.isArray(response) ? response as Row : {};
 		const value = envelope.data && typeof envelope.data === 'object' && !Array.isArray(envelope.data) ? envelope.data as Row : envelope;
-		const enrollmentToken = typeof value.enrollmentToken === 'string' ? value.enrollmentToken : '';
-		if (!enrollmentToken || !context.providerEnrollmentHandoff) throw Object.assign(new Error('The control plane did not return a usable local provider enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_invalid' });
-		const receipt = await context.providerEnrollmentHandoff({ action: 'begin', ...value, enrollmentToken,
+		const registrationCode = typeof value.registrationCode === 'string' ? value.registrationCode : '';
+		if (!registrationCode || !context.providerEnrollmentHandoff) throw Object.assign(new Error('The control plane did not return a usable local provider enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_invalid' });
+		const receipt = await context.providerEnrollmentHandoff({ action: 'begin', ...value, registrationCode,
 			controlPlaneUrl: selected.profile.baseUrl, controlPlaneAudience: selected.profile.baseUrl, serverProfile: selected.profile.serverId });
 		return { teamId: value.teamId, connectionState: 'approval_required', provider: receipt };
 	};

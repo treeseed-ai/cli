@@ -164,7 +164,7 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 		if (!enrollments.length) return response;
 		if (!context.providerEnrollmentHandoff) throw Object.assign(new Error('The seeded local provider requires the protected host enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_unavailable' });
 		for (const enrollment of enrollments) {
-			if (enrollment.approval !== 'trusted-local-owner' || typeof enrollment.enrollmentToken !== 'string' || typeof enrollment.teamId !== 'string' || typeof enrollment.connectionId !== 'string') {
+			if (enrollment.approval !== 'trusted-local-owner' || typeof enrollment.registrationCode !== 'string' || typeof enrollment.teamId !== 'string' || typeof enrollment.connectionId !== 'string') {
 				throw Object.assign(new Error('The seeded provider enrollment receipt is incomplete or not trusted-local-owner.'), { category: 'provider_unavailable', code: 'seed_provider_enrollment_invalid' });
 			}
 			const begun = await context.providerEnrollmentHandoff({ action: 'begin', ...enrollment,
@@ -196,9 +196,9 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 			: envelope;
 		if (['seeds.apply', 'seeds.reconcile'].includes(operation.descriptor.operationId)) return completeSeedProviderEnrollment(response, value);
 		if (operation.descriptor.operationId === 'providers.connect') {
-			const enrollmentToken = typeof value.enrollmentToken === 'string' ? value.enrollmentToken : null;
-			if (!enrollmentToken || !context.providerEnrollmentHandoff) throw Object.assign(new Error('The control plane did not return a usable local provider enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_invalid' });
-			const receipt = await context.providerEnrollmentHandoff({ action: 'begin', ...value, enrollmentToken,
+			const registrationCode = typeof value.registrationCode === 'string' ? value.registrationCode : null;
+			if (!registrationCode || !context.providerEnrollmentHandoff) throw Object.assign(new Error('The control plane did not return a usable local provider enrollment handoff.'), { category: 'provider_unavailable', code: 'provider_enrollment_handoff_invalid' });
+			const receipt = await context.providerEnrollmentHandoff({ action: 'begin', ...value, registrationCode,
 				controlPlaneUrl: profile.baseUrl, controlPlaneAudience: profile.baseUrl, serverProfile: profile.serverId });
 			return { teamId: value.teamId, connectionState: 'approval_required', provider: receipt };
 		}

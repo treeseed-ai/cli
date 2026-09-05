@@ -292,13 +292,13 @@ test('seed verify accepts a portable bundle path and derives its seed identity',
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('provider enrollment hands the unwrapped API receipt to trusted local custody', async () => {
+for (const field of ['registrationCode', 'enrollmentToken']) test(`provider enrollment accepts only canonical registrationCode (${field})`, async () => {
 	let requestBody = '';
 	const server = createServer((request, response) => {
 		request.on('data', (chunk) => { requestBody += String(chunk); });
 		request.on('end', () => {
 			response.setHeader('content-type', 'application/json');
-			response.end(JSON.stringify({ data: { teamId: 'team-1', enrollmentToken: 'one-time' } }));
+			response.end(JSON.stringify({ data: { teamId: 'team-1', [field]: 'one-time' } }));
 		});
 	});
 	await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept));
@@ -317,9 +317,16 @@ test('provider enrollment hands the unwrapped API receipt to trusted local custo
 			providerEnrollmentHandoff: async (input) => { handoffs.push(input); return { requestId: 'request-1' }; },
 			write: (value) => output.push(value),
 		});
+		assert.equal(output.join('').includes('one-time'), false);
+		if (field !== 'registrationCode') {
+			assert.notEqual(exit, 0);
+			assert.equal(handoffs.length, 0);
+			assert.equal(JSON.parse(output[0]!).error.code, 'provider_enrollment_handoff_invalid');
+			return;
+		}
 		assert.equal(exit, 0);
 		assert.equal(requestBody, '{}');
-		assert.equal(handoffs[0]?.enrollmentToken, 'one-time');
+		assert.equal(handoffs[0]?.registrationCode, 'one-time');
 		assert.deepEqual(JSON.parse(output[0]!).result, {
 			teamId: 'team-1', connectionState: 'approval_required', provider: { requestId: 'request-1' },
 		});
@@ -335,7 +342,7 @@ test('seed apply enrolls, owner-approves, and waits for execution-ready provider
 		request.resume(); request.on('end', () => {
 			paths.push(request.url ?? ''); response.setHeader('content-type', 'application/json');
 			if (request.url?.endsWith('/apply')) response.end(JSON.stringify({ data: { seed: 'treeseed', result: { providerClosure: { status: 'waiting_provider', receipts: [{
-				key: 'capacity-provider:treeseed/local', status: 'enrollment_required', approval: 'trusted-local-owner', teamId: 'team-1', connectionId: 'local-team-1', enrollmentToken: 'one-time',
+				key: 'capacity-provider:treeseed/local', status: 'enrollment_required', approval: 'trusted-local-owner', teamId: 'team-1', connectionId: 'local-team-1', registrationCode: 'one-time',
 			}] } } } }));
 			else if (request.url?.includes('/capacity-provider-requests/')) response.end(JSON.stringify({ data: { status: 'approved' } }));
 			else response.end(JSON.stringify({ data: { seed: 'treeseed', result: { providerClosure: { status: 'verified', receipts: [{ status: 'verified' }] } } } }));
