@@ -250,16 +250,60 @@ Execution: `local.secrets.lock`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
-### trsd secrets rotate
+## trsd services
 
-Rotate the selected resource.
+Team service credentials.
 
-Operation: mutation. Result schema: `treeseed.command.rotate/v1`.
-Execution: `local.secrets.rotate`.
+## trsd services credentials
 
-- `--yes`: Confirm authorized automation.
+Manage credentials in core OpenBao.
+
+### trsd services credentials show <connection> <profile>
+
+show an exact service credential profile.
+
+Operation: read. Result schema: `treeseed.services.credentials.show/v1`.
+Execution: `local.services.credentials.show`.
+
 - `--json`: Emit the stable JSON envelope.
-- `--plan`: Return the exact proposed outcome without mutation.
+- `--team <value>`: Authorized team ID.
+
+### trsd services credentials put <connection> <profile>
+
+put an exact service credential profile.
+
+Operation: mutation. Result schema: `treeseed.services.credentials.put/v1`.
+Execution: `local.services.credentials.put`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--team <value>`: Authorized team ID.
+- `--plan`: Inspect the proposed operation without mutation or secret input.
+- `--expected-version <value>`: Exact current credential version; zero for first creation.
+- `--stdin`: Read the credential field object as JSON from standard input.
+
+### trsd services credentials delete <connection> <profile>
+
+delete an exact service credential profile.
+
+Operation: mutation. Result schema: `treeseed.services.credentials.delete/v1`.
+Execution: `local.services.credentials.delete`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--team <value>`: Authorized team ID.
+- `--plan`: Inspect the proposed operation without mutation or secret input.
+- `--expected-version <value>`: Exact current credential version; zero for first creation.
+
+### trsd services credentials validate <connection> <profile>
+
+validate an exact service credential profile.
+
+Operation: mutation. Result schema: `treeseed.services.credentials.validate/v1`.
+Execution: `local.services.credentials.validate`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--team <value>`: Authorized team ID.
+- `--plan`: Inspect the proposed operation without mutation or secret input.
+- `--expected-version <value>`: Exact current credential version; zero for first creation.
 
 ## trsd platform
 

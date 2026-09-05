@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -8,7 +8,8 @@ import {
 	clearServerSession,
 	inspectServerCustody,
 	loadServerSession,
-	rotateServerCustodyKey,
+	lockServerCustody,
+	unlockServerCustody,
 	saveActiveTeam,
 	saveServerProfile,
 	saveServerSession,
@@ -23,15 +24,20 @@ test('server profiles and encrypted OAuth sessions remain CLI-local and redacted
 		saveActiveTeam('test', { id: 'team-1', slug: 'treeseed', name: 'TreeSeed' }, env);
 		assert.equal(loadServerSession('test', env)?.accessToken, 'secret-access');
 		assert.equal(loadServerSession('test', env)?.activeTeam?.slug, 'treeseed');
-		const ciphertext = readFileSync(resolve(root, 'sessions.enc'), 'utf8');
+		const record = readdirSync(resolve(root,'custody')).find(name=>name.endsWith('.enc'))!;
+		const ciphertext = readFileSync(resolve(root, 'custody',record), 'utf8');
 		assert.equal(ciphertext.includes('secret-access'), false);
 		assert.equal(ciphertext.includes('secret-refresh'), false);
 		assert.equal(ciphertext.includes('treeseed'), false);
-		assert.equal(statSync(resolve(root, 'sessions.enc')).mode & 0o777, 0o600);
-		assert.equal(statSync(resolve(root, 'custody.key')).mode & 0o777, 0o600);
+		assert.equal(statSync(resolve(root, 'custody',record)).mode & 0o777, 0o600);
+		assert.equal(statSync(resolve(root, 'custody','custody.cred')).mode & 0o777, 0o600);
+		assert.equal(existsSync(resolve(root,'custody.key')),false);
 		assert.deepEqual(inspectServerCustody(env).servers.map((entry) => entry.serverId), ['test']);
 		assert.equal(JSON.stringify(inspectServerCustody(env)).includes('secret-access'), false);
-		assert.deepEqual(rotateServerCustodyKey(env), { rotated: true, sessions: 1 });
+		assert.deepEqual(lockServerCustody(env), { custody:'os',locked:true });
+		assert.throws(()=>loadServerSession('test',env),/locked/);
+		assert.equal(inspectServerCustody(env).locked,true);
+		assert.deepEqual(unlockServerCustody(env),{custody:'os',locked:false});
 		assert.equal(loadServerSession('test', env)?.refreshToken, 'secret-refresh');
 		clearServerSession('test', env);
 		assert.equal(loadServerSession('test', env), null);

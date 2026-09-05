@@ -8,7 +8,7 @@ import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
 import { compileHostedTopologyTemplate, hostedTopologyArtifactInputsSchema, hostedTopologyDeclarationSchema, hostedTopologyPlanSchema, hostedTopologyRollbackExecutionSchema, hostedTopologyTemplateSchema } from '@treeseed/sdk/deployment';
 import type { CommandContext, ParsedInvocation } from '../../types.js';
 import { createControlPlaneClient } from '../../support/client.js';
-import { completeHostedTopologyOperation } from './hosted-vault.js';
+import { completeHostedTopologyOperation } from './hosted-operation.js';
 
 const values = (value: string | string[] | boolean | undefined) => Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
 const invalid = (code: string, message: string) => Object.assign(new Error(message), { category: 'invalid_input', code });

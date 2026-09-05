@@ -22,7 +22,7 @@ const result = spawnSync(process.execPath, [
 	...tests,
 ], {
 	cwd: process.cwd(),
-	env: process.env,
+	env: {...process.env,NODE_OPTIONS:`${process.env.NODE_OPTIONS ?? ''} --import=${resolve(process.cwd(),'tests/support/os-custody.mjs')}`.trim()},
 	stdio: 'inherit',
 });
 
