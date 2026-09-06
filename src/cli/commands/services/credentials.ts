@@ -15,7 +15,9 @@ export async function runServiceCredentials(invocation:ParsedInvocation,context:
   const teamId=String(invocation.options.team ?? clientContext?.session?.activeTeam?.id ?? '');
   const path={teamId,connectionId:invocation.arguments[0]!,profileId:invocation.arguments[1]!};
   operation.schema.path.parse(path);
-  const expectedVersion=Number(invocation.options['expected-version']);
+  const expectedVersion=Number(invocation.options.expectedVersion);
+  if(name!=='show'&&(!Number.isSafeInteger(expectedVersion)||expectedVersion<0||expectedVersion>=Number.MAX_SAFE_INTEGER))
+    throw Object.assign(new Error('--expected-version must be the current nonnegative credential version (zero for first creation).'),{category:'invalid_input',code:'credential_version_invalid'});
   const invoke=async (binding:any,input:any)=>context.operationInvoke
     ? context.operationInvoke(binding.descriptor.operationId,input,{idempotencyKey:randomUUID()})
     : clientContext!.client.invoke(binding,input,{idempotencyKey:randomUUID()});
