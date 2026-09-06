@@ -16,18 +16,23 @@ test('container startup and cleanup only invoke the protected manager, including
     const file=resolve(root,'treeseed.package.yaml');writeFileSync(file,JSON.stringify({development:runtime}));
     execFileSync('git',['init','-b','staging'],{cwd:root});execFileSync('git',['add','.'],{cwd:root});
     execFileSync('git',['-c','user.name=Test','-c','user.email=test@example.invalid','commit','-m','fixture'],{cwd:root});
-    let record:any;const actions:string[]=[];
+    let record:any;const actions:string[]=[],records=new Map<string,any>();let selected='';
     const context={cwd:root,env:{XDG_STATE_HOME:resolve(root,'state'),USER:'tester'},interactiveUi:false,write:()=>{},hostInvoke:async(request:any)=>{
       const payload=JSON.parse(request.options.payload);
-      if(request.handlerId==='local.dev.session.start'){record={session:payload.session,runtimes:payload.runtimes};return record;}
+      if(request.handlerId==='local.dev.session.start'){record={session:payload.session,runtimes:payload.runtimes};records.set(payload.session.sessionId,record);return record;}
+      record=records.get(payload.sessionId)??record;
       if(request.handlerId==='local.dev.environment')return {environment:{}};
-      if(request.handlerId==='local.dev.container'){actions.push(payload.action);return {};}
+      if(request.handlerId==='local.dev.container'){assert.equal(payload.sessionId,selected);actions.push(payload.action);return {};}
+      if(request.handlerId==='local.dev.use')record.session.targets[0].mode=payload.mode;
       return record;
     }};
     assert.equal(await runCommandLine(['dev','session','start',file,'--json'],context),0);
-    assert.equal(await runCommandLine(['dev','use','api.service=live','--json'],context),0);
-    assert.equal(await runCommandLine(['dev','use','api.service=released','--json'],context),0);
-    assert.equal(await runCommandLine(['dev','session','stop','--json'],context),0);
-    assert.deepEqual(actions,['start','stop','stop']);
+    selected=record.session.sessionId;
+    assert.equal(await runCommandLine(['dev','session','start',file,'--json'],context),0);
+    assert.equal(await runCommandLine(['dev','use','api.service=live','--session',selected,'--json'],context),0);
+    assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--json'],context),0);
+    assert.equal(await runCommandLine(['dev','use','api.service=released','--session',selected,'--json'],context),0);
+    assert.equal(await runCommandLine(['dev','session','stop','--session',selected,'--json'],context),0);
+    assert.deepEqual(actions,['start','stop','start','stop','stop']);
   } finally {rmSync(root,{recursive:true,force:true});}
 });

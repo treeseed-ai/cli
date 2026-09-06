@@ -236,7 +236,7 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 }
 
 async function freeze(invocation: ParsedInvocation, context: CommandContext) {
-	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
+	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
 	return withFreezeLock(context.env, sessionId, async () => {
 		const source = record.session.repositories.map((repository) => {
 		const runtime = record.runtimes.find((entry) => entry.project.id === repository.projectId);
@@ -395,7 +395,7 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 	if (invocation.command.name.startsWith('dev host ')) return runHostDevelopment(invocation, context);
 	if (invocation.command.name === 'dev session start') return startSession(invocation, context);
 	if (invocation.command.name === 'dev use') return useTargets(invocation, context);
-	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId);
+	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
 		const running = await stopProcesses(state);
