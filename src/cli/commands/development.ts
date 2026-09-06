@@ -343,7 +343,7 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 	const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
 	if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 	await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode: selected.mode as 'candidate' | 'live', context, recordGeneration: false });
-	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode });
+	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }

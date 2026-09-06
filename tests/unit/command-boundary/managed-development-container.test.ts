@@ -10,7 +10,7 @@ test('container startup and cleanup only invoke the protected manager, including
   try {
     const target={id:'service',kind:'live-api',platforms:['linux-amd64'],runtimeRequirements:[],sourceRoots:['src'],ignoredPaths:[],
       operations:{start:{command:'docker',args:['must-not-run'],environment:{},timeoutSeconds:10},cleanup:{command:'node',args:['-e','throw Error("unprivileged cleanup ran")'],environment:{},timeoutSeconds:10}},
-      ready:{kind:'http',path:'/health',expectedStatus:200,timeoutSeconds:1},outputs:[],endpoints:[],dependencies:[],statePolicy:'stateless',migrationPolicy:'none',secretRefs:{},
+      ready:{kind:'http',path:'/health',expectedStatus:200,timeoutSeconds:1},outputs:[],endpoints:[{id:'http',protocol:'http',port:3000,visibility:'host',canonicalAlias:'api.treeseed.localhost',authentication:'application'}],dependencies:[],statePolicy:'stateless',migrationPolicy:'none',secretRefs:{},
       shutdown:{graceSeconds:1,activeWorkPolicy:'block'},resources:{},logs:[],forbiddenOperations:[],promotion:{liveAdmissible:false,candidateRequiresVerification:true}};
     const runtime={schemaVersion:'treeseed.development-runtime/v1',project:{id:'api',repository:'treeseed-ai/api'},defaults:{leaseSeconds:600,restoreOnFailure:true},targets:[target]};
     const file=resolve(root,'treeseed.package.yaml');writeFileSync(file,JSON.stringify({development:runtime}));
@@ -23,7 +23,10 @@ test('container startup and cleanup only invoke the protected manager, including
       record=records.get(payload.sessionId)??record;
       if(request.handlerId==='local.dev.environment')return {environment:{}};
       if(request.handlerId==='local.dev.container'){assert.equal(payload.sessionId,selected);actions.push(payload.action);return {};}
-      if(request.handlerId==='local.dev.use')record.session.targets[0].mode=payload.mode;
+      if(request.handlerId==='local.dev.use'){
+        if(payload.mode!=='released')assert.equal(payload.port,3000,'Every activation, including restart, must reattach the canonical route');
+        record.session.targets[0].mode=payload.mode;
+      }
       return record;
     }};
     assert.equal(await runCommandLine(['dev','session','start',file,'--json'],context),0);
