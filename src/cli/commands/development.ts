@@ -11,6 +11,7 @@ import { developmentStateRoot, selectDevelopmentCli } from './development-cli-se
 import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
 import { artifactPaths, compatibilityAttestations, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
+import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
 
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
@@ -392,6 +393,17 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 }
 
 export async function runDevelopment(invocation: ParsedInvocation, context: CommandContext) {
+	if (invocation.command.name === 'dev session recover') {
+		const sessionId = String(invocation.options.session ?? '');
+		if (!/^dev-[a-z0-9-]{1,64}$/.test(sessionId)) throw new Error('An exact development session is required.');
+		if (existsSync(resolve(developmentStateRoot(context.env), sessionId, 'session.json'))) return { sessionId, mutation: false, noop: true };
+		const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as Parameters<typeof planDevelopmentRecovery>[0];
+		if (record.session.sessionId !== sessionId) throw new Error('Manager returned a different session.');
+		const inventory = await invoke(context, 'local.dev.status', { all: true }) as { sessions: Array<Parameters<typeof planDevelopmentRecovery>[0]> };
+		const plan = planDevelopmentRecovery(record, context.env, undefined, inventory.sessions ?? []);
+		if (!invocation.options.plan) applyDevelopmentRecovery(plan);
+		return { sessionId, mutation: !invocation.options.plan, recoveredProcesses: Object.keys(plan.state.processes), recoveredOverlays: plan.state.overlays.length };
+	}
 	if (invocation.command.name.startsWith('dev host ')) return runHostDevelopment(invocation, context);
 	if (invocation.command.name === 'dev session start') return startSession(invocation, context);
 	if (invocation.command.name === 'dev use') return useTargets(invocation, context);
