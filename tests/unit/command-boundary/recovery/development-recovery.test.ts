@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { applyDevelopmentRecovery, matchDevelopmentProcess, planDevelopmentRecovery } from '../../../src/cli/commands/development-support/recovery.ts';
+import { applyDevelopmentRecovery, matchDevelopmentProcess, planDevelopmentRecovery } from '../../../../src/cli/commands/development-support/recovery.ts';
 
 test('recovery matches exact session, cwd and invocation, rejecting duplicates', () => {
 	const expected = { sessionId: 'dev-one', worktree: '/workspace', cwd: '/workspace', command: 'node', args: ['watch.js'] };
