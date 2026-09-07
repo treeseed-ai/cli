@@ -6359,6 +6359,28 @@
                   }
                 ]
               }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "verify",
+              "description": "Verify the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.verify",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.verify/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.ai.storage.verify"
+              }
             }
           ]
         }
