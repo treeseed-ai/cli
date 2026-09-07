@@ -4,7 +4,7 @@ import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {resolve} from 'node:path';
 import test from 'node:test';
-import {runCommandLine} from '../../../src/cli/runtime.ts';
+import {runCommandLine} from '../../../../src/cli/runtime.ts';
 test('container startup and cleanup only invoke the protected manager, including failed-start cleanup',async()=>{
   const root=mkdtempSync(resolve(tmpdir(),'treeseed-managed-dev-'));
   try {
