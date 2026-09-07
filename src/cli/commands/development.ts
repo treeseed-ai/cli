@@ -344,6 +344,7 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 	if (target.kind === 'package-watch') throw new Error('Package-watch targets rebuild atomically and do not support restart.');
 	const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
 	if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
+	if (invocation.options.plan === true) return { sessionId, target: `${selection.projectId}.${selection.targetId}`, mode: selected.mode, restart: true, mutation: false };
 	await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode: selected.mode as 'candidate' | 'live', context, recordGeneration: false });
 	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	saveState(state, context.env);

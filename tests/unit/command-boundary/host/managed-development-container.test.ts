@@ -33,6 +33,12 @@ test('container startup and cleanup only invoke the protected manager, including
     selected=record.session.sessionId;
     assert.equal(await runCommandLine(['dev','session','start',file,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','use','api.service=live','--session',selected,'--json'],context),0);
+    const beforePlan=[...actions];
+    const planned:string[]=[];
+    assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--plan','--json'],{...context,write:(value:string)=>planned.push(value)}),0);
+    assert.deepEqual(actions,beforePlan,'Plan must not stop or start a container');
+    assert.equal(record.session.targets[0].mode,'live','Plan must not switch routes');
+    assert.equal(JSON.parse(planned[0]!).result.mutation,false);
     assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','use','api.service=released','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','session','stop','--session',selected,'--json'],context),0);
