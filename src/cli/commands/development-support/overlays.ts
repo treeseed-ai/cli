@@ -52,13 +52,24 @@ export function installPackageOverlay(state: OverlaySessionState, record: { sess
 	if (target.kind !== 'package-watch') return;
 	const packageName = (JSON.parse(readFileSync(resolve(worktree, 'package.json'), 'utf8')) as { name?: string }).name;
 	if (!packageName) throw new Error(`${runtime.project.id} package overlay has no package name.`);
-	restoreOverlays(state, runtime.project.id, false);
+	const planned: Array<{ link: string; backup: string; owned: boolean }> = [];
 	for (const consumerId of affectedConsumers(record.runtimes, runtime.project.id, target.id)) {
 		const consumer = record.session.repositories.find((entry) => entry.projectId === consumerId); if (!consumer) continue;
 		const link = resolve(consumer.worktree, 'node_modules', ...packageName.split('/'));
 		const backup = `${link}.treeseed-release-${state.sessionId}`;
+		let owned = false;
+		try { owned = lstatSync(link).isSymbolicLink() && resolve(dirname(link), readlinkSync(link)) === resolve(overlayRoot, 'current'); } catch { /* No existing link. */ }
+		if (existsSync(backup) && !owned) throw new Error(`Stale development overlay backup blocks ${link}.`);
+		planned.push({ link, backup, owned });
+	}
+	// Validate every ownership boundary before changing any consumer. A recovered
+	// exact link is evidence of ownership; a similarly named backup alone is not.
+	for (const { link, backup, owned } of planned) {
+		if (owned) {
+			if (!state.overlays.some(overlay => overlay.link === link)) state.overlays.push({ projectId: runtime.project.id, packageName, link, backup: existsSync(backup) ? backup : null, overlayRoot });
+			continue;
+		}
 		mkdirSync(dirname(link), { recursive: true });
-		if (existsSync(backup)) throw new Error(`Stale development overlay backup blocks ${link}.`);
 		let retained: string | null = null;
 		try { lstatSync(link); renameSync(link, backup); retained = backup; } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
 		symlinkSync(relativeOverlayTarget(link, overlayRoot), link, 'dir'); state.overlays.push({ projectId: runtime.project.id, packageName, link, backup: retained, overlayRoot });
