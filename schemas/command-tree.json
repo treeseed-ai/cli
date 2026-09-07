@@ -1364,11 +1364,6 @@
                   "name": "--actor",
                   "description": "Audited development-session actor.",
                   "type": "string"
-                },
-                {
-                  "name": "--lease-seconds",
-                  "description": "Requested bounded lease duration.",
-                  "type": "number"
                 }
               ],
               "authorization": {
@@ -1563,7 +1558,7 @@
             },
             {
               "name": "--all",
-              "description": "Include stopped and expired sessions.",
+              "description": "Include stopped sessions.",
               "type": "boolean"
             }
           ],
@@ -5924,11 +5919,19 @@
           "resultSchemaId": "treeseed.command.status/v1",
           "execution": {
             "kind": "operation",
-            "operationId": "treeai.qualification.get.status",
+            "operationId": "ai.instances.show",
             "input": [
               {
                 "target": "path",
-                "field": "nodeId",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "instanceId",
                 "source": "context",
                 "name": "node",
                 "required": true,
@@ -6217,22 +6220,30 @@
         },
         {
           "nodeType": "branch",
-          "segment": "qualify",
-          "description": "Qualify operations.",
+          "segment": "storage",
+          "description": "Storage operations.",
           "children": [
             {
               "nodeType": "leaf",
-              "segment": "status",
-              "description": "Status the selected resource.",
+              "segment": "show",
+              "description": "Show the selected resource.",
               "kind": "read",
-              "resultSchemaId": "treeseed.command.status/v1",
+              "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
                 "kind": "operation",
-                "operationId": "treeai.qualification.get.qualification.profile",
+                "operationId": "ai.instances.storage.show",
                 "input": [
                   {
                     "target": "path",
-                    "field": "nodeId",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "instanceId",
                     "source": "context",
                     "name": "node",
                     "required": true,
@@ -6243,8 +6254,76 @@
             },
             {
               "nodeType": "leaf",
-              "segment": "run",
-              "description": "Run the selected resource.",
+              "segment": "connect",
+              "description": "Connect the selected resource.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--connection",
+                  "description": "Team object-storage service connection ID.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--bucket",
+                  "description": "Private artifact bucket to ensure and bind.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.connect",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.connect/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "ai.instances.storage.put",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "instanceId",
+                    "source": "context",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "connectionId",
+                    "source": "option",
+                    "name": "connection",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "bucket",
+                    "source": "option",
+                    "name": "bucket",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "disconnect",
+              "description": "Disconnect the selected resource.",
               "kind": "mutation",
               "options": [
                 {
@@ -6254,38 +6333,25 @@
                 }
               ],
               "authorization": {
-                "capability": "command.run",
-                "confirmation": "authority"
+                "capability": "command.disconnect",
+                "confirmation": "never"
               },
-              "resultSchemaId": "treeseed.command.run/v1",
+              "resultSchemaId": "treeseed.command.disconnect/v1",
               "execution": {
                 "kind": "operation",
-                "operationId": "treeai.qualification.post.qualification.campaigns",
+                "operationId": "ai.instances.storage.remove",
                 "input": [
                   {
                     "target": "path",
-                    "field": "nodeId",
+                    "field": "teamId",
                     "source": "context",
-                    "name": "node",
+                    "name": "team",
                     "required": true,
                     "transform": "identity"
-                  }
-                ]
-              }
-            },
-            {
-              "nodeType": "leaf",
-              "segment": "campaigns",
-              "description": "Campaigns the selected resource.",
-              "kind": "read",
-              "resultSchemaId": "treeseed.command.campaigns/v1",
-              "execution": {
-                "kind": "operation",
-                "operationId": "treeai.qualification.get.qualification.campaigns",
-                "input": [
+                  },
                   {
                     "target": "path",
-                    "field": "nodeId",
+                    "field": "instanceId",
                     "source": "context",
                     "name": "node",
                     "required": true,

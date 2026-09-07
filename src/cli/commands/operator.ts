@@ -122,8 +122,9 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (invocation.options.plan === true) return { operationId: operation.descriptor.operationId, input, mutation: false };
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
-	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: randomUUID(), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };
-	if (operation.descriptor.concurrency.required && input.body?.version !== undefined) {
+	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: String(invocation.options.idempotencyKey ?? randomUUID()), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };
+	if (operation.descriptor.concurrency.required && invocation.options.ifMatch !== undefined) options.headers[operation.descriptor.concurrency.writeHeader] = String(invocation.options.ifMatch);
+	if (operation.descriptor.concurrency.required && !options.headers[operation.descriptor.concurrency.writeHeader] && input.body?.version !== undefined) {
 		options.headers[operation.descriptor.concurrency.writeHeader] = `"${String(input.body.version)}"`;
 	}
 	if (operation.descriptor.concurrency.required && !options.headers[operation.descriptor.concurrency.writeHeader]) {

@@ -13,6 +13,7 @@ import { loadServerSession, saveServerProfile, saveServerSession } from '../../.
 test('registry exactly matches the SDK command tree', () => {
 	assert.deepEqual(commandSpecs.map((command) => command.name), listCommandPaths(TREESEED_COMMAND_TREE_V1));
 	assert.equal(commandSpecs.some((command) => command.name.includes(':')), false);
+	assert.equal(commandSpecs.some((command) => command.name.startsWith('ai qualify')), false);
 });
 
 test('send derives project-qualified recipients without a project option or raw routes', async () => {
@@ -42,13 +43,13 @@ test('teams use persists the active team and team commands inherit it', async ()
 
 test('leaf commands expose only catalog-derived high-level options', () => {
 	const byName = new Map(commandSpecs.map((command) => [command.name, command.options.map((option) => option.flag)]));
-	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--plan']);
+	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--idempotency-key', '--plan']);
 	assert.deepEqual(byName.get('plans show'), ['--server', '--json']);
 	assert.deepEqual(byName.get('agents show'), ['--server', '--project', '--json']);
 	assert.deepEqual(byName.get('host status'), ['--server', '--json']);
 	assert.deepEqual(byName.get('host provider environment set'), ['--server', '--yes', '--json', '--plan', '--stdin']);
-	assert.deepEqual(byName.get('providers registration code rotate'), ['--server', '--team', '--yes', '--json', '--plan']);
-	assert.deepEqual(byName.get('providers environments grant'), ['--server', '--team', '--yes', '--json', '--plan', '--input']);
+	assert.deepEqual(byName.get('providers registration code rotate'), ['--server', '--team', '--yes', '--json', '--if-match', '--idempotency-key', '--plan']);
+	assert.deepEqual(byName.get('providers environments grant'), ['--server', '--team', '--yes', '--json', '--if-match', '--idempotency-key', '--plan', '--input']);
 	assert.equal(commandSpecs.some((command) => command.options.some((option) => option.flag === '--execute' || option.flag === '--market')), false);
 });
 

@@ -46,7 +46,7 @@ export function matchDevelopmentProcess(candidates: Process[], expected: { sessi
 export function planDevelopmentRecovery(record: Record, env: NodeJS.ProcessEnv, candidates: Process[] = developmentProcesses(), otherSessions: Record[] = []) {
 	const { session } = record;
 	if (!/^dev-[a-z0-9-]{1,64}$/.test(session.sessionId)) throw new Error('An exact manager session is required for recovery.');
-	const expired = ['stopped', 'expired'].includes(session.status);
+	const stopped = session.status === 'stopped';
 	const root = resolve(developmentStateRoot(env), session.sessionId);
 	let common = session.repositories[0]?.worktree;
 	if (!common) throw new Error('Recovery requires repository custody.');
@@ -76,7 +76,7 @@ export function planDevelopmentRecovery(record: Record, env: NodeJS.ProcessEnv, 
 			const operation = target.kind === 'package-watch' ? target.operations.watch ?? target.operations.build : target.operations.start;
 			if (!operation) throw new Error('Active target has no recoverable process operation.');
 			const found = matchDevelopmentProcess(candidates, { sessionId: session.sessionId, worktree, cwd: operation.cwd ? resolve(worktree, operation.cwd) : worktree, command: operation.command, args: operation.args });
-			if (!found && expired) continue;
+			if (!found && stopped) continue;
 			if (!found) throw new Error(`No unique owned process for ${repository.projectId}.${target.id}; no state changed.`);
 			const key = `${repository.projectId}.${target.id}`;
 			state.processes[key] = { pid: found.pid, projectId: repository.projectId, targetId: target.id, log: resolve(root, `${key}.log`) };
@@ -95,7 +95,7 @@ export function planDevelopmentRecovery(record: Record, env: NodeJS.ProcessEnv, 
 				try { linked = lstatSync(link).isSymbolicLink() && resolve(dirname(link), readlinkSync(link)) === resolve(overlayRoot, 'current'); } catch { /* No link is not evidence of ownership. */ }
 				if (existsSync(backup) && !linked) {
 					const foreign = otherSessions.some(other => other.session.sessionId !== session.sessionId
-						&& !['stopped', 'expired'].includes(other.session.status)
+						&& other.session.status !== 'stopped'
 						&& other.session.repositories.some(entry => entry.projectId === repository.projectId && entry.worktree === worktree)
 						&& (() => { try { return lstatSync(link).isSymbolicLink() && resolve(dirname(link), readlinkSync(link)) === resolve(worktree, '.treeseed/cache/development-sessions', other.session.sessionId, target.id, 'current'); } catch { return false; } })());
 					if (!foreign) throw new Error(`Overlay backup for ${consumer.projectId}/${repository.projectId} has no verified owner; recovery is ambiguous.`);

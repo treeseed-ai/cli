@@ -1,5 +1,6 @@
 import {
 	TREESEED_COMMAND_TREE_V1,
+	controlPlaneOperation,
 	type CommandLeafDescriptor,
 	type CommandNodeDescriptor,
 } from '@treeseed/sdk/operator-contracts';
@@ -10,6 +11,7 @@ const contextOptions: OptionSpec[] = [
 	{ name: 'team', flag: '--team', kind: 'string', description: 'Team id or slug.' },
 	{ name: 'project', flag: '--project', kind: 'string', description: 'Project id or slug.' },
 	{ name: 'provider', flag: '--provider', kind: 'string', description: 'Provider identity.' },
+	{ name: 'node', flag: '--node', kind: 'string', description: 'Registered AI node identity.' },
 	{ name: 'connection', flag: '--connection', kind: 'string', description: 'Trusted service connection identity.' },
 	{ name: 'credential', flag: '--credential', kind: 'string', description: 'Credential identity.' },
 	{ name: 'profile', flag: '--profile', kind: 'string', description: 'Workday profile identity.' },
@@ -40,6 +42,11 @@ function optionNames(path: string[], leaf: CommandLeafDescriptor) {
 
 function options(path: string[], leaf: CommandLeafDescriptor) {
 	const selected = contextOptions.filter((option) => optionNames(path, leaf).has(option.name));
+	if (leaf.execution.kind === 'operation') {
+		const operation = controlPlaneOperation(leaf.execution.operationId).descriptor;
+		if (operation.concurrency.required) selected.push({ name: 'ifMatch', flag: '--if-match', kind: 'string', description: 'Exact current resource version, or new when unconfigured.' });
+		if (operation.kind === 'mutation') selected.push({ name: 'idempotencyKey', flag: '--idempotency-key', kind: 'string', description: 'Reuse the same request identity when retrying this mutation.' });
+	}
 	for (const option of leaf.options ?? []) {
 		if (selected.some((candidate) => candidate.flag === option.name)) continue;
 		selected.push({ name: option.name.slice(2).replace(/-([a-z])/gu, (_, letter: string) => letter.toUpperCase()), flag: option.name, kind: option.type, description: option.description });

@@ -37,16 +37,28 @@ development:
       promotion: { liveAdmissible: false, candidateRequiresVerification: true }
 `;
 
+test('development rejects the retired lease duration option', async () => {
+	const output: string[] = [];
+	const exit = await runCommandLine(['dev', 'session', 'start', 'unused.yaml', '--lease-seconds', '600', '--plan', '--json'], {
+		interactiveUi: false, write: value => output.push(value), hostInvoke: async () => { throw new Error('must not call manager'); },
+	});
+	assert.notEqual(exit, 0);
+	assert.match(output.join(''), /unknown.option|Unknown option|Unexpected option/iu);
+});
+
 test('development session planning records exact source without manager mutation', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-')), file = resolve(root, 'treeseed.package.yaml'), output: string[] = [];
 	try {
 		writeFileSync(file, manifest); execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
 		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
 		let managerCalls = 0;
-		const exit = await runCommandLine(['dev', 'session', 'start', file, '--actor', 'test-developer', '--lease-seconds', '600', '--plan', '--json'], { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false, hostInvoke: async () => { managerCalls += 1; }, write: (value) => output.push(value) });
+		const exit = await runCommandLine(['dev', 'session', 'start', file, '--actor', 'test-developer', '--plan', '--json'], { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false, hostInvoke: async () => { managerCalls += 1; }, write: (value) => output.push(value) });
 		assert.equal(exit, 0); assert.equal(managerCalls, 0);
 		const result = JSON.parse(output[0]!).result;
 		assert.equal(result.mutation, false); assert.equal(result.session.actor, 'test-developer');
+		assert.equal(result.session.schemaVersion, 'treeseed.development-session/v2');
+		assert.equal('expiresAt' in result.session, false);
+		assert.equal('leaseSeconds' in result.runtimes[0].defaults, false);
 		assert.equal(result.session.repositories[0].dirty, false); assert.match(result.session.repositories[0].commit, /^[a-f0-9]{40}$/u);
 		assert.equal(result.runtimes[0].targets[0].endpoints[0].canonicalAlias, 'admin.treeseed.localhost');
 	} finally { rmSync(root, { recursive: true, force: true }); }
@@ -115,8 +127,8 @@ test('development CLI selection is an atomic, removable launcher input', () => {
 	try {
 		mkdirSync(resolve(entrypoint, '..'), { recursive: true }); writeFileSync(entrypoint, 'export {};\n');
 		const env = { XDG_STATE_HOME: resolve(root, 'state') };
-		selectDevelopmentCli(env, { entrypoint, expiresAt: new Date(Date.now() + 60_000).toISOString() });
-		assert.match(execFileSync('cat', [developmentCliEntrypointPath(env)], { encoding: 'utf8' }), new RegExp(`^treeseed\\.development-cli-selection/v1\\n\\d+\\n${entrypoint.replaceAll('/', '\\/')}\\n$`, 'u'));
+		selectDevelopmentCli(env, { entrypoint });
+		assert.equal(execFileSync('cat', [developmentCliEntrypointPath(env)], { encoding: 'utf8' }), `treeseed.development-cli-selection/v2\n${entrypoint}\n`);
 		selectDevelopmentCli(env, null);
 		assert.throws(() => execFileSync('cat', [developmentCliEntrypointPath(env)], { stdio: 'ignore' }));
 	} finally { rmSync(root, { recursive: true, force: true }); }

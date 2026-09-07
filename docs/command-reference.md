@@ -24,6 +24,7 @@ Control-plane operation: `communications.send`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--to <value>`: Deprecated validation-only address list.
 - `--timeout <value>`: Optional maximum seconds to listen for the complete response chain.
@@ -71,6 +72,7 @@ Control-plane operation: `communications.topics.subscriptions.put`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd topics unsubscribe <topic> <agent>
@@ -83,6 +85,7 @@ Control-plane operation: `communications.topics.subscriptions.delete`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd capabilities
@@ -466,7 +469,6 @@ Execution: `local.dev.session.start`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--actor <value>`: Audited development-session actor.
-- `--lease-seconds <value>`: Requested bounded lease duration.
 
 ### trsd dev session stop
 
@@ -534,7 +536,7 @@ Execution: `local.dev.status`.
 
 - `--json`: Emit the stable JSON envelope.
 - `--session <value>`: Development session identity.
-- `--all`: Include stopped and expired sessions.
+- `--all`: Include stopped sessions.
 
 ### trsd dev logs
 
@@ -1462,6 +1464,7 @@ Control-plane operation: `providers.connect`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd providers disconnect <connection>
@@ -1476,6 +1479,7 @@ Control-plane operation: `providers.disconnect`.
 - `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd providers registration
@@ -1508,6 +1512,7 @@ Control-plane operation: `providers.registration.code.reveal`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd providers registration code rotate
@@ -1521,6 +1526,8 @@ Control-plane operation: `providers.registration.code.rotate`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd providers environments
@@ -1563,6 +1570,8 @@ Control-plane operation: `providers.environment.grants.put`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--input <value>`: Digest-bound environment grant document.
 
@@ -1577,6 +1586,8 @@ Control-plane operation: `providers.environment.grants.revoke`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd providers requests
@@ -1619,6 +1630,7 @@ Control-plane operation: `providers.requests.approve`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd providers requests reject <request>
@@ -1632,6 +1644,7 @@ Control-plane operation: `providers.requests.reject`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd providers credentials
@@ -1660,6 +1673,7 @@ Control-plane operation: `providers.credentials.rotate`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd providers credentials revoke <connection>
@@ -1673,6 +1687,7 @@ Control-plane operation: `providers.credentials.revoke`.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd providers offers
@@ -1751,6 +1766,7 @@ Control-plane operation: `seeds.apply`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd seeds show <seed>
@@ -1938,6 +1954,7 @@ Control-plane operation: `workdays.plan`.
 - `--duration <value>`: Duration in seconds.
 - `--objective <value>`: Objective filter.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd workdays start
@@ -1953,6 +1970,7 @@ Control-plane operation: `workdays.start`.
 - `--digest <value>`: Exact preflight digest.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd workdays list
@@ -2080,6 +2098,7 @@ Control-plane operation: `workdays.schedules.create`.
 - `--duration <value>`: Duration in seconds.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd workdays schedules pause <schedule>
@@ -2176,6 +2195,7 @@ Control-plane operation: `assignments.retry`.
 - `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd assignments cancel <assignment>
@@ -2190,6 +2210,7 @@ Control-plane operation: `assignments.cancel`.
 - `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd assignments artifacts <assignment>
@@ -2229,6 +2250,7 @@ Control-plane operation: `treedx.library.bind`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--connection <value>`: Trusted service connection identity.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd projects treedx status <project>
@@ -2300,6 +2322,7 @@ Control-plane operation: `treedx.workspaces.abandon`.
 - `--project <value>`: Project id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd ai
@@ -2311,9 +2334,11 @@ Ai operations.
 Status the selected resource.
 
 Operation: read. Result schema: `treeseed.command.status/v1`.
-Control-plane operation: `treeai.qualification.get.status`.
+Control-plane operation: `ai.instances.show`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd ai mode
@@ -2356,6 +2381,7 @@ Operation: read. Result schema: `treeseed.command.models/v1`.
 Control-plane operation: `treeai.inference.get.models`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd ai inference jobs
@@ -2366,6 +2392,7 @@ Operation: read. Result schema: `treeseed.command.jobs/v1`.
 Control-plane operation: `treeai.inference.get.jobs`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd ai inference rollback
@@ -2376,8 +2403,10 @@ Operation: mutation. Result schema: `treeseed.command.rollback/v1`.
 Control-plane operation: `treeai.inference.post.deployments.rollback`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd ai training
@@ -2392,6 +2421,7 @@ Operation: read. Result schema: `treeseed.command.libraries/v1`.
 Control-plane operation: `treeai.training.get.libraries`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd ai training jobs
@@ -2402,6 +2432,7 @@ Operation: read. Result schema: `treeseed.command.jobs/v1`.
 Control-plane operation: `treeai.training.get.jobs`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd ai training runs
@@ -2412,6 +2443,7 @@ Operation: read. Result schema: `treeseed.command.runs/v1`.
 Control-plane operation: `treeai.training.get.library.runs`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd ai lab
@@ -2426,6 +2458,7 @@ Operation: read. Result schema: `treeseed.command.status/v1`.
 Control-plane operation: `treeai.lab.get.status`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd ai lab agents
@@ -2436,6 +2469,7 @@ Operation: read. Result schema: `treeseed.command.agents/v1`.
 Control-plane operation: `treeai.lab.get.agents`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd ai lab libraries
@@ -2446,43 +2480,56 @@ Operation: read. Result schema: `treeseed.command.libraries/v1`.
 Control-plane operation: `treeai.lab.get.libraries`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
-## trsd ai qualify
+## trsd ai storage
 
-Qualify operations.
+Storage operations.
 
-### trsd ai qualify status
+### trsd ai storage show
 
-Status the selected resource.
+Show the selected resource.
 
-Operation: read. Result schema: `treeseed.command.status/v1`.
-Control-plane operation: `treeai.qualification.get.qualification.profile`.
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `ai.instances.storage.show`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
 
-### trsd ai qualify run
+### trsd ai storage connect
 
-Run the selected resource.
+Connect the selected resource.
 
-Operation: mutation. Result schema: `treeseed.command.run/v1`.
-Control-plane operation: `treeai.qualification.post.qualification.campaigns`.
+Operation: mutation. Result schema: `treeseed.command.connect/v1`.
+Control-plane operation: `ai.instances.storage.put`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
+- `--team <value>`: Team id or slug.
+- `--node <value>`: Registered AI node identity.
+- `--connection <value>`: Trusted service connection identity.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--bucket <value>`: Private artifact bucket to ensure and bind.
 
-### trsd ai qualify campaigns
+### trsd ai storage disconnect
 
-Campaigns the selected resource.
+Disconnect the selected resource.
 
-Operation: read. Result schema: `treeseed.command.campaigns/v1`.
-Control-plane operation: `treeai.qualification.get.qualification.campaigns`.
+Operation: mutation. Result schema: `treeseed.command.disconnect/v1`.
+Control-plane operation: `ai.instances.storage.remove`.
 
 - `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--node <value>`: Registered AI node identity.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd library
 
@@ -2581,6 +2628,7 @@ Control-plane operation: `knowledge.workspaces.create`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--request <value>`: Replay-safe UUID request identity.
 
@@ -2623,6 +2671,8 @@ Control-plane operation: `knowledge.workspaces.content.update`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--input <value>`: YAML or JSON draft body.
 
@@ -2635,6 +2685,8 @@ Control-plane operation: `knowledge.workspaces.submit`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--version <value>`: Expected workspace version.
 - `--message <value>`: Commit message.
@@ -2651,6 +2703,8 @@ Control-plane operation: `knowledge.workspaces.abandon`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--version <value>`: Expected workspace version.
 
@@ -2681,6 +2735,8 @@ Control-plane operation: `knowledge.reviews.decide`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--input <value>`: YAML or JSON review decision.
 
@@ -2693,6 +2749,8 @@ Control-plane operation: `knowledge.reviews.publish`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--input <value>`: Optional YAML or JSON publication body.
 

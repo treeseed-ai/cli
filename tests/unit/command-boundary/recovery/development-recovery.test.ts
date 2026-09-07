@@ -26,8 +26,8 @@ test('recovery plan does not write, apply preserves current session, missing pro
 		writeFileSync(resolve(worktree, 'treeseed.package.yaml'), JSON.stringify({ development: record.runtimes[0] }));
 		assert.throws(() => planDevelopmentRecovery(record, env, []), /No unique owned process/);
 		const plan = planDevelopmentRecovery(record, env, [{ pid: 11, processGroup: 11, cwd: worktree, worktree, sessionId: 'dev-one', argv: ['/usr/bin/node', 'watch.js'] }]);
-		const expired = planDevelopmentRecovery({ ...record, session: { ...record.session, status: 'expired' } }, env, []);
-		assert.deepEqual(expired.state.processes, {});
+		const stopped = planDevelopmentRecovery({ ...record, session: { ...record.session, status: 'stopped' } }, env, []);
+		assert.deepEqual(stopped.state.processes, {});
 		assert.equal(existsSync(plan.state.manifest), false);
 		applyDevelopmentRecovery(plan);
 		assert.equal(JSON.parse(readFileSync(resolve(directory, 'current.json'), 'utf8')).sessionId, 'dev-other');
