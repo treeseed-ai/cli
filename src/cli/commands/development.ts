@@ -39,12 +39,20 @@ function saveState(state: LocalSessionState, env: NodeJS.ProcessEnv) {
 	const path = statePath(env), temporary = `${path}.new`;
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 	writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 }); renameSync(temporary, path);
+	const snapshot=resolve(developmentStateRoot(env),state.sessionId,'session.json');
+	mkdirSync(dirname(snapshot),{recursive:true,mode:0o700});
+	writeFileSync(`${snapshot}.new`,`${JSON.stringify(state,null,2)}\n`,{mode:0o600});renameSync(`${snapshot}.new`,snapshot);
 }
 
-function loadState(env: NodeJS.ProcessEnv) {
+function loadState(env: NodeJS.ProcessEnv, sessionId?: unknown) {
 	const path = statePath(env);
 	if (!existsSync(path)) throw new Error('No local development session is selected.');
-	return JSON.parse(readFileSync(path, 'utf8')) as LocalSessionState;
+	const current=JSON.parse(readFileSync(path, 'utf8')) as LocalSessionState;
+	if(sessionId===undefined||sessionId===current.sessionId)return current;
+	if(typeof sessionId!=='string'||!/^dev-[a-z0-9-]{1,64}$/.test(sessionId))throw new Error('Invalid development session identity.');
+	const snapshot=resolve(developmentStateRoot(env),sessionId,'session.json');
+	if(!existsSync(snapshot))throw new Error('Local state for the requested development session is unavailable; no other session was changed.');
+	return JSON.parse(readFileSync(snapshot,'utf8')) as LocalSessionState;
 }
 
 function sha256(value: string | Buffer) { return `sha256:${createHash('sha256').update(value).digest('hex')}`; }
@@ -109,6 +117,14 @@ function operationForMode(target: DevelopmentTarget, mode: string) {
 	if (target.kind === 'rebuild-restart') return target.operations.start ?? null;
 	if (mode === 'candidate') return target.operations.build ?? target.operations.start ?? null;
 	return target.operations.start ?? null;
+}
+
+export function usesManagedContainer(target: DevelopmentTarget) {
+	return target.operations.start?.command === 'docker';
+}
+
+async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop') {
+	return invoke(context, 'local.dev.container', {sessionId,projectId:runtime.project.id,targetId:target.id,action});
 }
 
 export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
@@ -179,7 +195,7 @@ async function startSession(invocation: ParsedInvocation, context: CommandContex
 }
 
 async function useTargets(invocation: ParsedInvocation, context: CommandContext) {
-	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId);
+	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { expiresAt: string; repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
 	const selections = [invocation.arguments[0]!, ...(Array.isArray(invocation.options.target) ? invocation.options.target : [])].map(parseSelection);
 	if (invocation.options.plan === true) return { sessionId, selections, mutation: false };
@@ -188,12 +204,14 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 		const repository = (record as { session: { repositories: Array<{ projectId: string; worktree: string }> } }).session.repositories.find((entry) => entry.projectId === selection.projectId);
 		if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 		if (selection.mode === 'released') {
+			if (usesManagedContainer(target)) await invoke(context, 'local.dev.use', {sessionId,...selection});
 			const processState = state.processes[`${selection.projectId}.${selection.targetId}`];
 			if (processState) {
 				await stopProcesses({ ...state, processes: { [`${selection.projectId}.${selection.targetId}`]: processState } });
 				delete state.processes[`${selection.projectId}.${selection.targetId}`];
 			}
-			if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
+			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
+			else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 			restoreOverlays(state, selection.projectId);
 			if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, null);
 		} else {
@@ -201,7 +219,8 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 			if (target.operations.setup) runOneShotOperation(state, target.operations.setup, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			const running = operationIsRunning(state, `${runtime.project.id}.${target.id}`);
 			if (target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
-			startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'start');
+			else startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			saveState(state, context.env);
 			if (target.kind === 'package-watch') {
 				const cliWorktree = record.session.repositories.find((entry) => entry.projectId === 'cli')?.worktree;
@@ -209,7 +228,7 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 				saveState(state, context.env);
 				await waitForPackageOverlay(target, repository.worktree, overlayRoot); installPackageOverlay(state, record, runtime, target, repository.worktree, overlayRoot); saveState(state, context.env);
 				if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, { entrypoint: resolve(overlayRoot, 'current', 'dist', 'cli', 'main.js'), expiresAt: record.session.expiresAt });
-			} else await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, `${runtime.project.id}.${target.id}`);
+			} else if (!usesManagedContainer(target)) await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, `${runtime.project.id}.${target.id}`);
 		}
 		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	}
@@ -217,7 +236,7 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 }
 
 async function freeze(invocation: ParsedInvocation, context: CommandContext) {
-	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
+	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
 	return withFreezeLock(context.env, sessionId, async () => {
 		const source = record.session.repositories.map((repository) => {
 		const runtime = record.runtimes.find((entry) => entry.project.id === repository.projectId);
@@ -248,7 +267,7 @@ async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 }
 
 async function verifyCandidate(invocation: ParsedInvocation, context: CommandContext) {
-	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId);
+	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	const selected = typeof invocation.options.candidate === 'string' ? state.candidates.find((path) => path.includes(invocation.options.candidate as string)) : state.candidates.at(-1);
 	if (!selected || !existsSync(selected)) throw new Error('No local development candidate is available for verification.');
 	const candidate = developmentCandidateSchema.parse(JSON.parse(readFileSync(selected, 'utf8')));
@@ -294,13 +313,18 @@ async function rebuildPackage(input: { state: LocalSessionState; runtime: Develo
 
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
+	if (usesManagedContainer(target)) await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
 	await stopProcess(state, key);
-	if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
+	if (usesManagedContainer(target)) await containerOperation(context, state.sessionId, runtime, target, 'stop');
+	else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
 	if (!target.operations.start && target.kind === 'rebuild-restart' && target.operations.build) {
 		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
 		await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
+	} else if (usesManagedContainer(target)) {
+		if (target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
+		await containerOperation(context, state.sessionId, runtime, target, 'start');
 	} else {
 		startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
 		saveState(state, context.env);
@@ -319,7 +343,7 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 	const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
 	if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 	await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode: selected.mode as 'candidate' | 'live', context, recordGeneration: false });
-	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode });
+	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
@@ -371,12 +395,15 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 	if (invocation.command.name.startsWith('dev host ')) return runHostDevelopment(invocation, context);
 	if (invocation.command.name === 'dev session start') return startSession(invocation, context);
 	if (invocation.command.name === 'dev use') return useTargets(invocation, context);
-	const state = loadState(context.env), sessionId = String(invocation.options.session ?? state.sessionId);
+	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
 		const running = await stopProcesses(state);
 		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
-		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
+		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
+			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
+			else if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
+		}
 		restoreOverlays(state); selectDevelopmentCli(context.env, null); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
 	}
 	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });

@@ -101,8 +101,22 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 			throw new Error('Host initialization plan does not contain a valid immutable catalog binding.');
 		}
 		const values: Record<string, string> = {};
+		if (typeof invocation.options.inputFile === 'string') {
+			const { capacityInstallConfigurationSchema } = await import('@treeseed/sdk/capacity-provider');
+			if (!capacityInstallConfigurationSchema) throw new Error('The active SDK must be updated before using installation configuration files.');
+			const source = readFileSync(resolve(context.cwd, invocation.options.inputFile));
+			let parsed;
+			try { if (source.length > 65536) throw new Error(); parsed = capacityInstallConfigurationSchema.parse(JSON.parse(source.toString('utf8'))); }
+			catch { throw new Error('Invalid capacity installation configuration; download a fresh copy from Admin.'); }
+			finally { source.fill(0); }
+			if (profile !== parsed.profile) throw new Error('Installation configuration requires the capacity-provider profile.');
+			const accepted = new Set((planned.inputs ?? []).map(input => input.name));
+			if (Object.keys(parsed.inputs).some(name => !accepted.has(name))) throw new Error('The installed catalog cannot consume this configuration. Update the host foundation first.');
+			Object.assign(values, parsed.inputs);
+		}
 		for (const descriptor of planned.inputs ?? []) {
 			if (!/^[a-z][A-Za-z0-9]{1,63}$/u.test(descriptor.name)) throw new Error('Host initialization plan contains an invalid input descriptor.');
+			if (values[descriptor.name] !== undefined) continue;
 			const question = `${descriptor.description}: `;
 			const value = descriptor.sensitive
 				? String(context.promptSecret ? await context.promptSecret(question) : await promptHidden(question)).trim()

@@ -12,7 +12,8 @@ function sha256(value: Buffer) { return `sha256:${createHash('sha256').update(va
 function files(root: string, directory: string, include: (path: string) => boolean): DevelopmentFile[] {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
 		const absolute = resolve(directory, entry.name);
-		if (entry.isDirectory() && (entry.name === '.treeseed' || entry.name === 'node_modules' || entry.name === '.git')) return [];
+		// These are never part of the runtime closure, including managed overlay links.
+		if (entry.name === '.treeseed' || entry.name === 'node_modules' || entry.name === '.git') return [];
 		if (entry.isSymbolicLink()) throw new Error(`Host development build contains a symbolic link: ${relative(root, absolute)}.`);
 		if (entry.isDirectory()) return files(root, absolute, include);
 		if (!entry.isFile()) throw new Error(`Host development build contains an unsupported file: ${relative(root, absolute)}.`);
@@ -35,6 +36,7 @@ export function hostDevelopmentRuntimeManifest(worktree: string) {
 		if (!path.startsWith(`${sdkRoot}/`)) return true;
 		const sdkPath = relative(sdkRoot, path);
 		return sdkPath === 'package.json' || sdkPath.startsWith('dist/deployment/') || sdkPath.startsWith('dist/development/')
+			|| sdkPath.startsWith('dist/secrets-capability/') || sdkPath === 'dist/configuration/secrets-capability.js'
 			|| sdkPath.startsWith('dist/capacity-provider/contracts/')
 			|| sdkPath === 'dist/capacity-provider/sandbox.js' || sdkPath === 'dist/capacity-provider/sandbox-contracts.js';
 	};
