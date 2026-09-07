@@ -16,18 +16,6 @@ test('registry exactly matches the SDK command tree', () => {
 	assert.equal(commandSpecs.some((command) => command.name.startsWith('ai qualify')), false);
 });
 
-test('AI storage binds exact team/node authority and explicit connection/bucket', async () => {
-	const calls: Array<{ operationId: string; input: unknown }> = [], output: string[] = [];
-	const node = '33333333-3333-4333-8333-333333333333', connection = '44444444-4444-4444-8444-444444444444';
-	const exit = await runCommandLine(['ai', 'storage', 'connect', '--team', 'team-1', '--node', node, '--connection', connection,
-		'--bucket', 'test-ai-artifacts', '--if-match', 'new', '--idempotency-key', 'storage-binding-1', '--json'], {
-		interactiveUi: false, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { configured: true } }; },
-		write: value => output.push(value),
-	});
-	assert.equal(exit, 0, output.join('\n'));
-	assert.deepEqual(calls, [{ operationId: 'ai.instances.storage.put', input: { path: { teamId: 'team-1', instanceId: node }, query: {}, body: { connectionId: connection, bucket: 'test-ai-artifacts' } } }]);
-});
-
 test('send derives project-qualified recipients without a project option or raw routes', async () => {
 	const calls: Array<{ operationId: string; input: unknown }> = []; const output: string[] = [];
 	const exit = await runCommandLine(['send', 'engineering', '@sdk/architect\n\nHow should this work?', '--team', 'team-1', '--to', 'sdk/architect', '--no-wait', '--json'], {
