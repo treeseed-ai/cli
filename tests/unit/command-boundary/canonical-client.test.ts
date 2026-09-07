@@ -13,6 +13,19 @@ import { loadServerSession, saveServerProfile, saveServerSession } from '../../.
 test('registry exactly matches the SDK command tree', () => {
 	assert.deepEqual(commandSpecs.map((command) => command.name), listCommandPaths(TREESEED_COMMAND_TREE_V1));
 	assert.equal(commandSpecs.some((command) => command.name.includes(':')), false);
+	assert.equal(commandSpecs.some((command) => command.name.startsWith('ai qualify')), false);
+});
+
+test('AI storage binds exact team/node authority and explicit connection/bucket', async () => {
+	const calls: Array<{ operationId: string; input: unknown }> = [], output: string[] = [];
+	const node = '33333333-3333-4333-8333-333333333333', connection = '44444444-4444-4444-8444-444444444444';
+	const exit = await runCommandLine(['ai', 'storage', 'connect', '--team', 'team-1', '--node', node, '--connection', connection,
+		'--bucket', 'test-ai-artifacts', '--if-match', 'new', '--idempotency-key', 'storage-binding-1', '--json'], {
+		interactiveUi: false, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { configured: true } }; },
+		write: value => output.push(value),
+	});
+	assert.equal(exit, 0, output.join('\n'));
+	assert.deepEqual(calls, [{ operationId: 'ai.instances.storage.put', input: { path: { teamId: 'team-1', instanceId: node }, query: {}, body: { connectionId: connection, bucket: 'test-ai-artifacts' } } }]);
 });
 
 test('send derives project-qualified recipients without a project option or raw routes', async () => {
@@ -42,13 +55,13 @@ test('teams use persists the active team and team commands inherit it', async ()
 
 test('leaf commands expose only catalog-derived high-level options', () => {
 	const byName = new Map(commandSpecs.map((command) => [command.name, command.options.map((option) => option.flag)]));
-	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--plan']);
+	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--idempotency-key', '--plan']);
 	assert.deepEqual(byName.get('plans show'), ['--server', '--json']);
 	assert.deepEqual(byName.get('agents show'), ['--server', '--project', '--json']);
 	assert.deepEqual(byName.get('host status'), ['--server', '--json']);
 	assert.deepEqual(byName.get('host provider environment set'), ['--server', '--yes', '--json', '--plan', '--stdin']);
-	assert.deepEqual(byName.get('providers registration code rotate'), ['--server', '--team', '--yes', '--json', '--plan']);
-	assert.deepEqual(byName.get('providers environments grant'), ['--server', '--team', '--yes', '--json', '--plan', '--input']);
+	assert.deepEqual(byName.get('providers registration code rotate'), ['--server', '--team', '--yes', '--json', '--if-match', '--idempotency-key', '--plan']);
+	assert.deepEqual(byName.get('providers environments grant'), ['--server', '--team', '--yes', '--json', '--if-match', '--idempotency-key', '--plan', '--input']);
 	assert.equal(commandSpecs.some((command) => command.options.some((option) => option.flag === '--execute' || option.flag === '--market')), false);
 });
 

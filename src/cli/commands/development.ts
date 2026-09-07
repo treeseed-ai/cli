@@ -186,11 +186,11 @@ async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds:
 
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
 	const manifest = resolve(context.cwd, invocation.arguments[0]!); const projects = loadRuntimes(manifest);
-	const now = new Date(), requestedLease = Number(invocation.options.leaseSeconds ?? 14_400), leaseSeconds = Math.max(60, Math.min(86_400, requestedLease));
-	const sessionId = `dev-${randomUUID().slice(0, 12)}`, expiresAt = new Date(now.getTime() + leaseSeconds * 1_000).toISOString();
+	const now = new Date();
+	const sessionId = `dev-${randomUUID().slice(0, 12)}`;
 	const targets = projects.flatMap(({ selection, runtime }) => (selection.targets ?? runtime.targets.map((target) => ({ id: target.id, mode: target.kind === 'rebuild-restart' ? 'candidate' as const : 'released' as const }))).map((target) => ({ projectId: runtime.project.id, targetId: target.id, mode: target.mode, generation: 0, health: target.mode === 'released' ? 'ready' as const : 'pending' as const })));
-	const leases = projects.flatMap(({ selection, runtime }) => runtime.targets.filter((target) => targets.some((entry) => entry.projectId === runtime.project.id && entry.targetId === target.id && entry.mode !== 'released')).flatMap((target) => target.endpoints.filter((endpoint) => endpoint.canonicalAlias).map((endpoint) => ({ kind: 'alias' as const, resource: endpoint.canonicalAlias!, acquiredAt: now.toISOString(), expiresAt }))));
-	const session = { schemaVersion: 'treeseed.development-session/v1' as const, sessionId, actor: String(invocation.options.actor ?? context.env.USER ?? 'local-developer'), hostId: 'local-host', createdAt: now.toISOString(), expiresAt, status: 'planning' as const, repositories: projects.map(({ selection, runtime }) => repositoryClosure(runtime, selection.worktree!)), targets, leases, restoredReceiptId: null, blockers: [] };
+	const leases = projects.flatMap(({ selection, runtime }) => runtime.targets.filter((target) => targets.some((entry) => entry.projectId === runtime.project.id && entry.targetId === target.id && entry.mode !== 'released')).flatMap((target) => target.endpoints.filter((endpoint) => endpoint.canonicalAlias).map((endpoint) => ({ kind: 'alias' as const, resource: endpoint.canonicalAlias!, acquiredAt: now.toISOString() }))));
+	const session = { schemaVersion: 'treeseed.development-session/v2' as const, sessionId, actor: String(invocation.options.actor ?? context.env.USER ?? 'local-developer'), hostId: 'local-host', createdAt: now.toISOString(), status: 'planning' as const, repositories: projects.map(({ selection, runtime }) => repositoryClosure(runtime, selection.worktree!)), targets, leases, restoredReceiptId: null, blockers: [] };
 	if (invocation.options.plan === true) return { session, runtimes: projects.map(({ runtime }) => runtime), mutation: false };
 	const result = await invoke(context, 'local.dev.session.start', { session, runtimes: projects.map(({ runtime }) => runtime) });
 	saveState({ sessionId, manifest, processes: {}, overlays: [], candidates: [] }, context.env); return result;
@@ -198,7 +198,7 @@ async function startSession(invocation: ParsedInvocation, context: CommandContex
 
 async function useTargets(invocation: ParsedInvocation, context: CommandContext) {
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
-	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { expiresAt: string; repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
 	const selections = [invocation.arguments[0]!, ...(Array.isArray(invocation.options.target) ? invocation.options.target : [])].map(parseSelection);
 	if (invocation.options.plan === true) return { sessionId, selections, mutation: false };
 	for (const selection of selections) {
@@ -229,7 +229,7 @@ async function useTargets(invocation: ParsedInvocation, context: CommandContext)
 				const overlayRoot = startPackageSynchronizer(state, runtime, target, repository.worktree, context.env, cliWorktree);
 				saveState(state, context.env);
 				await waitForPackageOverlay(target, repository.worktree, overlayRoot); installPackageOverlay(state, record, runtime, target, repository.worktree, overlayRoot); saveState(state, context.env);
-				if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, { entrypoint: resolve(overlayRoot, 'current', 'dist', 'cli', 'main.js'), expiresAt: record.session.expiresAt });
+				if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, { entrypoint: resolve(overlayRoot, 'current', 'dist', 'cli', 'main.js') });
 			} else if (!usesManagedContainer(target)) await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, `${runtime.project.id}.${target.id}`);
 		}
 		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
@@ -403,9 +403,9 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 		if (record.session.sessionId !== sessionId) throw new Error('Manager returned a different session.');
 		const inventory = await invoke(context, 'local.dev.status', { all: true }) as { sessions: Array<Parameters<typeof planDevelopmentRecovery>[0]> };
 		const plan = planDevelopmentRecovery(record, context.env, undefined, inventory.sessions ?? []);
-		if (['stopped', 'expired'].includes(record.session.status)) {
+		if (record.session.status === 'stopped') {
 			if (!invocation.options.plan) await stopProcesses(plan.state);
-			return { sessionId, mutation: !invocation.options.plan, cleanup: 'expired-processes-only', restoredRoutes: false };
+			return { sessionId, mutation: !invocation.options.plan, cleanup: 'stopped-processes-only', restoredRoutes: false };
 		}
 		if (!invocation.options.plan) applyDevelopmentRecovery(plan);
 		return { sessionId, mutation: !invocation.options.plan, recoveredProcesses: Object.keys(plan.state.processes), recoveredOverlays: plan.state.overlays.length };
