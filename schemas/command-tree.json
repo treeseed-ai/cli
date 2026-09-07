@@ -1412,6 +1412,34 @@
                 "kind": "local",
                 "handlerId": "local.dev.session.stop"
               }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "recover",
+              "description": "Recover a local development session.",
+              "kind": "mutation",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--session",
+                  "description": "Exact manager session whose local custody should be recovered.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "development.recover",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.dev.recover/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.dev.session.recover"
+              }
             }
           ]
         },
@@ -1677,6 +1705,11 @@
               "name": "--plan",
               "description": "Return the exact proposed outcome without mutation.",
               "type": "boolean"
+            },
+            {
+              "name": "--input-file",
+              "description": "Team capacity installation configuration downloaded from Admin. Values are never printed.",
+              "type": "string"
             },
             {
               "name": "--profile",

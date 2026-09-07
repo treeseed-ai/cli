@@ -19,6 +19,7 @@ export { developmentCliEntrypointPath, selectDevelopmentCli } from './developmen
 interface LocalSessionState {
 	sessionId: string;
 	manifest: string;
+	workspaceRoot?: string;
 	processes: Record<string, { pid: number; projectId: string; targetId: string; log: string }>;
 	overlays: Array<{ projectId: string; packageName: string; link: string; backup: string | null; overlayRoot: string }>;
 	candidates: string[];
@@ -128,8 +129,8 @@ async function containerOperation(context: CommandContext, sessionId: string, ru
 	return invoke(context, 'local.dev.container', {sessionId,projectId:runtime.project.id,targetId:target.id,action});
 }
 
-export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
-	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
+export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
+	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: state.workspaceRoot ?? dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
 }
 
 function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
@@ -396,11 +397,16 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 	if (invocation.command.name === 'dev session recover') {
 		const sessionId = String(invocation.options.session ?? '');
 		if (!/^dev-[a-z0-9-]{1,64}$/.test(sessionId)) throw new Error('An exact development session is required.');
-		if (existsSync(resolve(developmentStateRoot(context.env), sessionId, 'session.json'))) return { sessionId, mutation: false, noop: true };
+		const snapshot = resolve(developmentStateRoot(context.env), sessionId, 'session.json');
+		if (existsSync(snapshot) && JSON.parse(readFileSync(snapshot, 'utf8')).workspaceRoot) return { sessionId, mutation: false, noop: true };
 		const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as Parameters<typeof planDevelopmentRecovery>[0];
 		if (record.session.sessionId !== sessionId) throw new Error('Manager returned a different session.');
 		const inventory = await invoke(context, 'local.dev.status', { all: true }) as { sessions: Array<Parameters<typeof planDevelopmentRecovery>[0]> };
 		const plan = planDevelopmentRecovery(record, context.env, undefined, inventory.sessions ?? []);
+		if (['stopped', 'expired'].includes(record.session.status)) {
+			if (!invocation.options.plan) await stopProcesses(plan.state);
+			return { sessionId, mutation: !invocation.options.plan, cleanup: 'expired-processes-only', restoredRoutes: false };
+		}
 		if (!invocation.options.plan) applyDevelopmentRecovery(plan);
 		return { sessionId, mutation: !invocation.options.plan, recoveredProcesses: Object.keys(plan.state.processes), recoveredOverlays: plan.state.overlays.length };
 	}

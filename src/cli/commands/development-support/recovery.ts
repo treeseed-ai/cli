@@ -1,12 +1,22 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, resolve, sep } from 'node:path';
 import type { DevelopmentRuntime } from '@treeseed/sdk/development';
 import { parse } from 'yaml';
 import { developmentStateRoot } from '../development-cli-selection.js';
 
-type Process = { pid: number; cwd: string; argv: string[]; sessionId?: string; worktree?: string };
+type Process = { pid: number; processGroup: number; cwd: string; argv: string[]; sessionId?: string; worktree?: string };
 type Record = { session: { sessionId: string; status: string; repositories: Array<{ projectId: string; worktree: string }>; targets: Array<{ projectId: string; targetId: string; mode: string }> }; runtimes: DevelopmentRuntime[] };
-type State = { sessionId: string; manifest: string; processes: globalThis.Record<string, { pid: number; projectId: string; targetId: string; log: string }>; overlays: Array<{ projectId: string; packageName: string; link: string; backup: string | null; overlayRoot: string }>; candidates: string[] };
+type State = { sessionId: string; manifest: string; workspaceRoot: string; processes: globalThis.Record<string, { pid: number; projectId: string; targetId: string; log: string }>; overlays: Array<{ projectId: string; packageName: string; link: string; backup: string | null; overlayRoot: string }>; candidates: string[] };
+
+export function findDevelopmentWorkspaceRoot(worktree: string): string | null {
+	let root = worktree;
+	while (!existsSync(resolve(root, 'treeseed.site.yaml'))) {
+		const parent = dirname(root);
+		if (parent === root) return null;
+		root = parent;
+	}
+	return realpathSync(root);
+}
 
 /** Read only same-user process identity markers; never return arbitrary environment values. */
 export function developmentProcesses(): Process[] {
@@ -17,14 +27,16 @@ export function developmentProcesses(): Process[] {
 			if (statSync(root).uid !== process.getuid!()) return [];
 			const values = readFileSync(`${root}/environ`, 'utf8').split('\0');
 			const marker = (key: string) => values.find(value => value.startsWith(`${key}=`))?.slice(key.length + 1);
-			return [{ pid: Number(name), cwd: readlinkSync(`${root}/cwd`), argv: readFileSync(`${root}/cmdline`, 'utf8').split('\0').filter(Boolean),
+			const stat = readFileSync(`${root}/stat`, 'utf8');
+			const processGroup = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[2]);
+			return [{ pid: Number(name), processGroup, cwd: readlinkSync(`${root}/cwd`), argv: readFileSync(`${root}/cmdline`, 'utf8').split('\0').filter(Boolean),
 				sessionId: marker('TREESEED_DEVELOPMENT_SESSION_ID'), worktree: marker('TREESEED_DEVELOPMENT_WORKTREE') }];
 		} catch { return []; } // Unreadable or exited processes are not custody evidence.
 	});
 }
 
 export function matchDevelopmentProcess(candidates: Process[], expected: { sessionId: string; worktree: string; cwd: string; command: string; args: string[] }) {
-	const matches = candidates.filter(candidate => candidate.sessionId === expected.sessionId && candidate.worktree === expected.worktree
+	const matches = candidates.filter(candidate => candidate.processGroup === candidate.pid && candidate.sessionId === expected.sessionId && candidate.worktree === expected.worktree
 		&& candidate.cwd === expected.cwd && basename(candidate.argv[0] ?? '') === expected.command
 		&& JSON.stringify(candidate.argv.slice(1)) === JSON.stringify(expected.args));
 	if (matches.length > 1) throw new Error('Ambiguous development process ownership; no session state was changed.');
@@ -33,9 +45,15 @@ export function matchDevelopmentProcess(candidates: Process[], expected: { sessi
 
 export function planDevelopmentRecovery(record: Record, env: NodeJS.ProcessEnv, candidates: Process[] = developmentProcesses(), otherSessions: Record[] = []) {
 	const { session } = record;
-	if (!/^dev-[a-z0-9-]{1,64}$/.test(session.sessionId) || ['stopped', 'expired'].includes(session.status)) throw new Error('An active exact manager session is required for recovery.');
+	if (!/^dev-[a-z0-9-]{1,64}$/.test(session.sessionId)) throw new Error('An exact manager session is required for recovery.');
+	const expired = ['stopped', 'expired'].includes(session.status);
 	const root = resolve(developmentStateRoot(env), session.sessionId);
-	const state: State = { sessionId: session.sessionId, manifest: resolve(root, 'recovered-manifest.json'), processes: {}, overlays: [], candidates: [] };
+	let common = session.repositories[0]?.worktree;
+	if (!common) throw new Error('Recovery requires repository custody.');
+	while (!session.repositories.every(repository => repository.worktree === common || repository.worktree.startsWith(`${common}${sep}`))) common = dirname(common);
+	const workspaceRoot = findDevelopmentWorkspaceRoot(common);
+	if (!workspaceRoot) throw new Error('Recovery requires one unambiguous Platform workspace.');
+	const state: State = { sessionId: session.sessionId, manifest: resolve(root, 'recovered-manifest.json'), workspaceRoot, processes: {}, overlays: [], candidates: [] };
 	const projects: Array<{ manifest: string; worktree: string }> = [];
 	for (const repository of session.repositories) {
 		const worktree = realpathSync(repository.worktree);
@@ -58,12 +76,13 @@ export function planDevelopmentRecovery(record: Record, env: NodeJS.ProcessEnv, 
 			const operation = target.kind === 'package-watch' ? target.operations.watch ?? target.operations.build : target.operations.start;
 			if (!operation) throw new Error('Active target has no recoverable process operation.');
 			const found = matchDevelopmentProcess(candidates, { sessionId: session.sessionId, worktree, cwd: operation.cwd ? resolve(worktree, operation.cwd) : worktree, command: operation.command, args: operation.args });
+			if (!found && expired) continue;
 			if (!found) throw new Error(`No unique owned process for ${repository.projectId}.${target.id}; no state changed.`);
 			const key = `${repository.projectId}.${target.id}`;
 			state.processes[key] = { pid: found.pid, projectId: repository.projectId, targetId: target.id, log: resolve(root, `${key}.log`) };
 			if (target.kind !== 'package-watch') continue;
 			const overlayRoot = resolve(worktree, '.treeseed/cache/development-sessions', session.sessionId, target.id);
-			const sync = candidates.filter(candidate => candidate.cwd === worktree && candidate.argv.some(value => /^package-overlay-sync\.(js|ts)$/.test(basename(value)))
+			const sync = candidates.filter(candidate => candidate.processGroup === candidate.pid && candidate.cwd === worktree && candidate.argv.some(value => /^package-overlay-sync\.(js|ts)$/.test(basename(value)))
 				&& candidate.argv.includes(overlayRoot) && candidate.argv.includes(worktree));
 			if (sync.length > 1) throw new Error('Ambiguous package synchronizer ownership.');
 			if (sync[0]) state.processes[`overlay-sync.${key}`] = { pid: sync[0].pid, projectId: repository.projectId, targetId: target.id, log: resolve(root, `overlay-sync.${key}.log`) };
@@ -94,6 +113,11 @@ export function applyDevelopmentRecovery(plan: ReturnType<typeof planDevelopment
 	if (existsSync(snapshot)) throw new Error('Session custody already exists; use the existing session.');
 	mkdirSync(root, { recursive: true, mode: 0o700 });
 	writeFileSync(plan.state.manifest, `${JSON.stringify({ projects: plan.projects }, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-	writeFileSync(snapshot, `${JSON.stringify(plan.state, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-	// Do not change current.json: it may belong to another active session.
+	const value = `${JSON.stringify(plan.state, null, 2)}\n`;
+	writeFileSync(`${snapshot}.new`, value, { mode: 0o600, flag: 'wx' }); renameSync(`${snapshot}.new`, snapshot);
+	const current = resolve(dirname(root), 'current.json');
+	if (existsSync(current) && JSON.parse(readFileSync(current, 'utf8')).sessionId === plan.state.sessionId) {
+		writeFileSync(`${current}.new`, value, { mode: 0o600, flag: 'wx' }); renameSync(`${current}.new`, current);
+	}
+	// Preserve current.json when another session owns the selection.
 }

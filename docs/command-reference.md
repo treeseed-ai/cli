@@ -480,6 +480,17 @@ Execution: `local.dev.session.stop`.
 - `--session <value>`: Development session identity.
 - `--restore`: Restore released routes and targets.
 
+### trsd dev session recover
+
+Recover a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.recover/v1`.
+Execution: `local.dev.session.recover`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Exact manager session whose local custody should be recovered.
+
 ### trsd dev use <selection>
 
 Use a local development session.
@@ -587,6 +598,7 @@ Execution: `local.host.initialize`.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--input-file <value>`: Team capacity installation configuration downloaded from Admin. Values are never printed.
 - `--profile <value>`: Catalog-bound host initialization profile.
 - `--confirm`: Confirm installation of the reviewed profile plan.
 
