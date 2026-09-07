@@ -89,7 +89,10 @@ test('host runtime includes the SDK capacity-provider contracts required by Depl
 		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts/index.js'), 'export {};\n');
 		writeFileSync(resolve(root, 'node_modules/yaml/index.js'), 'export {};\n');
 		writeFileSync(resolve(root, 'node_modules/zod/index.js'), 'export {};\n');
+		symlinkSync(resolve(root,'node_modules'),resolve(root,'node_modules/@treeseed/sdk/node_modules'),'dir');
 		assert.equal(hostDevelopmentRuntimeManifest(root).some((entry) => entry.path === 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts/index.js'), true);
+		symlinkSync(resolve(root,'package.json'),resolve(root,'dist/escape.js'));
+		assert.throws(()=>hostDevelopmentRuntimeManifest(root),/symbolic link/);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
