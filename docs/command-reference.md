@@ -2531,6 +2531,18 @@ Control-plane operation: `ai.instances.storage.remove`.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+### trsd ai storage verify
+
+Verify the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.verify/v1`.
+Execution: `local.host.ai.storage.verify`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
 ## trsd library
 
 Library operations.
