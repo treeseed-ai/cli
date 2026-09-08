@@ -61,6 +61,8 @@ function templateLock(root: string, id: string) {
 async function projectCreate(invocation: ParsedInvocation, context: CommandContext) {
 	const slug = invocation.arguments[0]!;
 	const templateId = String(invocation.options.template ?? '');
+	const visibility = String(invocation.options.visibility ?? 'private');
+	if (visibility !== 'public' && visibility !== 'private') throw invalid('repository_visibility_invalid', '--visibility must be public or private.');
 	if (!templateId) throw invalid('template_required', '--template is required.');
 	const planning = invocation.options.plan === true; const applying = invocation.options.apply === true;
 	if (planning === applying) throw invalid('project_create_mode_required', 'Choose exactly one of --plan or --apply.');
@@ -73,7 +75,7 @@ async function projectCreate(invocation: ParsedInvocation, context: CommandConte
 		invoke = (body) => client.invoke(CONTROL_PLANE_OPERATIONS.projects.create, { path: { teamId }, query: {}, body }, { idempotencyKey: randomUUID(), headers: {} });
 	}
 	if (!teamId) throw Object.assign(new Error('Select an active team with `trsd teams use <team>` before creating a project.'), { category: 'ambiguous_context', code: 'active_team_required' });
-	const plan = projectCreatePlanSchema.parse(payload(await invoke({ mode: 'plan', target: { slug, template, repository: { name: slug, visibility: 'private' } } }, false)));
+	const plan = projectCreatePlanSchema.parse(payload(await invoke({ mode: 'plan', target: { slug, template, repository: { name: slug, visibility } } }, false)));
 	if (planning) return plan;
 	if (!plan.ok) throw Object.assign(new Error('Project creation is blocked by conflicting remote authority.'), { category: 'policy_blocked', code: 'platform_project_create_blocked', partialResult: plan });
 	return payload(await invoke({ mode: 'apply', plan }, true));

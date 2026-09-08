@@ -1085,6 +1085,11 @@
                   "required": true
                 },
                 {
+                  "name": "--visibility",
+                  "description": "Repository visibility: public or private (default private).",
+                  "type": "string"
+                },
+                {
                   "name": "--json",
                   "description": "Emit the stable command-result envelope.",
                   "type": "boolean"
