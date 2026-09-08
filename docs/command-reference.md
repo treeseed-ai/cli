@@ -353,6 +353,7 @@ Execution: `local.platform.project.create`.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--apply`: Apply the accepted creation plan.
 - `--template <value>`: Published template identity.
+- `--visibility <value>`: Repository visibility: public or private (default private).
 
 ## trsd platform topology
 

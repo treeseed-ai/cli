@@ -27,6 +27,33 @@ test('platform project create plans through API authority without mutation', asy
 		assert.equal(exit, 0, output.join('\n')); assert.equal(calls.length, 1); assert.equal(calls[0].input.body.mode, 'plan');
 		assert.match(calls[0].options.idempotencyKey, /^[0-9a-f-]{36}$/u);
 		assert.equal(JSON.parse(output[0]!).result.planDigest, digest);
+		assert.equal(calls[0].input.body.target.repository.visibility, 'private');
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('explicit public visibility is preserved in planning and exact apply', async () => {
+	const root = fixture(); const calls: any[] = []; const output: string[] = [];
+	const publicPlan = { ...plan, repository: { ...plan.repository, visibility: 'public' } };
+	try {
+		const exit = await runCommandLine(['platform', 'project', 'create', 'example-app', '--template', 'engineering', '--visibility', 'public', '--apply', '--yes', '--json'], {
+			cwd: root, env: { TREESEED_TEAM_ID: 'team-1' }, interactiveUi: false, write: (value) => output.push(value),
+			operationInvoke: async (_operationId, input: any) => { calls.push(input.body); return { data: input.body.mode === 'plan' ? publicPlan : { ...publicPlan, projectId: 'project-1' } }; },
+		});
+		assert.equal(exit, 0, output.join('\n'));
+		assert.equal(calls[0].target.repository.visibility, 'public');
+		assert.deepEqual(calls[1].plan, publicPlan);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('invalid visibility fails before invoking project authority', async () => {
+	const root = fixture(); let called = false; const output: string[] = [];
+	try {
+		const exit = await runCommandLine(['platform', 'project', 'create', 'example-app', '--template', 'engineering', '--visibility', 'internal', '--plan', '--json'], {
+			cwd: root, env: { TREESEED_TEAM_ID: 'team-1' }, interactiveUi: false, write: (value) => output.push(value),
+			operationInvoke: async () => { called = true; return { data: plan }; },
+		});
+		assert.equal(exit, 1); assert.equal(called, false);
+		assert.match(output.join(''), /repository_visibility_invalid/u);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
