@@ -4,21 +4,22 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { DevelopmentRuntime, DevelopmentTarget } from '@treeseed/sdk/development';
 import { developmentStateRoot } from '../development-cli-selection.js';
+import { ownsDevelopmentProcess, processIdentity } from './process-identity.js';
 
 interface OverlaySessionState {
  sessionId: string;
- processes: Record<string, { pid: number; projectId: string; targetId: string; log: string }>;
+ processes: Record<string, { pid: number; identity?: string; projectId: string; targetId: string; log: string }>;
  overlays: Array<{ projectId: string; packageName: string; link: string; backup: string | null; overlayRoot: string }>;
 }
 
 export async function stopProcesses(state: OverlaySessionState) {
-	const running = Object.values(state.processes);
+	const running = Object.values(state.processes).filter(entry => ownsDevelopmentProcess(entry, state.sessionId));
 	for (const processState of running) {
 		try { process.kill(-processState.pid, 'SIGTERM'); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
 	}
 	const deadline = Date.now() + 5_000;
 	while (Date.now() < deadline && running.some((processState) => { try { process.kill(processState.pid, 0); return true; } catch { return false; } })) await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
-	for (const processState of running) { try { process.kill(-processState.pid, 'SIGKILL'); } catch { /* process exited during the grace period */ } }
+	for (const processState of running) { if (ownsDevelopmentProcess(processState, state.sessionId)) try { process.kill(-processState.pid, 'SIGKILL'); } catch { /* process exited during the grace period */ } }
 	state.processes = {};
 	return running;
 }
@@ -82,7 +83,8 @@ export function relativeOverlayTarget(link: string, overlayRoot: string) {
 
 export function startPackageSynchronizer(state: OverlaySessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, env: NodeJS.ProcessEnv, cliWorktree?: string) {
 	const key = `overlay-sync.${runtime.project.id}.${target.id}`, overlayRoot = resolve(worktree, '.treeseed', 'cache', 'development-sessions', state.sessionId, target.id);
-	const existing = state.processes[key]; if (existing) { try { process.kill(existing.pid, 0); return overlayRoot; } catch { delete state.processes[key]; } }
+	const existing = state.processes[key]; if (existing && ownsDevelopmentProcess(existing, state.sessionId)) return overlayRoot;
+	delete state.processes[key];
 	const installedCompiledModule = fileURLToPath(new URL('../../development/package-overlay-sync.js', import.meta.url));
 	const worktreeCompiledModule = cliWorktree ? resolve(cliWorktree, 'dist/cli/development/package-overlay-sync.js') : '';
 	const worktreeSourceModule = cliWorktree ? resolve(cliWorktree, 'src/cli/development/package-overlay-sync.ts') : '';
@@ -94,8 +96,8 @@ export function startPackageSynchronizer(state: OverlaySessionState, runtime: De
 	mkdirSync(dirname(log), { recursive: true, mode: 0o700 }); const descriptor = openSync(log, 'a', 0o600);
 	try {
 		if (target.ready.kind !== 'marker') throw new Error(`${key} requires marker readiness.`);
-		const child = spawn(process.execPath, [...moduleArguments, worktree, overlayRoot, JSON.stringify(target.outputs.map((output) => output.path)), target.ready.path], { cwd: worktree, env, detached: true, stdio: ['ignore', descriptor, descriptor] });
-		child.unref(); if (!child.pid) throw new Error(`Failed to start ${key}.`); state.processes[key] = { pid: child.pid, projectId: runtime.project.id, targetId: target.id, log };
+		const child = spawn(process.execPath, [...moduleArguments, worktree, overlayRoot, JSON.stringify(target.outputs.map((output) => output.path)), target.ready.path], { cwd: worktree, env: { ...env, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId }, detached: true, stdio: ['ignore', descriptor, descriptor] });
+		child.unref(); if (!child.pid) throw new Error(`Failed to start ${key}.`); state.processes[key] = { pid: child.pid, identity: processIdentity(child.pid), projectId: runtime.project.id, targetId: target.id, log };
 	} finally { closeSync(descriptor); }
 	return overlayRoot;
 }
@@ -129,13 +131,14 @@ export async function waitForNewPackageOverlay(target: DevelopmentTarget, worktr
 export async function stopProcess(state: OverlaySessionState, key: string) {
 	const processState = state.processes[key];
 	if (!processState) return;
+	if (!ownsDevelopmentProcess(processState, state.sessionId)) { delete state.processes[key]; return; }
 	try { process.kill(-processState.pid, 'SIGTERM'); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
 	const deadline = Date.now() + 5_000;
 	while (Date.now() < deadline) {
 		try { process.kill(processState.pid, 0); } catch { break; }
 		await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
 	}
-	try { process.kill(-processState.pid, 'SIGKILL'); } catch { /* it exited during the grace period */ }
+	if (ownsDevelopmentProcess(processState, state.sessionId)) try { process.kill(-processState.pid, 'SIGKILL'); } catch { /* it exited during the grace period */ }
 	delete state.processes[key];
 }
 

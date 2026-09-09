@@ -12,6 +12,7 @@ import { dependentReactions, installPackageOverlay, overlayGeneration, relativeO
 import { artifactPaths, compatibilityAttestations, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
+import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
 
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
@@ -20,7 +21,7 @@ interface LocalSessionState {
 	sessionId: string;
 	manifest: string;
 	workspaceRoot?: string;
-	processes: Record<string, { pid: number; projectId: string; targetId: string; log: string }>;
+	processes: Record<string, { pid: number; identity?: string; projectId: string; targetId: string; log: string }>;
 	overlays: Array<{ projectId: string; packageName: string; link: string; backup: string | null; overlayRoot: string }>;
 	candidates: string[];
 }
@@ -144,7 +145,8 @@ function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, t
 	if (!operation) return null;
 	const key = `${runtime.project.id}.${target.id}`;
 	const existing = state.processes[key];
-	if (existing) { try { process.kill(existing.pid, 0); return existing; } catch { delete state.processes[key]; } }
+	if (existing && ownsDevelopmentProcess(existing, state.sessionId)) return existing;
+	delete state.processes[key];
 	const root = operation.cwd ? resolve(worktree, operation.cwd) : worktree;
 	const log = resolve(developmentStateRoot(env), state.sessionId, `${key}.log`);
 	mkdirSync(dirname(log), { recursive: true, mode: 0o700 });
@@ -152,13 +154,14 @@ function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, t
 	try {
 		const child = spawn(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), detached: true, stdio: ['ignore', descriptor, descriptor] });
 		child.unref(); if (!child.pid) throw new Error(`Failed to start ${key}.`);
-		return state.processes[key] = { pid: child.pid, projectId: runtime.project.id, targetId: target.id, log };
+		return state.processes[key] = { pid: child.pid, identity: processIdentity(child.pid), projectId: runtime.project.id, targetId: target.id, log };
 	} finally { closeSync(descriptor); }
 }
 
 function operationIsRunning(state: LocalSessionState, key: string) {
 	const existing = state.processes[key]; if (!existing) return false;
-	try { process.kill(existing.pid, 0); return true; } catch { delete state.processes[key]; return false; }
+	if (ownsDevelopmentProcess(existing, state.sessionId)) return true;
+	delete state.processes[key]; return false;
 }
 
 async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds: number, state?: LocalSessionState, key?: string) {
@@ -196,9 +199,10 @@ async function startSession(invocation: ParsedInvocation, context: CommandContex
 	saveState({ sessionId, manifest, processes: {}, overlays: [], candidates: [] }, context.env); return result;
 }
 
-async function useTargets(invocation: ParsedInvocation, context: CommandContext) {
+async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'options'>, context: CommandContext) {
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
-	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { status?: string; repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
+	if (record.session.status === 'stopped') throw new Error('The development session has been explicitly stopped.');
 	const selections = [invocation.arguments[0]!, ...(Array.isArray(invocation.options.target) ? invocation.options.target : [])].map(parseSelection);
 	if (invocation.options.plan === true) return { sessionId, selections, mutation: false };
 	for (const selection of selections) {
@@ -392,6 +396,21 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 	}
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, manual, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
+}
+
+/** Resume only current manager selections; never reconstruct desired state from stale PIDs. */
+export async function resumeDevelopmentSession(sessionId: string, context: CommandContext) {
+	if (!/^dev-[a-z0-9-]{1,64}$/.test(sessionId)) throw new Error('An exact development session is required.');
+	loadState(context.env, sessionId);
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord & { session: { status: string } };
+	if (record.session.status === 'stopped') return;
+	for (const target of record.session.targets.filter(target => target.mode !== 'released')) {
+		const current = await invoke(context, 'local.dev.status', { sessionId, all: false }) as typeof record;
+		if (current.session.status === 'stopped') return;
+		const selected = current.session.targets.find(entry => entry.projectId === target.projectId && entry.targetId === target.targetId);
+		if (!selected || selected.mode !== target.mode) continue;
+		await useTargets({ arguments: [`${target.projectId}.${target.targetId}=${target.mode}`], options: { session: sessionId } }, context);
+	}
 }
 
 export async function runDevelopment(invocation: ParsedInvocation, context: CommandContext) {
