@@ -42,6 +42,37 @@ test('lifecycle lock releases after a failed operation', { skip: process.platfor
     } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('boot acquisition survives a timeout window while manual acquisition stays bounded', { skip: process.platform !== 'linux', timeout: 15000 }, async () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'lifecycle-boot-wait-'));
+    const owner = child(root);
+    const env = { XDG_STATE_HOME: root };
+    let runs = 0;
+    try {
+        assert.equal((await once(owner, 'message'))[0], 'entered');
+        const queued = withDevelopmentLifecycle(env, async () => { runs++; return 'ready'; }, { waitForOwner: true, lockTimeoutSeconds: 1 });
+        await assert.rejects(withDevelopmentLifecycle(env, async () => assert.fail('manual entered'), { lockTimeoutSeconds: 1 }), /OS custody is busy/);
+        await delay(300);
+        assert.equal(runs, 0);
+        const exited = once(owner, 'exit'); owner.send('release'); await exited;
+        assert.equal(await queued, 'ready');
+        assert.equal(runs, 1);
+    } finally { await stop(owner); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('boot waiting never replays action errors or retries invalid lock configuration', { skip: process.platform !== 'linux', timeout: 5000 }, async () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'lifecycle-no-replay-'));
+    let runs = 0;
+    try {
+        await assert.rejects(withDevelopmentLifecycle({ XDG_STATE_HOME: root }, async () => {
+            runs++; throw new Error('OS custody is busy; retry the operation');
+        }, { waitForOwner: true }), /OS custody is busy/);
+        assert.equal(runs, 1);
+        await assert.rejects(withDevelopmentLifecycle({ XDG_STATE_HOME: root }, async () => assert.fail('entered'), {
+            waitForOwner: true, lockTimeoutSeconds: 0,
+        }), /Invalid custody lock timeout/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('healthy exact managed snapshot is reusable; missing runtime requires startup', () => {
     const state = JSON.stringify({ Name: 'treeseed-dev-test-api-operations-runner', State: 'running', Health: 'healthy' });
     assert.equal(managedContainerAlreadyReady({ registered: true, state }, 'dev-test', 'operations-runner'), true);
