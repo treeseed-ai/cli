@@ -30,7 +30,7 @@ test('teams use persists the active team and team commands inherit it', async ()
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-team-')); const output: string[] = [];
 	const env = { TREESEED_CONFIG_HOME: root, TREESEED_API_BASE_URL: 'http://127.0.0.1:3002' };
 	try {
-		saveServerSession({ serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'token', principal: { id: 'user-1' } as any }, env);
+		await saveServerSession({ serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'token', principal: { id: 'user-1' } as any }, env);
 		const invoke = async (operationId: string, input: any) => operationId === 'teams.list'
 			? { data: { items: [{ id: 'team-1', slug: 'treeseed', name: 'TreeSeed' }] } }
 			: { data: { operationId, teamId: input.path.teamId } };
@@ -101,7 +101,7 @@ test('host storage connect derives the active team and keeps bootstrap authority
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-storage-')); const calls: any[] = []; const output: string[] = [];
 	const env = { TREESEED_CONFIG_HOME: root, TREESEED_API_BASE_URL: 'http://127.0.0.1:3002' };
 	try {
-		saveServerSession({ serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'session', principal: { id: 'user-1' } as any,
+		await saveServerSession({ serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'session', principal: { id: 'user-1' } as any,
 			activeTeam: { id: '16549507-cebc-4a16-94c5-cf91defbd6a3', slug: 'treeseed', name: 'TreeSeed' } }, env);
 		const exit = await runCommandLine(['host', 'storage', 'connect', 'cloudflare-r2', '--json'], {
 			env, interactiveUi: false, promptSecret: async () => 'bootstrap-token-secret-value',
@@ -310,7 +310,7 @@ for (const field of ['registrationCode', 'enrollmentToken']) test(`provider enro
 	try {
 		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` };
 		saveServerProfile(profile, env);
-		saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
+		await saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
 		const handoffs: Record<string, unknown>[] = [];
 		const output: string[] = [];
 		const exit = await runCommandLine(['providers', 'connect', '--server', 'test', '--team', 'team-1', '--yes', '--json'], {
@@ -355,7 +355,7 @@ test('seed apply enrolls, owner-approves, and waits for execution-ready provider
 	writeFileSync(file, `schemaVersion: treeseed.seed-bundle/v3\nname: treeseed\nversion: 4\ndescription: test\nenvironments: [local]\ndigest: sha256:${'0'.repeat(64)}\nresources: { teams: [], memberships: [], projects: [], repositories: [] }\nruntime: { capacityProviders: [] }\n`);
 	const env = { TREESEED_CONFIG_HOME: root, TREESEED_SEED_PROVIDER_TIMEOUT_SECONDS: '10' };
 	try {
-		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` }; saveServerProfile(profile, env); saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
+		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` }; saveServerProfile(profile, env); await saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
 		const handoffs: Record<string, unknown>[] = []; const output: string[] = [];
 		const exit = await runCommandLine(['seeds', 'apply', file, '--server', 'test', '--yes', '--json'], { env, interactiveUi: false,
 			providerEnrollmentHandoff: async (input) => { handoffs.push(input); return input.action === 'begin' ? { requestId: 'request-1' } : { status: 'connected' }; }, write: (value) => output.push(value) });
@@ -404,7 +404,7 @@ test('high-risk operations replay the exact request with signed server confirmat
 	try {
 		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` };
 		saveServerProfile(profile, env);
-		saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
+		await saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
 		const output: string[] = [];
 		const exit = await runCommandLine(['workdays', 'start', '--server', 'test', '--team', 'team-1', '--preflight', 'p1', '--digest', 'sha256:x', '--yes', '--json'], { env, interactiveUi: false, write: (value) => output.push(value) });
 		assert.equal(exit, 0);
@@ -441,7 +441,7 @@ test('expired sessions rotate through OAuth before invoking the operation', asyn
 	const env = { TREESEED_CONFIG_HOME: root };
 	try {
 		saveServerProfile({ serverId: 'test', label: 'Test', baseUrl }, env);
-		saveServerSession({ serverId: 'test', audience: baseUrl, accessToken: 'expired-access', refreshToken: 'old-refresh', expiresAt: '2020-01-01T00:00:00.000Z' }, env);
+		await saveServerSession({ serverId: 'test', audience: baseUrl, accessToken: 'expired-access', refreshToken: 'old-refresh', expiresAt: '2020-01-01T00:00:00.000Z' }, env);
 		const output: string[] = [];
 		const exit = await runCommandLine(['status', '--server', 'test', '--json'], { env, interactiveUi: false, write: (value) => output.push(value) });
 		assert.equal(exit, 0);

@@ -4,7 +4,7 @@ import { ControlPlaneClient, ControlPlaneClientError } from '@treeseed/sdk/contr
 import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { CONTROL_PLANE_CLI_CLIENT_ID, createControlPlaneClient } from '../support/client.js';
-import { clearServerSession, saveServerProfile, saveServerSession } from '../support/server-custody.js';
+import { updateServerSession, saveServerProfile, saveServerSession } from '../support/server-custody.js';
 
 const DEFAULT_SCOPES: OAuthScope[] = ['treeseed:read', 'treeseed:knowledge:write', 'treeseed:governance:write', 'treeseed:projects:write', 'treeseed:execution'];
 const DEFAULT_LOGIN_TIMEOUT_SECONDS = 300;
@@ -62,7 +62,7 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 				const activeTeam = samePrincipal && prior && teams.some((team) => team.id === prior.id)
 					? teams.find((team) => team.id === prior.id)! : teams.length === 1 ? teams[0]! : null;
 				saveServerProfile(profile, context.env);
-				saveServerSession({ serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken, expiresAt, principal, activeTeam }, context.env);
+				await saveServerSession({ serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken, expiresAt, principal, activeTeam }, context.env);
 				return { serverId: profile.serverId, principal: principal ?? null, activeTeam, expiresAt, scopes: token.scope };
 			} catch (error) {
 				const state = pollingState(error);
@@ -74,9 +74,11 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 		throw Object.assign(new Error(`Device authorization was not approved within ${timeoutSeconds} seconds.`), { category: 'authentication_required', code: 'device_authorization_timeout' });
 	}
 	if (invocation.command.name === 'auth logout') {
-		const token = session?.refreshToken ?? session?.accessToken;
-		if (token) await client.revokeToken(CONTROL_PLANE_CLI_CLIENT_ID, token).catch(() => undefined);
-		clearServerSession(profile.serverId, context.env);
+		await updateServerSession(profile.serverId, context.env, async current => {
+			const token = current?.refreshToken ?? current?.accessToken;
+			if (token) await client.revokeToken(CONTROL_PLANE_CLI_CLIENT_ID, token, AbortSignal.timeout(10_000)).catch(() => undefined);
+			return null;
+		});
 		return { serverId: profile.serverId, loggedOut: true };
 	}
 	throw new Error(`Unknown OAuth protocol command: ${invocation.command.name}`);
