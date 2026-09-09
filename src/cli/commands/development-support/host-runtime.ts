@@ -25,8 +25,7 @@ function files(root: string, directory: string, include: (path: string) => boole
 }
 
 export function hostDevelopmentRuntimeManifest(worktree: string) {
-	// Ship only the production dependency closure. Host sandbox code imports the
-	// narrow SDK sandbox boundary, so TreeDX and TypeScript remain outside it.
+	// Deployment owns the runtime roots; preserve their installed resolution graph.
 	const roots = [resolve(worktree, 'dist'), ...hostDependencyRoots(worktree)];
 	for (const root of roots) if (!existsSync(root)) throw new Error(`Host development runtime dependency is missing: ${relative(worktree, root)}.`);
 	const packageContent = readFileSync(resolve(worktree, 'package.json'));
