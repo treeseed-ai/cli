@@ -64,7 +64,7 @@
     "yaml"
   ],
   "devDependencies": {
-    "@treeseed/deployment": "https://github.com/treeseed-ai/deployment/releases/download/0.1.0-rc.244/treeseed-deployment-runtime-0.1.0-rc.244.tgz",
+    "@treeseed/deployment": "https://github.com/treeseed-ai/deployment/releases/download/0.1.0-rc.277/treeseed-deployment-runtime-0.1.0-rc.277.tgz",
     "@treeseed/ui": ">=0.12.18-rc.12 <0.14.0",
     "@types/node": "^24.6.0",
     "@types/react": "^19.2.14",
