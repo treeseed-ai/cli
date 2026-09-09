@@ -406,7 +406,7 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 
 /** Resume only current manager selections; never reconstruct desired state from stale PIDs. */
 export async function resumeDevelopmentSession(sessionId: string, context: CommandContext) {
-	return withDevelopmentLifecycle(context.env, () => resumeDevelopmentUnlocked(sessionId, context));
+	return withDevelopmentLifecycle(context.env, () => resumeDevelopmentUnlocked(sessionId, context), { waitForOwner: true });
 }
 
 async function resumeDevelopmentUnlocked(sessionId: string, context: CommandContext) {
