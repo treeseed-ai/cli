@@ -14,6 +14,7 @@ import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
 import { developmentBootOrder } from './development-support/boot-order.js';
+import { managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
 
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
@@ -127,7 +128,7 @@ export function usesManagedContainer(target: DevelopmentTarget) {
 	return target.operations.start?.command === 'docker';
 }
 
-async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop') {
+async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop' | 'status') {
 	return invoke(context, 'local.dev.container', {sessionId,projectId:runtime.project.id,targetId:target.id,action});
 }
 
@@ -222,6 +223,10 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 			restoreOverlays(state, selection.projectId);
 			if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, null);
 		} else {
+			if (usesManagedContainer(target) && managedContainerAlreadyReady(await containerOperation(context, sessionId, runtime, target, 'status'), sessionId, target.id)) {
+				await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+				continue;
+			}
 			const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: selection.projectId, targetId: selection.targetId }) as { environment?: NodeJS.ProcessEnv };
 			if (target.operations.setup) runOneShotOperation(state, target.operations.setup, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			const running = operationIsRunning(state, `${runtime.project.id}.${target.id}`);
@@ -401,6 +406,10 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 
 /** Resume only current manager selections; never reconstruct desired state from stale PIDs. */
 export async function resumeDevelopmentSession(sessionId: string, context: CommandContext) {
+	return withDevelopmentLifecycle(context.env, () => resumeDevelopmentUnlocked(sessionId, context));
+}
+
+async function resumeDevelopmentUnlocked(sessionId: string, context: CommandContext) {
 	if (!/^dev-[a-z0-9-]{1,64}$/.test(sessionId)) throw new Error('An exact development session is required.');
 	loadState(context.env, sessionId);
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord & { session: { status: string } };
@@ -415,6 +424,11 @@ export async function resumeDevelopmentSession(sessionId: string, context: Comma
 }
 
 export async function runDevelopment(invocation: ParsedInvocation, context: CommandContext) {
+	if (invocation.options.plan === true || ['dev status', 'dev logs', 'dev plan', 'dev host status'].includes(invocation.command.name)) return runDevelopmentUnlocked(invocation, context);
+	return withDevelopmentLifecycle(context.env, () => runDevelopmentUnlocked(invocation, context));
+}
+
+async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.name === 'dev session recover') {
 		const sessionId = String(invocation.options.session ?? '');
 		if (!/^dev-[a-z0-9-]{1,64}$/.test(sessionId)) throw new Error('An exact development session is required.');
