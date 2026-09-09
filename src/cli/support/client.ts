@@ -6,8 +6,7 @@ import {
 } from '@treeseed/sdk/control-plane-client';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { loadServerRegistry, loadServerSession, updateServerSession } from './server-custody.js';
-
-export const CONTROL_PLANE_CLI_CLIENT_ID = 'trsd';
+import { identitySessionClient, validateIdentitySession } from './identity-session.js';
 
 export function controlPlaneServerRegistry(context: Pick<CommandContext, 'env'>): ControlPlaneServerRegistry {
 	const stored = loadServerRegistry(context.env);
@@ -28,17 +27,19 @@ export async function createControlPlaneClient(invocation: Pick<ParsedInvocation
 	const profile = resolveControlPlaneServer(selector, registry);
 	let session = loadServerSession(profile.serverId, context.env);
 	if (requireAuth && !session?.accessToken) throw Object.assign(new Error(`Not logged in to ${profile.serverId}. Run trsd auth login --server ${profile.serverId}.`), { category: 'authentication_required', code: 'authentication_required' });
+	if (requireAuth && session) validateIdentitySession(profile, session);
 	let client = new ControlPlaneClient({ profile, accessToken: session?.accessToken ?? null, userAgent: 'trsd' });
 	if (requireAuth && session?.refreshToken && (forceRefresh || (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now() + 30_000))) {
 		const observedRefresh = session.refreshToken;
 		session = await updateServerSession(profile.serverId, context.env, async current => {
 			if (!current?.accessToken || !current.refreshToken) throw Object.assign(new Error('Session ended before renewal. Log in again.'), { category: 'authentication_required', code: 'authentication_required' });
+			validateIdentitySession(profile,current);
 			const expired = current.expiresAt && new Date(current.expiresAt).getTime() <= Date.now() + 30_000;
 			if (!expired && (!forceRefresh || current.refreshToken !== observedRefresh)) return current;
-			const refreshingClient = new ControlPlaneClient({ profile, accessToken: current.accessToken, userAgent: 'trsd' });
-			const token = await refreshingClient.refreshAccessToken(CONTROL_PLANE_CLI_CLIENT_ID, current.refreshToken, AbortSignal.timeout(10_000));
-			if (token.audience !== current.audience) throw Object.assign(new Error('Refreshed token audience does not match the stored server session.'), { category: 'authentication_required', code: 'oauth_audience_mismatch' });
-			return { serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken ?? current.refreshToken, expiresAt: new Date(Date.now() + token.expiresIn * 1_000).toISOString(), principal: token.principal, activeTeam: current.activeTeam ?? null };
+			const result = await (await identitySessionClient(profile,current)).refresh(current.refreshToken,current.identity);
+			if (!Number.isFinite(result.tokens.expires_in) || result.tokens.expires_in! <= 0) throw new Error('Identity did not return a bounded token lifetime.');
+			return { ...current, accessToken:result.tokens.access_token, refreshToken:result.tokens.refresh_token ?? current.refreshToken,
+				expiresAt:new Date(Date.now() + result.tokens.expires_in! * 1000).toISOString() };
 		}, true);
 		if (!session) throw new Error('Session ended during renewal. Log in again.');
 		client = new ControlPlaneClient({ profile, accessToken: session.accessToken, userAgent: 'trsd' });

@@ -127,12 +127,14 @@ Auth operations.
 Login the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.login/v1`.
-Execution: `protocol.oauth.device.login`.
+Execution: `protocol.identity.login`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
-- `--timeout <value>`: Maximum seconds to wait for device authorization.
+- `--timeout <value>`: Maximum seconds to wait for identity authorization.
+- `--device`: Use headless device authorization instead of local browser PKCE.
+- `--issuer <value>`: Choose an authorization server advertised by the selected API.
 
 ### trsd auth logout
 

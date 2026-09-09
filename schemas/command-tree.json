@@ -514,8 +514,18 @@
             },
             {
               "name": "--timeout",
-              "description": "Maximum seconds to wait for device authorization.",
+              "description": "Maximum seconds to wait for identity authorization.",
               "type": "number"
+            },
+            {
+              "name": "--device",
+              "description": "Use headless device authorization instead of local browser PKCE.",
+              "type": "boolean"
+            },
+            {
+              "name": "--issuer",
+              "description": "Choose an authorization server advertised by the selected API.",
+              "type": "string"
             }
           ],
           "authorization": {
@@ -525,7 +535,7 @@
           "resultSchemaId": "treeseed.command.login/v1",
           "execution": {
             "kind": "protocol",
-            "handlerId": "protocol.oauth.device.login"
+            "handlerId": "protocol.identity.login"
           }
         },
         {
