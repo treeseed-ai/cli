@@ -22,7 +22,7 @@ test('container startup and cleanup only invoke the protected manager, including
       if(request.handlerId==='local.dev.session.start'){record={session:payload.session,runtimes:payload.runtimes};records.set(payload.session.sessionId,record);return record;}
       record=records.get(payload.sessionId)??record;
       if(request.handlerId==='local.dev.environment')return {environment:{}};
-      if(request.handlerId==='local.dev.container'){assert.equal(payload.sessionId,selected);actions.push(payload.action);return {};}
+      if(request.handlerId==='local.dev.container'){assert.equal(payload.sessionId,selected);actions.push(payload.action);return payload.action==='status'?{registered:false,state:null}:{};}
       if(request.handlerId==='local.dev.use'){
         if(payload.mode!=='released')assert.equal(payload.port,3000,'Every activation, including restart, must reattach the canonical route');
         record.session.targets[0].mode=payload.mode;
@@ -42,6 +42,6 @@ test('container startup and cleanup only invoke the protected manager, including
     assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','use','api.service=released','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','session','stop','--session',selected,'--json'],context),0);
-    assert.deepEqual(actions,['start','stop','start','stop','stop']);
+    assert.deepEqual(actions,['status','start','stop','start','stop','stop']);
   } finally {rmSync(root,{recursive:true,force:true});}
 });

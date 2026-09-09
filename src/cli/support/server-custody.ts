@@ -2,6 +2,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { OsSecretCustody, withOsCustodyLock } from '@treeseed/deployment/security/custody';
+// Keep shared OS locking in this already-bundled Deployment custody boundary.
+export { withOsCustodyLock };
 import { defaultLocalControlPlaneServer, normalizeControlPlaneServerRegistry,
   type ControlPlaneServerProfile, type ControlPlaneServerRegistry, type ControlPlaneServerSession } from '@treeseed/sdk/control-plane-client';
 interface SessionState { version: 1; sessions: ControlPlaneServerSession[]; custodyVersion: number }
