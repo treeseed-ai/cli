@@ -13,6 +13,7 @@ import { artifactPaths, compatibilityAttestations, withFreezeLock } from './deve
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
+import { developmentBootOrder } from './development-support/boot-order.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
 
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
@@ -404,7 +405,7 @@ export async function resumeDevelopmentSession(sessionId: string, context: Comma
 	loadState(context.env, sessionId);
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord & { session: { status: string } };
 	if (record.session.status === 'stopped') return;
-	for (const target of record.session.targets.filter(target => target.mode !== 'released')) {
+	for (const target of developmentBootOrder(record.session.targets, record.runtimes)) {
 		const current = await invoke(context, 'local.dev.status', { sessionId, all: false }) as typeof record;
 		if (current.session.status === 'stopped') return;
 		const selected = current.session.targets.find(entry => entry.projectId === target.projectId && entry.targetId === target.targetId);
