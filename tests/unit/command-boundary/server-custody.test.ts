@@ -21,7 +21,7 @@ test('server profiles and encrypted OAuth sessions remain CLI-local and redacted
 	const env = { TREESEED_CONFIG_HOME: root };
 	try {
 		saveServerProfile({ serverId: 'test', label: 'Test', baseUrl: 'https://control.example.test' }, env);
-		await saveServerSession({ serverId: 'test', audience: 'https://control.example.test', accessToken: 'secret-access', refreshToken: 'secret-refresh', principal: null }, env);
+		await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[], serverId: 'test', audience: 'https://control.example.test', accessToken: 'secret-access', refreshToken: 'secret-refresh', principal: null }, env);
 		await saveActiveTeam('test', { id: 'team-1', slug: 'treeseed', name: 'TreeSeed' }, env);
 		assert.equal(loadServerSession('test', env)?.accessToken, 'secret-access');
 		assert.equal(loadServerSession('test', env)?.activeTeam?.slug, 'treeseed');
@@ -64,7 +64,7 @@ test('session transactions preserve concurrent server and team edits and invalid
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-transactions-'));
 	const env = { TREESEED_CONFIG_HOME: root };
 	try {
-		await Promise.all(['one', 'two'].map(serverId => saveServerSession({serverId, audience:'https://api.example.test', accessToken:'old', refreshToken:'refresh'}, env)));
+		await Promise.all(['one', 'two'].map(serverId => saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[],serverId, audience:'https://api.example.test', accessToken:'old', refreshToken:'refresh'}, env)));
 		assert.deepEqual(inspectServerCustody(env).servers.map(entry => entry.serverId), ['one','two']);
 		let release!: () => void;
 		let entered!: () => void;
@@ -92,7 +92,7 @@ test('logout waits for renewal and a queued renewal cannot resurrect a removed s
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-logout-race-'));
 	const env = { TREESEED_CONFIG_HOME: root };
 	try {
-		await saveServerSession({serverId:'one', audience:'https://api.example.test', accessToken:'old'}, env);
+		await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[],serverId:'one', audience:'https://api.example.test', accessToken:'old'}, env);
 		let entered!: () => void;
 		let release!: () => void;
 		const started = new Promise<void>(resolve => { entered = resolve; });

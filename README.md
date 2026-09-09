@@ -54,6 +54,19 @@ trsd workdays list --team treeseed --json
 
 Commands default to the local control plane at `http://127.0.0.1:3002`. `TREESEED_API_BASE_URL` overrides that address. Server profiles and encrypted OAuth sessions are owned locally by the CLI; control-plane behavior remains API-owned.
 
+Identity sign-in requires the API's trusted HTTPS address (the managed local edge is
+`https://api.treeseed.localhost`), not its internal HTTP listener. Configure that address
+in the server profile or `TREESEED_API_BASE_URL`. `trsd auth login` discovers the API's
+advertised identity provider and uses browser PKCE with a temporary loopback callback.
+Use `--device` on a headless machine; use `--issuer` only to select among authorities
+advertised by that API. The CLI never collects the identity-provider password.
+
+Tokens stay in OS-encrypted local custody, bound to the exact API, issuer, subject,
+and client. Refresh, logout, and team selection serialize through one OS transaction.
+Old unbound sessions require fresh sign-in, not a fallback to the retired token issuer.
+`trsd auth logout` removes the local session even if upstream revocation is unavailable;
+the JSON result reports whether upstream revocation succeeded.
+
 ## Team discussions
 
 `trsd send` opens the active team's topic browser; `trsd send <topic>` opens it with a topic selected. The workbench keeps per-topic composers and recipient selections, shows all listeners and lifecycle events, and can export the visible transcript to Markdown. `trsd send <topic> <message>` remains the one-shot form.

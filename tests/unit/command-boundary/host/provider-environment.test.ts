@@ -23,7 +23,7 @@ test('provider code rotation pre-reads and replays the exact response ETag', asy
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-provider-code-')); const env = { TREESEED_CONFIG_HOME: root };
 	try {
 		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` };
-		saveServerProfile(profile, env); await saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
+		saveServerProfile(profile, env); await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[], serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
 		assert.equal(await runCommandLine(['providers', 'registration', 'code', 'rotate', '--server', 'test', '--team', 'team-1', '--yes', '--json'], { env, interactiveUi: false, write() {} }), 0);
 		assert.deepEqual(requests, [
 			{ method: 'GET', url: '/v1/teams/team-1/capacity-provider-registration-code', ifMatch: undefined },
