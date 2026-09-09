@@ -1,7 +1,8 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { OsSecretCustody } from '@treeseed/deployment/security/custody';
+import { OsSecretCustody, withOsCustodyLock } from '@treeseed/deployment/security/custody';
+export { withOsCustodyLock };
 import { defaultLocalControlPlaneServer, normalizeControlPlaneServerRegistry,
   type ControlPlaneServerProfile, type ControlPlaneServerRegistry, type ControlPlaneServerSession } from '@treeseed/sdk/control-plane-client';
 interface SessionState { version: 1; sessions: ControlPlaneServerSession[]; custodyVersion: number }
