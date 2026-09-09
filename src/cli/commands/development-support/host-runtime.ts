@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { basename, relative, resolve } from 'node:path';
 import type { CommandContext, ParsedInvocation } from '../../types.js';
 import { invokeLocalHostManager } from '../../support/host-client.js';
+import { hostDependencyRoots } from './host-dependencies.js';
 
 interface DevelopmentFile { path: string; size: number; sha256: string }
 
@@ -24,21 +25,12 @@ function files(root: string, directory: string, include: (path: string) => boole
 }
 
 export function hostDevelopmentRuntimeManifest(worktree: string) {
-	// Ship only the production dependency closure. Host sandbox code imports the
-	// narrow SDK sandbox boundary, so TreeDX and TypeScript remain outside it.
-	const dependencies = ['@treeseed/sdk', 'yaml', 'zod'];
-	const roots = [resolve(worktree, 'dist'), ...dependencies.map((dependency) => resolve(worktree, 'node_modules', dependency))];
+	// Deployment owns the runtime roots; preserve their installed resolution graph.
+	const roots = [resolve(worktree, 'dist'), ...hostDependencyRoots(worktree)];
 	for (const root of roots) if (!existsSync(root)) throw new Error(`Host development runtime dependency is missing: ${relative(worktree, root)}.`);
 	const packageContent = readFileSync(resolve(worktree, 'package.json'));
-	const sdkRoot = resolve(worktree, 'node_modules', '@treeseed', 'sdk');
 	const productionRuntimeFile = (path: string) => {
-		if (!/(?:\.js|\.json|\.node|\.wasm)$/u.test(path) || /\.map$/u.test(path)) return false;
-		if (!path.startsWith(`${sdkRoot}/`)) return true;
-		const sdkPath = relative(sdkRoot, path);
-		return sdkPath === 'package.json' || sdkPath.startsWith('dist/deployment/') || sdkPath.startsWith('dist/development/')
-			|| sdkPath.startsWith('dist/secrets-capability/') || sdkPath === 'dist/configuration/secrets-capability.js'
-			|| sdkPath.startsWith('dist/capacity-provider/contracts/')
-			|| sdkPath === 'dist/capacity-provider/sandbox.js' || sdkPath === 'dist/capacity-provider/sandbox-contracts.js';
+		return /\.(?:[cm]?js|json|node|wasm)$/u.test(path);
 	};
 	return [{ path: 'package.json', size: packageContent.byteLength, sha256: sha256(packageContent) }, ...roots.flatMap((root) => files(worktree, root, productionRuntimeFile))].sort((left, right) => left.path.localeCompare(right.path));
 }
