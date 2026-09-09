@@ -93,7 +93,7 @@ test('host runtime includes the SDK capacity-provider contracts required by Depl
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-runtime-'));
 	try {
 		for (const directory of ['dist', 'node_modules/@treeseed/sdk/dist/deployment', 'node_modules/@treeseed/sdk/dist/development', 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts', 'node_modules/yaml', 'node_modules/zod']) mkdirSync(resolve(root, directory), { recursive: true });
-		writeFileSync(resolve(root, 'package.json'), '{}\n');
+		writeFileSync(resolve(root, 'package.json'), JSON.stringify({ dependencies: { '@treeseed/sdk': '1' }, treeseed: { hostRuntimeDependencies: ['@treeseed/sdk'] } }));
 		writeFileSync(resolve(root, 'dist/index.js'), 'export {};\n');
 		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/package.json'), '{}\n');
 		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/deployment/index.js'), 'export {};\n');
