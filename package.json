@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.69",
+  "version": "0.13.0-rc.70",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -51,8 +51,8 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/sdk": "0.13.0-rc.106",
-    "@treeseed/identity": "0.1.0-rc.9",
+    "@treeseed/identity": "0.1.0-rc.16",
+    "@treeseed/sdk": "0.13.0-rc.108",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",
@@ -65,12 +65,12 @@
     "yaml"
   ],
   "devDependencies": {
-    "jose": "6.2.12",
     "@treeseed/deployment": "https://github.com/treeseed-ai/deployment/releases/download/0.1.0-rc.277/treeseed-deployment-runtime-0.1.0-rc.277.tgz",
     "@treeseed/ui": ">=0.12.18-rc.12 <0.14.0",
     "@types/node": "^24.6.0",
     "@types/react": "^19.2.14",
     "esbuild": "^0.25.10",
+    "jose": "6.2.12",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
