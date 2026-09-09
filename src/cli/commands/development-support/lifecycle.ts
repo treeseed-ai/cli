@@ -6,9 +6,25 @@ import { developmentStateRoot } from '../development-cli-selection.js';
  * operator's lifecycle, not a time-limited development selection. Deployment
  * owns the kernel-lock implementation; process death releases its descriptor.
  */
-export function withDevelopmentLifecycle<T>(env: NodeJS.ProcessEnv, action: () => Promise<T>): Promise<T> {
+export async function withDevelopmentLifecycle<T>(env: NodeJS.ProcessEnv, action: () => Promise<T>, options: {
+    waitForOwner?: boolean;
+    lockTimeoutSeconds?: number;
+} = {}): Promise<T> {
     if (process.platform !== 'linux') return action();
-    return withOsCustodyLock(resolve(developmentStateRoot(env), 'lifecycle'), action, 60);
+    for (;;) {
+        let entered = false;
+        try {
+            return await withOsCustodyLock(resolve(developmentStateRoot(env), 'lifecycle'), async () => {
+                entered = true;
+                return action();
+            }, options.lockTimeoutSeconds ?? 60);
+        } catch (error) {
+            // Only unattended acquisition waits again. Never replay a partially
+            // executed lifecycle, even if it throws the same custody message.
+            if (!options.waitForOwner || entered || !(error instanceof Error)
+                || error.message !== 'OS custody is busy; retry the operation') throw error;
+        }
+    }
 }
 
 /** Reusing an immutable snapshot is not permission to overwrite its contents.
