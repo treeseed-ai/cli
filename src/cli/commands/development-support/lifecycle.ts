@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { withOsCustodyLock } from '@treeseed/deployment/security/custody';
+import { withOsCustodyLock } from '../../support/server-custody.js';
 import { developmentStateRoot } from '../development-cli-selection.js';
 
 /** Shared builds and current.json cross session boundaries. Lock the Linux

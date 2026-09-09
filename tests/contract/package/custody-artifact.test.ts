@@ -10,7 +10,7 @@ test('extracted CLI custody imports without a manager or runtime Deployment pack
     cpSync('dist',join(root,'dist'),{recursive:true});writeFileSync(join(root,'package.json'),'{"type":"module"}');
     mkdirSync(join(root,'node_modules','@treeseed'),{recursive:true});
     symlinkSync(resolve('node_modules/@treeseed/sdk'),join(root,'node_modules/@treeseed/sdk'),'dir');
-    const result=spawnSync(process.execPath,['--input-type=module','-e',"import {inspectServerCustody} from './dist/cli/support/server-custody.js'; const result=inspectServerCustody({TREESEED_CONFIG_HOME:process.cwd()+'/config'}); if(result.custody!=='os'||result.encrypted)process.exit(1);"],{cwd:root,encoding:'utf8',env:{...process.env,NODE_OPTIONS:''}});
+    const result=spawnSync(process.execPath,['--input-type=module','-e',"import {inspectServerCustody} from './dist/cli/support/server-custody.js'; import {withDevelopmentLifecycle} from './dist/cli/commands/development-support/lifecycle.js'; await withDevelopmentLifecycle({XDG_STATE_HOME:process.cwd()},async()=>{}); const result=inspectServerCustody({TREESEED_CONFIG_HOME:process.cwd()+'/config'}); if(result.custody!=='os'||result.encrypted)process.exit(1);"],{cwd:root,encoding:'utf8',env:{...process.env,NODE_OPTIONS:''}});
     assert.equal(result.status,0,result.stderr);
   }finally{rmSync(root,{recursive:true,force:true});}
 });
