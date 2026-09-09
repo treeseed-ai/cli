@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { hostDependencyRoots } from '../../../src/cli/commands/development-support/host-dependencies.ts';
+import { hostDependencyRoots } from '../../../../src/cli/commands/development-support/host-dependencies.ts';
 
 test('host custody includes nested production dependencies but not development-only packages', () => {
 	const root = mkdtempSync(join(tmpdir(), 'host-closure-'));
