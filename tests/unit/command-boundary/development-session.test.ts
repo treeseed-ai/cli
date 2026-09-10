@@ -89,6 +89,26 @@ test('host runtime development planning is local and status uses the protected m
 	assert.equal(calls.length, 1);
 });
 
+test('development logs include bounded diagnostics for a selected managed container', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-container-logs-')), file = resolve(root, 'treeseed.package.yaml');
+	const calls: Array<{ handlerId: string; options: { payload: string } }> = [], output: string[] = [];
+	try {
+		writeFileSync(file, manifest.replaceAll('admin', 'api').replace('id: web', 'id: service').replace('command: npm', 'command: docker'));
+		execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		const context = { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false,
+			hostInvoke: async (input: { handlerId: string; options: { payload: string } }) => { calls.push(input); return input.handlerId === 'local.dev.session.start' ? { session: { sessionId: 'dev-logtest' } } : { events: [{ code: '53300' }] }; },
+			write: (value: string) => output.push(value) };
+		assert.equal(await runCommandLine(['dev', 'session', 'start', file, '--json'], context), 0, output.join('\n'));
+		const sessionId = JSON.parse(calls[0]!.options.payload).session.sessionId;
+		output.length = 0;
+		assert.equal(await runCommandLine(['dev', 'logs', '--session', sessionId, '--target', 'api.service', '--json'], context), 0, output.join('\n'));
+		assert.equal(calls[1]?.handlerId, 'local.dev.container');
+		assert.deepEqual(JSON.parse(calls[1]!.options.payload), { sessionId, projectId: 'api', targetId: 'service', action: 'logs' });
+		assert.deepEqual(JSON.parse(output[0]!).result.logs, [{ target: 'api.service', diagnostics: { events: [{ code: '53300' }] } }]);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('host runtime includes the SDK capacity-provider contracts required by Deployment', () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-runtime-'));
 	try {
