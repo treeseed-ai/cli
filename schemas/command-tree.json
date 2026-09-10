@@ -1936,6 +1936,60 @@
           ]
         },
         {
+          "nodeType": "branch",
+          "segment": "postgres",
+          "description": "Postgres operations.",
+          "children": [
+            {
+              "nodeType": "branch",
+              "segment": "transfer",
+              "description": "Transfer operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "prepare",
+                  "description": "Prepare the selected resource.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "file",
+                      "description": "file identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.prepare",
+                    "confirmation": "authority"
+                  },
+                  "resultSchemaId": "treeseed.command.prepare/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.postgres.transfer.prepare"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "status",
+                  "description": "Status the selected resource.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.command.status/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.postgres.transfer.status"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
           "nodeType": "leaf",
           "segment": "topology",
           "description": "Topology the selected resource.",
