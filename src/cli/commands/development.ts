@@ -128,7 +128,7 @@ export function usesManagedContainer(target: DevelopmentTarget) {
 	return target.operations.start?.command === 'docker';
 }
 
-async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop' | 'status') {
+async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop' | 'status' | 'logs') {
 	return invoke(context, 'local.dev.container', {sessionId,projectId:runtime.project.id,targetId:target.id,action});
 }
 
@@ -463,7 +463,12 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	if (invocation.command.name === 'dev plan') return invoke(context, 'local.dev.plan', { sessionId, selected: [] });
 	if (invocation.command.name === 'dev logs') {
 		const selected = typeof invocation.options.target === 'string' ? invocation.options.target : null;
-		return { logs: Object.entries(state.processes).filter(([key]) => !selected || key === selected).map(([target, processState]) => ({ target, path: processState.log, bytes: existsSync(processState.log) ? statSync(processState.log).size : 0 })) };
+		const logs: unknown[] = Object.entries(state.processes).filter(([key]) => !selected || key === selected).map(([target, processState]) => ({ target, path: processState.log, bytes: existsSync(processState.log) ? statSync(processState.log).size : 0 }));
+		for (const { runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
+			const key = `${runtime.project.id}.${target.id}`;
+			if (usesManagedContainer(target) && (!selected || selected === key)) logs.push({ target: key, diagnostics: await containerOperation(context, sessionId, runtime, target, 'logs') });
+		}
+		return { logs };
 	}
 	if (invocation.command.name === 'dev rebuild') {
 		return rebuild(invocation, context, state, sessionId);
