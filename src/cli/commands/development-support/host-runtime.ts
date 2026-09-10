@@ -29,10 +29,19 @@ export function hostDevelopmentRuntimeManifest(worktree: string) {
 	const roots = [resolve(worktree, 'dist'), ...hostDependencyRoots(worktree)];
 	for (const root of roots) if (!existsSync(root)) throw new Error(`Host development runtime dependency is missing: ${relative(worktree, root)}.`);
 	const packageContent = readFileSync(resolve(worktree, 'package.json'));
+	const declaredAssets: unknown = JSON.parse(packageContent.toString('utf8')).treeseed?.hostRuntimeAssets ?? [];
+	if (!Array.isArray(declaredAssets) || declaredAssets.some((path: unknown) => typeof path !== 'string'
+		|| !/^node_modules\/(?:@[a-zA-Z0-9._-]+\/)?[a-zA-Z0-9._-]+\/(?:[a-zA-Z0-9@._+-]+\/)*[a-zA-Z0-9@._+-]+$/u.test(path)
+		|| path.split('/').some(segment => segment === '.' || segment === '..')))
+		throw new Error('Deployment hostRuntimeAssets must contain exact production dependency file paths.');
+	const assets = new Set<string>(declaredAssets);
 	const productionRuntimeFile = (path: string) => {
-		return /\.(?:[cm]?js|json|node|wasm)$/u.test(path);
+		return /\.(?:[cm]?js|json|node|wasm)$/u.test(path) || assets.has(relative(worktree, path));
 	};
-	return [{ path: 'package.json', size: packageContent.byteLength, sha256: sha256(packageContent) }, ...roots.flatMap((root) => files(worktree, root, productionRuntimeFile))].sort((left, right) => left.path.localeCompare(right.path));
+	const manifest = [{ path: 'package.json', size: packageContent.byteLength, sha256: sha256(packageContent) }, ...roots.flatMap((root) => files(worktree, root, productionRuntimeFile))].sort((left, right) => left.path.localeCompare(right.path));
+	for (const asset of assets) if (!manifest.some(file => file.path === asset))
+		throw new Error(`Declared host runtime asset is missing from the production dependency closure: ${asset}.`);
+	return manifest;
 }
 
 function defaultWorktree(cwd: string) {
