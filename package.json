@@ -51,7 +51,7 @@
     "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/identity": "0.1.0-rc.22",
+    "@treeseed/identity": "0.1.0-rc.23",
     "@treeseed/sdk": "0.13.0-rc.110",
     "ink": "^7.1.1",
     "react": "^19.2.8",
