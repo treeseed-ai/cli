@@ -18,11 +18,11 @@ test('registry exactly matches the SDK command tree', () => {
 
 test('send derives project-qualified recipients without a project option or raw routes', async () => {
 	const calls: Array<{ operationId: string; input: unknown }> = []; const output: string[] = [];
-	const exit = await runCommandLine(['send', 'engineering', '@sdk/architect\n\nHow should this work?', '--team', 'team-1', '--to', 'sdk/architect', '--no-wait', '--json'], {
+	const exit = await runCommandLine(['send', 'engineering', '@sdk/architect\n\nHow should this work?', '--team', '11111111-1111-4111-8111-111111111111', '--to', 'sdk/architect', '--no-wait', '--json'], {
 		interactiveUi: false, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { sendId: 'send-1', status: 'queued' } }; }, write: (value) => output.push(value),
 	});
 	assert.equal(exit, 0);
-	assert.deepEqual(calls, [{ operationId: 'communications.send', input: { path: { teamId: 'team-1', channel: 'engineering' }, query: {}, body: { message: '@sdk/architect\n\nHow should this work?', recipients: ['sdk/architect'] } } }]);
+	assert.deepEqual(calls, [{ operationId: 'communications.send', input: { path: { teamId: '11111111-1111-4111-8111-111111111111', channel: 'engineering' }, query: {}, body: { message: '@sdk/architect\n\nHow should this work?', recipients: ['sdk/architect'] } } }]);
 	assert.equal(JSON.parse(output[0]!).result.sendId, 'send-1');
 });
 
@@ -32,12 +32,12 @@ test('teams use persists the active team and team commands inherit it', async ()
 	try {
 		await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[], serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'token', principal: { id: 'user-1' } as any }, env);
 		const invoke = async (operationId: string, input: any) => operationId === 'teams.list'
-			? { data: { items: [{ id: 'team-1', slug: 'treeseed', name: 'TreeSeed' }] } }
+			? { data: { items: [{ id: '11111111-1111-4111-8111-111111111111', slug: 'treeseed', name: 'TreeSeed' }] } }
 			: { data: { operationId, teamId: input.path.teamId } };
 		assert.equal(await runCommandLine(['teams', 'use', 'treeseed', '--json'], { env, interactiveUi: false, operationInvoke: invoke, write: (value) => output.push(value) }), 0);
-		assert.equal(loadServerSession('local', env)?.activeTeam?.id, 'team-1');
+		assert.equal(loadServerSession('local', env)?.activeTeam?.id, '11111111-1111-4111-8111-111111111111');
 		assert.equal(await runCommandLine(['capacity', 'status', '--json'], { env, interactiveUi: false, operationInvoke: invoke, write: (value) => output.push(value) }), 0);
-		assert.equal(JSON.parse(output.at(-1)!).result.teamId, 'team-1');
+		assert.equal(JSON.parse(output.at(-1)!).result.teamId, '11111111-1111-4111-8111-111111111111');
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -170,7 +170,7 @@ test('removed legacy commands are unknown without mutation', async () => {
 test('plan mode prevents mutation operation invocation', async () => {
 	const output: string[] = [];
 	let invocations = 0;
-	const exit = await runCommandLine(['workdays', 'start', '--team', 'team-1', '--preflight', 'p1', '--digest', 'sha256:x', '--plan', '--json'], { interactiveUi: false, operationInvoke: async () => { invocations += 1; }, write: (value) => output.push(value) });
+	const exit = await runCommandLine(['workdays', 'start', '--team', '11111111-1111-4111-8111-111111111111', '--preflight', 'p1', '--digest', 'sha256:x', '--plan', '--json'], { interactiveUi: false, operationInvoke: async () => { invocations += 1; }, write: (value) => output.push(value) });
 	assert.equal(exit, 0);
 	assert.equal(invocations, 0);
 	assert.equal(JSON.parse(output[0]!).result.mutation, false);
@@ -186,14 +186,14 @@ test('plan mode is non-mutating for local credential custody', async () => {
 test('remote commands invoke exactly one SDK operation without a URL', async () => {
 	const invocations: Array<{ operationId: string; input: unknown }> = [];
 	const output: string[] = [];
-	const exit = await runCommandLine(['capacity', 'status', '--team', 'team-1', '--json'], {
+	const exit = await runCommandLine(['capacity', 'status', '--team', '11111111-1111-4111-8111-111111111111', '--json'], {
 		interactiveUi: false,
 		operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { data: { source: 'api' } }; },
 		write: (value) => output.push(value),
 	});
 	assert.equal(exit, 0);
 	assert.deepEqual(JSON.parse(output[0]!).result, { source: 'api' });
-	assert.deepEqual(invocations, [{ operationId: 'capacity.status', input: { path: { teamId: 'team-1' }, query: {}, body: undefined } }]);
+	assert.deepEqual(invocations, [{ operationId: 'capacity.status', input: { path: { teamId: '11111111-1111-4111-8111-111111111111' }, query: {}, body: undefined } }]);
 });
 
 test('library commands resolve project slugs and the bound TreeDX repository', async () => {
@@ -299,7 +299,7 @@ for (const field of ['registrationCode', 'enrollmentToken']) test(`provider enro
 		request.on('data', (chunk) => { requestBody += String(chunk); });
 		request.on('end', () => {
 			response.setHeader('content-type', 'application/json');
-			response.end(JSON.stringify({ data: { teamId: 'team-1', [field]: 'one-time' } }));
+			response.end(JSON.stringify({ data: { teamId: '11111111-1111-4111-8111-111111111111', [field]: 'one-time' } }));
 		});
 	});
 	await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept));
@@ -313,7 +313,7 @@ for (const field of ['registrationCode', 'enrollmentToken']) test(`provider enro
 		await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[], serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
 		const handoffs: Record<string, unknown>[] = [];
 		const output: string[] = [];
-		const exit = await runCommandLine(['providers', 'connect', '--server', 'test', '--team', 'team-1', '--yes', '--json'], {
+		const exit = await runCommandLine(['providers', 'connect', '--server', 'test', '--team', '11111111-1111-4111-8111-111111111111', '--yes', '--json'], {
 			env, interactiveUi: false,
 			providerEnrollmentHandoff: async (input) => { handoffs.push(input); return { requestId: 'request-1' }; },
 			write: (value) => output.push(value),
@@ -329,7 +329,7 @@ for (const field of ['registrationCode', 'enrollmentToken']) test(`provider enro
 		assert.equal(requestBody, '{}');
 		assert.equal(handoffs[0]?.registrationCode, 'one-time');
 		assert.deepEqual(JSON.parse(output[0]!).result, {
-			teamId: 'team-1', connectionState: 'approval_required', provider: { requestId: 'request-1' },
+			teamId: '11111111-1111-4111-8111-111111111111', connectionState: 'approval_required', provider: { requestId: 'request-1' },
 		});
 	} finally {
 		await new Promise<void>((accept, reject) => server.close((error) => error ? reject(error) : accept()));
@@ -343,7 +343,7 @@ test('seed apply enrolls, owner-approves, and waits for execution-ready provider
 		request.resume(); request.on('end', () => {
 			paths.push(request.url ?? ''); response.setHeader('content-type', 'application/json');
 			if (request.url?.endsWith('/apply')) response.end(JSON.stringify({ data: { seed: 'treeseed', result: { providerClosure: { status: 'waiting_provider', receipts: [{
-				key: 'capacity-provider:treeseed/local', status: 'enrollment_required', approval: 'trusted-local-owner', teamId: 'team-1', connectionId: 'local-team-1', registrationCode: 'one-time',
+				key: 'capacity-provider:treeseed/local', status: 'enrollment_required', approval: 'trusted-local-owner', teamId: '11111111-1111-4111-8111-111111111111', connectionId: 'local-11111111-1111-4111-8111-111111111111', registrationCode: 'one-time',
 			}] } } } }));
 			else if (request.url?.includes('/capacity-provider-requests/')) response.end(JSON.stringify({ data: { status: 'approved' } }));
 			else response.end(JSON.stringify({ data: { seed: 'treeseed', result: { providerClosure: { status: 'verified', receipts: [{ status: 'verified' }] } } } }));
@@ -406,7 +406,7 @@ test('high-risk operations replay the exact request with signed server confirmat
 		saveServerProfile(profile, env);
 		await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[], serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
 		const output: string[] = [];
-		const exit = await runCommandLine(['workdays', 'start', '--server', 'test', '--team', 'team-1', '--preflight', 'p1', '--digest', 'sha256:x', '--yes', '--json'], { env, interactiveUi: false, write: (value) => output.push(value) });
+		const exit = await runCommandLine(['workdays', 'start', '--server', 'test', '--team', '11111111-1111-4111-8111-111111111111', '--preflight', 'p1', '--digest', 'sha256:x', '--yes', '--json'], { env, interactiveUi: false, write: (value) => output.push(value) });
 		assert.equal(exit, 0);
 		assert.deepEqual(JSON.parse(output[0]!).result, { started: true });
 		assert.equal(requests.length, 2);

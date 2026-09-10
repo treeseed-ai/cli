@@ -5,7 +5,7 @@ import { runCommandLine } from '../../../src/cli/runtime.ts';
 
 test('interactive chat requires a TTY when the send message is omitted', async () => {
 	const output: string[] = [];
-	const exit = await runCommandLine(['send', 'sdk-agent-tuning', '--team', 'team-1', '--json'], {
+	const exit = await runCommandLine(['send', 'sdk-agent-tuning', '--team', '11111111-1111-4111-8111-111111111111', '--json'], {
 		interactiveUi: false, write: (value) => output.push(value),
 	});
 	assert.equal(exit, 1);
@@ -14,7 +14,7 @@ test('interactive chat requires a TTY when the send message is omitted', async (
 
 test('send without a topic opens the same TTY-only topic browser boundary', async () => {
 	const output: string[] = [];
-	const exit = await runCommandLine(['send', '--team', 'team-1', '--json'], {
+	const exit = await runCommandLine(['send', '--team', '11111111-1111-4111-8111-111111111111', '--json'], {
 		interactiveUi: false, write: (value) => output.push(value),
 	});
 	assert.equal(exit, 1);
