@@ -5,6 +5,19 @@ import type { CommandContext } from '../types.js';
 
 export const IDENTITY_CLIENT_ID = 'trsd';
 export const IDENTITY_SCOPES = ['treeseed:read', 'treeseed:knowledge:write', 'treeseed:governance:write', 'treeseed:projects:write', 'treeseed:execution'];
+export function requestedIdentityScopes(additional: unknown): string[] {
+	if (additional === undefined) return [...IDENTITY_SCOPES];
+	if (typeof additional !== 'string' || !additional.trim()) throw new Error('--scope requires comma-separated additional API scopes.');
+	const scopes = additional.split(',').map(value => value.trim());
+	if (scopes.some(scope => !/^[\x21\x23-\x2b\x2d-\x5b\x5d-\x7e]+$/u.test(scope))) throw new Error('--scope contains an invalid API scope.');
+	return [...new Set([...IDENTITY_SCOPES, ...scopes])];
+}
+export function grantedIdentityScopes(requested: string[], granted: string | undefined): string[] {
+	// OAuth permits omitting scope only when the issued scope equals the request.
+	const scopes = granted === undefined ? requested : granted.split(/\s+/u).filter(Boolean);
+	if (requested.some(scope => !scopes.includes(scope))) throw new Error('Identity did not grant every requested API scope. Existing login was preserved.');
+	return [...new Set(scopes)];
+}
 type LoginResult = Awaited<ReturnType<Awaited<ReturnType<Awaited<ReturnType<typeof createNativeOidcClient>>['begin']>>['finish']>>;
 
 async function showAuthorization(url: string, context: CommandContext) {
@@ -46,14 +59,15 @@ async function nativeLogin(options: Omit<NativeOidcOptions, 'redirectUri'>, cont
 	}
 }
 
-export async function identityLogin(input: {resource:string; issuer?:string; device:boolean; timeoutSeconds:number}, context:CommandContext): Promise<LoginResult> {
+export async function identityLogin(input: {resource:string; issuer?:string; device:boolean; timeoutSeconds:number; scopes?:string[]}, context:CommandContext): Promise<LoginResult> {
 	const selected = await discoverResourceAuthorization({resource:input.resource, issuer:input.issuer, transport:fetch});
-	if (IDENTITY_SCOPES.some(scope => !selected.scopesSupported.includes(scope))) throw new Error('The selected API does not advertise the required TreeSeed login scopes.');
-	const options = {issuer:selected.issuer, clientId:IDENTITY_CLIENT_ID, resource:selected.resource, scopes:IDENTITY_SCOPES,
+	const scopes = input.scopes ?? IDENTITY_SCOPES;
+	if (scopes.some(scope => !selected.scopesSupported.includes(scope))) throw new Error('The selected API does not advertise every requested login scope.');
+	const options = {issuer:selected.issuer, clientId:IDENTITY_CLIENT_ID, resource:selected.resource, scopes,
 		verificationKey:await discoverSigningKeys({issuer:selected.issuer, transport:fetch}), profile:'keycloak' as const, transport:fetch,
 		resolvePrincipal:async (identity: {subject:string}) => ({principalId:identity.subject,kind:'human' as const})};
 	if (!input.device) return nativeLogin(options, context, input.timeoutSeconds);
-	const pending = await (await createDeviceAuthorizationClient({...options, resources:[selected.resource]})).begin({resource:selected.resource, scopes:IDENTITY_SCOPES});
+	const pending = await (await createDeviceAuthorizationClient({...options, resources:[selected.resource]})).begin({resource:selected.resource, scopes});
 	try {
 		await showAuthorization(pending.verificationUriComplete ?? pending.verificationUri, context);
 		if (!pending.verificationUriComplete) context.write(`Enter code ${pending.userCode}.`,'stderr');

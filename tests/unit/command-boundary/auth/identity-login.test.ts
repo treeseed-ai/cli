@@ -6,15 +6,17 @@ import test from 'node:test';
 import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import { loadServerSession, saveServerProfile } from '../../../../src/cli/support/server-custody.ts';
 import { apiResource, identityFixture, identityIssuer } from '../../../support/identity-fixture.ts';
+import { IDENTITY_SCOPES } from '../../../../src/cli/support/identity-login.ts';
 
-for (const device of [false,true]) test(`identity ${device ? 'device':'browser PKCE'} login stores only encrypted resource-bound credentials`,async context=>{
-	const fixture=await identityFixture(), realFetch=globalThis.fetch;
+for (const device of [false,true]) for (const administrative of [false,true]) test(`identity ${device ? 'device':'browser PKCE'} ${administrative ? 'explicit admin' : 'default'} login stores only encrypted resource-bound credentials`,async context=>{
+	const scopes = administrative ? [...IDENTITY_SCOPES, 'treeseed:admin'] : IDENTITY_SCOPES;
+	const fixture=await identityFixture({scopes}), realFetch=globalThis.fetch;
 	context.mock.method(globalThis,'fetch',fixture.transport);
 	const root=mkdtempSync(join(tmpdir(),'treeseed-cli-login-')),env={TREESEED_CONFIG_HOME:root};
 	const output:Array<{value:string;stream?:string}>=[];
 	try {
 		saveServerProfile({serverId:'test',label:'Test',baseUrl:apiResource},env);
-		const exit=await runCommandLine(['auth','login','--server','test','--json',...(device ? ['--device']:[])],{
+		const exit=await runCommandLine(['auth','login','--server','test','--json',...(device ? ['--device']:[]),...(administrative ? ['--scope','treeseed:admin']:[])],{
 			env,interactiveUi:false,write:(value,stream)=>output.push({value,stream}),
 			openExternal:async url=>{
 				if (!device) {const callback=fixture.authorize(url);const response=await realFetch(callback);assert.equal(response.status,200);}
@@ -25,6 +27,7 @@ for (const device of [false,true]) test(`identity ${device ? 'device':'browser P
 		const session=loadServerSession('test',env)!;
 		assert.deepEqual(session.identity,{issuer:identityIssuer,subject:'subject'});
 		assert.equal(session.principal?.id,'local-user');assert.equal(session.audience,apiResource);
+		assert.deepEqual(session.scopes, scopes);
 		const stdout=output.filter(item=>item.stream!=='stderr').map(item=>item.value).join('');
 		assert.equal(JSON.parse(stdout).ok,true);
 		for (const secret of [session.accessToken,session.refreshToken!,'private-device']) assert.equal(JSON.stringify(output).includes(secret),false);
