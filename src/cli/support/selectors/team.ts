@@ -1,6 +1,6 @@
 import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
-import type { CommandContext, ParsedInvocation } from '../types.js';
-import { createControlPlaneClient } from './client.js';
+import type { CommandContext, ParsedInvocation } from '../../types.js';
+import { createControlPlaneClient } from '../client.js';
 
 type Page = { items?: Array<{id: string; slug: string}>; teams?: Array<{id: string; slug: string}>; page?: {hasMore?: boolean; nextCursor?: string | null} };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;

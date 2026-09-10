@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveTeamSelector } from '../../../src/cli/support/team-selector.ts';
-import { runCommandLine } from '../../../src/cli/runtime.ts';
+import { resolveTeamSelector } from '../../../../src/cli/support/selectors/team.ts';
+import { runCommandLine } from '../../../../src/cli/runtime.ts';
 const id = '11111111-1111-4111-8111-111111111111';
 test('exact IDs do not require inventory and unknown slugs fail closed', async () => {
   assert.equal(await resolveTeamSelector(id, async () => {throw new Error('unexpected read');}), id);

@@ -10,7 +10,7 @@ import { runInteractiveChat } from '../communication/interactive-chat.js';
 import { controlPlaneServerRegistry, createControlPlaneClient } from '../support/client.js';
 import { loadServerSession } from '../support/server-custody.js';
 import { renderCommunicationResponses } from '../support/human-renderer.js';
-import { resolveExplicitTeam } from '../support/team-selector.js';
+import { resolveExplicitTeam } from '../support/selectors/team.js';
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 	const registry = controlPlaneServerRegistry(context);
