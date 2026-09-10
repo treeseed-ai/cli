@@ -720,6 +720,36 @@ Execution: `local.host.config.adopt`.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--confirm`: Confirm replacement of the installed configuration identity.
 
+## trsd host postgres
+
+Postgres operations.
+
+## trsd host postgres transfer
+
+Transfer operations.
+
+### trsd host postgres transfer prepare <file>
+
+Prepare the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.prepare/v1`.
+Execution: `local.host.postgres.transfer.prepare`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host postgres transfer status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.postgres.transfer.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
 ### trsd host topology
 
 Topology the selected resource.

@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.75",
+  "version": "0.13.0-rc.76",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "@treeseed/identity": "0.1.0-rc.16",
-    "@treeseed/sdk": "0.13.0-rc.108",
+    "@treeseed/sdk": "0.13.0-rc.109",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",
