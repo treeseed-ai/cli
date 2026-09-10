@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runCommandLine } from '../../../../src/cli/runtime.ts';
+import { renderHumanCommandResult } from '../../../../src/cli/support/human-renderer.ts';
 
 for (const status of ['failed', 'complete'] as const) {
 	test(`send preserves the ${status} receipt and reports the execution outcome`, async () => {
@@ -18,3 +19,19 @@ for (const status of ['failed', 'complete'] as const) {
 		assert.equal(envelope.error?.code ?? null, status === 'failed' ? 'communication_execution_failed' : null);
 	});
 }
+
+test('streamed human sends retain failure reason and IDs without duplicating prior responses', () => {
+	const result = { status: 'failed', humanStreamed: true, sendId: 'send-failed',
+		responses: [{ markdown: 'already printed response' }],
+		targets: [{ status: 'failed', projectSlug: 'sdk', agentSlug: 'architect',
+			failure: { message: 'Kata guest exited 1: Guest process failed (ERR_MODULE_NOT_FOUND).' },
+			capacity: { assignmentId: 'assignment-failed' } }],
+	};
+	const rendered = renderHumanCommandResult({ commandPath: ['send'], ok: true, result });
+	assert.match(rendered, /@sdk\/architect: Kata guest exited 1/);
+	assert.match(rendered, /Send: send-failed/);
+	assert.match(rendered, /Assignment: assignment-failed/);
+	assert.doesNotMatch(rendered, /already printed response/);
+	assert.equal(renderHumanCommandResult({ commandPath: ['send'], ok: true,
+		result: { ...result, status: 'complete', targets: [] } }), '');
+});
