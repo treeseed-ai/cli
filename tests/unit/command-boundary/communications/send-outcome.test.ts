@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runCommandLine } from '../../../src/cli/runtime.ts';
+import { runCommandLine } from '../../../../src/cli/runtime.ts';
 
 for (const status of ['failed', 'complete'] as const) {
 	test(`send preserves the ${status} receipt and reports the execution outcome`, async () => {
