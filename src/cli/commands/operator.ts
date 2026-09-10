@@ -10,6 +10,7 @@ import { runInteractiveChat } from '../communication/interactive-chat.js';
 import { controlPlaneServerRegistry, createControlPlaneClient } from '../support/client.js';
 import { loadServerSession } from '../support/server-custody.js';
 import { renderCommunicationResponses } from '../support/human-renderer.js';
+import { resolveExplicitTeam } from '../support/selectors/team.js';
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 	const registry = controlPlaneServerRegistry(context);
@@ -105,6 +106,13 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (execution.kind === 'unavailable') throw Object.assign(new Error(execution.reason), { category: 'policy_blocked', code: execution.code });
 	if (execution.kind !== 'operation') throw Object.assign(new Error(`No CLI handler is installed for ${execution.handlerId}.`), { category: 'policy_blocked', code: 'local_handler_unavailable' });
 	const { operation, input } = await operationInput(invocation, context);
+	if (typeof invocation.options.team === 'string') {
+		const slots = [input.path, input.query, input.body].filter((slot): slot is Record<string, unknown> => Boolean(slot) && slot?.teamId === invocation.options.team);
+		if (slots.length) {
+			const teamId = await resolveExplicitTeam(invocation, context, invocation.options.team);
+			for (const slot of slots) slot.teamId = teamId;
+		}
+	}
 	if (operation.descriptor.operationId === 'communications.send' && !input.body?.message) {
 		if (!context.interactiveUi || !process.stdin.isTTY || !process.stdout.isTTY || invocation.options.json || invocation.options.jsonStream) return runInteractiveChat(invocation, context, String(input.path.teamId), typeof input.path.channel === 'string' ? input.path.channel : undefined);
 		return launchApplication(context, { server: typeof invocation.options.server === 'string' ? invocation.options.server : undefined, workspace: 'chat' });
