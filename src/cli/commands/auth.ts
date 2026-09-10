@@ -3,7 +3,7 @@ import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { createControlPlaneClient } from '../support/client.js';
 import { updateServerSession, saveServerProfile, saveServerSession } from '../support/server-custody.js';
-import { identityLogin, IDENTITY_CLIENT_ID, IDENTITY_SCOPES } from '../support/identity-login.js';
+import { identityLogin, IDENTITY_CLIENT_ID, requestedIdentityScopes, grantedIdentityScopes } from '../support/identity-login.js';
 import { identitySessionClient } from '../support/identity-session.js';
 
 function record(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
@@ -20,8 +20,10 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 	if (invocation.command.name === 'auth login') {
 		const timeoutSeconds = Number(invocation.options.timeout ?? context.env.TREESEED_CLI_LOGIN_TIMEOUT_SECONDS ?? 300);
 		if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0 || timeoutSeconds > 3600) throw new Error('--timeout must be between 1 and 3600 seconds.');
+		const requestedScopes = requestedIdentityScopes(invocation.options.scope);
 		const result = await identityLogin({resource:profile.baseUrl, issuer:typeof invocation.options.issuer === 'string' ? invocation.options.issuer : undefined,
-			device:invocation.options.device === true, timeoutSeconds}, context);
+			device:invocation.options.device === true, timeoutSeconds, scopes:requestedScopes}, context);
+		const scopes = grantedIdentityScopes(requestedScopes, result.tokens.scope);
 		const client = new ControlPlaneClient({profile,accessToken:result.tokens.access_token,userAgent:'trsd'});
 		const current = await client.invoke(CONTROL_PLANE_OPERATIONS.accounts.current, {path:{},query:{},body:undefined});
 		const principal = record(current.data).principal;
@@ -33,9 +35,9 @@ export async function runAuth(invocation: ParsedInvocation, context: CommandCont
 		const expiresAt = new Date(Date.now() + result.tokens.expires_in! * 1000).toISOString();
 		saveServerProfile(profile, context.env);
 		await saveServerSession({serverId:profile.serverId, audience:result.resource, identity:result.principal.identity, clientId:IDENTITY_CLIENT_ID,
-			scopes:IDENTITY_SCOPES, accessToken:result.tokens.access_token, refreshToken:result.tokens.refresh_token, expiresAt,
+			scopes, accessToken:result.tokens.access_token, refreshToken:result.tokens.refresh_token, expiresAt,
 			principal:principal as NonNullable<typeof session>['principal'], activeTeam}, context.env);
-		return {serverId:profile.serverId, principal, identity:result.principal.identity, activeTeam, expiresAt, scopes:IDENTITY_SCOPES};
+		return {serverId:profile.serverId, principal, identity:result.principal.identity, activeTeam, expiresAt, scopes};
 	}
 	if (invocation.command.name === 'auth logout') {
 		let upstreamRevoked = false;

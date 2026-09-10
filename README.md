@@ -61,6 +61,18 @@ advertised identity provider and uses browser PKCE with a temporary loopback cal
 Use `--device` on a headless machine; use `--issuer` only to select among authorities
 advertised by that API. The CLI never collects the identity-provider password.
 
+Administrative operations require an explicitly scoped login:
+
+```sh
+trsd auth login --server local --scope treeseed:admin
+```
+
+`--scope` adds comma-separated scopes to the normal login request and works with
+`--device` too. The API must advertise them and Identity must grant them. This
+does not assign roles: `platform_admin` already has all application permissions,
+while a team owner remains limited to that team's authorized operations. Logging
+in again without `--scope` returns to the default least-privilege scope set.
+
 Tokens stay in OS-encrypted local custody, bound to the exact API, issuer, subject,
 and client. Refresh, logout, and team selection serialize through one OS transaction.
 Old unbound sessions require fresh sign-in, not a fallback to the retired token issuer.
