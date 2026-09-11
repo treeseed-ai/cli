@@ -97,6 +97,20 @@ function renderLibraryRead(result: Record<string, unknown>, options: RenderOptio
 	}).join(`\n\n${ansi(options.color === true, '2;36', '═'.repeat(Math.max(48, Math.min(160, Number(options.width) || 100))))}\n\n`);
 }
 
+function renderCommunicationFailures(result: Record<string, unknown>) {
+	const clean = (value: unknown) => scalar(value).replace(/[\u0000-\u001f\u007f-\u009f]/gu, ' ').slice(0, 512);
+	const targets = Array.isArray(result.targets) ? result.targets : [];
+	return targets.flatMap(value => {
+		if (!value || typeof value !== 'object') return [];
+		const target = value as Record<string, unknown>;
+		if (target.status !== 'failed' && target.status !== 'cancelled') return [];
+		const failure = target.failure && typeof target.failure === 'object' ? target.failure as Record<string, unknown> : {};
+		const capacity = target.capacity && typeof target.capacity === 'object' ? target.capacity as Record<string, unknown> : {};
+		return [`@${clean(target.projectSlug ?? target.projectId)}/${clean(target.agentSlug)}: ${clean(failure.message ?? target.status)}`,
+			`Send: ${clean(result.sendId)}`, `Assignment: ${clean(capacity.assignmentId)}`];
+	}).join('\n');
+}
+
 export function renderHumanCommandResult(value: unknown, options: RenderOptions = {}) {
 	if (!value || typeof value !== 'object') return scalar(value);
 	const envelope = value as { commandPath?: string[]; ok?: boolean; result?: unknown; warnings?: unknown[]; nextActions?: unknown[] };
@@ -135,7 +149,10 @@ export function renderHumanCommandResult(value: unknown, options: RenderOptions 
 		].filter(Boolean).join('\n');
 	}
 	if (path === 'inbox' && result?.interactiveSession === true) return '';
-	if (path === 'send' && result) return result.humanStreamed === true || result.interactiveSession === true ? '' : renderCommunicationResponses(result, options);
+	if (path === 'send' && result) return [
+		result.humanStreamed === true || result.interactiveSession === true ? '' : renderCommunicationResponses(result, options),
+		renderCommunicationFailures(result),
+	].filter(Boolean).join('\n\n');
 	if (path === 'library read' && result) return renderLibraryRead(result, options) || 'No file content was returned.';
 	const rendered = lines(envelope.result);
 	const warnings = Array.isArray(envelope.warnings) && envelope.warnings.length ? [`Warnings: ${envelope.warnings.map(scalar).join('; ')}`] : [];

@@ -127,12 +127,15 @@ Auth operations.
 Login the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.login/v1`.
-Execution: `protocol.oauth.device.login`.
+Execution: `protocol.identity.login`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
-- `--timeout <value>`: Maximum seconds to wait for device authorization.
+- `--timeout <value>`: Maximum seconds to wait for identity authorization.
+- `--device`: Use headless device authorization instead of local browser PKCE.
+- `--issuer <value>`: Choose an authorization server advertised by the selected API.
+- `--scope <value>`: Comma-separated additional API scopes to request explicitly, such as treeseed:admin. Does not grant application permissions.
 
 ### trsd auth logout
 
@@ -353,6 +356,7 @@ Execution: `local.platform.project.create`.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--apply`: Apply the accepted creation plan.
 - `--template <value>`: Published template identity.
+- `--visibility <value>`: Repository visibility: public or private (default private).
 
 ## trsd platform topology
 
@@ -716,6 +720,36 @@ Execution: `local.host.config.adopt`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--confirm`: Confirm replacement of the installed configuration identity.
+
+## trsd host postgres
+
+Postgres operations.
+
+## trsd host postgres transfer
+
+Transfer operations.
+
+### trsd host postgres transfer prepare <file>
+
+Prepare the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.prepare/v1`.
+Execution: `local.host.postgres.transfer.prepare`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host postgres transfer status
+
+Status the selected resource.
+
+Operation: read. Result schema: `treeseed.command.status/v1`.
+Execution: `local.host.postgres.transfer.status`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
 
 ### trsd host topology
 
@@ -1916,8 +1950,13 @@ Profiles operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `workdays.profiles.list`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays profiles show <profile>
@@ -1925,9 +1964,25 @@ Availability: fail-closed (`standards_migration_not_enabled`). This capability i
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `workdays.profiles.show`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
+
+### trsd workdays profiles reconcile <project>
+
+Reconcile the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.reconcile/v1`.
+Control-plane operation: `workdays.profiles.reconcile`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd workdays profiles validate <file>
 
@@ -1940,9 +1995,9 @@ Availability: fail-closed (`standards_migration_not_enabled`). This capability i
 
 ### trsd workdays plan
 
-Plan the selected resource.
+Plan a workday with optional targeted cooperative planning; acting stays decision-governed.
 
-Operation: mutation. Result schema: `treeseed.command.plan/v1`.
+Operation: mutation. Result schema: `treeseed.command.workdays.plan/v1`.
 Control-plane operation: `workdays.plan`.
 
 - `--server <value>`: Control-plane server profile or URL.
@@ -1955,7 +2010,10 @@ Control-plane operation: `workdays.plan`.
 - `--objective <value>`: Objective filter.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
-- `--plan`: Return the exact proposed outcome without mutation.
+- `--plan`: Return the request without creating a preflight.
+- `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
+- `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
+- `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
 
 ### trsd workdays start
 

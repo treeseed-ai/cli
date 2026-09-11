@@ -8,6 +8,7 @@ import { promptHidden, promptText } from '../support/prompts.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostConfigurationSchema } from '@treeseed/sdk/deployment';
+import { readPostgresTransferSelection } from './host/postgres-transfer.js';
 
 const cloudflareSetupGuide = `Cloudflare R2 setup
 
@@ -81,6 +82,10 @@ async function providerEnvironmentInput(invocation: ParsedInvocation, context: C
 async function input(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.execution.kind !== 'local') throw new Error('Host command is not locally bound.');
 	const { server: _server, json: _json, yes: _yes, ...options } = invocation.options;
+	if (invocation.command.name === 'host postgres transfer prepare') {
+		const selection = readPostgresTransferSelection(invocation.arguments[0]);
+		return { handlerId: invocation.command.execution.handlerId, arguments: [], options: { ...options, payload: JSON.stringify(selection) } };
+	}
 	if (invocation.command.name.startsWith('host provider environment ')) return providerEnvironmentInput(invocation, context, options);
 	if (invocation.command.name === 'host initialize') {
 		const profile = invocation.options.profile;
@@ -225,6 +230,7 @@ export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocatio
 	return invocation.command.name === 'host initialize' || invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll'
 		|| invocation.command.name === 'host reset' || invocation.command.name === 'host uninstall' || invocation.command.name.startsWith('host storage ')
 		|| invocation.command.name.startsWith('host security ') || invocation.command.name.startsWith('host sandbox ')
+		|| invocation.command.name.startsWith('host postgres ')
 		|| invocation.command.name.startsWith('host provider credentials ') || invocation.command.name.startsWith('host provider environment ');
 }
 

@@ -1,83 +1,55 @@
-import { setTimeout as delay } from 'node:timers/promises';
-import type { OAuthScope } from '@treeseed/sdk/operator-contracts';
-import { ControlPlaneClient, ControlPlaneClientError } from '@treeseed/sdk/control-plane-client';
+import { ControlPlaneClient } from '@treeseed/sdk/control-plane-client';
 import { CONTROL_PLANE_OPERATIONS } from '@treeseed/sdk/operator-contracts';
 import type { CommandContext, ParsedInvocation } from '../types.js';
-import { CONTROL_PLANE_CLI_CLIENT_ID, createControlPlaneClient } from '../support/client.js';
-import { clearServerSession, saveServerProfile, saveServerSession } from '../support/server-custody.js';
-
-const DEFAULT_SCOPES: OAuthScope[] = ['treeseed:read', 'treeseed:knowledge:write', 'treeseed:governance:write', 'treeseed:projects:write', 'treeseed:execution'];
-const DEFAULT_LOGIN_TIMEOUT_SECONDS = 300;
-
-function configuredLoginTimeoutSeconds(invocation: ParsedInvocation, context: CommandContext) {
-	const configured = invocation.options.timeout ?? context.env.TREESEED_CLI_LOGIN_TIMEOUT_SECONDS
-		?? context.env.TREESEED_CLI_OPERATION_TIMEOUT_SECONDS ?? DEFAULT_LOGIN_TIMEOUT_SECONDS;
-	const value = Number(configured);
-	if (!Number.isFinite(value) || value <= 0 || value > 3_600) throw Object.assign(new Error('--timeout must be between 1 and 3600 seconds.'), { category: 'invalid_input', code: 'invalid_timeout' });
-	return value;
-}
-
-function pollingState(error: unknown) {
-	if (!(error instanceof ControlPlaneClientError)) return 'failed' as const;
-	if (error.problem.code === 'slow_down') return 'slow_down' as const;
-	if (error.problem.code === 'authorization_pending' || /authorization.pending/iu.test(error.message)) return 'pending' as const;
-	return 'failed' as const;
-}
+import { createControlPlaneClient } from '../support/client.js';
+import { updateServerSession, saveServerProfile, saveServerSession } from '../support/server-custody.js';
+import { identityLogin, IDENTITY_CLIENT_ID, requestedIdentityScopes, grantedIdentityScopes } from '../support/identity-login.js';
+import { identitySessionClient } from '../support/identity-session.js';
 
 function record(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
-function principalIdentity(value: unknown) { const principal = record(value); return String(principal.id ?? principal.email ?? principal.username ?? ''); }
 function teamsFrom(value: unknown) {
 	const source = record(value); const values = Array.isArray(source.teams) ? source.teams : Array.isArray(source.items) ? source.items : [];
-	return values.map(record).flatMap((team) => {
-		const id = String(team.id ?? '').trim(); const slug = String(team.slug ?? '').trim(); const name = String(team.name ?? team.displayName ?? slug).trim();
-		return id && slug ? [{ id, slug, name }] : [];
+	return values.map(record).flatMap(team => {
+		const id = String(team.id ?? '').trim(), slug = String(team.slug ?? '').trim(), name = String(team.name ?? team.displayName ?? slug).trim();
+		return id && slug ? [{id,slug,name}] : [];
 	});
 }
 
 export async function runAuth(invocation: ParsedInvocation, context: CommandContext) {
-	const { profile, session, client } = await createControlPlaneClient(invocation, context, false);
+	const {profile, session} = await createControlPlaneClient(invocation, context, false);
 	if (invocation.command.name === 'auth login') {
-		const configuredTimeout = configuredLoginTimeoutSeconds(invocation, context);
-		const authorization = await client.authorizeDevice(CONTROL_PLANE_CLI_CLIENT_ID, DEFAULT_SCOPES, AbortSignal.timeout(configuredTimeout * 1_000));
-		const verificationUrl = authorization.verificationUriComplete ?? authorization.verificationUri;
-		const opened = await Promise.resolve(context.openExternal?.(verificationUrl)).catch(() => false) ?? false;
-		if (opened) context.write('Opened your default browser. Follow the instructions there.', 'stderr');
-		else context.write('A browser could not be opened automatically.', 'stderr');
-		const codeFallback = authorization.verificationUriComplete ? '' : ` and enter code ${authorization.userCode}`;
-		context.write(`To authorize from this or another computer, open ${verificationUrl}${codeFallback}.`, 'stderr');
-		const timeoutSeconds = Math.min(configuredTimeout, authorization.expiresIn);
-		const deadline = Date.now() + timeoutSeconds * 1_000;
-		let interval = Math.max(1, authorization.interval) * 1_000;
-		while (Date.now() < deadline) {
-			try {
-				const token = await client.exchangeDeviceCode(CONTROL_PLANE_CLI_CLIENT_ID, authorization.deviceCode);
-				const expiresAt = new Date(Date.now() + token.expiresIn * 1_000).toISOString();
-				const authenticatedClient = new ControlPlaneClient({ profile, accessToken: token.accessToken, userAgent: 'trsd' });
-				const current = await authenticatedClient.invoke(CONTROL_PLANE_OPERATIONS.accounts.current, { path: {}, query: {}, body: undefined });
-				const principal = current.data && typeof current.data === 'object' && 'principal' in current.data
-					? current.data.principal as typeof token.principal : token.principal;
-				const teams = teamsFrom(current.data);
-				const prior = session?.activeTeam;
-				const samePrincipal = principalIdentity(session?.principal) && principalIdentity(session?.principal) === principalIdentity(principal);
-				const activeTeam = samePrincipal && prior && teams.some((team) => team.id === prior.id)
-					? teams.find((team) => team.id === prior.id)! : teams.length === 1 ? teams[0]! : null;
-				saveServerProfile(profile, context.env);
-				saveServerSession({ serverId: profile.serverId, audience: token.audience, accessToken: token.accessToken, refreshToken: token.refreshToken, expiresAt, principal, activeTeam }, context.env);
-				return { serverId: profile.serverId, principal: principal ?? null, activeTeam, expiresAt, scopes: token.scope };
-			} catch (error) {
-				const state = pollingState(error);
-				if (state === 'failed') throw error;
-				if (state === 'slow_down') interval += 5_000;
-				await delay(Math.min(interval, Math.max(1, deadline - Date.now())));
-			}
-		}
-		throw Object.assign(new Error(`Device authorization was not approved within ${timeoutSeconds} seconds.`), { category: 'authentication_required', code: 'device_authorization_timeout' });
+		const timeoutSeconds = Number(invocation.options.timeout ?? context.env.TREESEED_CLI_LOGIN_TIMEOUT_SECONDS ?? 300);
+		if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0 || timeoutSeconds > 3600) throw new Error('--timeout must be between 1 and 3600 seconds.');
+		const requestedScopes = requestedIdentityScopes(invocation.options.scope);
+		const result = await identityLogin({resource:profile.baseUrl, issuer:typeof invocation.options.issuer === 'string' ? invocation.options.issuer : undefined,
+			device:invocation.options.device === true, timeoutSeconds, scopes:requestedScopes}, context);
+		const scopes = grantedIdentityScopes(requestedScopes, result.tokens.scope);
+		const client = new ControlPlaneClient({profile,accessToken:result.tokens.access_token,userAgent:'trsd'});
+		const current = await client.invoke(CONTROL_PLANE_OPERATIONS.accounts.current, {path:{},query:{},body:undefined});
+		const principal = record(current.data).principal;
+		if (!principal || typeof principal !== 'object' || !('id' in principal) || typeof principal.id !== 'string') throw new Error('The API has no local principal mapping for this identity.');
+		const teams = teamsFrom(current.data), prior = session?.activeTeam;
+		const sameIdentity = session?.identity?.issuer === result.principal.identity.issuer && session?.identity?.subject === result.principal.identity.subject;
+		const activeTeam = sameIdentity && prior && teams.some(team => team.id === prior.id) ? teams.find(team => team.id === prior.id)! : teams.length === 1 ? teams[0]! : null;
+		if (!Number.isFinite(result.tokens.expires_in) || result.tokens.expires_in! <= 0) throw new Error('Identity did not return a bounded access-token lifetime.');
+		const expiresAt = new Date(Date.now() + result.tokens.expires_in! * 1000).toISOString();
+		saveServerProfile(profile, context.env);
+		await saveServerSession({serverId:profile.serverId, audience:result.resource, identity:result.principal.identity, clientId:IDENTITY_CLIENT_ID,
+			scopes, accessToken:result.tokens.access_token, refreshToken:result.tokens.refresh_token, expiresAt,
+			principal:principal as NonNullable<typeof session>['principal'], activeTeam}, context.env);
+		return {serverId:profile.serverId, principal, identity:result.principal.identity, activeTeam, expiresAt, scopes};
 	}
 	if (invocation.command.name === 'auth logout') {
-		const token = session?.refreshToken ?? session?.accessToken;
-		if (token) await client.revokeToken(CONTROL_PLANE_CLI_CLIENT_ID, token).catch(() => undefined);
-		clearServerSession(profile.serverId, context.env);
-		return { serverId: profile.serverId, loggedOut: true };
+		let upstreamRevoked = false;
+		await updateServerSession(profile.serverId,context.env,async current => {
+			const token = current?.refreshToken ?? current?.accessToken;
+			if (current && token) {
+				try { await (await identitySessionClient(profile,current)).revoke(token); upstreamRevoked = true; }
+				catch { /* Local logout must still succeed; never retry ambiguous revocation. */ }
+			}
+			return null;
+		});
+		return {serverId:profile.serverId,loggedOut:true,upstreamRevoked};
 	}
-	throw new Error(`Unknown OAuth protocol command: ${invocation.command.name}`);
+	throw new Error(`Unknown identity command: ${invocation.command.name}`);
 }

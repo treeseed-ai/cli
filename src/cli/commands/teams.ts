@@ -37,7 +37,7 @@ export async function runTeams(invocation: ParsedInvocation, context: CommandCon
 		const matches = teams.filter((team) => team.id.toLowerCase() === selector || team.slug.toLowerCase() === selector);
 		if (!matches.length) throw Object.assign(new Error(`Team ${selector} is not accessible.`), { category: 'not_found', code: 'team_not_found' });
 		if (matches.length > 1) throw Object.assign(new Error(`Team ${selector} is ambiguous.`), { category: 'ambiguous_context', code: 'team_ambiguous' });
-		return { serverId: profile.serverId, team: saveActiveTeam(profile.serverId, matches[0]!, context.env) };
+		return { serverId: profile.serverId, team: await saveActiveTeam(profile.serverId, matches[0]!, context.env) };
 	}
 	throw new Error(`Unknown team context command: ${invocation.command.name}`);
 }

@@ -11,7 +11,7 @@ test('host storage reset is destructive, environment-bounded, and uses retained 
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-storage-reset-')); const calls: any[] = [];
 	const env = { TREESEED_CONFIG_HOME: root, TREESEED_API_BASE_URL: 'http://127.0.0.1:3002' };
 	try {
-		saveServerSession({ serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'session', principal: { id: 'user-1' } as any,
+		await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[], serverId: 'local', audience: 'http://127.0.0.1:3002', accessToken: 'session', principal: { id: 'user-1' } as any,
 			activeTeam: { id: '16549507-cebc-4a16-94c5-cf91defbd6a3', slug: 'treeseed', name: 'TreeSeed' } }, env);
 		assert.equal(await runCommandLine(['host', 'storage', 'reset', 'cloudflare-r2', '--environment', 'preview', '--yes', '--json'], {
 			env, interactiveUi: false, hostInvoke: async (input) => calls.push(input), write() {},

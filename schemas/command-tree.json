@@ -514,8 +514,23 @@
             },
             {
               "name": "--timeout",
-              "description": "Maximum seconds to wait for device authorization.",
+              "description": "Maximum seconds to wait for identity authorization.",
               "type": "number"
+            },
+            {
+              "name": "--device",
+              "description": "Use headless device authorization instead of local browser PKCE.",
+              "type": "boolean"
+            },
+            {
+              "name": "--issuer",
+              "description": "Choose an authorization server advertised by the selected API.",
+              "type": "string"
+            },
+            {
+              "name": "--scope",
+              "description": "Comma-separated additional API scopes to request explicitly, such as treeseed:admin. Does not grant application permissions.",
+              "type": "string"
             }
           ],
           "authorization": {
@@ -525,7 +540,7 @@
           "resultSchemaId": "treeseed.command.login/v1",
           "execution": {
             "kind": "protocol",
-            "handlerId": "protocol.oauth.device.login"
+            "handlerId": "protocol.identity.login"
           }
         },
         {
@@ -1083,6 +1098,11 @@
                   "description": "Published template identity.",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "--visibility",
+                  "description": "Repository visibility: public or private (default private).",
+                  "type": "string"
                 },
                 {
                   "name": "--json",
@@ -1917,6 +1937,60 @@
                 "kind": "local",
                 "handlerId": "local.host.config.adopt"
               }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "postgres",
+          "description": "Postgres operations.",
+          "children": [
+            {
+              "nodeType": "branch",
+              "segment": "transfer",
+              "description": "Transfer operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "prepare",
+                  "description": "Prepare the selected resource.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "file",
+                      "description": "file identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.prepare",
+                    "confirmation": "authority"
+                  },
+                  "resultSchemaId": "treeseed.command.prepare/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.postgres.transfer.prepare"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "status",
+                  "description": "Status the selected resource.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.command.status/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.postgres.transfer.status"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -4719,9 +4793,39 @@
               "kind": "read",
               "resultSchemaId": "treeseed.command.list/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "workdays.profiles.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "status",
+                    "source": "option",
+                    "name": "status",
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -4738,9 +4842,73 @@
               ],
               "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "workdays.profiles.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "profileId",
+                    "source": "argument",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "reconcile",
+              "description": "Reconcile the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.reconcile",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.reconcile/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "workdays.profiles.reconcile",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -4767,20 +4935,35 @@
         {
           "nodeType": "leaf",
           "segment": "plan",
-          "description": "Plan the selected resource.",
+          "description": "Plan a workday with optional targeted cooperative planning; acting stays decision-governed.",
           "kind": "mutation",
           "options": [
             {
               "name": "--plan",
-              "description": "Return the exact proposed outcome without mutation.",
+              "description": "Return the request without creating a preflight.",
               "type": "boolean"
+            },
+            {
+              "name": "--agent",
+              "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
+              "type": "string[]"
+            },
+            {
+              "name": "--activity",
+              "description": "Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.",
+              "type": "string[]"
+            },
+            {
+              "name": "--class",
+              "description": "Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.",
+              "type": "string[]"
             }
           ],
           "authorization": {
             "capability": "command.plan",
             "confirmation": "never"
           },
-          "resultSchemaId": "treeseed.command.plan/v1",
+          "resultSchemaId": "treeseed.command.workdays.plan/v1",
           "execution": {
             "kind": "operation",
             "operationId": "workdays.plan",
@@ -4839,6 +5022,27 @@
                 "source": "option",
                 "name": "objective",
                 "required": false,
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.agentSlugs",
+                "source": "option",
+                "name": "agent",
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.activityTypes",
+                "source": "option",
+                "name": "activity",
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.classSlugs",
+                "source": "option",
+                "name": "class",
                 "transform": "csv"
               }
             ]

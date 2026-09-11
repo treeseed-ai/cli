@@ -35,7 +35,7 @@ export async function runServiceCredentials(invocation:ParsedInvocation,context:
       if(!context.promptSecret&&!context.interactiveUi)throw invalid();
       const connection=data(await invoke(operations.connection,{path:{teamId,connectionId:path.connectionId},query:{},body:undefined}));
       const profile=getServiceProviderDefinition(connection.providerId)?.credentialProfiles.find(p=>p.id===path.profileId);
-      if(!profile?.authoritySchemes.includes('openbao'))throw invalid();
+      if(!profile?.authoritySchemes?.includes('openbao'))throw invalid();
       for(const field of profile.fields.filter(f=>f.sensitive)) {
         const value=String(await (context.promptSecret ?? promptHidden)(`${field.label}${field.required?'':' (optional)'}: `));
         if(value)values[field.key]=value;

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
+import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, validateWorkdayIntentSelection, normalizeWorkdayAgentSelection, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
 import { ControlPlaneClientError, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { launchApplication } from '../application/launch.js';
@@ -10,6 +10,8 @@ import { runInteractiveChat } from '../communication/interactive-chat.js';
 import { controlPlaneServerRegistry, createControlPlaneClient } from '../support/client.js';
 import { loadServerSession } from '../support/server-custody.js';
 import { renderCommunicationResponses } from '../support/human-renderer.js';
+import { resolveExplicitTeam } from '../support/selectors/team.js';
+import { getOperationInputField, setOperationInputField } from '../support/operations/input-fields.js';
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 	const registry = controlPlaneServerRegistry(context);
@@ -29,13 +31,14 @@ function sourceValue(binding: CommandInputBinding, invocation: ParsedInvocation,
 }
 
 function transform(value: unknown, binding: CommandInputBinding) {
-	if (value === undefined || value === null || value === '') return undefined;
+	if (value === undefined || value === null) return undefined;
+	if (binding.transform === 'csv') return (Array.isArray(value) ? value : [value]).flatMap(item => String(item).split(',').map(part => part.trim()));
+	if (value === '') return undefined;
 	if (binding.transform === 'integer') {
 		const parsed = Number(value);
 		if (!Number.isInteger(parsed)) throw new Error(`${binding.name} must be an integer.`);
 		return parsed;
 	}
-	if (binding.transform === 'csv') return Array.isArray(value) ? value : String(value).split(',').map((item) => item.trim()).filter(Boolean);
 	return value;
 }
 
@@ -64,9 +67,14 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 	for (const binding of invocation.command.execution.input) {
 		const value = transform(sourceValue(binding, invocation, context), binding);
 		if (binding.required && value === undefined) { deferred.push(binding); continue; }
-		if (value !== undefined) input[binding.target][binding.field] = value;
+		if (value !== undefined) setOperationInputField(input[binding.target], binding.field, value);
 	}
 	const operation = controlPlaneOperation(invocation.command.execution.operationId);
+	if (operation.descriptor.operationId === 'workdays.plan' && input.body.agentSelection !== undefined) {
+		const diagnostics = validateWorkdayIntentSelection(input.body.agentSelection);
+		if (diagnostics.length) throw Object.assign(new Error(diagnostics.map(item => `${item.path}: ${item.message}`).join(' ')), { category: 'invalid_input', code: 'workday_agent_selection_invalid' });
+		input.body.agentSelection = normalizeWorkdayAgentSelection(input.body.agentSelection);
+	}
 	if (operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
 		const parsed = await portableSeedBundle(input.body.file, context);
 		delete input.body.file;
@@ -91,7 +99,7 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		delete input.body.file;
 		Object.assign(input.body, parsed);
 	}
-	for (const binding of deferred) if (input[binding.target][binding.field] === undefined) {
+	for (const binding of deferred) if (getOperationInputField(input[binding.target], binding.field) === undefined) {
 		throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });
 	}
 	const body = Object.keys(input.body).length
@@ -105,6 +113,13 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	if (execution.kind === 'unavailable') throw Object.assign(new Error(execution.reason), { category: 'policy_blocked', code: execution.code });
 	if (execution.kind !== 'operation') throw Object.assign(new Error(`No CLI handler is installed for ${execution.handlerId}.`), { category: 'policy_blocked', code: 'local_handler_unavailable' });
 	const { operation, input } = await operationInput(invocation, context);
+	if (typeof invocation.options.team === 'string') {
+		const slots = [input.path, input.query, input.body].filter((slot): slot is Record<string, unknown> => Boolean(slot) && slot?.teamId === invocation.options.team);
+		if (slots.length) {
+			const teamId = await resolveExplicitTeam(invocation, context, invocation.options.team);
+			for (const slot of slots) slot.teamId = teamId;
+		}
+	}
 	if (operation.descriptor.operationId === 'communications.send' && !input.body?.message) {
 		if (!context.interactiveUi || !process.stdin.isTTY || !process.stdout.isTTY || invocation.options.json || invocation.options.jsonStream) return runInteractiveChat(invocation, context, String(input.path.teamId), typeof input.path.channel === 'string' ? input.path.channel : undefined);
 		return launchApplication(context, { server: typeof invocation.options.server === 'string' ? invocation.options.server : undefined, workspace: 'chat' });

@@ -130,6 +130,11 @@ export async function runCommandLine(argv: string[], overrides: Partial<CommandC
 		const operationResponse = invocation.command.execution.kind === 'operation';
 		if (operationResponse && api?.ok === false) { const failed = failure('policy_blocked', api.code ?? 'control_plane_rejected', api.error ?? 'The control plane rejected the operation.'); print(context, envelope(invocation, false, null, failed), false); return 1; }
 		const result = operationResponse && api && 'payload' in api ? api.payload : response && typeof response === 'object' && 'data' in response ? (response as { data: unknown }).data : response;
+		if (invocation.command.name === 'send' && result && typeof result === 'object' && 'status' in result && result.status === 'failed') {
+			throw Object.assign(new Error('Agent execution failed. The send receipt contains the assignment failure and diagnostics.'), {
+				category: 'provider_unavailable', code: 'communication_execution_failed', partialResult: result,
+			});
+		}
 		print(context, envelope(invocation, true, result)); return 0;
 	} catch (error) {
 		if (context.env.TREESEED_DEBUG_STACK === '1' && error instanceof Error && error.stack) context.write(error.stack, 'stderr');

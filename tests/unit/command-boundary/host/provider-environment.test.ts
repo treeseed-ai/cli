@@ -15,19 +15,19 @@ test('provider code rotation pre-reads and replays the exact response ETag', asy
 		response.setHeader('content-type', 'application/json');
 		if (request.method === 'GET') response.setHeader('etag', '"code-revision-7"');
 		response.end(JSON.stringify({ data: request.method === 'GET'
-			? { schemaVersion: 'treeseed.provider-registration-code-status/v1', teamId: 'team-1', generation: 7, codePrefix: 'trsd_reg', rotatedAt: '2026-09-01T20:00:00.000Z' }
-			: { schemaVersion: 'treeseed.provider-registration-code-receipt/v1', teamId: 'team-1', generation: 8, codePrefix: 'trsd_reg', registrationCode: 'redacted-in-test', rotatedAt: '2026-09-01T21:00:00.000Z' } }));
+			? { schemaVersion: 'treeseed.provider-registration-code-status/v1', teamId: '11111111-1111-4111-8111-111111111111', generation: 7, codePrefix: 'trsd_reg', rotatedAt: '2026-09-01T20:00:00.000Z' }
+			: { schemaVersion: 'treeseed.provider-registration-code-receipt/v1', teamId: '11111111-1111-4111-8111-111111111111', generation: 8, codePrefix: 'trsd_reg', registrationCode: 'redacted-in-test', rotatedAt: '2026-09-01T21:00:00.000Z' } }));
 	});
 	await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept));
 	const address = server.address(); if (!address || typeof address === 'string') throw new Error('Test server did not bind.');
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-provider-code-')); const env = { TREESEED_CONFIG_HOME: root };
 	try {
 		const profile = { serverId: 'test', label: 'Test', baseUrl: `http://127.0.0.1:${address.port}` };
-		saveServerProfile(profile, env); saveServerSession({ serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
-		assert.equal(await runCommandLine(['providers', 'registration', 'code', 'rotate', '--server', 'test', '--team', 'team-1', '--yes', '--json'], { env, interactiveUi: false, write() {} }), 0);
+		saveServerProfile(profile, env); await saveServerSession({identity:{issuer:'https://identity.example.test/realms/local',subject:'user'},clientId:'trsd',scopes:[], serverId: 'test', audience: profile.baseUrl, accessToken: 'access-token' }, env);
+		assert.equal(await runCommandLine(['providers', 'registration', 'code', 'rotate', '--server', 'test', '--team', '11111111-1111-4111-8111-111111111111', '--yes', '--json'], { env, interactiveUi: false, write() {} }), 0);
 		assert.deepEqual(requests, [
-			{ method: 'GET', url: '/v1/teams/team-1/capacity-provider-registration-code', ifMatch: undefined },
-			{ method: 'POST', url: '/v1/teams/team-1/capacity-provider-registration-code/rotate', ifMatch: '"code-revision-7"' },
+			{ method: 'GET', url: '/v1/teams/11111111-1111-4111-8111-111111111111/capacity-provider-registration-code', ifMatch: undefined },
+			{ method: 'POST', url: '/v1/teams/11111111-1111-4111-8111-111111111111/capacity-provider-registration-code/rotate', ifMatch: '"code-revision-7"' },
 		]);
 	} finally { await new Promise<void>((accept, reject) => server.close((error) => error ? reject(error) : accept())); rmSync(root, { recursive: true, force: true }); }
 });

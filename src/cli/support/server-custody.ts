@@ -2,6 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { OsSecretCustody, withOsCustodyLock } from '@treeseed/deployment/security/custody';
+// Keep shared OS locking in this already-bundled Deployment custody boundary.
 export { withOsCustodyLock };
 import { defaultLocalControlPlaneServer, normalizeControlPlaneServerRegistry,
   type ControlPlaneServerProfile, type ControlPlaneServerRegistry, type ControlPlaneServerSession } from '@treeseed/sdk/control-plane-client';
@@ -35,8 +36,30 @@ function readState(env:NodeJS.ProcessEnv):SessionState {
 function writeState(state:Omit<SessionState,'custodyVersion'>,env:NodeJS.ProcessEnv,expectedVersion:number) {
   custody(env).run(c=>c.write(scope,{state:JSON.stringify(state)},expectedVersion),true);
 }
-export function lockServerCustody(env:NodeJS.ProcessEnv) {custody(env).lock();return {custody:'os',locked:true};}
-export function unlockServerCustody(env:NodeJS.ProcessEnv) {custody(env).unlock(true);return {custody:'os',locked:false};}
+export async function lockServerCustody(env:NodeJS.ProcessEnv) {return withOsCustodyLock(paths(env).custody,async()=>{custody(env).lock();return {custody:'os',locked:true};});}
+export async function unlockServerCustody(env:NodeJS.ProcessEnv) {return withOsCustodyLock(paths(env).custody,async()=>{custody(env).unlock(true);return {custody:'os',locked:false};});}
+
+/** Serialize the complete read/remote-operation/write transaction, not just the final write. */
+export async function updateServerSession(
+	serverId: string,
+	env: NodeJS.ProcessEnv,
+	update: (session: ControlPlaneServerSession | null) => Promise<ControlPlaneServerSession | null>,
+	invalidateOnFailure: () => boolean = () => false,
+) {
+	return withOsCustodyLock(paths(env).custody, async () => {
+		const state = readState(env);
+		const previous = state.sessions.find(entry => entry.serverId === serverId) ?? null;
+		const persist = (session: ControlPlaneServerSession | null) => {
+			if (session && session.serverId !== serverId) throw new Error('Session transaction cannot change server identity.');
+			writeState({version: 1, sessions: [...state.sessions.filter(entry => entry.serverId !== serverId), ...(session ? [session] : [])].sort((a,b) => a.serverId.localeCompare(b.serverId))}, env, state.custodyVersion);
+		};
+		let next: ControlPlaneServerSession | null;
+		try { next = await update(previous); }
+		catch (error) { if (invalidateOnFailure() && previous) persist(null); throw error; }
+		if (next !== previous) persist(next);
+		return next;
+	});
+}
 export function loadServerRegistry(env: NodeJS.ProcessEnv): ControlPlaneServerRegistry {
 	const path = paths(env).registry;
 	if (!existsSync(path)) {
@@ -60,21 +83,20 @@ export function loadActiveTeam(serverId: string, env: NodeJS.ProcessEnv) {
 	return loadServerSession(serverId, env)?.activeTeam ?? null;
 }
 
-export function saveActiveTeam(serverId: string, team: { id: string; slug: string; name: string }, env: NodeJS.ProcessEnv) {
-	const session = loadServerSession(serverId, env);
-	if (!session?.accessToken) throw Object.assign(new Error(`Not logged in to ${serverId}.`), { category: 'authentication_required', code: 'authentication_required' });
-	saveServerSession({ ...session, activeTeam: team }, env);
+export async function saveActiveTeam(serverId: string, team: { id: string; slug: string; name: string }, env: NodeJS.ProcessEnv) {
+	await updateServerSession(serverId, env, async session => {
+		if (!session?.accessToken) throw Object.assign(new Error(`Not logged in to ${serverId}.`), { category: 'authentication_required', code: 'authentication_required' });
+		return { ...session, activeTeam: team };
+	});
 	return team;
 }
 
-export function saveServerSession(session: ControlPlaneServerSession, env: NodeJS.ProcessEnv) {
-	const state = readState(env);
-	writeState({ version: 1, sessions: [...state.sessions.filter((entry) => entry.serverId !== session.serverId), session].sort((left, right) => left.serverId.localeCompare(right.serverId)) }, env, state.custodyVersion);
+export async function saveServerSession(session: ControlPlaneServerSession, env: NodeJS.ProcessEnv) {
+	await updateServerSession(session.serverId, env, async () => session);
 }
 
-export function clearServerSession(serverId: string, env: NodeJS.ProcessEnv) {
-	const state = readState(env);
-	writeState({ version: 1, sessions: state.sessions.filter((entry) => entry.serverId !== serverId) }, env, state.custodyVersion);
+export async function clearServerSession(serverId: string, env: NodeJS.ProcessEnv) {
+	await updateServerSession(serverId, env, async () => null);
 }
 
 export function inspectServerCustody(env: NodeJS.ProcessEnv) {
