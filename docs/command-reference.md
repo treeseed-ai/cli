@@ -1995,9 +1995,9 @@ Availability: fail-closed (`standards_migration_not_enabled`). This capability i
 
 ### trsd workdays plan
 
-Plan the selected resource.
+Plan a workday with optional targeted cooperative planning; acting stays decision-governed.
 
-Operation: mutation. Result schema: `treeseed.command.plan/v1`.
+Operation: mutation. Result schema: `treeseed.command.workdays.plan/v1`.
 Control-plane operation: `workdays.plan`.
 
 - `--server <value>`: Control-plane server profile or URL.
@@ -2010,7 +2010,10 @@ Control-plane operation: `workdays.plan`.
 - `--objective <value>`: Objective filter.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
-- `--plan`: Return the exact proposed outcome without mutation.
+- `--plan`: Return the request without creating a preflight.
+- `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
+- `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
+- `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
 
 ### trsd workdays start
 
