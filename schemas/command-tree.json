@@ -4935,20 +4935,35 @@
         {
           "nodeType": "leaf",
           "segment": "plan",
-          "description": "Plan the selected resource.",
+          "description": "Plan a workday with optional targeted cooperative planning; acting stays decision-governed.",
           "kind": "mutation",
           "options": [
             {
               "name": "--plan",
-              "description": "Return the exact proposed outcome without mutation.",
+              "description": "Return the request without creating a preflight.",
               "type": "boolean"
+            },
+            {
+              "name": "--agent",
+              "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
+              "type": "string[]"
+            },
+            {
+              "name": "--activity",
+              "description": "Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.",
+              "type": "string[]"
+            },
+            {
+              "name": "--class",
+              "description": "Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.",
+              "type": "string[]"
             }
           ],
           "authorization": {
             "capability": "command.plan",
             "confirmation": "never"
           },
-          "resultSchemaId": "treeseed.command.plan/v1",
+          "resultSchemaId": "treeseed.command.workdays.plan/v1",
           "execution": {
             "kind": "operation",
             "operationId": "workdays.plan",
@@ -5007,6 +5022,27 @@
                 "source": "option",
                 "name": "objective",
                 "required": false,
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.agentSlugs",
+                "source": "option",
+                "name": "agent",
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.activityTypes",
+                "source": "option",
+                "name": "activity",
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.classSlugs",
+                "source": "option",
+                "name": "class",
                 "transform": "csv"
               }
             ]
