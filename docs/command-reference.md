@@ -135,6 +135,7 @@ Execution: `protocol.identity.login`.
 - `--timeout <value>`: Maximum seconds to wait for identity authorization.
 - `--device`: Use headless device authorization instead of local browser PKCE.
 - `--issuer <value>`: Choose an authorization server advertised by the selected API.
+- `--scope <value>`: Comma-separated additional API scopes to request explicitly, such as treeseed:admin. Does not grant application permissions.
 
 ### trsd auth logout
 
