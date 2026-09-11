@@ -1950,8 +1950,13 @@ Profiles operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `workdays.profiles.list`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays profiles show <profile>
@@ -1959,9 +1964,25 @@ Availability: fail-closed (`standards_migration_not_enabled`). This capability i
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `workdays.profiles.show`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
+
+### trsd workdays profiles reconcile <project>
+
+Reconcile the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.reconcile/v1`.
+Control-plane operation: `workdays.profiles.reconcile`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
 
 ### trsd workdays profiles validate <file>
 

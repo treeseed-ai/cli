@@ -4793,9 +4793,39 @@
               "kind": "read",
               "resultSchemaId": "treeseed.command.list/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "workdays.profiles.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "status",
+                    "source": "option",
+                    "name": "status",
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -4812,9 +4842,73 @@
               ],
               "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "workdays.profiles.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "profileId",
+                    "source": "argument",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "reconcile",
+              "description": "Reconcile the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "project",
+                  "description": "project identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.reconcile",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.reconcile/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "workdays.profiles.reconcile",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "argument",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
