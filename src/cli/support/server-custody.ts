@@ -44,7 +44,7 @@ export async function updateServerSession(
 	serverId: string,
 	env: NodeJS.ProcessEnv,
 	update: (session: ControlPlaneServerSession | null) => Promise<ControlPlaneServerSession | null>,
-	invalidateOnFailure = false,
+	invalidateOnFailure: () => boolean = () => false,
 ) {
 	return withOsCustodyLock(paths(env).custody, async () => {
 		const state = readState(env);
@@ -55,7 +55,7 @@ export async function updateServerSession(
 		};
 		let next: ControlPlaneServerSession | null;
 		try { next = await update(previous); }
-		catch (error) { if (invalidateOnFailure && previous) persist(null); throw error; }
+		catch (error) { if (invalidateOnFailure() && previous) persist(null); throw error; }
 		if (next !== previous) persist(next);
 		return next;
 	});

@@ -31,16 +31,20 @@ export async function createControlPlaneClient(invocation: Pick<ParsedInvocation
 	let client = new ControlPlaneClient({ profile, accessToken: session?.accessToken ?? null, userAgent: 'trsd' });
 	if (requireAuth && session?.refreshToken && (forceRefresh || (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now() + 30_000))) {
 		const observedRefresh = session.refreshToken;
+		let refreshStarted = false;
 		session = await updateServerSession(profile.serverId, context.env, async current => {
 			if (!current?.accessToken || !current.refreshToken) throw Object.assign(new Error('Session ended before renewal. Log in again.'), { category: 'authentication_required', code: 'authentication_required' });
 			validateIdentitySession(profile,current);
 			const expired = current.expiresAt && new Date(current.expiresAt).getTime() <= Date.now() + 30_000;
 			if (!expired && (!forceRefresh || current.refreshToken !== observedRefresh)) return current;
-			const result = await (await identitySessionClient(profile,current)).refresh(current.refreshToken,current.identity);
+			const identityClient = await identitySessionClient(profile,current);
+			// Discovery has not submitted credentials. Only a refresh attempt can rotate the saved token.
+			refreshStarted = true;
+			const result = await identityClient.refresh(current.refreshToken,current.identity);
 			if (!Number.isFinite(result.tokens.expires_in) || result.tokens.expires_in! <= 0) throw new Error('Identity did not return a bounded token lifetime.');
 			return { ...current, accessToken:result.tokens.access_token, refreshToken:result.tokens.refresh_token ?? current.refreshToken,
 				expiresAt:new Date(Date.now() + result.tokens.expires_in! * 1000).toISOString() };
-		}, true);
+		}, () => refreshStarted);
 		if (!session) throw new Error('Session ended during renewal. Log in again.');
 		client = new ControlPlaneClient({ profile, accessToken: session.accessToken, userAgent: 'trsd' });
 	}

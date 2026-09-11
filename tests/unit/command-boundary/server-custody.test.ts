@@ -80,7 +80,7 @@ test('session transactions preserve concurrent server and team edits and invalid
 		await Promise.all([renewal, selection]);
 		assert.equal(loadServerSession('one', env)?.refreshToken, 'rotated');
 		assert.equal(loadServerSession('one', env)?.activeTeam?.id, 'team');
-		await assert.rejects(updateServerSession('one', env, async () => { throw new Error('ambiguous renewal'); }, true), /ambiguous renewal/);
+		await assert.rejects(updateServerSession('one', env, async () => { throw new Error('ambiguous renewal'); }, () => true), /ambiguous renewal/);
 		assert.equal(loadServerSession('one', env), null);
 		assert.equal(loadServerSession('two', env)?.accessToken, 'old');
 		await assert.rejects(updateServerSession('two', env, async () => { throw new Error('invalid edit'); }), /invalid edit/);
@@ -107,7 +107,7 @@ test('logout waits for renewal and a queued renewal cannot resurrect a removed s
 		await assert.rejects(updateServerSession('one', env, async current => {
 			assert.equal(current, null);
 			throw new Error('session ended');
-		}, true), /session ended/);
+		}, () => true), /session ended/);
 		assert.equal(loadServerSession('one', env), null);
 	} finally { rmSync(root, {recursive:true, force:true}); }
 });
