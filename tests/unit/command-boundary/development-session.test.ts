@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -184,6 +184,8 @@ test('package synchronizer launches the CLI development module and publishes a c
 		const deadline = Date.now() + 2_000;
 		while (!existsSync(resolve(overlay, 'current')) && Date.now() < deadline) await new Promise((accept) => setTimeout(accept, 25));
 		assert.equal(existsSync(resolve(overlay, 'current', 'dist/index.js')), true, readFileSync(state.processes['overlay-sync.sdk.package']!.log, 'utf8'));
+		assert.equal(statSync(overlay).mode & 0o050, 0o050, 'manager-side consumers require group traversal');
+		assert.equal(statSync(resolve(overlay, 'current')).mode & 0o050, 0o050, 'completed generations require group traversal');
 	} finally {
 		await stopProcess(state, 'overlay-sync.sdk.package');
 		rmSync(root, { recursive: true, force: true }); rmSync(stateRoot, { recursive: true, force: true });

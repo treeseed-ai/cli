@@ -16,14 +16,18 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
         session: { sessionId, status: 'active', repositories: [{ projectId: 'api', worktree: root }],
             targets: [{ projectId: 'api', targetId: 'operations-runner', mode: 'candidate', generation: 0, health: 'pending' }] },
         runtimes: [{ project: { id: 'api' }, targets: [{ id: 'operations-runner', kind: 'rebuild-restart', executionCustody: 'manager',
-            operations: { start: { command: 'manager-runtime' } }, dependencies: [], endpoints: [], ready: { kind: 'process', graceSeconds: 0 } }] }],
+            operations: { start: { command: 'manager-runtime' } }, dependencies: [], endpoints: [{ id: 'http', protocol: 'http', port: 4000 }], ready: { kind: 'process', graceSeconds: 0 } }] }],
     };
     let started = false, starts = 0;
     const context = {
         cwd: root, env,
         hostInvoke: async (request: { handlerId: string; options: { payload?: unknown } }) => {
             const payload = JSON.parse(String(request.options.payload));
-            if (request.handlerId === 'local.dev.status' || request.handlerId === 'local.dev.use') return record;
+            if (request.handlerId === 'local.dev.status') return record;
+            if (request.handlerId === 'local.dev.use') {
+                assert.equal(payload.port, undefined, 'Manager-custody targets must not receive redundant host-port readiness probes');
+                return record;
+            }
             if (request.handlerId === 'local.dev.environment') return { environment: {} };
             if (request.handlerId === 'local.dev.container' && payload.action === 'status') return started
                 ? { registered: true, state: JSON.stringify({ Name: 'treeseed-dev-test-api-operations-runner', State: 'running', Health: 'healthy' }) }
