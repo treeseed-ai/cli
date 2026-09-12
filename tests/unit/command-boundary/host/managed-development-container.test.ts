@@ -42,6 +42,6 @@ test('container startup and cleanup only invoke the protected manager, including
     assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','use','api.service=released','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','session','stop','--session',selected,'--json'],context),0);
-    assert.deepEqual(actions,['status','start','stop','start','stop','stop']);
+    assert.deepEqual(actions,['status','start','stop','start','stop','status']);
   } finally {rmSync(root,{recursive:true,force:true});}
 });

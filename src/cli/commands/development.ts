@@ -35,10 +35,10 @@ interface DevelopmentStatusRecord {
 	runtimes: DevelopmentRuntime[];
 }
 function statePath(env: NodeJS.ProcessEnv) { return resolve(developmentStateRoot(env), 'current.json'); }
-function saveState(state: LocalSessionState, env: NodeJS.ProcessEnv) {
+function saveState(state: LocalSessionState, env: NodeJS.ProcessEnv, select = true) {
 	const path = statePath(env), temporary = `${path}.new`;
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-	writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 }); renameSync(temporary, path);
+	if (select) { writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 }); renameSync(temporary, path); }
 	const snapshot=resolve(developmentStateRoot(env),state.sessionId,'session.json');
 	mkdirSync(dirname(snapshot),{recursive:true,mode:0o700});
 	writeFileSync(`${snapshot}.new`,`${JSON.stringify(state,null,2)}\n`,{mode:0o600});renameSync(`${snapshot}.new`,snapshot);
@@ -450,13 +450,20 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
+		const isSelected = JSON.parse(readFileSync(statePath(context.env), 'utf8')).sessionId === sessionId;
+		const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
 		const running = await stopProcesses(state);
 		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
-		for (const { selection, runtime } of await loadDevelopmentRuntimes(state.manifest)) for (const target of runtime.targets) {
-			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
-			else if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
+		for (const selected of record.session.targets) {
+			const { runtime, target } = selectedTarget(record, selected.projectId, selected.targetId);
+			const repository = record.session.repositories.find((entry) => entry.projectId === selected.projectId);
+			if (usesManagedContainer(target)) {
+				const status = await containerOperation(context, sessionId, runtime, target, 'status') as { registered?: unknown };
+				if (status.registered === true) await containerOperation(context, sessionId, runtime, target, 'stop');
+			}
+			else if (repository && active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 		}
-		restoreOverlays(state); selectDevelopmentCli(context.env, null); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
+		restoreOverlays(state); if (isSelected) selectDevelopmentCli(context.env, null); saveState(state, context.env, isSelected); return invoke(context, 'local.dev.session.stop', { sessionId });
 	}
 	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });
 	if (invocation.command.name === 'dev plan') return invoke(context, 'local.dev.plan', { sessionId, selected: [] });
