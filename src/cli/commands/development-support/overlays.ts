@@ -27,6 +27,14 @@ export async function stopProcesses(state: OverlaySessionState) {
 export function restoreOverlays(state: OverlaySessionState, projectId?: string, removeGenerations = true) {
 	const retained: OverlaySessionState['overlays'] = [];
 	for (const overlay of state.overlays ?? []) {
+		if (projectId && overlay.projectId !== projectId) continue;
+		if (overlay.backup) {
+			try {
+				if (lstatSync(overlay.backup).isSymbolicLink()) throw new Error(`Development overlay backup is not a release directory: ${overlay.backup}.`);
+			} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+		}
+	}
+	for (const overlay of state.overlays ?? []) {
 		if (projectId && overlay.projectId !== projectId) { retained.push(overlay); continue; }
 		if (existsSync(overlay.link) || (() => { try { lstatSync(overlay.link); return true; } catch { return false; } })()) rmSync(overlay.link, { recursive: true, force: true });
 		if (overlay.backup && existsSync(overlay.backup)) renameSync(overlay.backup, overlay.link);
@@ -60,6 +68,14 @@ export function installPackageOverlay(state: OverlaySessionState, record: { sess
 		const backup = `${link}.treeseed-release-${state.sessionId}`;
 		let owned = false;
 		try { owned = lstatSync(link).isSymbolicLink() && resolve(dirname(link), readlinkSync(link)) === resolve(overlayRoot, 'current'); } catch { /* No existing link. */ }
+		if (!owned) {
+			try {
+				if (lstatSync(link).isSymbolicLink()) throw new Error(`Another development overlay blocks ${link}; stop or recover its owning session first.`);
+			} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+		}
+		try {
+			if (lstatSync(backup).isSymbolicLink()) throw new Error(`Development overlay backup is not a release directory: ${backup}.`);
+		} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
 		if (existsSync(backup) && !owned) throw new Error(`Stale development overlay backup blocks ${link}.`);
 		planned.push({ link, backup, owned });
 	}

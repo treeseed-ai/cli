@@ -32,9 +32,29 @@ test('a later foreign backup conflict does not mutate any earlier consumer', () 
 	const f = fixture(); try {
 		const second = resolve(f.consumers[1]!.worktree, 'node_modules/@test/source');
 		symlinkSync(f.overlay, `${second}.treeseed-release-dev-test`);
-		assert.throws(f.install, /Stale development overlay backup/);
+		assert.throws(f.install, /backup is not a release directory/);
 		assert.equal(f.state.overlays.length, 0);
 		assert.ok(existsSync(resolve(f.consumers[0]!.worktree, 'node_modules/@test/source/original')));
 		assert.equal(readlinkSync(`${second}.treeseed-release-dev-test`), f.overlay);
+	} finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('foreign development links and symlinked backups are rejected before mutation', () => {
+	const f = fixture(); try {
+		const first = resolve(f.consumers[0]!.worktree, 'node_modules/@test/source');
+		rmSync(first, { recursive: true }); symlinkSync(resolve(f.root, 'foreign/current'), first);
+		assert.throws(f.install, /Another development overlay blocks/); assert.equal(f.state.overlays.length, 0);
+		rmSync(first); mkdirSync(first); writeFileSync(resolve(first, 'original'), 'one');
+		symlinkSync(f.overlay, `${first}.treeseed-release-dev-test`);
+		assert.throws(f.install, /backup is not a release directory/); assert.equal(f.state.overlays.length, 0);
+	} finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('restore refuses a symlinked backup without removing the active overlay', () => {
+	const f = fixture(); try {
+		f.install(); const item = f.state.overlays[0]!; rmSync(item.backup!, { recursive: true }); symlinkSync(f.overlay, item.backup!);
+		assert.throws(() => restoreOverlays(f.state, 'source', false), /backup is not a release directory/);
+		assert.equal(resolve(item.link, '..', readlinkSync(item.link)), resolve(f.overlay, 'current'));
+		assert.equal(existsSync(item.link), true);
 	} finally { rmSync(f.root, { recursive: true, force: true }); }
 });
