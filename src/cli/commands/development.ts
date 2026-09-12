@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { developmentCandidateSchema, developmentRuntimeSchema, type DevelopmentRuntime, type DevelopmentTarget } from '@treeseed/sdk/development';
 import { parse as parseYaml } from 'yaml';
 import type { CommandContext, ParsedInvocation } from '../types.js';
@@ -81,10 +81,31 @@ function projectSelections(file: string): ProjectSelection[] {
 	});
 }
 
-function loadRuntimes(file: string) {
-	return projectSelections(file).map((selection) => {
+async function localDevelopmentRuntimeSchema(selections: ProjectSelection[], prepare: boolean) {
+	const sdk = selections.find((selection) => {
+		const document = parseYaml(readFileSync(selection.manifest, 'utf8')) as { development?: { project?: { id?: unknown; repository?: unknown } } };
+		return document.development?.project?.id === 'sdk' && document.development.project.repository === 'treeseed-ai/sdk';
+	});
+	if (!sdk) return developmentRuntimeSchema;
+	const worktree = sdk.worktree ?? dirname(sdk.manifest), packagePath = resolve(worktree, 'package.json');
+	const packageDocument = JSON.parse(readFileSync(packagePath, 'utf8')) as { name?: unknown; scripts?: { ['build:dist']?: unknown } };
+	if (packageDocument.name !== '@treeseed/sdk' || typeof packageDocument.scripts?.['build:dist'] !== 'string') throw new Error('The selected SDK source is not a buildable @treeseed/sdk worktree.');
+	if (prepare) {
+		const result = spawnSync('npm', ['run', 'build:dist'], { cwd: worktree, env: process.env, stdio: 'inherit', timeout: 900_000 });
+		if (result.status !== 0) throw new Error('The selected SDK source contract could not be built.');
+	}
+	const entrypoint = resolve(worktree, 'dist/development/index.js');
+	if (!existsSync(entrypoint)) throw new Error('The selected SDK source contract is not built. Run development session start without --plan to prepare it.');
+	const module = await import(`${pathToFileURL(entrypoint).href}?source=${statSync(entrypoint).mtimeMs}`) as { developmentRuntimeSchema?: typeof developmentRuntimeSchema };
+	if (!module.developmentRuntimeSchema?.parse) throw new Error('The selected SDK source does not export its development runtime contract.');
+	return module.developmentRuntimeSchema;
+}
+
+async function loadRuntimes(file: string, prepareLocalSdk = false) {
+	const selections = projectSelections(file), schema = await localDevelopmentRuntimeSchema(selections, prepareLocalSdk);
+	return selections.map((selection) => {
 		const document = parseYaml(readFileSync(selection.manifest, 'utf8')) as { development?: unknown };
-		return { selection, runtime: developmentRuntimeSchema.parse(document.development) };
+		return { selection, runtime: schema.parse(document.development) };
 	});
 }
 
@@ -187,14 +208,15 @@ async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds:
 }
 
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
-	const manifest = resolve(context.cwd, invocation.arguments[0]!); const projects = loadRuntimes(manifest);
+	const manifest = resolve(context.cwd, invocation.arguments[0]!);
+	if (invocation.options.plan !== true) assertNoSelectedDevelopmentCustody(context.env);
+	const projects = await loadRuntimes(manifest, invocation.options.plan !== true);
 	const now = new Date();
 	const sessionId = `dev-${randomUUID().slice(0, 12)}`;
 	const targets = projects.flatMap(({ selection, runtime }) => (selection.targets ?? runtime.targets.map((target) => ({ id: target.id, mode: target.kind === 'rebuild-restart' ? 'candidate' as const : 'released' as const }))).map((target) => ({ projectId: runtime.project.id, targetId: target.id, mode: target.mode, generation: 0, health: target.mode === 'released' ? 'ready' as const : 'pending' as const })));
 	const leases = projects.flatMap(({ selection, runtime }) => runtime.targets.filter((target) => targets.some((entry) => entry.projectId === runtime.project.id && entry.targetId === target.id && entry.mode !== 'released')).flatMap((target) => target.endpoints.filter((endpoint) => endpoint.canonicalAlias).map((endpoint) => ({ kind: 'alias' as const, resource: endpoint.canonicalAlias!, acquiredAt: now.toISOString() }))));
 	const session = { schemaVersion: 'treeseed.development-session/v2' as const, sessionId, actor: String(invocation.options.actor ?? context.env.USER ?? 'local-developer'), hostId: 'local-host', createdAt: now.toISOString(), status: 'planning' as const, repositories: projects.map(({ selection, runtime }) => repositoryClosure(runtime, selection.worktree!)), targets, leases, restoredReceiptId: null, blockers: [] };
 	if (invocation.options.plan === true) return { session, runtimes: projects.map(({ runtime }) => runtime), mutation: false };
-	assertNoSelectedDevelopmentCustody(context.env);
 	const result = await invoke(context, 'local.dev.session.start', { session, runtimes: projects.map(({ runtime }) => runtime) });
 	saveState({ sessionId, manifest, processes: {}, overlays: [], candidates: [] }, context.env); return result;
 }
@@ -472,7 +494,7 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
 		const running = await stopProcesses(state);
 		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
-		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
+		for (const { selection, runtime } of await loadRuntimes(state.manifest)) for (const target of runtime.targets) {
 			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
 			else if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 		}
@@ -483,7 +505,7 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	if (invocation.command.name === 'dev logs') {
 		const selected = typeof invocation.options.target === 'string' ? invocation.options.target : null;
 		const logs: unknown[] = Object.entries(state.processes).filter(([key]) => !selected || key === selected).map(([target, processState]) => ({ target, path: processState.log, bytes: existsSync(processState.log) ? statSync(processState.log).size : 0 }));
-		for (const { runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
+		for (const { runtime } of await loadRuntimes(state.manifest)) for (const target of runtime.targets) {
 			const key = `${runtime.project.id}.${target.id}`;
 			if (usesManagedContainer(target) && (!selected || selected === key)) logs.push({ target: key, diagnostics: await containerOperation(context, sessionId, runtime, target, 'logs') });
 		}
