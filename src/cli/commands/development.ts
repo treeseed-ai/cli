@@ -118,6 +118,7 @@ function selectedTarget(record: unknown, projectId: string, targetId: string) {
 
 function operationForMode(target: DevelopmentTarget, mode: string) {
 	if (mode === 'released') return null;
+	if (String(target.kind) === 'source-check') return target.operations.verify ?? null;
 	if (target.kind === 'package-watch') return target.operations.watch ?? target.operations.build ?? null;
 	if (target.kind === 'rebuild-restart') return target.operations.start ?? null;
 	if (mode === 'candidate') return target.operations.build ?? target.operations.start ?? null;
@@ -125,7 +126,11 @@ function operationForMode(target: DevelopmentTarget, mode: string) {
 }
 
 export function usesManagedContainer(target: DevelopmentTarget) {
-	return target.operations.start?.command === 'docker';
+	return (target as DevelopmentTarget & { executionCustody?: string }).executionCustody === 'manager' || target.operations.start?.command === 'docker';
+}
+
+function usesManagerBuild(target: DevelopmentTarget) {
+	return (target as DevelopmentTarget & { executionCustody?: string }).executionCustody === 'manager';
 }
 
 async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop' | 'status' | 'logs') {
@@ -229,8 +234,15 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 			}
 			const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: selection.projectId, targetId: selection.targetId }) as { environment?: NodeJS.ProcessEnv };
 			if (target.operations.setup) runOneShotOperation(state, target.operations.setup, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			if (String(target.kind) === 'source-check') {
+				if (!target.operations.verify) throw new Error(`${selection.projectId}.${selection.targetId} does not declare verification.`);
+				runOneShotOperation(state, target.operations.verify, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+				await invoke(context, 'local.dev.rebuild', { sessionId, projectId: selection.projectId, targetId: selection.targetId });
+				await invoke(context, 'local.dev.use', { sessionId, ...selection });
+				continue;
+			}
 			const running = operationIsRunning(state, `${runtime.project.id}.${target.id}`);
-			if (target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			if (!usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'start');
 			else startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			saveState(state, context.env);
@@ -335,7 +347,7 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
 		await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
 	} else if (usesManagedContainer(target)) {
-		if (target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
+		if (!usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
 		await containerOperation(context, state.sessionId, runtime, target, 'start');
 	} else {
 		startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
@@ -351,10 +363,16 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 	const selected = record.session.targets.find((entry) => entry.projectId === selection.projectId && entry.targetId === selection.targetId);
 	if (!selected || selected.mode === 'released') throw new Error(`${selection.projectId}.${selection.targetId} is not selected for local development.`);
 	const { runtime, target } = selectedTarget(record, selection.projectId, selection.targetId);
-	if (target.kind === 'package-watch') throw new Error('Package-watch targets rebuild atomically and do not support restart.');
 	const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
 	if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 	if (invocation.options.plan === true) return { sessionId, target: `${selection.projectId}.${selection.targetId}`, mode: selected.mode, restart: true, mutation: false };
+	if (String(target.kind) === 'source-check') {
+		if (!target.operations.verify) throw new Error(`${selection.projectId}.${selection.targetId} does not declare verification.`);
+		runOneShotOperation(state, target.operations.verify, repository.worktree, selected.mode, context.env);
+		await markRebuilt(context, sessionId, runtime.project.id, target.id, selected.mode as 'candidate' | 'live', target);
+		return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
+	}
+	if (target.kind === 'package-watch') throw new Error('Package-watch targets rebuild atomically and do not support restart.');
 	await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode: selected.mode as 'candidate' | 'live', context, recordGeneration: false });
 	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	saveState(state, context.env);
@@ -376,8 +394,15 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		mode,
 		mutation: false,
 	};
-	if (target.kind === 'package-watch') await rebuildPackage({ state, runtime, target, worktree: repository.worktree, mode, context });
+	if (String(target.kind) === 'source-check') {
+		if (!target.operations.verify) throw new Error(`${selection.projectId}.${selection.targetId} does not declare verification.`);
+		runOneShotOperation(state, target.operations.verify, repository.worktree, mode, context.env);
+		await markRebuilt(context, sessionId, runtime.project.id, target.id, mode, target);
+	} else if (target.kind === 'package-watch') await rebuildPackage({ state, runtime, target, worktree: repository.worktree, mode, context });
 	else if (target.kind === 'rebuild-restart') {
+		if (usesManagerBuild(target)) {
+			await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
+		} else {
 		if (!target.operations.build) throw new Error(`${selection.projectId}.${selection.targetId} does not declare a build operation.`);
 		const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env, resolved.environment ?? {});
@@ -385,6 +410,7 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		else {
 			await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
 			await markRebuilt(context, sessionId, runtime.project.id, target.id, mode, target);
+		}
 		}
 	} else await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 	const manual: string[] = [];

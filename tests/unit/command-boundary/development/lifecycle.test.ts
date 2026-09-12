@@ -79,6 +79,12 @@ test('healthy exact managed snapshot is reusable; missing runtime requires start
     assert.equal(managedContainerAlreadyReady({ registered: false, state: null }, 'dev-test', 'operations-runner'), false);
 });
 
+test('healthy multi-container manager runtime is reusable', () => {
+	const instances = ['manager', 'runner'].map((name) => ({ name, sessionId: 'dev-test', target: 'agent.provider', running: true, health: 'healthy' }));
+	assert.equal(managedContainerAlreadyReady({ registered: true, instances, ready: true }, 'dev-test', 'provider'), true);
+	assert.throws(() => managedContainerAlreadyReady({ registered: true, instances: [{ ...instances[0], running: false }], ready: false }, 'dev-test', 'provider'), /not healthy/);
+});
+
 test('registered unhealthy, malformed, or wrong-instance state never authorizes overwrite', () => {
     const value = { Name: 'treeseed-dev-test-api-operations-runner', State: 'running', Health: 'unhealthy' };
     assert.throws(() => managedContainerAlreadyReady({ registered: true, state: JSON.stringify(value) }, 'dev-test', 'operations-runner'), /dev restart/);
