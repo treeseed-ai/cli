@@ -221,7 +221,7 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 			if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, null);
 		} else {
 			if (usesManagedContainer(target) && managedContainerAlreadyReady(await containerOperation(context, sessionId, runtime, target, 'status'), sessionId, target.id)) {
-				await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+				await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(!usesManagerBuild(target) && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 				continue;
 			}
 			const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: selection.projectId, targetId: selection.targetId }) as { environment?: NodeJS.ProcessEnv };
@@ -246,7 +246,7 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 				if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, { entrypoint: resolve(overlayRoot, 'current', 'dist', 'cli', 'main.js') });
 			} else if (!usesManagedContainer(target)) await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, `${runtime.project.id}.${target.id}`);
 		}
-		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && !usesManagerBuild(target) && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	}
 	saveState(state, context.env); return invoke(context, 'local.dev.status', { sessionId, all: false });
 }
@@ -314,7 +314,7 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 
 async function markRebuilt(context: CommandContext, sessionId: string, projectId: string, targetId: string, mode: 'candidate' | 'live', target: DevelopmentTarget) {
 	await invoke(context, 'local.dev.rebuild', { sessionId, projectId, targetId });
-	await invoke(context, 'local.dev.use', { sessionId, projectId, targetId, mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+	await invoke(context, 'local.dev.use', { sessionId, projectId, targetId, mode, ...(!usesManagerBuild(target) && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 }
 
 async function rebuildPackage(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext }) {
