@@ -114,6 +114,32 @@ test('stopping another session preserves the selected session and skips unregist
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('stopping a session recovers an unhealthy registered managed target', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-stop-unhealthy-'));
+	try {
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, stateRoot = resolve(root, 'state/treeseed/development');
+		const state = { sessionId: 'dev-unhealthy', manifest: '/missing.yaml', processes: {}, overlays: [], candidates: [] };
+		mkdirSync(resolve(stateRoot, 'dev-unhealthy'), { recursive: true, mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(state));
+		writeFileSync(resolve(stateRoot, 'dev-unhealthy/session.json'), JSON.stringify(state));
+		const target = { id: 'service', kind: 'live-api', executionCustody: 'manager', operations: {}, endpoints: [] };
+		const record = { session: { sessionId: 'dev-unhealthy', status: 'active', repositories: [{ projectId: 'api', worktree: '/workspace/api' }], targets: [{ projectId: 'api', targetId: 'service', mode: 'candidate' }] }, runtimes: [{ project: { id: 'api' }, targets: [target] }] };
+		const actions: string[] = [], output: string[] = [];
+		const exit = await runCommandLine(['dev', 'session', 'stop', '--session', 'dev-unhealthy', '--json'], { env, interactiveUi: false,
+			hostInvoke: async (input) => {
+				if (input.handlerId === 'local.dev.status') return record;
+				if (input.handlerId === 'local.dev.container') {
+					const action = JSON.parse(String(input.options.payload)).action as string; actions.push(action);
+					if (action === 'status' || action === 'stop') throw new Error('Managed development application_unhealthy.');
+					return {};
+				}
+				return { session: { sessionId: 'dev-unhealthy', status: 'stopped' } };
+			}, write: (value) => output.push(value) });
+		assert.equal(exit, 0, output.join('\n'));
+		assert.deepEqual(actions, ['status', 'stop']);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('host runtime development planning is local and status uses the protected manager socket', async () => {
 	const output: string[] = [], calls: any[] = [];
 	const hostInvoke = async (input: any) => { calls.push(input); return { generationId: 'installed', status: 'installed' }; };

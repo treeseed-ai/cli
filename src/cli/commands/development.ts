@@ -458,8 +458,21 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 			const { runtime, target } = selectedTarget(record, selected.projectId, selected.targetId);
 			const repository = record.session.repositories.find((entry) => entry.projectId === selected.projectId);
 			if (usesManagedContainer(target)) {
-				const status = await containerOperation(context, sessionId, runtime, target, 'status') as { registered?: unknown };
-				if (status.registered === true) await containerOperation(context, sessionId, runtime, target, 'stop');
+				let registered = true;
+				try {
+					const status = await containerOperation(context, sessionId, runtime, target, 'status') as { registered?: unknown };
+					registered = status.registered === true;
+				} catch {
+					// An unhealthy registered application may reject status; stopping it is the recovery path.
+				}
+				if (registered) {
+					try {
+						await containerOperation(context, sessionId, runtime, target, 'stop');
+					} catch {
+						// Session closure is authoritative and must remain available when an unhealthy
+						// application cannot complete its own stop operation.
+					}
+				}
 			}
 			else if (repository && active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 		}
