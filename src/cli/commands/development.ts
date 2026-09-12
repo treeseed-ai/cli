@@ -114,7 +114,7 @@ export function developmentOperationEnvironment(state: Pick<LocalSessionState, '
 
 function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
 	const root = operation.cwd ? resolve(worktree, operation.cwd) : worktree;
-	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
+	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'pipe', timeout: operation.timeoutSeconds * 1_000 });
 	if (result.status !== 0) throw new Error(`Development operation failed: ${operation.command} ${operation.args.join(' ')}.`);
 }
 
