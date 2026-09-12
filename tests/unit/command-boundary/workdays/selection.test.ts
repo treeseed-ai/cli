@@ -15,6 +15,15 @@ test('repeated and CSV selectors become a normalized intersecting nested intent'
 	assert.equal(Object.keys(calls[0]!.input.body).some(key => key.includes('.')), false);
 });
 
+test('repeated and CSV accepted decisions become one normalized selection', async () => {
+	let body: any;
+	const exit = await runCommandLine([...base, '--decision', 'decision-b,decision-a', '--decision', 'decision-b'], {
+		interactiveUi: false, write() {}, operationInvoke: async (_operationId, input) => { body = input.body; return { data: {} }; },
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(body.decisionIds, ['decision-a', 'decision-b']);
+});
+
 test('omitted selection leaves the full intent unchanged', async () => {
 	let body: any;
 	assert.equal(await runCommandLine(base, { interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = input.body; return { data: {} }; } }), 0);
@@ -31,6 +40,12 @@ for (const selector of [['--agent', ''], ['--agent', 'reviewer,'], ['--activity'
 		assert.equal(error.code, selector[1] === '' ? 'invalid_input' : 'workday_agent_selection_invalid');
 	});
 }
+
+test('empty decision selection never invokes the API', async () => {
+	let calls = 0;
+	assert.equal(await runCommandLine([...base, '--decision', 'decision,'], { interactiveUi: false, write() {}, operationInvoke: async () => { calls++; } }), 1);
+	assert.equal(calls, 0);
+});
 
 test('nested bindings reject prototype traversal, collisions, and excessive depth', () => {
 	const input = {}; setOperationInputField(input, 'agentSelection.agentSlugs', ['reviewer']);
