@@ -76,6 +76,21 @@ test('development session start uses one protected manager command and private l
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('development session start refuses existing package-overlay custody before manager mutation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-')), file = resolve(root, 'treeseed.package.yaml'), output: string[] = [];
+	try {
+		writeFileSync(file, manifest); execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' };
+		const stateRoot = resolve(env.XDG_STATE_HOME, 'treeseed/development'); mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify({ sessionId: 'dev-existing', manifest: file, processes: {}, overlays: [{ projectId: 'sdk' }], candidates: [] }));
+		let managerCalls = 0;
+		const exit = await runCommandLine(['dev', 'session', 'start', file, '--json'], { cwd: root, env, interactiveUi: false,
+			hostInvoke: async () => { managerCalls += 1; }, write: (value) => output.push(value) });
+		assert.notEqual(exit, 0); assert.equal(managerCalls, 0); assert.match(output.join(''), /still owns local processes or package overlays/);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('host runtime development planning is local and status uses the protected manager socket', async () => {
 	const output: string[] = [], calls: any[] = [];
 	const hostInvoke = async (input: any) => { calls.push(input); return { generationId: 'installed', status: 'installed' }; };

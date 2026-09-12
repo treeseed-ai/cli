@@ -3,8 +3,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { developmentCandidateSchema, developmentRuntimeSchema, type DevelopmentRuntime, type DevelopmentTarget } from '@treeseed/sdk/development';
-import { parse as parseYaml } from 'yaml';
+import { developmentCandidateSchema, type DevelopmentRuntime, type DevelopmentTarget } from '@treeseed/sdk/development';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { invokeLocalHostManager } from '../support/host-client.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
@@ -14,7 +13,8 @@ import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
 import { developmentBootOrder } from './development-support/boot-order.js';
-import { managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
+import { assertNoSelectedDevelopmentCustody, managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
+import { loadDevelopmentRuntimes } from './development-support/runtime-loader.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
 
@@ -27,7 +27,6 @@ interface LocalSessionState {
 	candidates: string[];
 }
 
-interface ProjectSelection { manifest: string; worktree?: string; targets?: Array<{ id: string; mode: 'released' | 'candidate' | 'live' }> }
 interface DevelopmentStatusRecord {
 	session: {
 		targets: Array<{ projectId: string; targetId: string; mode: 'released' | 'candidate' | 'live'; generation: number; health?: string }>;
@@ -67,26 +66,6 @@ function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, exclud
 	return { projectId: runtime.project.id, repository: runtime.project.repository, worktree, commit: git(worktree, ['rev-parse', 'HEAD']), branch, dirty: Boolean(status), dirtyDigest: status ? sha256(`${status}\n${git(worktree, ['diff', '--binary', 'HEAD', ...pathspec])}`) : null, recipeDigest: sha256(JSON.stringify(runtime)) };
 }
 
-function projectSelections(file: string): ProjectSelection[] {
-	const root = dirname(file), document = parseYaml(readFileSync(file, 'utf8')) as Record<string, unknown>;
-	if (document.development) return [{ manifest: file, worktree: root }];
-	if (!Array.isArray(document.projects) || document.projects.length === 0) throw new Error('Development session manifest requires a non-empty projects array.');
-	return document.projects.map((project) => {
-		if (!project || typeof project !== 'object' || Array.isArray(project)) throw new Error('Development project selection must be an object.');
-		const input = project as Record<string, unknown>;
-		if (typeof input.manifest !== 'string') throw new Error('Development project selection requires a manifest path.');
-		const manifest = isAbsolute(input.manifest) ? input.manifest : resolve(root, input.manifest);
-		const worktree = typeof input.worktree === 'string' ? (isAbsolute(input.worktree) ? input.worktree : resolve(root, input.worktree)) : dirname(manifest);
-		return { manifest, worktree, ...(Array.isArray(input.targets) ? { targets: input.targets as ProjectSelection['targets'] } : {}) };
-	});
-}
-
-function loadRuntimes(file: string) {
-	return projectSelections(file).map((selection) => {
-		const document = parseYaml(readFileSync(selection.manifest, 'utf8')) as { development?: unknown };
-		return { selection, runtime: developmentRuntimeSchema.parse(document.development) };
-	});
-}
 
 function hostCommand(handlerId: string, payload: unknown) {
 	return { handlerId, arguments: [], options: { payload: JSON.stringify(payload) } };
@@ -187,7 +166,9 @@ async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds:
 }
 
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
-	const manifest = resolve(context.cwd, invocation.arguments[0]!); const projects = loadRuntimes(manifest);
+	const manifest = resolve(context.cwd, invocation.arguments[0]!);
+	if (invocation.options.plan !== true) assertNoSelectedDevelopmentCustody(context.env);
+	const projects = await loadDevelopmentRuntimes(manifest, invocation.options.plan !== true);
 	const now = new Date();
 	const sessionId = `dev-${randomUUID().slice(0, 12)}`;
 	const targets = projects.flatMap(({ selection, runtime }) => (selection.targets ?? runtime.targets.map((target) => ({ id: target.id, mode: target.kind === 'rebuild-restart' ? 'candidate' as const : 'released' as const }))).map((target) => ({ projectId: runtime.project.id, targetId: target.id, mode: target.mode, generation: 0, health: target.mode === 'released' ? 'ready' as const : 'pending' as const })));
@@ -471,7 +452,7 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
 		const running = await stopProcesses(state);
 		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
-		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
+		for (const { selection, runtime } of await loadDevelopmentRuntimes(state.manifest)) for (const target of runtime.targets) {
 			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
 			else if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 		}
@@ -482,7 +463,7 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	if (invocation.command.name === 'dev logs') {
 		const selected = typeof invocation.options.target === 'string' ? invocation.options.target : null;
 		const logs: unknown[] = Object.entries(state.processes).filter(([key]) => !selected || key === selected).map(([target, processState]) => ({ target, path: processState.log, bytes: existsSync(processState.log) ? statSync(processState.log).size : 0 }));
-		for (const { runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
+		for (const { runtime } of await loadDevelopmentRuntimes(state.manifest)) for (const target of runtime.targets) {
 			const key = `${runtime.project.id}.${target.id}`;
 			if (usesManagedContainer(target) && (!selected || selected === key)) logs.push({ target: key, diagnostics: await containerOperation(context, sessionId, runtime, target, 'logs') });
 		}
