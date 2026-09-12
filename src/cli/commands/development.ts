@@ -16,7 +16,6 @@ import { ownsDevelopmentProcess, processIdentity } from './development-support/p
 import { developmentBootOrder } from './development-support/boot-order.js';
 import { managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
-
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
 
 interface LocalSessionState {
@@ -29,7 +28,6 @@ interface LocalSessionState {
 }
 
 interface ProjectSelection { manifest: string; worktree?: string; targets?: Array<{ id: string; mode: 'released' | 'candidate' | 'live' }> }
-
 interface DevelopmentStatusRecord {
 	session: {
 		targets: Array<{ projectId: string; targetId: string; mode: 'released' | 'candidate' | 'live'; generation: number; health?: string }>;
@@ -37,9 +35,7 @@ interface DevelopmentStatusRecord {
 	};
 	runtimes: DevelopmentRuntime[];
 }
-
 function statePath(env: NodeJS.ProcessEnv) { return resolve(developmentStateRoot(env), 'current.json'); }
-
 function saveState(state: LocalSessionState, env: NodeJS.ProcessEnv) {
 	const path = statePath(env), temporary = `${path}.new`;
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
@@ -62,7 +58,6 @@ function loadState(env: NodeJS.ProcessEnv, sessionId?: unknown) {
 
 function sha256(value: string | Buffer) { return `sha256:${createHash('sha256').update(value).digest('hex')}`; }
 function sha512Integrity(value: Buffer) { return `sha512-${createHash('sha512').update(value).digest('base64')}`; }
-
 function git(root: string, args: string[]) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim(); }
 
 function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
@@ -96,18 +91,15 @@ function loadRuntimes(file: string) {
 function hostCommand(handlerId: string, payload: unknown) {
 	return { handlerId, arguments: [], options: { payload: JSON.stringify(payload) } };
 }
-
 async function invoke(context: CommandContext, handlerId: string, payload: unknown) {
 	const command = hostCommand(handlerId, payload);
 	return context.hostInvoke ? context.hostInvoke(command) : invokeLocalHostManager(command);
 }
-
 function parseSelection(value: string) {
 	const match = /^([a-z][a-z0-9.-]{1,63})\.([a-z][a-z0-9.-]{1,63})=(released|candidate|live)$/u.exec(value);
 	if (!match) throw new Error(`Invalid development selection ${value}; expected project.target=mode.`);
 	return { projectId: match[1]!, targetId: match[2]!, mode: match[3]! as 'released' | 'candidate' | 'live' };
 }
-
 function selectedTarget(record: unknown, projectId: string, targetId: string) {
 	const value = record as { runtimes?: DevelopmentRuntime[] };
 	const runtime = value.runtimes?.find((entry) => entry.project.id === projectId);
