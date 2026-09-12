@@ -4944,6 +4944,11 @@
               "type": "boolean"
             },
             {
+              "name": "--decision",
+              "description": "Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.",
+              "type": "string[]"
+            },
+            {
               "name": "--agent",
               "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
               "type": "string[]"
@@ -5021,6 +5026,14 @@
                 "field": "objectiveFilters",
                 "source": "option",
                 "name": "objective",
+                "required": false,
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "decisionIds",
+                "source": "option",
+                "name": "decision",
                 "required": false,
                 "transform": "csv"
               },

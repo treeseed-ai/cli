@@ -22,7 +22,7 @@ Operation: mutation. Result schema: `treeseed.communication-send-receipt/v4`.
 Control-plane operation: `communications.send`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--team <value>`: Team id or slug.
+- `--team <value>`: One-command team override.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
@@ -46,9 +46,9 @@ Control-plane operation: `communications.topics.list`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
+- `--status <value>`: Topic status.
+- `--limit <value>`: Maximum topics.
+- `--cursor <value>`: Pagination cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd topics show <topic>
@@ -100,9 +100,9 @@ Operation: read. Result schema: `treeseed.capability-page/v1`.
 Control-plane operation: `capabilities.list`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
+- `--status <value>`: Definition status.
+- `--limit <value>`: Maximum definitions.
+- `--cursor <value>`: Pagination cursor.
 - `--json`: Emit the stable JSON envelope.
 - `--family <value>`: Capability family filter.
 - `--namespace <value>`: Namespace filter.
@@ -322,7 +322,7 @@ Verify a declarative Platform repository without package checkouts or a control-
 Operation: read. Result schema: `treeseed.platform-verification/v1`.
 Execution: `local.platform.verify`.
 
-- `--json`: Emit the stable JSON envelope.
+- `--json`: Emit the stable command-result envelope.
 - `--profile <value>`: Composable profile to verify.
 
 ### trsd platform workset
@@ -332,7 +332,7 @@ Plan or safely materialize exact primary source checkouts beneath packages/.
 Operation: mutation. Result schema: `treeseed.platform-workset-result/v1`.
 Execution: `local.platform.workset`.
 
-- `--json`: Emit the stable JSON envelope.
+- `--json`: Emit the stable command-result envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--apply`: Apply the frozen workset plan.
 - `--yes`: Confirm the planned checkout mutations.
@@ -351,8 +351,8 @@ Plan or reconcile a project, repository, template, library binding, and live inv
 Operation: mutation. Result schema: `treeseed.platform-project-create-result/v1`.
 Execution: `local.platform.project.create`.
 
-- `--yes`: Confirm authorized automation.
-- `--json`: Emit the stable JSON envelope.
+- `--yes`: Confirm authority-bearing project creation.
+- `--json`: Emit the stable command-result envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--apply`: Apply the accepted creation plan.
 - `--template <value>`: Published template identity.
@@ -379,7 +379,7 @@ Apply an exact agent-authorized hosted-topology plan through the operations runn
 Operation: mutation. Result schema: `treeseed.platform-operation/v1`.
 Execution: `local.platform.topology.apply`.
 
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm the authority-bearing mutation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
@@ -399,7 +399,7 @@ Restore exact prior hosted-topology state from a known-good receipt.
 Operation: mutation. Result schema: `treeseed.platform-operation/v1`.
 Execution: `local.platform.topology.rollback`.
 
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm the destructive rollback.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
@@ -601,7 +601,7 @@ Operation: mutation. Result schema: `treeseed.host-initialization-result/v1`.
 Execution: `local.host.initialize`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm non-interactive execution after reviewing the plan.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--input-file <value>`: Team capacity installation configuration downloaded from Admin. Values are never printed.
@@ -1317,7 +1317,7 @@ Operation: mutation. Result schema: `treeseed.host-uninstall-result/v1`.
 Execution: `local.host.uninstall`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm non-interactive execution after reviewing the plan.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--confirm`: Confirm removal of the reviewed TreeSeed resource inventory.
@@ -2003,6 +2003,7 @@ Control-plane operation: `workdays.plan`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--profile <value>`: Workday profile identity.
+- `--decision <value>`: Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.
 - `--projects <value>`: Project scope or comma-separated projects.
 - `--start <value>`: ISO start time.
 - `--end <value>`: ISO end time.
@@ -2567,7 +2568,7 @@ Control-plane operation: `ai.instances.storage.put`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--node <value>`: Registered AI node identity.
-- `--connection <value>`: Trusted service connection identity.
+- `--connection <value>`: Team object-storage service connection ID.
 - `--json`: Emit the stable JSON envelope.
 - `--if-match <value>`: Exact current resource version, or new when unconfigured.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.

@@ -75,6 +75,13 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		if (diagnostics.length) throw Object.assign(new Error(diagnostics.map(item => `${item.path}: ${item.message}`).join(' ')), { category: 'invalid_input', code: 'workday_agent_selection_invalid' });
 		input.body.agentSelection = normalizeWorkdayAgentSelection(input.body.agentSelection);
 	}
+	if (operation.descriptor.operationId === 'workdays.plan' && input.body.decisionIds !== undefined) {
+		const values = Array.isArray(input.body.decisionIds) ? input.body.decisionIds : [];
+		if (!values.length || values.length > 64 || values.some(value => typeof value !== 'string' || !value.trim() || value.length > 128)) {
+			throw Object.assign(new Error('decisionIds must contain one to 64 non-empty decision identities.'), { category: 'invalid_input', code: 'workday_decision_selection_invalid' });
+		}
+		input.body.decisionIds = [...new Set(values.map(value => String(value).trim()))].sort();
+	}
 	if (operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
 		const parsed = await portableSeedBundle(input.body.file, context);
 		delete input.body.file;
