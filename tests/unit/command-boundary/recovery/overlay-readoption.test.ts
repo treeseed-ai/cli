@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, symlinkSync, readlinkSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, symlinkSync, readlinkSync, existsSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -44,7 +44,7 @@ test('foreign development links and symlinked backups are rejected before mutati
 		const first = resolve(f.consumers[0]!.worktree, 'node_modules/@test/source');
 		rmSync(first, { recursive: true }); symlinkSync(resolve(f.root, 'foreign/current'), first);
 		assert.throws(f.install, /Another development overlay blocks/); assert.equal(f.state.overlays.length, 0);
-		rmSync(first); mkdirSync(first); writeFileSync(resolve(first, 'original'), 'one');
+		unlinkSync(first); mkdirSync(first); writeFileSync(resolve(first, 'original'), 'one');
 		symlinkSync(f.overlay, `${first}.treeseed-release-dev-test`);
 		assert.throws(f.install, /backup is not a release directory/); assert.equal(f.state.overlays.length, 0);
 	} finally { rmSync(f.root, { recursive: true, force: true }); }
