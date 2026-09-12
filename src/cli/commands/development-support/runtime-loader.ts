@@ -31,7 +31,7 @@ async function sourceSchema(selections: ProjectSelection[], prepare: boolean) {
 	const packageDocument = JSON.parse(readFileSync(packagePath, 'utf8')) as { name?: unknown; scripts?: { ['build:dist']?: unknown } };
 	if (packageDocument.name !== '@treeseed/sdk' || typeof packageDocument.scripts?.['build:dist'] !== 'string') throw new Error('The selected SDK source is not a buildable @treeseed/sdk worktree.');
 	if (prepare) {
-		const result = spawnSync('npm', ['run', 'build:dist'], { cwd: worktree, env: process.env, stdio: 'inherit', timeout: 900_000 });
+		const result = spawnSync('npm', ['run', 'build:dist'], { cwd: worktree, env: process.env, stdio: 'pipe', timeout: 900_000 });
 		if (result.status !== 0) throw new Error('The selected SDK source contract could not be built.');
 	}
 	const entrypoint = resolve(worktree, 'dist/development/index.js');
