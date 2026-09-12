@@ -15,8 +15,8 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
     const record = {
         session: { sessionId, status: 'active', repositories: [{ projectId: 'api', worktree: root }],
             targets: [{ projectId: 'api', targetId: 'operations-runner', mode: 'candidate', generation: 0, health: 'pending' }] },
-        runtimes: [{ project: { id: 'api' }, targets: [{ id: 'operations-runner', kind: 'rebuild-restart',
-            operations: { start: { command: 'docker' } }, dependencies: [], endpoints: [], ready: { kind: 'process', graceSeconds: 0 } }] }],
+        runtimes: [{ project: { id: 'api' }, targets: [{ id: 'operations-runner', kind: 'rebuild-restart', executionCustody: 'manager',
+            operations: { start: { command: 'manager-runtime' } }, dependencies: [], endpoints: [], ready: { kind: 'process', graceSeconds: 0 } }] }],
     };
     let started = false, starts = 0;
     const context = {
