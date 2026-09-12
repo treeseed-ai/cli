@@ -91,6 +91,29 @@ test('development session start refuses existing package-overlay custody before 
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('stopping another session preserves the selected session and skips unregistered managed targets', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-stop-'));
+	try {
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, stateRoot = resolve(root, 'state/treeseed/development');
+		const current = { sessionId: 'dev-current', manifest: '/current.yaml', processes: {}, overlays: [], candidates: [] };
+		const stale = { sessionId: 'dev-stale', manifest: '/missing.yaml', processes: {}, overlays: [], candidates: [] };
+		mkdirSync(stateRoot, { recursive: true, mode: 0o700 }); mkdirSync(resolve(stateRoot, 'dev-stale'), { mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(current));
+		writeFileSync(resolve(stateRoot, 'dev-stale/session.json'), JSON.stringify(stale));
+		const target = { id: 'service', kind: 'live-api', executionCustody: 'manager', operations: {}, endpoints: [] };
+		const record = { session: { sessionId: 'dev-stale', status: 'active', repositories: [{ projectId: 'api', worktree: '/workspace/api' }], targets: [{ projectId: 'api', targetId: 'service', mode: 'released' }] }, runtimes: [{ project: { id: 'api' }, targets: [target] }] };
+		const calls: Array<{ handlerId: string; options: { payload?: string } }> = [], output: string[] = [];
+		const exit = await runCommandLine(['dev', 'session', 'stop', '--session', 'dev-stale', '--json'], { env, interactiveUi: false,
+			hostInvoke: async (input) => { calls.push(input as typeof calls[number]); if (input.handlerId === 'local.dev.status') return record;
+				if (input.handlerId === 'local.dev.container') return { registered: false, state: null }; return { session: { sessionId: 'dev-stale', status: 'stopped' } }; },
+			write: (value) => output.push(value) });
+		assert.equal(exit, 0, output.join('\n'));
+		assert.equal(JSON.parse(readFileSync(resolve(stateRoot, 'current.json'), 'utf8')).sessionId, 'dev-current');
+		const containerCalls = calls.filter((call) => call.handlerId === 'local.dev.container').map((call) => JSON.parse(String(call.options.payload)));
+		assert.deepEqual(containerCalls, [{ sessionId: 'dev-stale', projectId: 'api', targetId: 'service', action: 'status' }]);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('host runtime development planning is local and status uses the protected manager socket', async () => {
 	const output: string[] = [], calls: any[] = [];
 	const hostInvoke = async (input: any) => { calls.push(input); return { generationId: 'installed', status: 'installed' }; };
