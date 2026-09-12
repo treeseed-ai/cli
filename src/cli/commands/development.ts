@@ -14,7 +14,7 @@ import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
 import { developmentBootOrder } from './development-support/boot-order.js';
-import { managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
+import { assertNoSelectedDevelopmentCustody, managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
 
@@ -194,14 +194,7 @@ async function startSession(invocation: ParsedInvocation, context: CommandContex
 	const leases = projects.flatMap(({ selection, runtime }) => runtime.targets.filter((target) => targets.some((entry) => entry.projectId === runtime.project.id && entry.targetId === target.id && entry.mode !== 'released')).flatMap((target) => target.endpoints.filter((endpoint) => endpoint.canonicalAlias).map((endpoint) => ({ kind: 'alias' as const, resource: endpoint.canonicalAlias!, acquiredAt: now.toISOString() }))));
 	const session = { schemaVersion: 'treeseed.development-session/v2' as const, sessionId, actor: String(invocation.options.actor ?? context.env.USER ?? 'local-developer'), hostId: 'local-host', createdAt: now.toISOString(), status: 'planning' as const, repositories: projects.map(({ selection, runtime }) => repositoryClosure(runtime, selection.worktree!)), targets, leases, restoredReceiptId: null, blockers: [] };
 	if (invocation.options.plan === true) return { session, runtimes: projects.map(({ runtime }) => runtime), mutation: false };
-	const selectedState = statePath(context.env);
-	if (existsSync(selectedState)) {
-		const selected = JSON.parse(readFileSync(selectedState, 'utf8')) as LocalSessionState;
-		const ownsProcesses = Object.values(selected.processes ?? {}).some((entry) => ownsDevelopmentProcess(entry, selected.sessionId));
-		if (ownsProcesses || (selected.overlays ?? []).length > 0) {
-			throw new Error(`Development session ${selected.sessionId} still owns local processes or package overlays; stop or recover it before starting another session.`);
-		}
-	}
+	assertNoSelectedDevelopmentCustody(context.env);
 	const result = await invoke(context, 'local.dev.session.start', { session, runtimes: projects.map(({ runtime }) => runtime) });
 	saveState({ sessionId, manifest, processes: {}, overlays: [], candidates: [] }, context.env); return result;
 }

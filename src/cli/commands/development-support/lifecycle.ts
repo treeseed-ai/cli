@@ -1,6 +1,16 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { withOsCustodyLock } from '../../support/server-custody.js';
 import { developmentStateRoot } from '../development-cli-selection.js';
+import { ownsDevelopmentProcess } from './process-identity.js';
+
+export function assertNoSelectedDevelopmentCustody(env: NodeJS.ProcessEnv) {
+	const selectedState = resolve(developmentStateRoot(env), 'current.json');
+	if (!existsSync(selectedState)) return;
+	const selected = JSON.parse(readFileSync(selectedState, 'utf8')) as { sessionId: string; processes?: Record<string, Parameters<typeof ownsDevelopmentProcess>[0]>; overlays?: unknown[] };
+	const ownsProcesses = Object.values(selected.processes ?? {}).some((entry) => ownsDevelopmentProcess(entry, selected.sessionId));
+	if (ownsProcesses || (selected.overlays ?? []).length > 0) throw new Error(`Development session ${selected.sessionId} still owns local processes or package overlays; stop or recover it before starting another session.`);
+}
 
 /** Shared builds and current.json cross session boundaries. Lock the Linux
  * operator's lifecycle, not a time-limited development selection. Deployment
