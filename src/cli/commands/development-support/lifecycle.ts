@@ -47,7 +47,7 @@ export function managedContainerAlreadyReady(value: unknown, sessionId: string, 
         const instances = result.instances as Array<{ sessionId?: unknown; target?: unknown; running?: unknown; health?: unknown }>;
         if (!instances.length || instances.some((item) => item.sessionId !== sessionId || typeof item.target !== 'string'
             || !item.target.endsWith(`.${targetId}`) || item.running !== true || item.health === 'starting' || item.health === 'unhealthy') || result.ready !== true)
-            throw new Error('Managed runtime is not healthy; use dev restart to drain and recover it.');
+            return false;
         return true;
     }
     if (result?.registered !== true || typeof result.state !== 'string') throw new Error('Managed runtime status is invalid.');
@@ -57,6 +57,6 @@ export function managedContainerAlreadyReady(value: unknown, sessionId: string, 
     if (rows.length !== 1 || rows[0]?.Name !== `treeseed-${sessionId}-api-${targetId}`)
         throw new Error('Managed runtime identity is inconsistent; inspect the session before restarting.');
     if (rows[0].State !== 'running' || rows[0].Health !== 'healthy')
-        throw new Error('Managed runtime is not healthy; use dev restart to drain and recover it.');
+        return false;
     return true;
 }
