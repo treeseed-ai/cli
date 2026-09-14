@@ -59,7 +59,6 @@ function loadState(env: NodeJS.ProcessEnv, sessionId?: unknown) {
 function sha256(value: string | Buffer) { return `sha256:${createHash('sha256').update(value).digest('hex')}`; }
 function sha512Integrity(value: Buffer) { return `sha512-${createHash('sha512').update(value).digest('base64')}`; }
 function git(root: string, args: string[]) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim(); }
-
 function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
 	const pathspec = excludedPaths.length ? ['--', '.', ...excludedPaths.map((path) => `:(exclude)${path}`)] : [];
 	const status = git(worktree, ['status', '--porcelain=v1', '--untracked-files=all', ...pathspec]);
@@ -83,7 +82,6 @@ export function usesManagedContainer(target: DevelopmentTarget) {
 function usesManagerBuild(target: DevelopmentTarget) {
 	return (target as DevelopmentTarget & { executionCustody?: string }).executionCustody === 'manager';
 }
-
 async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop' | 'status' | 'logs') {
 	return invoke(context, 'local.dev.container', {sessionId,projectId:runtime.project.id,targetId:target.id,action});
 }
@@ -91,7 +89,6 @@ async function containerOperation(context: CommandContext, sessionId: string, ru
 export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
 	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: state.workspaceRoot ?? dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
 }
-
 function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
 	const root = operation.cwd ? resolve(worktree, operation.cwd) : worktree;
 	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'pipe', timeout: operation.timeoutSeconds * 1_000 });
