@@ -50,6 +50,17 @@ test('foreign development links and symlinked backups are rejected before mutati
 	} finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test('a recorded session overlay repairs a package-manager link without replacing its release backup', () => {
+	const f = fixture(); try {
+		f.install(); const item = f.state.overlays[0]!; const originalBackup = item.backup;
+		rmSync(item.link, { recursive: true, force: true }); symlinkSync(resolve(f.root, 'package-manager/source'), item.link);
+		f.install();
+		assert.equal(resolve(item.link, '..', readlinkSync(item.link)), resolve(f.overlay, 'current'));
+		assert.equal(f.state.overlays.length, 2);
+		assert.equal(f.state.overlays[0]!.backup, originalBackup);
+	} finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test('restore refuses a symlinked backup without removing the active overlay', () => {
 	const f = fixture(); try {
 		f.install(); const item = f.state.overlays[0]!; rmSync(item.backup!, { recursive: true }); symlinkSync(f.overlay, item.backup!);

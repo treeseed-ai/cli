@@ -41,8 +41,13 @@ export async function withDevelopmentLifecycle<T>(env: NodeJS.ProcessEnv, action
  * Source changes enter through explicit restart/rebuild, not another use/resume.
  */
 export function managedContainerAlreadyReady(value: unknown, sessionId: string, targetId: string): boolean {
-    const result = value as { registered?: unknown; state?: unknown; instances?: unknown; ready?: unknown };
+    const result = value as { registered?: unknown; state?: unknown; instances?: unknown; ready?: unknown; digest?: unknown; activeDigest?: unknown };
     if (result?.registered === false) return false;
+    if (result?.registered === true && targetId === 'sandbox' && typeof result.digest === 'string' && typeof result.activeDigest === 'string') {
+        if (!/^sha256:[a-f0-9]{64}$/u.test(result.digest) || !/^sha256:[a-f0-9]{64}$/u.test(result.activeDigest))
+            throw new Error('Managed sandbox runtime identity is invalid.');
+        return result.ready === true && result.digest === result.activeDigest;
+    }
     if (result?.registered === true && Array.isArray(result.instances)) {
         const instances = result.instances as Array<{ sessionId?: unknown; target?: unknown; running?: unknown; health?: unknown }>;
         if (!instances.length || instances.some((item) => item.sessionId !== sessionId || typeof item.target !== 'string'

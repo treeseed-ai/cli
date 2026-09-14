@@ -44,7 +44,8 @@ test('teams use persists the active team and team commands inherit it', async ()
 test('leaf commands expose only catalog-derived high-level options', () => {
 	const byName = new Map(commandSpecs.map((command) => [command.name, command.options.map((option) => option.flag)]));
 	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--idempotency-key', '--plan']);
-	assert.deepEqual(byName.get('plans show'), ['--server', '--json']);
+	assert.equal(byName.has('plans show'), false);
+	assert.deepEqual(byName.get('workdays stop'), ['--server', '--team', '--reason', '--yes', '--json', '--idempotency-key', '--plan']);
 	assert.deepEqual(byName.get('agents show'), ['--server', '--project', '--json']);
 	assert.deepEqual(byName.get('host status'), ['--server', '--json']);
 	assert.deepEqual(byName.get('host provider environment set'), ['--server', '--yes', '--json', '--plan', '--stdin']);
@@ -174,6 +175,18 @@ test('plan mode prevents mutation operation invocation', async () => {
 	assert.equal(exit, 0);
 	assert.equal(invocations, 0);
 	assert.equal(JSON.parse(output[0]!).result.mutation, false);
+});
+
+test('execution reconciliation plan invokes the API-owned read-only diff', async () => {
+	const output: string[] = []; const invocations: Array<{ operationId: string; input: any }> = [];
+	const projectId = '22222222-2222-4222-8222-222222222222';
+	const exit = await runCommandLine(['execution', 'reconcile', '--team', '11111111-1111-4111-8111-111111111111', '--project', projectId, '--plan', '--json'], {
+		interactiveUi: false, operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { data: { changes: [] } }; },
+		write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(invocations, [{ operationId: 'execution.reconcile', input: { path: { teamId: '11111111-1111-4111-8111-111111111111' }, query: {}, body: { projectId, plan: true } } }]);
+	assert.deepEqual(JSON.parse(output[0]!).result, { changes: [] });
 });
 
 test('plan mode is non-mutating for local credential custody', async () => {
