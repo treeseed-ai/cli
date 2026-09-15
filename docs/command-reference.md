@@ -1530,6 +1530,41 @@ Control-plane operation: `agents.show`.
 - `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
+## trsd agents team
+
+Team operations.
+
+## trsd agents team clone
+
+Clone operations.
+
+### trsd agents team clone plan <source>
+
+Plan the selected resource.
+
+Operation: read. Result schema: `treeseed.command.plan/v1`.
+Control-plane operation: `agents.team.clone.plan`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--project <value>`: Target project; repeat to select projects.
+- `--json`: Emit the stable JSON envelope.
+- `--all`: Target every eligible project except the source.
+
+### trsd agents team clone apply <file>
+
+Apply the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.apply/v1`.
+Control-plane operation: `agents.team.clone.apply`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+
 ## trsd agents handlers
 
 Handlers operations.

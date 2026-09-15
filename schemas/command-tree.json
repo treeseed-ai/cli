@@ -3780,6 +3780,131 @@
         },
         {
           "nodeType": "branch",
+          "segment": "team",
+          "description": "Team operations.",
+          "children": [
+            {
+              "nodeType": "branch",
+              "segment": "clone",
+              "description": "Clone operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "plan",
+                  "description": "Plan the selected resource.",
+                  "kind": "read",
+                  "arguments": [
+                    {
+                      "name": "source",
+                      "description": "source identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--project",
+                      "description": "Target project; repeat to select projects.",
+                      "type": "string[]"
+                    },
+                    {
+                      "name": "--all",
+                      "description": "Target every eligible project except the source.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.command.plan/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "agents.team.clone.plan",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "teamId",
+                        "source": "context",
+                        "name": "team",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "sourceProject",
+                        "source": "argument",
+                        "name": "source",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "targetProjects",
+                        "source": "option",
+                        "name": "project",
+                        "required": false,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "allEligible",
+                        "source": "option",
+                        "name": "all",
+                        "required": false,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "apply",
+                  "description": "Apply the selected resource.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "file",
+                      "description": "file identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.apply",
+                    "confirmation": "authority"
+                  },
+                  "resultSchemaId": "treeseed.command.apply/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "agents.team.clone.apply",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "teamId",
+                        "source": "context",
+                        "name": "team",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "file",
+                        "source": "argument",
+                        "name": "file",
+                        "required": true,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
           "segment": "handlers",
           "description": "Handlers operations.",
           "children": [
