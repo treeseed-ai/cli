@@ -11,7 +11,18 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
     const sessionId = 'dev-test', env = { ...process.env, XDG_STATE_HOME: root };
     const directory = resolve(root, 'treeseed/development');
     mkdirSync(directory, { recursive: true, mode: 0o700 });
-    writeFileSync(resolve(directory, 'current.json'), JSON.stringify({ sessionId, manifest: resolve(root, 'session.yaml'), processes: {}, overlays: [], candidates: [] }));
+    const manifest = resolve(root, 'session.yaml');
+    writeFileSync(manifest, `projects:\n  - manifest: api/treeseed.package.yaml\n    worktree: .\n`);
+    mkdirSync(resolve(root, 'api'), { recursive: true, mode: 0o700 });
+    writeFileSync(resolve(root, 'api/treeseed.package.yaml'), JSON.stringify({ development: {
+        schemaVersion: 'treeseed.development-runtime/v2', project: { id: 'api', repository: 'treeseed-ai/api' }, defaults: { restoreOnFailure: true },
+        targets: [{ id: 'operations-runner', kind: 'rebuild-restart', executionCustody: 'manager', platforms: ['linux-amd64'], runtimeRequirements: [],
+            sourceRoots: ['src'], ignoredPaths: [], operations: { start: { command: 'manager-runtime' } }, ready: { kind: 'process', graceSeconds: 0 },
+            outputs: [], endpoints: [{ id: 'http', protocol: 'http', port: 4000, visibility: 'loopback', authentication: 'application' }], dependencies: [],
+            statePolicy: 'stateless', migrationPolicy: 'none', secretRefs: {}, shutdown: { graceSeconds: 1, activeWorkPolicy: 'block' }, resources: {}, logs: [],
+            forbiddenOperations: [], promotion: { liveAdmissible: false, candidateRequiresVerification: true } }],
+    } }));
+    writeFileSync(resolve(directory, 'current.json'), JSON.stringify({ sessionId, manifest, processes: {}, overlays: [], candidates: [] }));
     const record = {
         session: { sessionId, status: 'active', repositories: [{ projectId: 'api', worktree: root }],
             targets: [{ projectId: 'api', targetId: 'operations-runner', mode: 'candidate', generation: 0, health: 'pending' }] },
@@ -24,6 +35,7 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
         hostInvoke: async (request: { handlerId: string; options: { payload?: unknown } }) => {
             const payload = JSON.parse(String(request.options.payload));
             if (request.handlerId === 'local.dev.status') return record;
+            if (request.handlerId === 'local.dev.session.refresh') return record;
             if (request.handlerId === 'local.dev.use') {
                 assert.equal(payload.port, undefined, 'Manager-custody targets must not receive redundant host-port readiness probes');
                 return record;

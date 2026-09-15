@@ -11,6 +11,7 @@ import { controlPlaneServerRegistry, createControlPlaneClient } from '../support
 import { loadServerSession } from '../support/server-custody.js';
 import { renderCommunicationResponses } from '../support/human-renderer.js';
 import { resolveExplicitTeam } from '../support/selectors/team.js';
+import { resolveExplicitProject } from '../support/selectors/project.js';
 import { getOperationInputField, setOperationInputField } from '../support/operations/input-fields.js';
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
@@ -75,6 +76,13 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		if (diagnostics.length) throw Object.assign(new Error(diagnostics.map(item => `${item.path}: ${item.message}`).join(' ')), { category: 'invalid_input', code: 'workday_agent_selection_invalid' });
 		input.body.agentSelection = normalizeWorkdayAgentSelection(input.body.agentSelection);
 	}
+	if (operation.descriptor.operationId === 'workdays.plan' && input.body.decisionIds !== undefined) {
+		const values = Array.isArray(input.body.decisionIds) ? input.body.decisionIds : [];
+		if (!values.length || values.length > 64 || values.some(value => typeof value !== 'string' || !value.trim() || value.length > 128)) {
+			throw Object.assign(new Error('decisionIds must contain one to 64 non-empty decision identities.'), { category: 'invalid_input', code: 'workday_decision_selection_invalid' });
+		}
+		input.body.decisionIds = [...new Set(values.map(value => String(value).trim()))].sort();
+	}
 	if (operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
 		const parsed = await portableSeedBundle(input.body.file, context);
 		delete input.body.file;
@@ -120,6 +128,17 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 			for (const slot of slots) slot.teamId = teamId;
 		}
 	}
+	if (typeof invocation.options.project === 'string') {
+		const slots = [input.path, input.query, input.body].filter((slot): slot is Record<string, unknown> => Boolean(slot) && slot?.projectId === invocation.options.project);
+		if (slots.length) {
+			const teamId = typeof input.path.teamId === 'string' ? input.path.teamId
+				: typeof input.query.teamId === 'string' ? input.query.teamId
+					: typeof input.body?.teamId === 'string' ? input.body.teamId
+						: activeTeam(invocation, context);
+			const projectId = await resolveExplicitProject(invocation, context, invocation.options.project, teamId);
+			for (const slot of slots) slot.projectId = projectId;
+		}
+	}
 	if (operation.descriptor.operationId === 'communications.send' && !input.body?.message) {
 		if (!context.interactiveUi || !process.stdin.isTTY || !process.stdout.isTTY || invocation.options.json || invocation.options.jsonStream) return runInteractiveChat(invocation, context, String(input.path.teamId), typeof input.path.channel === 'string' ? input.path.channel : undefined);
 		return launchApplication(context, { server: typeof invocation.options.server === 'string' ? invocation.options.server : undefined, workspace: 'chat' });
@@ -134,7 +153,11 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 			new Error(`Deprecated --to target ${target} is not addressed in the message.`), { category: 'invalid_input', code: 'communication_to_not_mentioned' });
 		if (input.body) input.body.recipients = compatibility.length ? compatibility : undefined;
 	}
-	if (invocation.options.plan === true) return { operationId: operation.descriptor.operationId, input, mutation: false };
+	// Reconciliation planning is itself an API-owned read-only computation over
+	// current TreeDX and graph state. Invoke that explicit plan contract instead
+	// of returning the generic client-side mutation preview.
+	const serverSidePlan = invocation.options.plan === true && operation.descriptor.operationId === 'execution.reconcile';
+	if (invocation.options.plan === true && !serverSidePlan) return { operationId: operation.descriptor.operationId, input, mutation: false };
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
 	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: String(invocation.options.idempotencyKey ?? randomUUID()), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };

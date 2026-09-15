@@ -85,6 +85,14 @@ test('healthy multi-container manager runtime is reusable', () => {
 	assert.equal(managedContainerAlreadyReady({ registered: true, instances: [{ ...instances[0], running: false }], ready: false }, 'dev-test', 'provider'), false);
 });
 
+test('managed Agent sandbox status recognizes exact active guest-image custody', () => {
+	const digest = `sha256:${'a'.repeat(64)}`;
+	assert.equal(managedContainerAlreadyReady({ registered: false, state: null }, 'dev-test', 'sandbox'), false);
+	assert.equal(managedContainerAlreadyReady({ registered: true, ready: true, digest, activeDigest: digest }, 'dev-test', 'sandbox'), true);
+	assert.equal(managedContainerAlreadyReady({ registered: true, ready: false, digest, activeDigest: `sha256:${'b'.repeat(64)}` }, 'dev-test', 'sandbox'), false);
+	assert.throws(() => managedContainerAlreadyReady({ registered: true, ready: true, digest: 'latest', activeDigest: digest }, 'dev-test', 'sandbox'), /identity/);
+});
+
 test('registered unhealthy, malformed, or wrong-instance state never authorizes overwrite', () => {
     const value = { Name: 'treeseed-dev-test-api-operations-runner', State: 'running', Health: 'unhealthy' };
     assert.equal(managedContainerAlreadyReady({ registered: true, state: JSON.stringify(value) }, 'dev-test', 'operations-runner'), false);

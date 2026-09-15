@@ -48,8 +48,10 @@ function options(path: string[], leaf: CommandLeafDescriptor) {
 		if (operation.kind === 'mutation') selected.push({ name: 'idempotencyKey', flag: '--idempotency-key', kind: 'string', description: 'Reuse the same request identity when retrying this mutation.' });
 	}
 	for (const option of leaf.options ?? []) {
-		if (selected.some((candidate) => candidate.flag === option.name)) continue;
-		selected.push({ name: option.name.slice(2).replace(/-([a-z])/gu, (_, letter: string) => letter.toUpperCase()), flag: option.name, kind: option.type, description: option.description });
+		const descriptor = { name: option.name.slice(2).replace(/-([a-z])/gu, (_, letter: string) => letter.toUpperCase()), flag: option.name, kind: option.type, description: option.description } as OptionSpec;
+		const existing = selected.findIndex((candidate) => candidate.flag === option.name);
+		if (existing >= 0) selected.splice(existing, 1, descriptor);
+		else selected.push(descriptor);
 	}
 	return selected;
 }
