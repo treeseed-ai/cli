@@ -5,6 +5,26 @@ import { getOperationInputField, setOperationInputField } from '../../../../src/
 
 const base = ['workdays', 'plan', '--team', '11111111-1111-4111-8111-111111111111', '--profile', 'documentation', '--projects', 'sdk', '--start', '2030-01-01T00:00:00Z', '--duration', '600', '--json'];
 
+test('high-level allocation options use one nested policy input', async () => {
+	let body: any;
+	assert.equal(await runCommandLine([...base, '--planning-percent', '20', '--allocation-weight', '2',
+		'--planning-turn-maximum-seconds', '180', '--project-percentages', '{"sdk":60,"api":40}',
+		'--agent-class-percentages', '{"sdk":{"engineer":100}}'], {
+		interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = input.body; return { data: {} }; },
+	}), 0);
+	assert.deepEqual(body.allocation, { planningPercent: 20, allocationWeight: 2, planningTurnMaximumSeconds: 180,
+		projectPercentages: { sdk: 60, api: 40 }, agentClassPercentages: { sdk: { engineer: 100 } } });
+});
+
+for (const options of [['--project-percentages', 'invalid'], ['--allocation-weight', '0'], ['--planning-percent', '101']]) {
+	test(`invalid allocation ${JSON.stringify(options)} never invokes the API`, async () => {
+		let calls = 0;
+		assert.equal(await runCommandLine([...base, ...options], { interactiveUi: false, write() {},
+			operationInvoke: async () => { calls++; } }), 1);
+		assert.equal(calls, 0);
+	});
+}
+
 test('repeated and CSV selectors become a normalized intersecting nested intent', async () => {
 	const calls: Array<{ operationId: string; input: any }> = [];
 	const exit = await runCommandLine([...base, '--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering'], {

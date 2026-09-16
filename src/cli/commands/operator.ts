@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, validateWorkdayIntentSelection, normalizeWorkdayAgentSelection, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
 import { ControlPlaneClientError, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
+import { workdayAllocationOverridesSchema } from '@treeseed/sdk/agent-capacity';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { launchApplication } from '../application/launch.js';
 import { runInteractiveChat } from '../communication/interactive-chat.js';
@@ -34,7 +35,17 @@ function sourceValue(binding: CommandInputBinding, invocation: ParsedInvocation,
 function transform(value: unknown, binding: CommandInputBinding) {
 	if (value === undefined || value === null) return undefined;
 	if (binding.transform === 'csv') return (Array.isArray(value) ? value : [value]).flatMap(item => String(item).split(',').map(part => part.trim()));
+	if (binding.transform === 'json') {
+		try { return JSON.parse(String(value)); } catch { throw Object.assign(new Error(`Invalid JSON for --${binding.name}.`),
+			{ category: 'invalid_input', code: 'command_json_invalid' }); }
+	}
 	if (value === '') return undefined;
+	if (binding.transform === 'number') {
+		const parsed = Number(value);
+		if (!Number.isFinite(parsed)) throw Object.assign(new Error(`${binding.name} must be a finite number.`),
+			{ category: 'invalid_input', code: 'command_number_invalid' });
+		return parsed;
+	}
 	if (binding.transform === 'integer') {
 		const parsed = Number(value);
 		if (!Number.isInteger(parsed)) throw new Error(`${binding.name} must be an integer.`);
@@ -71,6 +82,11 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		if (value !== undefined) setOperationInputField(input[binding.target], binding.field, value);
 	}
 	const operation = controlPlaneOperation(invocation.command.execution.operationId);
+	if (operation.descriptor.operationId === 'workdays.plan' && input.body.allocation !== undefined) {
+		const parsed = workdayAllocationOverridesSchema.safeParse(input.body.allocation);
+		if (!parsed.success) throw Object.assign(new Error(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(' ')),
+			{ category: 'invalid_input', code: 'workday_allocation_invalid' });
+	}
 	if (operation.descriptor.operationId === 'workdays.plan' && input.body.agentSelection !== undefined) {
 		const diagnostics = validateWorkdayIntentSelection(input.body.agentSelection);
 		if (diagnostics.length) throw Object.assign(new Error(diagnostics.map(item => `${item.path}: ${item.message}`).join(' ')), { category: 'invalid_input', code: 'workday_agent_selection_invalid' });
