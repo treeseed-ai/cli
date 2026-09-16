@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { DevelopmentRuntime, DevelopmentTarget } from '@treeseed/sdk/development';
@@ -93,7 +93,8 @@ export function installPackageOverlay(state: OverlaySessionState, record: { sess
 			continue;
 		}
 		if (repair) {
-			rmSync(link, { recursive: true, force: true });
+			// This path was verified as our recorded symbolic link, not a directory.
+			unlinkSync(link);
 			symlinkSync(relativeOverlayTarget(link, overlayRoot), link, 'dir');
 			continue;
 		}
