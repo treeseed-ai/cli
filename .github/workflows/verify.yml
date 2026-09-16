@@ -30,7 +30,12 @@ jobs:
         timeout-minutes: 20
         run: npm ci --no-audit --no-fund
 
-      - name: Verify package
+      - name: Install exact integrated SDK
+        uses: treeseed-ai/sdk/.github/actions/install-exact-sdk@e440819668c01fbc1f9a487cb67e87def7405f07
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Verify package with exact SDK
         run: npm run verify:direct
 
       - name: Seal protected staging candidate
