@@ -81,7 +81,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify immutable npm tarball and unchanged latest tag
         env:
-          GITHUB_REF_NAME: ${{ inputs.resume_tag }}
+          TREESEED_RELEASE_TAG: ${{ inputs.resume_tag }}
         run: |
           set -euo pipefail
           export EXPECTED_SHA256="$(node -e "const e=require('./candidate/release-evidence-v1.json'); process.stdout.write(e.artifacts.find(x=>x.kind==='npm-package').digest.slice(7))")"
