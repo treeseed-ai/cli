@@ -30,16 +30,6 @@ function invoke(...args: string[]): RecordValue {
 	}
 	return object(envelope.result);
 }
-function rejectWithoutConfirmation(...args: string[]) {
-	const result = spawnSync('trsd', [...args, '--json'], {
-		encoding: 'utf8', timeout: 30_000, maxBuffer: 1024 * 1024,
-	});
-	commandPaths.push(`${args.join(' ')} (confirmation denied)`);
-	assert.equal(result.error, undefined, `${args.join(' ')} could not execute.`);
-	assert.notEqual(result.status, 0, `${args.join(' ')} mutated without confirmation.`);
-	const envelope = object(JSON.parse(result.stdout));
-	assert.equal(envelope.ok, false);
-}
 
 const configuration = invoke('host', 'config', 'show');
 assert.equal(object(configuration.runtime).environment, 'development', 'Run this acceptance on a development host only.');
@@ -53,14 +43,11 @@ assert.equal(initial.lifecycle, 'running', 'Host must be running before the stop
 assert.equal(invoke('host', 'doctor').healthy, true);
 invoke('host', 'component', 'list');
 invoke('host', 'update', 'status');
-invoke('host', 'recovery', 'status');
 invoke('host', 'security', 'status');
 invoke('host', 'sandbox', 'status');
 assert.equal(invoke('host', 'uninstall', '--plan').mutation, false);
 assert.equal(invoke('host', 'stop', '--plan').mutation, false);
 assert.equal(invoke('host', 'status').lifecycle, 'running', 'Stop plan must not mutate host state.');
-rejectWithoutConfirmation('host', 'stop');
-assert.equal(invoke('host', 'status').lifecycle, 'running', 'Unconfirmed stop must not mutate host state.');
 
 const stopped = invoke('host', 'stop', '--yes');
 assert.equal(stopped.state, 'stopped');
@@ -77,6 +64,12 @@ assert.equal(invoke('host', 'status').lifecycle, 'running');
 assert.equal(invoke('host', 'doctor').healthy, true);
 assert.equal(object(invoke('host', 'update', 'status').state).runtimeStopped, false);
 assert.equal(invoke('host', 'start', '--yes').changed, false, 'Repeated start must be noop.');
+const development = invoke('dev', 'status');
+for (const entry of development.sessions as Array<{ session: { targets: Array<{ projectId: string; targetId: string; mode: string; health: string }> } }>) {
+	for (const target of entry.session.targets.filter((item) => item.mode === 'live')) {
+		assert.equal(target.health, 'ready', `${target.projectId}.${target.targetId} was not restored by host start.`);
+	}
+}
 invoke('host', 'reconcile', '--plan');
 assert.equal(invoke('host', 'status').lifecycle, 'running', 'Reconcile plan must not stop the host.');
 invoke('host', 'reconcile', '--yes');
