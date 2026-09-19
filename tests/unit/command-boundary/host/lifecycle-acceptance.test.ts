@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -140,4 +140,31 @@ test('uninstall and reset require explicit destructive confirmation before manag
 		assert.deepEqual(calls, [], name);
 		assert.equal(JSON.parse(output.at(-1)!).ok, false, name);
 	}
+});
+
+test('host start retries an incomplete session without activating a disabled AI target', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-host-ai-off-resume-'));
+	try {
+		const sessionId = 'dev-ai-off', stateRoot = resolve(root, 'treeseed', 'development');
+		const sessionRoot = resolve(stateRoot, sessionId);
+		mkdirSync(sessionRoot, { recursive: true, mode: 0o700 });
+		const local = { sessionId, manifest: resolve(root, 'manifest.yaml'), processes: {}, overlays: [], candidates: [] };
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(local), { mode: 0o600 });
+		writeFileSync(resolve(sessionRoot, 'session.json'), JSON.stringify(local), { mode: 0o600 });
+		const record = { session: { sessionId, status: 'active', targets: [{ projectId: 'ai', targetId: 'ai-inference',
+			mode: 'candidate', health: 'stopped' }] }, runtimes: [{ project: { id: 'ai' }, targets: [{ id: 'ai-inference', dependencies: [] }] }] };
+		const calls: string[] = [], output: string[] = [];
+		assert.equal(await runCommandLine(['host', 'start', '--yes', '--json'], {
+			interactiveUi: false, env: { ...process.env, XDG_STATE_HOME: root }, write: value => output.push(value),
+			hostInvoke: async request => {
+				calls.push(request.handlerId);
+				if (request.handlerId === 'local.dev.status') return String(request.options.payload).includes('"all":true')
+					? { sessions: [record] } : record;
+				if (request.handlerId === 'local.host.config.show') return { components: { 'ai-inference': { enabled: false } } };
+				if (request.handlerId === 'local.host.start') return { state: 'running', changed: false };
+				throw new Error(`Disabled target unexpectedly invoked ${request.handlerId}`);
+			},
+		}), 0, output.join(''));
+		assert.deepEqual(calls, ['local.dev.status', 'local.host.start', 'local.dev.status', 'local.host.config.show']);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -404,7 +404,11 @@ async function resumeDevelopmentUnlocked(sessionId: string, context: CommandCont
 	loadState(context.env, sessionId);
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord & { session: { status: string } };
 	if (record.session.status === 'stopped') return;
+	const configuration = await invoke(context, 'local.host.config.show', {}) as { components?: Record<string, { enabled?: boolean }> };
+	if (!configuration.components) throw new Error('Manager did not return the authoritative host component selection.');
 	for (const target of developmentBootOrder(record.session.targets, record.runtimes)) {
+		const componentId = target.projectId === 'ai' ? target.targetId : target.projectId;
+		if (configuration.components[componentId]?.enabled === false) continue;
 		const current = await invoke(context, 'local.dev.status', { sessionId, all: false }) as typeof record;
 		if (current.session.status === 'stopped') return;
 		const selected = current.session.targets.find(entry => entry.projectId === target.projectId && entry.targetId === target.targetId);
