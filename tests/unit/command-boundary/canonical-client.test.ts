@@ -64,6 +64,19 @@ test('host commands preserve the SDK handler boundary and stable envelope', asyn
 	assert.deepEqual(JSON.parse(output[0]!).result, { componentId: 'agent', healthy: true });
 });
 
+test('host lifecycle commands preserve plan/noop/result envelopes and never need a remote server', async () => {
+	const calls: unknown[] = []; const output: string[] = [];
+	const invoke = async (input: unknown) => { calls.push(input); return { state: 'stopped', changed: false }; };
+	for (const action of ['stop', 'start'] as const) {
+		for (const plan of [true, false]) {
+			const args = ['host', action, ...(plan ? ['--plan'] : ['--yes']), '--json'];
+			assert.equal(await runCommandLine(args, { interactiveUi: false, hostInvoke: invoke, write: (value) => output.push(value) }), 0);
+			assert.deepEqual(calls.at(-1), { handlerId: `local.host.${action}`, arguments: [], options: plan ? { plan: true } : {} });
+			assert.deepEqual(JSON.parse(output.at(-1)!).result, { state: 'stopped', changed: false });
+		}
+	}
+});
+
 test('AI mode commands use the same bounded host-manager authority', async () => {
 	const calls: unknown[] = []; const output: string[] = [];
 	const exit = await runCommandLine(['ai', 'mode', 'set', 'sleep', '--idempotency-key', 'cycle-1', '--drain-timeout', '120', '--yes', '--json'], {
@@ -88,6 +101,13 @@ test('host configuration adoption sends validated content and requires explicit 
 		assert.equal(calls[0]?.options.confirm, true);
 		assert.equal(calls[0]?.configuration.configurationId, 'development-workstation');
 		assert.deepEqual(calls[0]?.arguments, []);
+		const staged = await runCommandLine(['host', 'config', 'stage', file, '--yes', '--json'], {
+			interactiveUi: false, hostInvoke: async (value) => { calls.push(value); return { staged: true, lifecycle: 'stopped' }; }, write() {},
+		});
+		assert.equal(staged, 0);
+		assert.equal(calls.at(-1)?.handlerId, 'local.host.config.stage');
+		assert.equal(calls.at(-1)?.configuration.configurationId, 'development-workstation');
+		assert.equal(calls.at(-1)?.configuration.generation, 1);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -96,6 +116,9 @@ test('host identity adoption is permanently bound to the protected local socket'
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config adopt' } as any }), true);
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host reset' } as any }), true);
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config apply' } as any }), false);
+	for (const name of ['host start', 'host stop', 'host config stage']) {
+		assert.equal(hostUsesProtectedLocalTransport({ command: { name } as any }), true, name);
+	}
 });
 
 test('host storage connect derives the active team and keeps bootstrap authority out of output', async () => {
