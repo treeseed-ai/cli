@@ -26,6 +26,8 @@ Control-plane operation: `communications.send`.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--proposal <value>`: Open project proposal to bind as exact discussion context.
+- `--workday <value>`: Attach addressed communication to this active workday and its allocation.
 - `--to <value>`: Deprecated validation-only address list.
 - `--timeout <value>`: Optional maximum seconds to listen for the complete response chain.
 - `--no-wait`: Return immediately after durable admission.
@@ -840,6 +842,30 @@ Execution: `local.host.reconcile`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+### trsd host start
+
+Start the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.start/v1`.
+Execution: `local.host.start`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host stop
+
+Stop the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.stop/v1`.
+Execution: `local.host.stop`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
 ### trsd host events
 
 Events the selected resource.
@@ -880,6 +906,18 @@ Apply the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.apply/v1`.
 Execution: `local.host.config.apply`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host config stage <file>
+
+Stage the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.stage/v1`.
+Execution: `local.host.config.stage`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--yes`: Confirm authorized automation.
@@ -1940,8 +1978,10 @@ Offers operations.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `providers.offers.show`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers offers validate <file>
@@ -2119,7 +2159,6 @@ Control-plane operation: `workdays.profiles.list`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
@@ -2135,28 +2174,20 @@ Control-plane operation: `workdays.profiles.show`.
 - `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
-### trsd workdays profiles reconcile <project>
+### trsd workdays profiles update <profile>
 
-Reconcile the selected resource.
+Update the selected resource.
 
-Operation: mutation. Result schema: `treeseed.command.reconcile/v1`.
-Control-plane operation: `workdays.profiles.reconcile`.
+Operation: mutation. Result schema: `treeseed.command.update/v1`.
+Control-plane operation: `workdays.profiles.update`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
-
-### trsd workdays profiles validate <file>
-
-Validate the selected resource.
-
-Operation: read. Result schema: `treeseed.command.validate/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays plan
 
@@ -2176,7 +2207,15 @@ Control-plane operation: `workdays.plan`.
 - `--objective <value>`: Objective filter.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--planning-percent <value>`: Planning share of workday time and capacity (default 20%).
+- `--allocation-weight <value>`: Relative share among eligible concurrent workdays (default 1).
+- `--planning-turn-maximum-seconds <value>`: Maximum active seconds per planning turn (default 180).
+- `--project-percentages <value>`: JSON project allocation targets; normalized among selected projects.
+- `--agent-class-percentages <value>`: JSON class allocation targets keyed by project.
 - `--plan`: Return the request without creating a preflight.
+- `--planning-only`: Run cooperative planning profiles without admitting accepted acting work.
+- `--execution-mode <value>`: Select simulation or production custody; both consume real capacity.
+- `--proposal <value>`: Governed proposal id for cooperative planning; repeat or comma-separate.
 - `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
 - `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
 - `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
@@ -2289,12 +2328,28 @@ Control-plane operation: `workdays.schedules.create`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--profile <value>`: Workday profile identity.
+- `--decision <value>`: Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.
 - `--projects <value>`: Project scope or comma-separated projects.
+- `--start <value>`: ISO start time.
+- `--end <value>`: ISO end time.
 - `--duration <value>`: Duration in seconds.
+- `--objective <value>`: Objective filter.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--planning-percent <value>`: Planning share of workday time and capacity (default 20%).
+- `--allocation-weight <value>`: Relative share among eligible concurrent workdays (default 1).
+- `--planning-turn-maximum-seconds <value>`: Maximum active seconds per planning turn (default 180).
+- `--project-percentages <value>`: JSON project allocation targets; normalized among selected projects.
+- `--agent-class-percentages <value>`: JSON class allocation targets keyed by project.
+- `--planning-only`: Run cooperative planning profiles without admitting accepted acting work.
+- `--execution-mode <value>`: Select simulation or production custody; both consume real capacity.
+- `--proposal <value>`: Governed proposal id for cooperative planning; repeat or comma-separate.
+- `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
+- `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
+- `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
+- `--cadence-seconds <value>`: Seconds between recurring workday starts.
 
 ### trsd workdays schedules pause <schedule>
 
