@@ -9,6 +9,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostConfigurationSchema } from '@treeseed/sdk/deployment';
 import { readPostgresTransferSelection } from './host/postgres-transfer.js';
+import { developmentStateRoot } from './development-cli-selection.js';
+import { invokeDevelopmentManager } from './development-support/manager/invoke.js';
 
 const cloudflareSetupGuide = `Cloudflare R2 setup
 
@@ -248,6 +250,25 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 	const invoke = () => context.hostInvoke ? context.hostInvoke(command)
 		: hostUsesProtectedLocalTransport(invocation) ? invokeLocalHostManager(command)
 			: invokeHostManager(command, typeof invocation.options.server === 'string' ? invocation.options.server : undefined, context.env);
+	if (invocation.options.plan !== true && (invocation.command.name === 'host stop' || invocation.command.name === 'host start')) {
+		const listed = await invokeDevelopmentManager(context, 'local.dev.status', { all: true }) as { sessions?: Array<{ session: { sessionId: string; status: string; targets: Array<{ mode: string }> } }> };
+		if (!Array.isArray(listed.sessions)) throw new Error('Manager did not return an authoritative development session inventory.');
+		const selected = listed.sessions.filter(record => record.session.status !== 'stopped'
+			&& (invocation.command.name === 'host stop' || record.session.status === 'suspended')
+			&& record.session.targets.some(target => target.mode !== 'released'));
+		const snapshots = selected.map(record => ({ sessionId: record.session.sessionId, status: record.session.status }));
+		for (const { sessionId } of snapshots) if (!/^dev-[a-z0-9-]{1,64}$/u.test(sessionId)
+			|| !existsSync(resolve(developmentStateRoot(context.env), sessionId, 'session.json')))
+			throw new Error(`Development session ${sessionId} requires its original owner to manage the host lifecycle; no workloads were changed.`);
+		const { suspendDevelopmentSession, resumeDevelopmentSession } = await import('./development.js');
+		if (invocation.command.name === 'host stop') {
+			for (const { sessionId, status } of snapshots) if (status !== 'suspended') await suspendDevelopmentSession(sessionId, context);
+			return invoke();
+		}
+		const result = await invoke();
+		for (const { sessionId, status } of snapshots) if (status === 'suspended') await resumeDevelopmentSession(sessionId, context);
+		return result;
+	}
 	const progressLabel = context.outputFormat === 'human' && invocation.options.plan !== true ? ({
 		'host initialize': 'Initializing the selected TreeSeed host profile',
 		'host storage connect': 'Connecting Cloudflare R2. Provisioning storage, securing credentials, and reconciling the host',

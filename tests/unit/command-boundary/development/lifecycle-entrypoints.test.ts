@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { resumeDevelopmentSession, runDevelopment } from '../../../../src/cli/commands/development.ts';
+import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import type { CommandContext, ParsedInvocation } from '../../../../src/cli/types.ts';
 
 test('boot resume and manual use re-read state under the same lifecycle lock', { skip: process.platform !== 'linux' }, async () => {
@@ -22,7 +23,10 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
             statePolicy: 'stateless', migrationPolicy: 'none', secretRefs: {}, shutdown: { graceSeconds: 1, activeWorkPolicy: 'block' }, resources: {}, logs: [],
             forbiddenOperations: [], promotion: { liveAdmissible: false, candidateRequiresVerification: true } }],
     } }));
-    writeFileSync(resolve(directory, 'current.json'), JSON.stringify({ sessionId, manifest, processes: {}, overlays: [], candidates: [] }));
+    const local = { sessionId, manifest, processes: {}, overlays: [], candidates: [] };
+    writeFileSync(resolve(directory, 'current.json'), JSON.stringify(local), { mode: 0o600 });
+    mkdirSync(resolve(directory, sessionId), { mode: 0o700 });
+    writeFileSync(resolve(directory, sessionId, 'session.json'), JSON.stringify(local), { mode: 0o600 });
     const record = {
         session: { sessionId, status: 'active', repositories: [{ projectId: 'api', worktree: root }],
             targets: [{ projectId: 'api', targetId: 'operations-runner', mode: 'candidate', generation: 0, health: 'pending' }] },
@@ -33,11 +37,12 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
     const context = {
         cwd: root, env,
         hostInvoke: async (request: { handlerId: string; options: { payload?: unknown } }) => {
-            const payload = JSON.parse(String(request.options.payload));
-            if (request.handlerId === 'local.dev.status') return record;
+            const payload = request.options.payload ? JSON.parse(String(request.options.payload)) : {};
+            if (request.handlerId === 'local.dev.status') return payload.all ? { sessions: [record] } : record;
             if (request.handlerId === 'local.dev.session.refresh') return record;
             if (request.handlerId === 'local.dev.use') {
                 assert.equal(payload.port, undefined, 'Manager-custody targets must not receive redundant host-port readiness probes');
+                record.session.status = 'active';
                 return record;
             }
             if (request.handlerId === 'local.dev.environment') return { environment: {} };
@@ -47,6 +52,10 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
             if (request.handlerId === 'local.dev.container' && payload.action === 'start') {
                 starts++; await new Promise(resolve => setTimeout(resolve, 30)); started = true; return { started: true };
             }
+            if (request.handlerId === 'local.dev.container' && payload.action === 'stop') { started = false; return { stopped: true }; }
+            if (request.handlerId === 'local.dev.session.suspend') { record.session.status = 'suspended'; return record; }
+            if (request.handlerId === 'local.host.stop') return { state: 'stopped', changed: true };
+            if (request.handlerId === 'local.host.start') return { state: 'running', changed: true };
             throw new Error(`Unexpected operation ${request.handlerId}`);
         },
     } as CommandContext;
@@ -56,5 +65,14 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
         assert.equal(starts, 1);
         await resumeDevelopmentSession(sessionId, context);
         assert.equal(starts, 1);
+        const lifecycleContext = { ...context, interactiveUi: false, write() {} };
+        assert.equal(await runCommandLine(['host', 'stop', '--yes', '--json'], lifecycleContext), 0);
+        assert.equal(record.session.status, 'suspended');
+        assert.equal(started, false);
+        assert.equal(await runCommandLine(['host', 'start', '--yes', '--json'], lifecycleContext), 0);
+        assert.equal(starts, 2, 'Host start must restore the exact suspended live target');
+        assert.equal(record.session.status, 'active');
+        await resumeDevelopmentSession(sessionId, context);
+        assert.equal(starts, 2, 'Repeating resume must not duplicate the managed container');
     } finally { rmSync(root, { recursive: true, force: true }); }
 });
