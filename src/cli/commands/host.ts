@@ -140,9 +140,9 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 			profile, hostId: planned.hostId, catalog: { release: planned.catalog.release, generation: planned.catalog.generation, digest: planned.catalog.digest }, inputs: values,
 		}) } };
 	}
-	if (invocation.command.name === 'host uninstall' && invocation.options.plan !== true) {
+	if ((invocation.command.name === 'host uninstall' || invocation.command.name === 'host reset') && invocation.options.plan !== true) {
 		if (invocation.options.confirm !== true || invocation.options.yes !== true) {
-			throw Object.assign(new Error('Host uninstall execution requires both --confirm and --yes after reviewing the plan.'), {
+			throw Object.assign(new Error(`Host ${invocation.command.name.slice('host '.length)} execution requires both --confirm and --yes after reviewing the plan.`), {
 				category: 'confirmation_required', code: 'confirmation_required',
 			});
 		}
