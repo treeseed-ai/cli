@@ -391,12 +391,10 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, manual, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
-
 /** Resume only current manager selections; never reconstruct desired state from stale PIDs. */
 export async function resumeDevelopmentSession(sessionId: string, context: CommandContext) {
 	return withDevelopmentLifecycle(context.env, () => resumeDevelopmentUnlocked(sessionId, context), { waitForOwner: true });
 }
-
 export async function suspendDevelopmentSession(sessionId: string, context: CommandContext) {
 	return withDevelopmentLifecycle(context.env, () => closeDevelopmentSession(loadState(context.env, sessionId), sessionId, context, false)); }
 async function resumeDevelopmentUnlocked(sessionId: string, context: CommandContext) {
@@ -404,7 +402,11 @@ async function resumeDevelopmentUnlocked(sessionId: string, context: CommandCont
 	loadState(context.env, sessionId);
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord & { session: { status: string } };
 	if (record.session.status === 'stopped') return;
+	const configuration = await invoke(context, 'local.host.config.show', {}) as { components?: Record<string, { enabled?: boolean }> };
+	if (!configuration.components) throw new Error('Manager did not return the authoritative host component selection.');
 	for (const target of developmentBootOrder(record.session.targets, record.runtimes)) {
+		const componentId = target.projectId === 'ai' ? target.targetId : target.projectId;
+		if (configuration.components[componentId]?.enabled === false) continue;
 		const current = await invoke(context, 'local.dev.status', { sessionId, all: false }) as typeof record;
 		if (current.session.status === 'stopped') return;
 		const selected = current.session.targets.find(entry => entry.projectId === target.projectId && entry.targetId === target.targetId);
@@ -412,7 +414,6 @@ async function resumeDevelopmentUnlocked(sessionId: string, context: CommandCont
 		await useTargets({ arguments: [`${target.projectId}.${target.targetId}=${target.mode}`], options: { session: sessionId } }, context);
 	}
 }
-
 async function closeDevelopmentSession(state: LocalSessionState, sessionId: string, context: CommandContext, permanent: boolean) {
 	const isSelected = JSON.parse(readFileSync(statePath(context.env), 'utf8')).sessionId === sessionId;
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
@@ -436,7 +437,6 @@ async function closeDevelopmentSession(state: LocalSessionState, sessionId: stri
 	saveState(state, context.env, isSelected);
 	return invoke(context, permanent ? 'local.dev.session.stop' : 'local.dev.session.suspend', { sessionId });
 }
-
 export async function runDevelopment(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.options.plan === true || ['dev status', 'dev logs', 'dev plan', 'dev host status'].includes(invocation.command.name)) return runDevelopmentUnlocked(invocation, context);
 	return withDevelopmentLifecycle(context.env, () => runDevelopmentUnlocked(invocation, context));

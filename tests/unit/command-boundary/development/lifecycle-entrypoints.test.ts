@@ -39,6 +39,7 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
         hostInvoke: async (request: { handlerId: string; options: { payload?: unknown } }) => {
             const payload = request.options.payload ? JSON.parse(String(request.options.payload)) : {};
             if (request.handlerId === 'local.dev.status') return payload.all ? { sessions: [record] } : record;
+			if (request.handlerId === 'local.host.config.show') return { components: { api: { enabled: true } } };
             if (request.handlerId === 'local.dev.session.refresh') return record;
             if (request.handlerId === 'local.dev.use') {
                 assert.equal(payload.port, undefined, 'Manager-custody targets must not receive redundant host-port readiness probes');
