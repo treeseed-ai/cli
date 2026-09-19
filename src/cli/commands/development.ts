@@ -397,6 +397,10 @@ export async function resumeDevelopmentSession(sessionId: string, context: Comma
 	return withDevelopmentLifecycle(context.env, () => resumeDevelopmentUnlocked(sessionId, context), { waitForOwner: true });
 }
 
+export async function suspendDevelopmentSession(sessionId: string, context: CommandContext) {
+	return withDevelopmentLifecycle(context.env, () => closeDevelopmentSession(loadState(context.env, sessionId), sessionId, context, false));
+}
+
 async function resumeDevelopmentUnlocked(sessionId: string, context: CommandContext) {
 	if (!/^dev-[a-z0-9-]{1,64}$/.test(sessionId)) throw new Error('An exact development session is required.');
 	loadState(context.env, sessionId);
@@ -409,6 +413,35 @@ async function resumeDevelopmentUnlocked(sessionId: string, context: CommandCont
 		if (!selected || selected.mode !== target.mode) continue;
 		await useTargets({ arguments: [`${target.projectId}.${target.targetId}=${target.mode}`], options: { session: sessionId } }, context);
 	}
+}
+
+async function closeDevelopmentSession(state: LocalSessionState, sessionId: string, context: CommandContext, permanent: boolean) {
+	const isSelected = JSON.parse(readFileSync(statePath(context.env), 'utf8')).sessionId === sessionId;
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+	const running = await stopProcesses(state);
+	const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
+	for (const selected of record.session.targets) {
+		const { runtime, target } = selectedTarget(record, selected.projectId, selected.targetId);
+		const repository = record.session.repositories.find((entry) => entry.projectId === selected.projectId);
+		if (usesManagedContainer(target)) {
+			let registered = true;
+			try {
+				const status = await containerOperation(context, sessionId, runtime, target, 'status') as { registered?: unknown };
+				registered = status.registered === true;
+			} catch {
+				// An unhealthy registered application may reject status; stopping it is the recovery path.
+			}
+			if (registered) {
+				try { await containerOperation(context, sessionId, runtime, target, 'stop'); }
+				catch { /* Session closure must remain available when an unhealthy container cannot stop itself. */ }
+			}
+		} else if (repository && active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup)
+			runOneShotOperation(state, target.operations.cleanup, repository.worktree, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
+	}
+	restoreOverlays(state);
+	if (isSelected) selectDevelopmentCli(context.env, null);
+	saveState(state, context.env, isSelected);
+	return invoke(context, permanent ? 'local.dev.session.stop' : 'local.dev.session.suspend', { sessionId });
 }
 
 export async function runDevelopment(invocation: ParsedInvocation, context: CommandContext) {
@@ -439,33 +472,7 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
-		const isSelected = JSON.parse(readFileSync(statePath(context.env), 'utf8')).sessionId === sessionId;
-		const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
-		const running = await stopProcesses(state);
-		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
-		for (const selected of record.session.targets) {
-			const { runtime, target } = selectedTarget(record, selected.projectId, selected.targetId);
-			const repository = record.session.repositories.find((entry) => entry.projectId === selected.projectId);
-			if (usesManagedContainer(target)) {
-				let registered = true;
-				try {
-					const status = await containerOperation(context, sessionId, runtime, target, 'status') as { registered?: unknown };
-					registered = status.registered === true;
-				} catch {
-					// An unhealthy registered application may reject status; stopping it is the recovery path.
-				}
-				if (registered) {
-					try {
-						await containerOperation(context, sessionId, runtime, target, 'stop');
-					} catch {
-						// Session closure is authoritative and must remain available when an unhealthy
-						// application cannot complete its own stop operation.
-					}
-				}
-			}
-			else if (repository && active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
-		}
-		restoreOverlays(state); if (isSelected) selectDevelopmentCli(context.env, null); saveState(state, context.env, isSelected); return invoke(context, 'local.dev.session.stop', { sessionId });
+		return closeDevelopmentSession(state, sessionId, context, true);
 	}
 	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });
 	if (invocation.command.name === 'dev plan') return invoke(context, 'local.dev.plan', { sessionId, selected: [] });

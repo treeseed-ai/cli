@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -66,15 +66,60 @@ test('host commands preserve the SDK handler boundary and stable envelope', asyn
 
 test('host lifecycle commands preserve plan/noop/result envelopes and never need a remote server', async () => {
 	const calls: unknown[] = []; const output: string[] = [];
-	const invoke = async (input: unknown) => { calls.push(input); return { state: 'stopped', changed: false }; };
+	const invoke = async (input: unknown) => { calls.push(input); return (input as { handlerId: string }).handlerId === 'local.dev.status'
+		? { sessions: [] } : { state: 'stopped', changed: false }; };
 	for (const action of ['stop', 'start'] as const) {
 		for (const plan of [true, false]) {
 			const args = ['host', action, ...(plan ? ['--plan'] : ['--yes']), '--json'];
 			assert.equal(await runCommandLine(args, { interactiveUi: false, hostInvoke: invoke, write: (value) => output.push(value) }), 0);
 			assert.deepEqual(calls.at(-1), { handlerId: `local.host.${action}`, arguments: [], options: plan ? { plan: true } : {} });
+			if (!plan) assert.deepEqual(calls.at(-2), { handlerId: 'local.dev.status', arguments: [], options: { payload: '{"all":true}' } });
 			assert.deepEqual(JSON.parse(output.at(-1)!).result, { state: 'stopped', changed: false });
 		}
 	}
+});
+
+test('host stop suspends a selected development session before stopping released workloads', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-stop-'));
+	const env = { XDG_STATE_HOME: root };
+	const stateRoot = resolve(root, 'treeseed', 'development'), sessionId = 'dev-test-session';
+	const local = { sessionId, manifest: '/fixture/manifest.yaml', processes: {}, overlays: [], candidates: [] };
+	const record = { session: { sessionId, status: 'active', targets: [{ projectId: 'admin', targetId: 'web', mode: 'live' }], repositories: [] },
+		runtimes: [{ project: { id: 'admin' }, targets: [{ id: 'web', kind: 'source-check', operations: {}, endpoints: [] }] }] };
+	mkdirSync(resolve(stateRoot, sessionId), { recursive: true });
+	for (const path of [resolve(root, 'treeseed'), stateRoot, resolve(stateRoot, sessionId)]) chmodSync(path, 0o700);
+	writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(local), { mode: 0o600 });
+	writeFileSync(resolve(stateRoot, sessionId, 'session.json'), JSON.stringify(local), { mode: 0o600 });
+	const calls: string[] = [];
+	const output: string[] = [];
+	try {
+		const exit = await runCommandLine(['host', 'stop', '--yes', '--json'], { env, interactiveUi: false, write: value => output.push(value),
+			hostInvoke: async (request: any) => {
+				calls.push(request.handlerId);
+				if (request.handlerId === 'local.dev.status') return JSON.parse(request.options.payload).all ? { sessions: [record] } : record;
+				if (request.handlerId === 'local.dev.session.suspend') return { ...record, session: { ...record.session, status: 'suspended' } };
+				return { state: 'stopped', changed: true };
+			},
+		});
+		assert.equal(exit, 0, output.join(''));
+		assert.deepEqual(calls, ['local.dev.status', 'local.dev.status', 'local.dev.session.suspend', 'local.host.stop']);
+		assert.equal(JSON.parse(readFileSync(resolve(stateRoot, sessionId, 'session.json'), 'utf8')).sessionId, sessionId);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('host stop fails before mutation when another owner holds a live development selection', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-owner-'));
+	const calls: string[] = []; const output: string[] = [];
+	try {
+		const exit = await runCommandLine(['host', 'stop', '--yes', '--json'], { env: { XDG_STATE_HOME: root }, interactiveUi: false,
+			write: value => output.push(value), hostInvoke: async (request: any) => {
+				calls.push(request.handlerId);
+				return { sessions: [{ session: { sessionId: 'dev-other-owner', status: 'active', targets: [{ mode: 'live' }] } }] };
+			} });
+		assert.equal(exit, 1);
+		assert.deepEqual(calls, ['local.dev.status']);
+		assert.match(output.join(''), /original owner/u);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('AI mode commands use the same bounded host-manager authority', async () => {
@@ -108,6 +153,10 @@ test('host configuration adoption sends validated content and requires explicit 
 		assert.equal(calls.at(-1)?.handlerId, 'local.host.config.stage');
 		assert.equal(calls.at(-1)?.configuration.configurationId, 'development-workstation');
 		assert.equal(calls.at(-1)?.configuration.generation, 1);
+		assert.equal(await runCommandLine(['host', 'config', 'stage', resolve(root, 'missing.json'), '--yes', '--json'], {
+			interactiveUi: false, hostInvoke: async (value) => { calls.push(value); return {}; }, write() {},
+		}), 1);
+		assert.equal(calls.length, 2);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
