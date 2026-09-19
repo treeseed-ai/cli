@@ -64,6 +64,12 @@ assert.equal(invoke('host', 'status').lifecycle, 'running');
 assert.equal(invoke('host', 'doctor').healthy, true);
 assert.equal(object(invoke('host', 'update', 'status').state).runtimeStopped, false);
 assert.equal(invoke('host', 'start', '--yes').changed, false, 'Repeated start must be noop.');
+const development = invoke('dev', 'status');
+for (const entry of development.sessions as Array<{ session: { targets: Array<{ projectId: string; targetId: string; mode: string; health: string }> } }>) {
+	for (const target of entry.session.targets.filter((item) => item.mode === 'live')) {
+		assert.equal(target.health, 'ready', `${target.projectId}.${target.targetId} was not restored by host start.`);
+	}
+}
 invoke('host', 'reconcile', '--plan');
 assert.equal(invoke('host', 'status').lifecycle, 'running', 'Reconcile plan must not stop the host.');
 invoke('host', 'reconcile', '--yes');
