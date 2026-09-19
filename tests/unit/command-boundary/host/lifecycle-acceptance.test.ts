@@ -82,3 +82,62 @@ test('component list/status and enable/disable expose exact target and plan/exec
 		}
 	}
 });
+
+test('update, recovery, and remaining lifecycle reads route to the exact manager contract', async () => {
+	const commands = [
+		['events', 'local.host.events'], ['topology', 'local.host.topology'],
+		['connections', 'local.host.connections'], ['aliases list', 'local.host.aliases.list'],
+		['fleet status', 'local.host.fleet.status'], ['provider status', 'local.host.provider.status'],
+		['security plan', 'local.host.security.plan'], ['security status', 'local.host.security.status'],
+		['security verify', 'local.host.security.verify'], ['sandbox status', 'local.host.sandbox.status'],
+		['sandbox doctor', 'local.host.sandbox.doctor'], ['bootstrap status', 'local.host.bootstrap.status'],
+		['update status', 'local.host.update.status'], ['update check', 'local.host.update.check'],
+		['recovery status', 'local.host.recovery.status'],
+	] as const;
+	for (const [path, handlerId] of commands) {
+		const calls: unknown[] = [], output: string[] = [];
+		const argv = ['host', ...path.split(' '), '--json'];
+		assert.equal(await runCommandLine(argv, {
+			interactiveUi: false, hostInvoke: async request => { calls.push(request); return { state: 'ready' }; },
+			write: value => output.push(value),
+		}), 0, path);
+		assert.deepEqual(calls, [{ handlerId, arguments: [], options: {} }], path);
+		assert.equal(JSON.parse(output.at(-1)!).result.state, 'ready', path);
+	}
+});
+
+test('update and recovery mutations retain target, plan boundary, and stable result envelope', async () => {
+	const commands = [
+		['update apply', 'local.host.update.apply', []],
+		['update channel', 'local.host.update.channel', ['development']],
+		['update pause', 'local.host.update.pause', []],
+		['update resume', 'local.host.update.resume', []],
+		['recovery retry', 'local.host.recovery.retry', []],
+		['recovery restore', 'local.host.recovery.restore', ['42']],
+	] as const;
+	for (const [path, handlerId, args] of commands) {
+		for (const plan of [true, false]) {
+			const calls: unknown[] = [], output: string[] = [];
+			const argv = ['host', ...path.split(' '), ...args, plan ? '--plan' : '--yes', '--json'];
+			assert.equal(await runCommandLine(argv, {
+				interactiveUi: false, hostInvoke: async request => { calls.push(request); return { mutation: !plan }; },
+				write: value => output.push(value),
+			}), 0, path);
+			assert.deepEqual(calls, [{ handlerId, arguments: [...args], options: plan ? { plan: true } : {} }], path);
+			assert.equal(JSON.parse(output.at(-1)!).result.mutation, !plan, path);
+		}
+	}
+});
+
+test('uninstall and reset require explicit destructive confirmation before manager execution', async () => {
+	for (const name of ['uninstall', 'reset']) {
+		const calls: unknown[] = [], output: string[] = [];
+		const exitCode = await runCommandLine(['host', name, '--yes', '--json'], {
+			interactiveUi: false, hostInvoke: async request => { calls.push(request); return { state: 'removed' }; },
+			write: value => output.push(value),
+		});
+		assert.notEqual(exitCode, 0, name);
+		assert.deepEqual(calls, [], name);
+		assert.equal(JSON.parse(output.at(-1)!).ok, false, name);
+	}
+});
