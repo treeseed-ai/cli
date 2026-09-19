@@ -228,6 +228,7 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 
 export function hostUsesProtectedLocalTransport(invocation: Pick<ParsedInvocation, 'command'>) {
 	return invocation.command.name === 'host initialize' || invocation.command.name === 'host config adopt' || invocation.command.name === 'host bootstrap enroll'
+		|| invocation.command.name === 'host start' || invocation.command.name === 'host stop' || invocation.command.name === 'host config stage'
 		|| invocation.command.name === 'host reset' || invocation.command.name === 'host uninstall' || invocation.command.name.startsWith('host storage ')
 		|| invocation.command.name.startsWith('host security ') || invocation.command.name.startsWith('host sandbox ')
 		|| invocation.command.name.startsWith('host postgres ')
