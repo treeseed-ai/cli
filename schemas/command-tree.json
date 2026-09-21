@@ -59,6 +59,16 @@
           "type": "string"
         },
         {
+          "name": "--proposal",
+          "description": "Open project proposal to bind as exact discussion context.",
+          "type": "string"
+        },
+        {
+          "name": "--workday",
+          "description": "Attach addressed communication to this active workday and its allocation.",
+          "type": "string"
+        },
+        {
           "name": "--to",
           "description": "Deprecated validation-only address list.",
           "type": "string[]"
@@ -127,6 +137,22 @@
             "field": "recipients",
             "source": "option",
             "name": "to",
+            "required": false,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "proposalId",
+            "source": "option",
+            "name": "proposal",
+            "required": false,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "parentWorkdayId",
+            "source": "option",
+            "name": "workday",
             "required": false,
             "transform": "identity"
           },
@@ -2454,6 +2480,50 @@
         },
         {
           "nodeType": "leaf",
+          "segment": "start",
+          "description": "Start the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.start",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.start/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.start"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "stop",
+          "description": "Stop the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.stop",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.stop/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.stop"
+          }
+        },
+        {
+          "nodeType": "leaf",
           "segment": "events",
           "description": "Events the selected resource.",
           "kind": "read",
@@ -2524,6 +2594,35 @@
               "execution": {
                 "kind": "local",
                 "handlerId": "local.host.config.apply"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "stage",
+              "description": "Stage the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.stage",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.stage/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.config.stage"
               }
             },
             {
@@ -5015,9 +5114,26 @@
               ],
               "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.offers.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "providerId",
+                    "source": "argument",
+                    "name": "connection",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -5537,13 +5653,6 @@
                     "source": "option",
                     "name": "cursor",
                     "transform": "identity"
-                  },
-                  {
-                    "target": "query",
-                    "field": "status",
-                    "source": "option",
-                    "name": "status",
-                    "transform": "identity"
                   }
                 ]
               }
@@ -5586,13 +5695,13 @@
             },
             {
               "nodeType": "leaf",
-              "segment": "reconcile",
-              "description": "Reconcile the selected resource.",
+              "segment": "update",
+              "description": "Update the selected resource.",
               "kind": "mutation",
               "arguments": [
                 {
-                  "name": "project",
-                  "description": "project identity or path.",
+                  "name": "profile",
+                  "description": "profile identity or path.",
                   "required": true
                 }
               ],
@@ -5601,16 +5710,22 @@
                   "name": "--plan",
                   "description": "Return the exact proposed outcome without mutation.",
                   "type": "boolean"
+                },
+                {
+                  "name": "--input",
+                  "description": "YAML or JSON workday policy document.",
+                  "type": "string",
+                  "required": true
                 }
               ],
               "authorization": {
-                "capability": "command.reconcile",
+                "capability": "command.update",
                 "confirmation": "authority"
               },
-              "resultSchemaId": "treeseed.command.reconcile/v1",
+              "resultSchemaId": "treeseed.command.update/v1",
               "execution": {
                 "kind": "operation",
-                "operationId": "workdays.profiles.reconcile",
+                "operationId": "workdays.profiles.update",
                 "input": [
                   {
                     "target": "path",
@@ -5622,32 +5737,21 @@
                   },
                   {
                     "target": "path",
-                    "field": "projectId",
+                    "field": "profileId",
                     "source": "argument",
-                    "name": "project",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "file",
+                    "source": "option",
+                    "name": "input",
                     "required": true,
                     "transform": "identity"
                   }
                 ]
-              }
-            },
-            {
-              "nodeType": "leaf",
-              "segment": "validate",
-              "description": "Validate the selected resource.",
-              "kind": "read",
-              "arguments": [
-                {
-                  "name": "file",
-                  "description": "file identity or path.",
-                  "required": true
-                }
-              ],
-              "resultSchemaId": "treeseed.command.validate/v1",
-              "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
               }
             }
           ]
@@ -5659,9 +5763,49 @@
           "kind": "mutation",
           "options": [
             {
+              "name": "--planning-percent",
+              "description": "Planning share of workday time and capacity (default 20%).",
+              "type": "number"
+            },
+            {
+              "name": "--allocation-weight",
+              "description": "Relative share among eligible concurrent workdays (default 1).",
+              "type": "number"
+            },
+            {
+              "name": "--planning-turn-maximum-seconds",
+              "description": "Maximum active seconds per planning turn (default 180).",
+              "type": "number"
+            },
+            {
+              "name": "--project-percentages",
+              "description": "JSON project allocation targets; normalized among selected projects.",
+              "type": "string"
+            },
+            {
+              "name": "--agent-class-percentages",
+              "description": "JSON class allocation targets keyed by project.",
+              "type": "string"
+            },
+            {
               "name": "--plan",
               "description": "Return the request without creating a preflight.",
               "type": "boolean"
+            },
+            {
+              "name": "--planning-only",
+              "description": "Run cooperative planning profiles without admitting accepted acting work.",
+              "type": "boolean"
+            },
+            {
+              "name": "--execution-mode",
+              "description": "Select simulation or production custody; both consume real capacity.",
+              "type": "string"
+            },
+            {
+              "name": "--proposal",
+              "description": "Governed proposal id for cooperative planning; repeat or comma-separate.",
+              "type": "string[]"
             },
             {
               "name": "--decision",
@@ -5719,6 +5863,14 @@
               },
               {
                 "target": "body",
+                "field": "executionMode",
+                "source": "option",
+                "name": "executionMode",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
                 "field": "startsAt",
                 "source": "option",
                 "name": "start",
@@ -5751,11 +5903,62 @@
               },
               {
                 "target": "body",
+                "field": "planningOnly",
+                "source": "option",
+                "name": "planningOnly",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "proposalIds",
+                "source": "option",
+                "name": "proposal",
+                "required": false,
+                "transform": "csv"
+              },
+              {
+                "target": "body",
                 "field": "decisionIds",
                 "source": "option",
                 "name": "decision",
                 "required": false,
                 "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "allocation.planningPercent",
+                "source": "option",
+                "name": "planningPercent",
+                "transform": "number"
+              },
+              {
+                "target": "body",
+                "field": "allocation.allocationWeight",
+                "source": "option",
+                "name": "allocationWeight",
+                "transform": "number"
+              },
+              {
+                "target": "body",
+                "field": "allocation.planningTurnMaximumSeconds",
+                "source": "option",
+                "name": "planningTurnMaximumSeconds",
+                "transform": "integer"
+              },
+              {
+                "target": "body",
+                "field": "allocation.projectPercentages",
+                "source": "option",
+                "name": "projectPercentages",
+                "transform": "json"
+              },
+              {
+                "target": "body",
+                "field": "allocation.agentClassPercentages",
+                "source": "option",
+                "name": "agentClassPercentages",
+                "transform": "json"
               },
               {
                 "target": "body",
@@ -6051,6 +6254,71 @@
                   "name": "--plan",
                   "description": "Return the exact proposed outcome without mutation.",
                   "type": "boolean"
+                },
+                {
+                  "name": "--planning-percent",
+                  "description": "Planning share of workday time and capacity (default 20%).",
+                  "type": "number"
+                },
+                {
+                  "name": "--allocation-weight",
+                  "description": "Relative share among eligible concurrent workdays (default 1).",
+                  "type": "number"
+                },
+                {
+                  "name": "--planning-turn-maximum-seconds",
+                  "description": "Maximum active seconds per planning turn (default 180).",
+                  "type": "number"
+                },
+                {
+                  "name": "--project-percentages",
+                  "description": "JSON project allocation targets; normalized among selected projects.",
+                  "type": "string"
+                },
+                {
+                  "name": "--agent-class-percentages",
+                  "description": "JSON class allocation targets keyed by project.",
+                  "type": "string"
+                },
+                {
+                  "name": "--planning-only",
+                  "description": "Run cooperative planning profiles without admitting accepted acting work.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--execution-mode",
+                  "description": "Select simulation or production custody; both consume real capacity.",
+                  "type": "string"
+                },
+                {
+                  "name": "--proposal",
+                  "description": "Governed proposal id for cooperative planning; repeat or comma-separate.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--decision",
+                  "description": "Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--agent",
+                  "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--activity",
+                  "description": "Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--class",
+                  "description": "Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--cadence-seconds",
+                  "description": "Seconds between recurring workday starts.",
+                  "type": "number"
                 }
               ],
               "authorization": {
@@ -6072,7 +6340,7 @@
                   },
                   {
                     "target": "body",
-                    "field": "profile",
+                    "field": "intent.profileId",
                     "source": "option",
                     "name": "profile",
                     "required": false,
@@ -6080,7 +6348,7 @@
                   },
                   {
                     "target": "body",
-                    "field": "projects",
+                    "field": "intent.projects",
                     "source": "option",
                     "name": "projects",
                     "required": false,
@@ -6088,9 +6356,129 @@
                   },
                   {
                     "target": "body",
-                    "field": "duration",
+                    "field": "intent.executionMode",
+                    "source": "option",
+                    "name": "executionMode",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.startsAt",
+                    "source": "option",
+                    "name": "start",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.endsAt",
+                    "source": "option",
+                    "name": "end",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.durationSeconds",
                     "source": "option",
                     "name": "duration",
+                    "required": false,
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.objectiveFilters",
+                    "source": "option",
+                    "name": "objective",
+                    "required": false,
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.planningOnly",
+                    "source": "option",
+                    "name": "planningOnly",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.proposalIds",
+                    "source": "option",
+                    "name": "proposal",
+                    "required": false,
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.decisionIds",
+                    "source": "option",
+                    "name": "decision",
+                    "required": false,
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.planningPercent",
+                    "source": "option",
+                    "name": "planningPercent",
+                    "transform": "number"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.allocationWeight",
+                    "source": "option",
+                    "name": "allocationWeight",
+                    "transform": "number"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.planningTurnMaximumSeconds",
+                    "source": "option",
+                    "name": "planningTurnMaximumSeconds",
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.projectPercentages",
+                    "source": "option",
+                    "name": "projectPercentages",
+                    "transform": "json"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.agentClassPercentages",
+                    "source": "option",
+                    "name": "agentClassPercentages",
+                    "transform": "json"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.agentSelection.agentSlugs",
+                    "source": "option",
+                    "name": "agent",
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.agentSelection.activityTypes",
+                    "source": "option",
+                    "name": "activity",
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.agentSelection.classSlugs",
+                    "source": "option",
+                    "name": "class",
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "cadenceSeconds",
+                    "source": "option",
+                    "name": "cadenceSeconds",
                     "required": false,
                     "transform": "integer"
                   }

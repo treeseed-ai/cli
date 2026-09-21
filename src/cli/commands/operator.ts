@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, validateWorkdayIntentSelection, normalizeWorkdayAgentSelection, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
 import { ControlPlaneClientError, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
-import { workdayAllocationOverridesSchema } from '@treeseed/sdk/agent-capacity';
+import { workdayAllocationOverridesSchema, workdayPolicySchema } from '@treeseed/sdk/agent-capacity';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { launchApplication } from '../application/launch.js';
 import { runInteractiveChat } from '../communication/interactive-chat.js';
@@ -121,7 +121,12 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		const parsed = parseYaml(await inputDocument(input.body.file, context));
 		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Input file must contain one YAML or JSON object.'), { category: 'invalid_input', code: 'command_input_file_invalid' });
 		delete input.body.file;
-		Object.assign(input.body, parsed);
+		if (operation.descriptor.operationId === 'workdays.profiles.update') {
+			const policy = workdayPolicySchema.safeParse(parsed);
+			if (!policy.success) throw Object.assign(new Error(policy.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')),
+				{ category: 'invalid_input', code: 'workday_policy_file_invalid' });
+			input.body.policy = policy.data;
+		} else Object.assign(input.body, parsed);
 	}
 	for (const binding of deferred) if (getOperationInputField(input[binding.target], binding.field) === undefined) {
 		throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });

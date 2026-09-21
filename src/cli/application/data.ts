@@ -1,6 +1,4 @@
 import type { InkRow as Row, InkSurfaceCollection as SurfaceCollection, InkSurfaceItem as SurfaceItem, InkWorkspaceDataSource } from '@treeseed/ui/ink';
-import { validateCapacityAllocationSetV2, type CapacityAllocationSetV2 } from '@treeseed/sdk/agent-capacity';
-import { parse as parseYaml } from 'yaml';
 
 export type { InkRow as Row, InkSurfaceCollection as SurfaceCollection, InkSurfaceItem as SurfaceItem } from '@treeseed/ui/ink';
 export type Invoke = (operationId: string, input: { path: Row; query: Row; body: unknown }, options?: Row) => Promise<unknown>;
@@ -87,7 +85,7 @@ export async function loadSurfaceCollection(invoke: Invoke, teamId: string, surf
 }
 
 export function canExecuteSurfaceAction(actionId: string, selected?: SurfaceItem) {
-	if (['project.create', 'service.connect', 'capacity.configure', 'allocation.save', 'agent.create'].includes(actionId)) return true;
+	if (['project.create', 'service.connect', 'capacity.configure', 'agent.create'].includes(actionId)) return true;
 	if (['service.configure', 'service.remove', 'capacity.revoke', 'agent.save', 'content.edit', 'release.promote-production'].includes(actionId)) return Boolean(selected);
 	if (actionId === 'release.cut') return !selected || ['approved', 'ready', 'staging'].includes(text(selected.raw.status));
 	if (actionId === 'question.answer') return selected?.raw.kind === 'question' && selected.raw.status === 'outstanding';
@@ -132,7 +130,7 @@ export async function executeSurfaceAction(invoke: Invoke, teamId: string, actio
 		if (!selected) throw new Error('Revoke capacity requires a selected provider connection.');
 		return invoke('providers.disconnect', { path: { teamId, connectionId: text(selected.raw.connectionId) || selected.id }, query: {}, body: undefined }, { idempotencyKey: globalThis.crypto.randomUUID() });
 	}
-	if (['content.edit', 'agent.create', 'agent.save', 'allocation.save'].includes(actionId)) return executeTreeDxAuthoring(invoke, actionId, values, selected);
+	if (['content.edit', 'agent.create', 'agent.save'].includes(actionId)) return executeTreeDxAuthoring(invoke, actionId, values, selected);
 	if (actionId === 'release.cut' || actionId === 'release.promote-production') {
 		const reviewId = text(values.reviewId) || selected?.id;
 		if (!reviewId) throw new Error(`${actionId} requires a review.`);
@@ -146,13 +144,6 @@ export async function executeSurfaceAction(invoke: Invoke, teamId: string, actio
 async function executeTreeDxAuthoring(invoke: Invoke, actionId: string, values: Row, selected?: SurfaceItem) {
 	const projectId = text(values.projectId || selected?.raw.projectId);
 	if (!projectId) throw new Error(`${actionId} requires a project ID.`);
-	if (actionId === 'allocation.save') {
-		let allocation: unknown;
-		try { allocation = parseYaml(text(values.content)); }
-		catch (error) { throw new Error(`Allocation profile is not valid JSON or YAML: ${error instanceof Error ? error.message : String(error)}`); }
-		const validation = validateCapacityAllocationSetV2(allocation as CapacityAllocationSetV2);
-		if (!validation.ok) throw new Error(`Allocation profile is invalid: ${validation.diagnostics.map((entry) => `${entry.path}: ${entry.message}`).join(' ')}`);
-	}
 	let workspaceId = text(values.workspaceId), version = Number(values.version || 0);
 	if (!workspaceId) {
 		const created = payload(await invoke('knowledge.workspaces.create', { path: { projectId }, query: {}, body: { requestId: globalThis.crypto.randomUUID() } }, { idempotencyKey: globalThis.crypto.randomUUID() }));
@@ -161,7 +152,7 @@ async function executeTreeDxAuthoring(invoke: Invoke, actionId: string, values: 
 	if (!workspaceId || version < 1) throw new Error('A valid TreeDX workspace and version are required.');
 	const sourcePath = text(values.sourcePath || selected?.raw.path);
 	const body = actionId === 'content.edit' ? { kind: 'page', version, sourcePath: sourcePath || undefined, bookId: text(values.bookId), slug: text(values.slug), title: text(values.title), summary: text(values.summary), body: text(values.body) }
-		: { kind: actionId === 'agent.save' || actionId === 'agent.create' ? 'agent-profile' : 'operational-content', version, sourcePath, expectedSha: text(selected?.raw.sha ?? values.expectedSha) || undefined, content: text(values.content), ...(actionId === 'agent.create' || !sourcePath ? { create: true } : {}) };
+		: { kind: 'agent-profile', version, sourcePath, expectedSha: text(selected?.raw.sha ?? values.expectedSha) || undefined, content: text(values.content), ...(actionId === 'agent.create' || !sourcePath ? { create: true } : {}) };
 	const updated = payload(await invoke('knowledge.workspaces.content.update', { path: { workspaceId }, query: {}, body }, {}));
 	const nextWorkspace = record(updated.workspace), nextVersion = Number(nextWorkspace.version ?? version + 1);
 	return invoke('knowledge.workspaces.submit', { path: { workspaceId }, query: {}, body: { version: nextVersion, message: text(values.message) } }, { idempotencyKey: globalThis.crypto.randomUUID() });

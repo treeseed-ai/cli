@@ -134,18 +134,9 @@ test('TreeDX authoring creates, writes, and submits one recoverable workspace', 
 	assert.deepEqual(calls[2]?.input.body, { version: 2, message: 'Add welcome page' });
 });
 
-test('allocation authoring validates normalized hierarchy percentages before writing TreeDX content', async () => {
-	const calls: string[] = [];
-	const invoke = async (operationId: string) => {
-		calls.push(operationId);
-		if (operationId === 'knowledge.workspaces.create') return { data: { id: 'workspace-a', version: 1 } };
-		if (operationId === 'knowledge.workspaces.content.update') return { data: { workspace: { version: 2 } } };
-		return { data: { review: { id: 'review-a' } } };
-	};
-	const allocation = { schemaVersion: 2, id: 'allocation-a', teamId: 'team-a', version: 1, status: 'draft', effectiveFrom: '2026-09-02T12:00:00.000Z', reservePolicy: { percent: 0, overflow: 'deny' }, slices: [{ id: 'project-a', scope: 'project', targetId: 'project-a', policy: { minPercent: 0, targetPercent: 100, maxPercent: 100, hardCapPercent: 100 } }], borrowingRules: [] };
-	await executeSurfaceAction(invoke, 'team-a', 'allocation.save', { projectId: 'project-a', sourcePath: 'capacity/allocations/team.yaml', content: JSON.stringify(allocation), message: 'Allocate project capacity' });
-	assert.deepEqual(calls, ['knowledge.workspaces.create', 'knowledge.workspaces.content.update', 'knowledge.workspaces.submit']);
-	await assert.rejects(() => executeSurfaceAction(invoke, 'team-a', 'allocation.save', { projectId: 'project-a', sourcePath: 'capacity/allocations/team.yaml', content: JSON.stringify({ ...allocation, slices: [{ ...allocation.slices[0], policy: { ...allocation.slices[0].policy, targetPercent: 90 } }] }), message: 'Invalid allocation' }), /Sibling target percentages must total 100/u);
+test('retired allocation-set authoring cannot create a TreeDX workspace', async () => {
+	const invoke = async () => { throw new Error('unexpected operation'); };
+	await assert.rejects(() => executeSurfaceAction(invoke, 'team-a', 'allocation.save', {}, undefined), /not implemented/u);
 });
 
 test('release workflows publish staging and leave production fail-closed to control-plane authority', async () => {
