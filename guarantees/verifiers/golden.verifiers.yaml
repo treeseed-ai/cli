@@ -1,0 +1,48 @@
+schemaVersion: treeseed.guarantee-verifiers/v1
+ownerPackage: "@treeseed/cli"
+verifiers:
+  cli.golden.refused-rebuild:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/host/managed-development-container.test.ts
+    testName: container startup and cleanup only invoke the protected manager, including failed-start cleanup
+  cli.golden.allocations:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: high-level allocation options use one nested policy input
+  cli.golden.selection:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: repeated and CSV selectors become a normalized intersecting nested intent
+  cli.golden.decisions:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: repeated and CSV accepted decisions become one normalized selection
+  cli.golden.decision-denial:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: empty decision selection never invokes the API
+  cli.golden.input-isolation:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: nested bindings reject prototype traversal, collisions, and excessive depth
+  cli.golden.diagnostics:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/communications/send-outcome.test.ts
+    testName: streamed human sends retain failure reason and IDs without duplicating prior responses
+  cli.golden.runtime-readback:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/lifecycle.test.ts
+    testName: managed Agent sandbox status recognizes exact active guest-image custody
+  cli.golden.lifecycle-lock:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/lifecycle.test.ts
+    testName: lifecycle lock releases after a failed operation

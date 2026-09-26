@@ -1,0 +1,12 @@
+schemaVersion: treeseed.guarantee/v1
+id: guarantee.cli.golden.component-boundaries
+journey: Verify golden operator component boundaries
+ownerPackage: "@treeseed/cli"
+type: agent
+subtype: operator
+status: planned
+gates: [core]
+summary: Coded operator component scenarios; not proof of a live SDK golden workday.
+scene:
+  required: true
+  manifest: guarantees/agent/golden/scenes/component-boundaries.scene.yaml

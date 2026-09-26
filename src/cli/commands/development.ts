@@ -293,9 +293,13 @@ async function rebuildPackage(input: { state: LocalSessionState; record: { sessi
 
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
-	if (usesManagedContainer(target)) await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
 	await stopProcess(state, key);
-	if (usesManagedContainer(target)) await containerOperation(context, state.sessionId, runtime, target, 'stop');
+	if (usesManagedContainer(target)) {
+		// A manager refusal (for example, an active Kata claim) leaves the current
+		// runtime in place. Do not retire its selection before that custody check.
+		await containerOperation(context, state.sessionId, runtime, target, 'stop');
+		await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
+	}
 	else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
