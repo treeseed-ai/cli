@@ -118,7 +118,6 @@ function operationIsRunning(state: LocalSessionState, key: string) {
 	if (ownsDevelopmentProcess(existing, state.sessionId)) return true;
 	delete state.processes[key]; return false;
 }
-
 async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds: number, state?: LocalSessionState, key?: string) {
 	if (target.ready.kind === 'process') {
 		if (!state || !key) throw new Error(`Process readiness for ${target.id} requires tracked process state.`);
@@ -141,7 +140,6 @@ async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds:
 	}
 	throw new Error(`Readiness timed out for ${target.id}.`);
 }
-
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
 	const manifest = resolve(context.cwd, invocation.arguments[0]!);
 	if (invocation.options.plan !== true) assertNoSelectedDevelopmentCustody(context.env);
@@ -384,7 +382,9 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		if (action === 'package-rebuild') await rebuildPackage(dependentInput);
 		else if (action === 'rebuild-restart') await restartConsumer(dependentInput);
 		else if (action === 'build-only') {
-			runOneShotOperation(state, dependent.target.operations.build, dependentRepository.worktree, dependentSelection.mode, context.env);
+			const build = dependent.target.operations.build;
+			if (!build) throw new Error('Build-only dependent has no build operation.');
+			runOneShotOperation(state, build, dependentRepository.worktree, dependentSelection.mode, context.env);
 			await markRebuilt(context, sessionId, dependent.runtime.project.id, dependent.target.id, dependentSelection.mode, dependent.target);
 		} else await restartConsumer(dependentInput);
 	}
