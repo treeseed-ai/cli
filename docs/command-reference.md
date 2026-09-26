@@ -362,6 +362,7 @@ Control-plane operation: `governance.proposals.withdraw`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--project <value>`: Project id or slug.
+- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--if-match <value>`: Exact current resource version, or new when unconfigured.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
@@ -2139,6 +2140,9 @@ Control-plane operation: `capacity.usage`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--project <value>`: Project id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 - `--workday <value>`: Restrict evidence to one workday.
 

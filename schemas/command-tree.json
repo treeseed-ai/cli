@@ -1262,7 +1262,7 @@
           ],
           "authorization": {
             "capability": "command.withdraw",
-            "confirmation": "never"
+            "confirmation": "destructive"
           },
           "resultSchemaId": "treeseed.command.withdraw/v1",
           "execution": {
@@ -5583,6 +5583,16 @@
               "name": "--workday",
               "description": "Restrict evidence to one workday.",
               "type": "string"
+            },
+            {
+              "name": "--limit",
+              "description": "Page size.",
+              "type": "number"
+            },
+            {
+              "name": "--cursor",
+              "description": "Opaque page cursor.",
+              "type": "string"
             }
           ],
           "resultSchemaId": "treeseed.command.usage/v1",
@@ -5611,6 +5621,30 @@
                 "field": "workDayId",
                 "source": "option",
                 "name": "workday",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
                 "required": false,
                 "transform": "identity"
               }
