@@ -42,6 +42,16 @@ test('container startup and cleanup only invoke the protected manager, including
     assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--plan','--json'],{...context,write:(value:string)=>planned.push(value)}),0);
     assert.deepEqual(actions,beforePlan,'Plan must not stop or start a container');
     assert.equal(record.session.targets[0].mode,'live','Plan must not switch routes');
+    Object.assign(target, { kind: 'rebuild-restart' });
+    Object.assign(target.operations, { build: { command: process.execPath, args: ['-e', 'process.exit(7)'], environment: {}, timeoutSeconds: 10 } });
+    writeFileSync(file,JSON.stringify({development:runtime}));
+    const beforeFailedBuild = [...actions];
+    assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--json'],context),1);
+    assert.deepEqual(actions,beforeFailedBuild,'A failed candidate build must not stop the healthy managed runtime');
+    assert.equal(record.session.targets[0].mode,'live','A failed candidate build must retain the live route');
+    delete (target.operations as { build?: unknown }).build;
+    Object.assign(target, { kind: 'live-api' });
+    writeFileSync(file,JSON.stringify({development:runtime}));
     assert.equal(JSON.parse(planned[0]!).result.mutation,false);
     rejectStop=true;
     for(const command of ['restart','rebuild']) {
