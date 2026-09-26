@@ -13,7 +13,7 @@ export function selectedDevelopmentTarget(record: unknown, projectId: string, ta
 	return { runtime, target };
 }
 
-export function dependentDevelopmentAction(reaction: 'none' | 'restart' | 'rebuild' | 'manual', target: Pick<DevelopmentTarget, 'kind' | 'operations'>) {
+export function dependentDevelopmentAction(reaction: DevelopmentTarget['dependencies'][number]['reaction'], target: Pick<DevelopmentTarget, 'kind' | 'operations'>) {
 	if (reaction === 'manual') return 'manual' as const;
 	if (reaction !== 'rebuild') return 'restart' as const;
 	if (target.kind === 'package-watch') return 'package-rebuild' as const;
