@@ -1,3 +1,7 @@
+schemaVersion: treeseed.scene/v1
+id: cli.golden.component-boundaries
+title: Golden operator component boundaries
+scope: local-component-tests
 workflow:
   - id: refused-rebuild
     action: { verifier: cli.golden.refused-rebuild }
