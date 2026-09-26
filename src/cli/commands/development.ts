@@ -291,8 +291,7 @@ async function rebuildPackage(input: { state: LocalSessionState; record: { sessi
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
-	if (usesManagedContainer(target) && !usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build)
-		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
+	if (usesManagedContainer(target) && !usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
 	await stopProcess(state, key);
 	if (usesManagedContainer(target)) {
 		// Preserve the live selection if manager custody refuses an active claim.
