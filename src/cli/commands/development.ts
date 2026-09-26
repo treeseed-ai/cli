@@ -118,7 +118,6 @@ function operationIsRunning(state: LocalSessionState, key: string) {
 	if (ownsDevelopmentProcess(existing, state.sessionId)) return true;
 	delete state.processes[key]; return false;
 }
-
 async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds: number, state?: LocalSessionState, key?: string) {
 	if (target.ready.kind === 'process') {
 		if (!state || !key) throw new Error(`Process readiness for ${target.id} requires tracked process state.`);
@@ -141,7 +140,6 @@ async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds:
 	}
 	throw new Error(`Readiness timed out for ${target.id}.`);
 }
-
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
 	const manifest = resolve(context.cwd, invocation.arguments[0]!);
 	if (invocation.options.plan !== true) assertNoSelectedDevelopmentCustody(context.env);
@@ -290,12 +288,14 @@ async function rebuildPackage(input: { state: LocalSessionState; record: { sessi
 	installPackageOverlay(state, record, runtime, target, worktree, overlayRoot);
 	await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
-
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
-	if (usesManagedContainer(target)) await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
 	await stopProcess(state, key);
-	if (usesManagedContainer(target)) await containerOperation(context, state.sessionId, runtime, target, 'stop');
+	if (usesManagedContainer(target)) {
+		// Preserve the live selection if manager custody refuses an active claim.
+		await containerOperation(context, state.sessionId, runtime, target, 'stop');
+		await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
+	}
 	else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
@@ -312,7 +312,6 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 	}
 	if (input.recordGeneration !== false) await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
-
 async function restart(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
 	const status = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
@@ -335,7 +334,6 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
-
 async function rebuild(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
 	const runtimes = (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime);
@@ -384,7 +382,9 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		if (action === 'package-rebuild') await rebuildPackage(dependentInput);
 		else if (action === 'rebuild-restart') await restartConsumer(dependentInput);
 		else if (action === 'build-only') {
-			runOneShotOperation(state, dependent.target.operations.build, dependentRepository.worktree, dependentSelection.mode, context.env);
+			const build = dependent.target.operations.build;
+			if (!build) throw new Error('Build-only dependent has no build operation.');
+			runOneShotOperation(state, build, dependentRepository.worktree, dependentSelection.mode, context.env);
 			await markRebuilt(context, sessionId, dependent.runtime.project.id, dependent.target.id, dependentSelection.mode, dependent.target);
 		} else await restartConsumer(dependentInput);
 	}

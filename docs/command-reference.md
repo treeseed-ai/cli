@@ -353,6 +353,36 @@ Control-plane operation: `governance.proposals.evaluate`.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--input <value>`: Optional YAML or JSON evaluation decision.
 
+### trsd proposals withdraw <proposal>
+
+Withdraw the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.withdraw/v1`.
+Control-plane operation: `governance.proposals.withdraw`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: Optional YAML or JSON withdrawal reason and evidence.
+
+### trsd proposals supersede <proposal>
+
+Supersede the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.supersede/v1`.
+Control-plane operation: `governance.proposals.supersede`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: Optional YAML or JSON successor, reason, and evidence.
+
 ## trsd decisions
 
 Decisions operations.
@@ -2188,6 +2218,7 @@ Control-plane operation: `workdays.profiles.update`.
 - `--if-match <value>`: Exact current resource version, or new when unconfigured.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: YAML or JSON workday policy document.
 
 ### trsd workdays plan
 

@@ -54,6 +54,7 @@ test('leaf commands expose only catalog-derived high-level options', () => {
 	assert.equal(commandSpecs.some((command) => command.options.some((option) => option.flag === '--execute' || option.flag === '--market')), false);
 });
 
+
 test('host commands preserve the SDK handler boundary and stable envelope', async () => {
 	const calls: unknown[] = []; const output: string[] = [];
 	const exit = await runCommandLine(['host', 'component', 'status', 'agent', '--server', 'lab', '--json'], {
@@ -63,6 +64,7 @@ test('host commands preserve the SDK handler boundary and stable envelope', asyn
 	assert.deepEqual(calls, [{ handlerId: 'local.host.component.status', arguments: ['agent'], options: {} }]);
 	assert.deepEqual(JSON.parse(output[0]!).result, { componentId: 'agent', healthy: true });
 });
+
 
 test('host stop suspends a selected development session before stopping released workloads', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-stop-'));

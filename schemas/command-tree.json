@@ -1235,6 +1235,126 @@
               }
             ]
           }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "withdraw",
+          "description": "Withdraw the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--input",
+              "description": "Optional YAML or JSON withdrawal reason and evidence.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "command.withdraw",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.withdraw/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.withdraw",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "option",
+                "name": "input",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "supersede",
+          "description": "Supersede the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--input",
+              "description": "Optional YAML or JSON successor, reason, and evidence.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "command.supersede",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.supersede/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.supersede",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "option",
+                "name": "input",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
         }
       ]
     },
@@ -5710,6 +5830,12 @@
                   "name": "--plan",
                   "description": "Return the exact proposed outcome without mutation.",
                   "type": "boolean"
+                },
+                {
+                  "name": "--input",
+                  "description": "YAML or JSON workday policy document.",
+                  "type": "string",
+                  "required": true
                 }
               ],
               "authorization": {

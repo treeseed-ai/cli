@@ -1,0 +1,32 @@
+schemaVersion: treeseed.scene/v1
+id: cli.golden.component-boundaries
+title: Golden operator component boundaries
+scope: local-component-tests
+workflow:
+  - id: refused-rebuild
+    action: { verifier: cli.golden.refused-rebuild }
+    expect: { status: passed }
+  - id: allocations
+    action: { verifier: cli.golden.allocations }
+    expect: { status: passed }
+  - id: selection
+    action: { verifier: cli.golden.selection }
+    expect: { status: passed }
+  - id: decisions
+    action: { verifier: cli.golden.decisions }
+    expect: { status: passed }
+  - id: decision-denial
+    action: { verifier: cli.golden.decision-denial }
+    expect: { status: passed }
+  - id: input-isolation
+    action: { verifier: cli.golden.input-isolation }
+    expect: { status: passed }
+  - id: diagnostics
+    action: { verifier: cli.golden.diagnostics }
+    expect: { status: passed }
+  - id: runtime-readback
+    action: { verifier: cli.golden.runtime-readback }
+    expect: { status: passed }
+  - id: lifecycle-lock
+    action: { verifier: cli.golden.lifecycle-lock }
+    expect: { status: passed }

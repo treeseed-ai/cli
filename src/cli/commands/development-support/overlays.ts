@@ -171,7 +171,7 @@ export async function stopProcess(state: OverlaySessionState, key: string) {
 }
 
 export function dependentReactions(runtimes: DevelopmentRuntime[], projectId: string, targetId: string) {
-	const result: Array<{ runtime: DevelopmentRuntime; target: DevelopmentTarget; reaction: string }> = [], queued = [`${projectId}.${targetId}`], seen = new Set(queued);
+	const result: Array<{ runtime: DevelopmentRuntime; target: DevelopmentTarget; reaction: DevelopmentTarget['dependencies'][number]['reaction'] }> = [], queued = [`${projectId}.${targetId}`], seen = new Set(queued);
 	while (queued.length) {
 		const selected = queued.shift()!;
 		for (const runtime of runtimes) for (const target of runtime.targets) for (const dependency of target.dependencies) {
