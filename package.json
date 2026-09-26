@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.13.0-rc.83",
+  "version": "0.13.0-rc.85",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -35,6 +35,7 @@
     "check:file-architecture": "node --import tsx ./scripts/support/check-file-architecture.ts",
     "lint": "npm run check:file-lengths && npm run build:dist",
     "test": "npm run build:dist && node --import tsx ./scripts/testing/run-tests.ts",
+    "accept:host-lifecycle": "node --import tsx ./scripts/testing/accept-host-lifecycle.ts",
     "build:operator-docs": "node --import tsx ./scripts/build/generate-operator-docs.ts",
     "build:dist": "npm run build:operator-docs && node --import tsx ./scripts/build/build-dist.ts",
     "dev:tui": "node --import tsx ./scripts/development/tui-watch.ts",
@@ -52,7 +53,7 @@
   },
   "dependencies": {
     "@treeseed/identity": "0.1.0-rc.23",
-    "@treeseed/sdk": "0.13.0-rc.117",
+    "@treeseed/sdk": "0.13.0-rc.121",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "string-width": "^8.2.2",

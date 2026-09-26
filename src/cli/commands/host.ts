@@ -140,9 +140,9 @@ async function input(invocation: ParsedInvocation, context: CommandContext) {
 			profile, hostId: planned.hostId, catalog: { release: planned.catalog.release, generation: planned.catalog.generation, digest: planned.catalog.digest }, inputs: values,
 		}) } };
 	}
-	if (invocation.command.name === 'host uninstall' && invocation.options.plan !== true) {
+	if ((invocation.command.name === 'host uninstall' || invocation.command.name === 'host reset') && invocation.options.plan !== true) {
 		if (invocation.options.confirm !== true || invocation.options.yes !== true) {
-			throw Object.assign(new Error('Host uninstall execution requires both --confirm and --yes after reviewing the plan.'), {
+			throw Object.assign(new Error(`Host ${invocation.command.name.slice('host '.length)} execution requires both --confirm and --yes after reviewing the plan.`), {
 				category: 'confirmation_required', code: 'confirmation_required',
 			});
 		}
@@ -251,12 +251,14 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 		: hostUsesProtectedLocalTransport(invocation) ? invokeLocalHostManager(command)
 			: invokeHostManager(command, typeof invocation.options.server === 'string' ? invocation.options.server : undefined, context.env);
 	if (invocation.options.plan !== true && (invocation.command.name === 'host stop' || invocation.command.name === 'host start')) {
-		const listed = await invokeDevelopmentManager(context, 'local.dev.status', { all: true }) as { sessions?: Array<{ session: { sessionId: string; status: string; targets: Array<{ mode: string }> } }> };
+		const listed = await invokeDevelopmentManager(context, 'local.dev.status', { all: true }) as { sessions?: Array<{ session: { sessionId: string; status: string; targets: Array<{ mode: string; health?: string }> } }> };
 		if (!Array.isArray(listed.sessions)) throw new Error('Manager did not return an authoritative development session inventory.');
 		const selected = listed.sessions.filter(record => record.session.status !== 'stopped'
-			&& (invocation.command.name === 'host stop' || record.session.status === 'suspended')
+			&& (invocation.command.name === 'host stop' || record.session.status === 'suspended'
+				|| record.session.targets.some(target => target.mode !== 'released' && target.health !== 'ready'))
 			&& record.session.targets.some(target => target.mode !== 'released'));
-		const snapshots = selected.map(record => ({ sessionId: record.session.sessionId, status: record.session.status }));
+		const snapshots = selected.map(record => ({ sessionId: record.session.sessionId, status: record.session.status,
+			needsResume: record.session.status === 'suspended' || record.session.targets.some(target => target.mode !== 'released' && target.health !== 'ready') }));
 		for (const { sessionId } of snapshots) if (!/^dev-[a-z0-9-]{1,64}$/u.test(sessionId)
 			|| !existsSync(resolve(developmentStateRoot(context.env), sessionId, 'session.json')))
 			throw new Error(`Development session ${sessionId} requires its original owner to manage the host lifecycle; no workloads were changed.`);
@@ -266,7 +268,7 @@ export async function runHost(invocation: ParsedInvocation, context: CommandCont
 			return invoke();
 		}
 		const result = await invoke();
-		for (const { sessionId, status } of snapshots) if (status === 'suspended') await resumeDevelopmentSession(sessionId, context);
+		for (const { sessionId, needsResume } of snapshots) if (needsResume) await resumeDevelopmentSession(sessionId, context);
 		return result;
 	}
 	const progressLabel = context.outputFormat === 'human' && invocation.options.plan !== true ? ({
