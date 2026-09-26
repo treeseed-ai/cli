@@ -37,6 +37,10 @@ jobs:
 
       - name: Verify package with exact SDK
         run: npm run verify:direct
+      - name: Execute coded golden component scenes
+        uses: treeseed-ai/reviewer/.github/actions/run-scenes@e29c5bf2db97188c47fdc67a7a098e81a95ced22
+        with:
+          ids: guarantee.cli.golden.component-boundaries
 
       - name: Seal protected staging candidate
         if: github.ref == 'refs/heads/staging'
