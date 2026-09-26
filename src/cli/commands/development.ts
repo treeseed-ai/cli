@@ -290,13 +290,11 @@ async function rebuildPackage(input: { state: LocalSessionState; record: { sessi
 	installPackageOverlay(state, record, runtime, target, worktree, overlayRoot);
 	await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
-
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
 	await stopProcess(state, key);
 	if (usesManagedContainer(target)) {
-		// A manager refusal (for example, an active Kata claim) leaves the current
-		// runtime in place. Do not retire its selection before that custody check.
+		// Preserve the live selection if manager custody refuses an active claim.
 		await containerOperation(context, state.sessionId, runtime, target, 'stop');
 		await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
 	}
@@ -316,7 +314,6 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 	}
 	if (input.recordGeneration !== false) await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
-
 async function restart(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
 	const status = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
@@ -339,7 +336,6 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
-
 async function rebuild(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
 	const runtimes = (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime);
