@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
+import { parse } from 'yaml';
 
 test('package has one executable and only its declared CLI runtime dependencies', () => {
 	const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -67,5 +68,21 @@ test('source contains no legacy implementation residue', () => {
 	for (const forbidden of ['MarketClient', 'marketId', '--market', 'operator/commands', 'workflow-support']) assert.equal(source.includes(forbidden), false, forbidden);
 	const nonHostTransport = sourceFiles.filter((file) => !file.endsWith('/host-client.ts')).map((file) => readFileSync(file, 'utf8')).join('\n');
 	assert.equal(nonHostTransport.includes('/v1/'), false, '/v1/ outside the fixed host-manager transport');
-	for (const removed of ['docs/src', 'guarantees', '.gitmodules']) assert.equal(existsSync(removed), false, removed);
+	for (const removed of ['docs/src', '.gitmodules']) assert.equal(existsSync(removed), false, removed);
+});
+
+test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
+	const files = readdirSync('guarantees', { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
+	assert.equal(files.length, 3);
+	for (const entry of files) {
+		assert.match(entry.name, /\.yaml$/u);
+		const document = parse(readFileSync(`${entry.parentPath}/${entry.name}`, 'utf8'));
+		assert.match(document.schemaVersion, /^treeseed\.(guarantee|scene|guarantee-verifiers)\/v1$/u);
+		if (document.verifiers) for (const verifier of Object.values(document.verifiers) as Array<{kind: string; ownerPackage: string; testFile: string}>) {
+			assert.equal(verifier.kind, 'nodeTestCase');
+			assert.equal(verifier.ownerPackage, '@treeseed/cli');
+			assert.match(verifier.testFile, /^tests\/unit\/command-boundary\//u);
+			assert.equal(existsSync(verifier.testFile), true);
+		}
+	}
 });
