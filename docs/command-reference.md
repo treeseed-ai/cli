@@ -1032,6 +1032,35 @@ Execution: `local.host.provider.status`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
+## trsd host provider limits
+
+Limits operations.
+
+### trsd host provider limits show
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Execution: `local.host.provider.limits.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host provider limits set <provider>
+
+Set the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.set/v1`.
+Execution: `local.host.provider.limits.set`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--daily-active-seconds <value>`: Daily active-time cap in seconds.
+- `--capability <value>`: Set only this capability; otherwise set the shared model and all its capabilities.
+- `--expected-generation <value>`: Reject if the host configuration generation changed.
+
 ## trsd host provider credentials
 
 Credentials operations.
