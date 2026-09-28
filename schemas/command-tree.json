@@ -2875,6 +2875,69 @@
             },
             {
               "nodeType": "branch",
+              "segment": "limits",
+              "description": "Limits operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "show",
+                  "description": "Show the selected resource.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.command.show/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.limits.show"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "set",
+                  "description": "Set the selected resource.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "provider",
+                      "description": "provider identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    },
+                    {
+                      "name": "--daily-active-seconds",
+                      "description": "Daily active-time cap in seconds.",
+                      "type": "number",
+                      "required": true
+                    },
+                    {
+                      "name": "--capability",
+                      "description": "Set only this capability; otherwise set the shared model and all its capabilities.",
+                      "type": "string"
+                    },
+                    {
+                      "name": "--expected-generation",
+                      "description": "Reject if the host configuration generation changed.",
+                      "type": "number"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.set",
+                    "confirmation": "authority"
+                  },
+                  "resultSchemaId": "treeseed.command.set/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.limits.set"
+                  }
+                }
+              ]
+            },
+            {
+              "nodeType": "branch",
               "segment": "credentials",
               "description": "Credentials operations.",
               "children": [
