@@ -31,7 +31,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install exact integrated SDK
-        uses: treeseed-ai/sdk/.github/actions/install-exact-sdk@affa0623b8af92cde577f3b8ab685c1b61f2c8cb
+        uses: treeseed-ai/sdk/.github/actions/install-exact-sdk@a12f06dc33c02161cedb4d74928fb915a803911f
         with:
           github-token: ${{ github.token }}
 
