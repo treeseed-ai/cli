@@ -6030,6 +6030,11 @@
               "type": "string[]"
             },
             {
+              "name": "--continue-from",
+              "description": "Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.",
+              "type": "string"
+            },
+            {
               "name": "--agent",
               "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
               "type": "string[]"
@@ -6141,6 +6146,14 @@
                 "name": "decision",
                 "required": false,
                 "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "continueFromWorkdayId",
+                "source": "option",
+                "name": "continueFrom",
+                "required": false,
+                "transform": "identity"
               },
               {
                 "target": "body",
@@ -6518,6 +6531,11 @@
                   "type": "string[]"
                 },
                 {
+                  "name": "--continue-from",
+                  "description": "Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.",
+                  "type": "string"
+                },
+                {
                   "name": "--agent",
                   "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
                   "type": "string[]"
@@ -6634,6 +6652,14 @@
                     "name": "decision",
                     "required": false,
                     "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.continueFromWorkdayId",
+                    "source": "option",
+                    "name": "continueFrom",
+                    "required": false,
+                    "transform": "identity"
                   },
                   {
                     "target": "body",

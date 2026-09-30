@@ -2280,6 +2280,7 @@ Control-plane operation: `workdays.plan`.
 - `--planning-only`: Run cooperative planning profiles without admitting accepted acting work.
 - `--execution-mode <value>`: Select simulation or production custody; both consume real capacity.
 - `--proposal <value>`: Governed proposal id for cooperative planning; repeat or comma-separate.
+- `--continue-from <value>`: Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.
 - `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
 - `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
 - `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
@@ -2410,6 +2411,7 @@ Control-plane operation: `workdays.schedules.create`.
 - `--planning-only`: Run cooperative planning profiles without admitting accepted acting work.
 - `--execution-mode <value>`: Select simulation or production custody; both consume real capacity.
 - `--proposal <value>`: Governed proposal id for cooperative planning; repeat or comma-separate.
+- `--continue-from <value>`: Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.
 - `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
 - `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
 - `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
