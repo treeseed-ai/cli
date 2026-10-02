@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -14,6 +14,42 @@ function freezeRecord(root:string) {
 	return {session:{repositories:[{projectId:'specimen',worktree:root}],targets:[{projectId:'specimen',targetId:'package',mode:'candidate'}]},
 		runtimes:[developmentRuntimeSchema.parse(parse(readFileSync(resolve(root,'treeseed.package.yaml'),'utf8')).development)]};
 }
+
+for(const kind of ['build','contract','missing','file','cycle'] as const) {
+	test(`freeze command custody rejects ${kind} working directories before source capture`,()=>{
+		const fixture=candidateFixture(),external=candidateFixture();
+		try {
+			const selected=freezeRecord(fixture.root),target=selected.runtimes[0]!.targets[0]!;
+			if(kind==='build'||kind==='contract')symlinkSync(external.root,resolve(fixture.root,'working'));
+			else if(kind==='file')writeFileSync(resolve(fixture.root,'working'),'not a directory');
+			else if(kind==='cycle')symlinkSync('working',resolve(fixture.root,'working'));
+			if(kind==='contract')target.freeze!.contractOperations=[{...target.freeze!.operation,cwd:'working'}];
+			else target.freeze!.operation.cwd='working';
+			assert.throws(()=>freezeCustody(selected),/working directory custody/);
+			assert.equal(fixture.registrations.length,0);
+		} finally {fixture.close();external.close();}
+	});
+}
+test('freeze command custody preserves canonical contained directory aliases and default roots',()=>{
+	const fixture=candidateFixture();
+	try {
+		const selected=freezeRecord(fixture.root);freezeCustody(selected).assert([]);
+		mkdirSync(resolve(fixture.root,'working'));symlinkSync('working',resolve(fixture.root,'alias'));
+		selected.runtimes[0]!.targets[0]!.freeze!.operation.cwd='alias';
+		freezeCustody(selected).assert([]);
+	} finally {fixture.close();}
+});
+test('freeze command custody rejects an ignored directory alias moving after capture',()=>{
+	const fixture=candidateFixture(),external=candidateFixture();
+	try {
+		writeFileSync(resolve(fixture.root,'.gitignore'),'working\nverification.log\n');
+		symlinkSync('scripts',resolve(fixture.root,'working'));
+		const selected=freezeRecord(fixture.root);selected.runtimes[0]!.targets[0]!.freeze!.operation.cwd='working';
+		const custody=freezeCustody(selected);unlinkSync(resolve(fixture.root,'working'));symlinkSync(external.root,resolve(fixture.root,'working'));
+		assert.throws(()=>custody.assert([]),/working directory custody/);
+		assert.equal(readFileSync(resolve(fixture.root,'scripts/verify.ts'),'utf8').includes('appendFileSync'),true);
+	} finally {fixture.close();external.close();}
+});
 
 test('freeze custody binds exact source snapshots independently of command success',()=>{
 	for(const kind of ['tracked','untracked','head','recipe','deleted'] as const) {

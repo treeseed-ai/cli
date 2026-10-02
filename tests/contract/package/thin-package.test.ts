@@ -73,6 +73,21 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.operation-build-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects build working directories before source capture"},
+		'cli.golden.operation-contract-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects contract working directories before source capture"},
+		'cli.golden.operation-missing-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects missing working directories before source capture"},
+		'cli.golden.operation-file-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects file working directories before source capture"},
+		'cli.golden.operation-cycle-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects cycle working directories before source capture"},
+		'cli.golden.operation-contained-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody preserves canonical contained directory aliases and default roots"},
+		'cli.golden.operation-moved-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects an ignored directory alias moving after capture"},
+		'cli.golden.operation-freeze-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native freeze rejects an escaped command directory before executing its actual subprocess"},
+		'cli.golden.operation-contract-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native freeze preflights escaped contract directories before its otherwise valid build"},
+		'cli.golden.operation-targets-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native freeze preflights every selected target directory before any native build"},
+		'cli.golden.operation-verify-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native candidate verification rejects an escaped directory before its actual verifier"},
+		'cli.golden.operation-verifiers-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native candidate verification preflights every verifier directory before the first native command"},
+		'cli.golden.operation-alias-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native candidate commands preserve contained directory aliases and exact working-directory execution"},
+		'cli.golden.operation-freeze-moved-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native freeze rejects ignored command directory movement after one actual execution"},
+		'cli.golden.operation-verify-moved-native': {testFile:"tests/integration/development-operations.test.ts",testName:"native verify rejects ignored command directory movement after one actual execution"},
 		'cli.golden.artifact-escaped-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects escaped bytes through the existing freeze boundary"},
 		'cli.golden.build-manager-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"development build custody recognizes the existing protected manager target"},
 		'cli.golden.build-docker-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"development build custody recognizes a caller-built Docker runtime"},

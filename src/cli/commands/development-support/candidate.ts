@@ -39,6 +39,15 @@ export function artifactPaths(pattern: string, root: string) {
 	return readdirSync(directory).filter((name) => expression.test(name)).map((name) => resolve(directory, name));
 }
 
+/** A declared relative command directory must remain within its canonical owner. */
+export function developmentOperationDirectory(root:string,cwd?:string) {
+	try {
+		const owner=realpathSync(root),directory=realpathSync(resolve(root,cwd??'.')),inside=relative(owner,directory);
+		if(inside==='..'||inside.startsWith('../')||isAbsolute(inside)||!lstatSync(directory).isDirectory()) throw new Error('Invalid command directory.');
+		return directory;
+	} catch {throw new Error('Development command working directory custody requires a directory inside its exact owner.');}
+}
+
 /** Resolve aliases only within the owning repository; inspect the opened bytes. */
 export function readDevelopmentArtifact(root:string,path:string) {
 	let descriptor:number|undefined;
@@ -59,7 +68,15 @@ export function readDevelopmentArtifact(root:string,path:string) {
 
 /** Build outputs may change; the source closure and already captured artifacts may not. */
 export function freezeCustody(record:{session:{repositories:Array<{projectId:string;worktree:string}>;targets:Array<{projectId:string;targetId:string;mode:string}>};runtimes:DevelopmentRuntime[]}) {
-	const capture=()=>record.session.repositories.map(repository=>{
+	const directories:Array<{root:string;cwd?:string;directory:string}>=[];
+	for(const runtime of record.runtimes)for(const target of runtime.targets)if(target.freeze&&record.session.targets.some(selected=>selected.projectId===runtime.project.id&&selected.targetId===target.id&&selected.mode!=='released')) {
+		const repository=record.session.repositories.find(entry=>entry.projectId===runtime.project.id);
+		if(!repository)throw new Error(`Development runtime source is missing for ${runtime.project.id}.`);
+		for(const operation of [target.freeze.operation,...target.freeze.contractOperations])directories.push({root:repository.worktree,cwd:operation.cwd,directory:developmentOperationDirectory(repository.worktree,operation.cwd)});
+	}
+	const capture=()=>{
+		for(const entry of directories)if(developmentOperationDirectory(entry.root,entry.cwd)!==entry.directory)throw new Error('Development command working directory custody changed during freeze.');
+		return record.session.repositories.map(repository=>{
 		const runtime=record.runtimes.find(entry=>entry.project.id===repository.projectId);
 		if(!runtime) throw new Error(`Development runtime is missing for ${repository.projectId}.`);
 		const outputs=runtime.targets.filter(target=>target.freeze&&record.session.targets.some(selected=>selected.projectId===runtime.project.id&&selected.targetId===target.id&&selected.mode!=='released'))
@@ -70,7 +87,8 @@ export function freezeCustody(record:{session:{repositories:Array<{projectId:str
 				return identity;
 			});
 		return repositoryClosure(runtime,repository.worktree,outputs);
-	});
+		});
+	};
 	const source=capture();
 	return {source,assert(artifacts:Array<{projectId:string;identity:string;digest:string}>) {
 		const current=capture();

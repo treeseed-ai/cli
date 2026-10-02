@@ -7,7 +7,7 @@ import { developmentCandidateSchema, type DevelopmentRuntime, type DevelopmentTa
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
 import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
-import { artifactPaths, compatibilityAttestations, freezeCustody, readDevelopmentArtifact, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
+import { artifactPaths, compatibilityAttestations, developmentOperationDirectory, freezeCustody, readDevelopmentArtifact, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
@@ -211,11 +211,11 @@ async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 		const artifacts: Array<{ projectId: string; targetId: string; kind: string; identity: string; digest: string; integrity?: string }> = [];
 		for (const runtime of record.runtimes) for (const target of runtime.targets) if (target.freeze && record.session.targets.some((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id && selected.mode !== 'released')) {
 		const repository = record.session.repositories.find((entry) => entry.projectId === runtime.project.id)!;
-		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: target.freeze.operation.cwd ? resolve(repository.worktree, target.freeze.operation.cwd) : repository.worktree, env: { ...context.env, ...target.freeze.operation.environment }, stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
+		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: developmentOperationDirectory(repository.worktree,target.freeze.operation.cwd), env: { ...context.env, ...target.freeze.operation.environment }, stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
 		if (result.status !== 0) throw new Error(`Freeze failed for ${runtime.project.id}.${target.id}.`);
 		custody.assert(artifacts);
 		for (const contractOperation of target.freeze.contractOperations) {
-			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: contractOperation.cwd ? resolve(repository.worktree, contractOperation.cwd) : repository.worktree, env: { ...context.env, ...contractOperation.environment }, stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
+			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: developmentOperationDirectory(repository.worktree,contractOperation.cwd), env: { ...context.env, ...contractOperation.environment }, stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
 			if (contract.status !== 0) throw new Error(`Contract generation failed for ${runtime.project.id}.${target.id}.`);
 			custody.assert(artifacts);
 		}
@@ -243,12 +243,14 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 	const bindings = candidate.artifacts.map(artifact => {
 		const runtime = record.runtimes.find((entry) => entry.project.id === artifact.projectId), target = runtime?.targets.find((entry) => entry.id === artifact.targetId), repository = record.session.repositories.find((entry) => entry.projectId === artifact.projectId);
 		if (!target?.operations.verify || !repository || !candidate.source.some(source=>source.projectId===artifact.projectId)) throw new Error(`Candidate verification operation is unavailable for ${artifact.projectId}.${artifact.targetId}.`);
+		const directory=developmentOperationDirectory(repository.worktree,target.operations.verify.cwd);
 		const artifactPath = resolve(repository.worktree, artifact.identity);
 		const artifactRelative = relative(repository.worktree, artifactPath);
 		if (artifactRelative.startsWith('..') || isAbsolute(artifactRelative)) throw new Error(`Candidate artifact identity escapes its source repository: ${artifact.identity}.`);
-		return {artifact,artifactPath,repository,operation:target.operations.verify};
+		return {artifact,artifactPath,repository,operation:target.operations.verify,directory};
 	});
 	const assertCustody = () => {
+	for(const {repository,operation,directory} of bindings)if(developmentOperationDirectory(repository.worktree,operation.cwd)!==directory)throw new Error('Development command working directory custody changed during verification.');
 	for (const {artifact,artifactPath,repository} of bindings) if (!existsSync(artifactPath) || sha256(readDevelopmentArtifact(repository.worktree,artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification or changed sealed artifact: ${artifact.identity}.`);
 	for (const source of candidate.source) {
 		const runtime = record.runtimes.find((entry) => entry.project.id === source.projectId);
@@ -259,7 +261,7 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 	};
 	assertCustody();
 	for (const {artifact,repository,operation} of new Map(bindings.map(binding=>[JSON.stringify([binding.artifact.projectId,binding.artifact.targetId]),binding])).values()) {
-		const result = spawnSync(operation.command, operation.args, { cwd: operation.cwd ? resolve(repository.worktree, operation.cwd) : repository.worktree, env: { ...context.env, ...operation.environment }, stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
+		const result = spawnSync(operation.command, operation.args, { cwd: developmentOperationDirectory(repository.worktree,operation.cwd), env: { ...context.env, ...operation.environment }, stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
 		operations.push(`${artifact.projectId}.${artifact.targetId}:${operation.command} ${operation.args.join(' ')}`);
 		if (result.status !== 0) throw new Error(`Candidate verification failed for ${artifact.projectId}.${artifact.targetId}.`);
 		assertCustody();
