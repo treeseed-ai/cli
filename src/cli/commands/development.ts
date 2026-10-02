@@ -240,24 +240,29 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 	const candidate = developmentCandidateSchema.parse(JSON.parse(readFileSync(selected, 'utf8')));
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
 	const operations: string[] = [];
-	for (const artifact of candidate.artifacts) {
+	const bindings = candidate.artifacts.map(artifact => {
 		const runtime = record.runtimes.find((entry) => entry.project.id === artifact.projectId), target = runtime?.targets.find((entry) => entry.id === artifact.targetId), repository = record.session.repositories.find((entry) => entry.projectId === artifact.projectId);
-		if (!target?.operations.verify || !repository) continue;
+		if (!target?.operations.verify || !repository || !candidate.source.some(source=>source.projectId===artifact.projectId)) throw new Error(`Candidate verification operation is unavailable for ${artifact.projectId}.${artifact.targetId}.`);
 		const artifactPath = resolve(repository.worktree, artifact.identity);
 		const artifactRelative = relative(repository.worktree, artifactPath);
 		if (artifactRelative.startsWith('..') || isAbsolute(artifactRelative)) throw new Error(`Candidate artifact identity escapes its source repository: ${artifact.identity}.`);
-		if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification: ${artifact.identity}.`);
-		const operation = target.operations.verify, result = spawnSync(operation.command, operation.args, { cwd: operation.cwd ? resolve(repository.worktree, operation.cwd) : repository.worktree, env: { ...context.env, ...operation.environment }, stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
-		operations.push(`${artifact.projectId}.${artifact.targetId}:${operation.command} ${operation.args.join(' ')}`);
-		if (result.status !== 0) throw new Error(`Candidate verification failed for ${artifact.projectId}.${artifact.targetId}.`);
-		if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate verification rebuilt or changed sealed artifact ${artifact.identity}.`);
-	}
-	if (!operations.length) throw new Error('Candidate verification requires at least one declared verification operation.');
+		return {artifact,artifactPath,repository,operation:target.operations.verify};
+	});
+	const assertCustody = () => {
+	for (const {artifact,artifactPath} of bindings) if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification or changed sealed artifact: ${artifact.identity}.`);
 	for (const source of candidate.source) {
 		const runtime = record.runtimes.find((entry) => entry.project.id === source.projectId);
 		const repository = record.session.repositories.find((entry) => entry.projectId === source.projectId);
 		const artifactPaths = candidate.artifacts.filter((artifact) => artifact.projectId === source.projectId).map((artifact) => artifact.identity);
 		if (!runtime || !repository || JSON.stringify(repositoryClosure(runtime, repository.worktree, artifactPaths)) !== JSON.stringify(source)) throw new Error(`Candidate source changed after freeze: ${source.projectId}.`);
+	}
+	};
+	assertCustody();
+	for (const {artifact,repository,operation} of new Map(bindings.map(binding=>[JSON.stringify([binding.artifact.projectId,binding.artifact.targetId]),binding])).values()) {
+		const result = spawnSync(operation.command, operation.args, { cwd: operation.cwd ? resolve(repository.worktree, operation.cwd) : repository.worktree, env: { ...context.env, ...operation.environment }, stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
+		operations.push(`${artifact.projectId}.${artifact.targetId}:${operation.command} ${operation.args.join(' ')}`);
+		if (result.status !== 0) throw new Error(`Candidate verification failed for ${artifact.projectId}.${artifact.targetId}.`);
+		assertCustody();
 	}
 	const verified = developmentCandidateSchema.parse({ ...candidate, verification: { status: 'passed', operations, completedAt: new Date().toISOString() }, promotable: !candidate.source.some((source) => source.dirty) });
 	writeFileSync(selected, `${JSON.stringify(verified, null, 2)}\n`, { mode: 0o600 }); await invoke(context, 'local.dev.candidate.register', { sessionId, candidate: verified }); return { candidate: verified, receipt: selected };

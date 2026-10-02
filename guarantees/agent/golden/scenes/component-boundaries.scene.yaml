@@ -3,6 +3,33 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: source-parent
+    action: { verifier: cli.golden.source-parent }
+    expect: { status: passed }
+  - id: source-git-loss
+    action: { verifier: cli.golden.source-git-loss }
+    expect: { status: passed }
+  - id: source-linked-root
+    action: { verifier: cli.golden.source-linked-root }
+    expect: { status: passed }
+  - id: candidate-preflight-source
+    action: { verifier: cli.golden.candidate-preflight-source }
+    expect: { status: passed }
+  - id: candidate-preflight-owner
+    action: { verifier: cli.golden.candidate-preflight-owner }
+    expect: { status: passed }
+  - id: candidate-preflight-artifact
+    action: { verifier: cli.golden.candidate-preflight-artifact }
+    expect: { status: passed }
+  - id: candidate-between-source
+    action: { verifier: cli.golden.candidate-between-source }
+    expect: { status: passed }
+  - id: candidate-between-artifact
+    action: { verifier: cli.golden.candidate-between-artifact }
+    expect: { status: passed }
+  - id: candidate-once
+    action: { verifier: cli.golden.candidate-once }
+    expect: { status: passed }
   - id: source-bytes
     action: { verifier: cli.golden.source-bytes }
     expect: { status: passed }

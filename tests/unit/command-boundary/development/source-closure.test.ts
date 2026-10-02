@@ -1,8 +1,40 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { candidateFixture } from '../../../support/development-candidate.ts';
+import { repositoryClosure } from '../../../../src/cli/commands/development-support/candidate.ts';
+import type { DevelopmentRuntime } from '@treeseed/sdk/development';
+
+const runtime = { project: { id: 'specimen', repository: 'example/specimen' } } as DevelopmentRuntime;
+
+test('development closure rejects a selected directory borrowing its parent Git root', () => {
+	const fixture = candidateFixture();
+	try {
+		const nested=resolve(fixture.root,'nested'); mkdirSync(nested); writeFileSync(resolve(nested,'source.ts'),'export {};');
+		assert.throws(()=>repositoryClosure(runtime,nested),/own exact Git source root/);
+	} finally {fixture.close();}
+});
+
+test('development closure rejects Git loss even when the parent retains the same commit', () => {
+	const fixture = candidateFixture();
+	try {
+		const nested=resolve(fixture.root,'nested'); mkdirSync(nested); cpSync(resolve(fixture.root,'.git'),resolve(nested,'.git'),{recursive:true});
+		assert.equal(repositoryClosure(runtime,nested).commit,fixture.git('rev-parse','HEAD').trim());
+		rmSync(resolve(nested,'.git'),{recursive:true});
+		assert.throws(()=>repositoryClosure(runtime,nested),/own exact Git source root/);
+	} finally {fixture.close();}
+});
+
+test('development closure accepts exact linked Git worktrees and canonical root aliases', () => {
+	const fixture = candidateFixture();
+	try {
+		const linked=resolve(fixture.root,'linked'),alias=resolve(fixture.root,'alias');
+		fixture.git('worktree','add','--detach',linked,'HEAD'); symlinkSync(linked,alias);
+		assert.equal(repositoryClosure(runtime,linked).commit,fixture.git('rev-parse','HEAD').trim());
+		assert.equal(repositoryClosure(runtime,alias).commit,repositoryClosure(runtime,linked).commit);
+	} finally {fixture.close();}
+});
 
 test('development source digest binds same-size untracked binary bytes and newline paths', async () => {
 	const fixture = candidateFixture();

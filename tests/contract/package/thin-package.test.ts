@@ -73,6 +73,15 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.source-parent': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development closure rejects a selected directory borrowing its parent Git root'},
+		'cli.golden.source-git-loss': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development closure rejects Git loss even when the parent retains the same commit'},
+		'cli.golden.source-linked-root': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development closure accepts exact linked Git worktrees and canonical root aliases'},
+		'cli.golden.candidate-preflight-source': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects changed tracked source before executing any verifier'},
+		'cli.golden.candidate-preflight-owner': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects a later artifact without an owned verifier before any side effect'},
+		'cli.golden.candidate-preflight-artifact': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification checks every artifact before the first verifier executes'},
+		'cli.golden.candidate-between-source': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification blocks later verifiers after source mutation in the first operation'},
+		'cli.golden.candidate-between-artifact': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification blocks later verifiers after an earlier artifact changes'},
+		'cli.golden.candidate-once': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification executes each owned target once while checking all its artifacts'},
 		'cli.golden.source-bytes': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development source digest binds same-size untracked binary bytes and newline paths'},
 		'cli.golden.source-mode': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development source digest binds untracked executable mode and symbolic link identity'},
 		'cli.golden.source-ignore': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development source digest retains tracked edits and ignores Git-excluded output'},
