@@ -1,6 +1,26 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.native-reporting:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/native-suite-reporting.test.ts
+    testName: native complete reporting preserves build discovery custody and nested subprocess defaults
+  cli.golden.reporting-denial:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/native-suite-reporting.test.ts
+    testName: native reporter arguments reject filters unknown flags and malformed pairs before test side effects
+  cli.golden.reporting-outcomes:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/native-suite-reporting.test.ts
+    testName: native reporting retains failed skipped todo empty and crashed suite outcomes
+  cli.golden.reporting-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/native-suite-reporting.test.ts
+    testName: native reporting accepts only a complete nonempty reporting pair without test selection
   cli.golden.refused-rebuild:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
