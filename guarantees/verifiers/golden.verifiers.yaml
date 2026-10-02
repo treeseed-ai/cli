@@ -1,6 +1,41 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.live-directory-escape-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: one-shot build custody rejects an escaped directory before native side effects
+  cli.golden.live-directory-moved-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: one-shot build custody rejects directory movement after one native execution
+  cli.golden.live-directory-alias-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: one-shot build custody preserves contained aliases and original environment authority
+  cli.golden.live-directory-escape-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild rejects an escaped build directory before execution or selection
+  cli.golden.live-directory-moved-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild rejects moved build directory before stop or selection
+  cli.golden.live-directory-alias-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild preserves contained build aliases and exactly one selected output
+  cli.golden.live-directory-manager-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild keeps unused manager-owned build directories out of caller authority
   cli.golden.operation-build-unit:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

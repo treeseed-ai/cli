@@ -73,6 +73,13 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.live-directory-escape-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build custody rejects an escaped directory before native side effects"},
+		'cli.golden.live-directory-moved-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build custody rejects directory movement after one native execution"},
+		'cli.golden.live-directory-alias-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build custody preserves contained aliases and original environment authority"},
+		'cli.golden.live-directory-escape-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild rejects an escaped build directory before execution or selection"},
+		'cli.golden.live-directory-moved-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild rejects moved build directory before stop or selection"},
+		'cli.golden.live-directory-alias-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild preserves contained build aliases and exactly one selected output"},
+		'cli.golden.live-directory-manager-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild keeps unused manager-owned build directories out of caller authority"},
 		'cli.golden.operation-build-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects build working directories before source capture"},
 		'cli.golden.operation-contract-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects contract working directories before source capture"},
 		'cli.golden.operation-missing-unit': {testFile:"tests/unit/command-boundary/development/source-closure.test.ts",testName:"freeze command custody rejects missing working directories before source capture"},
