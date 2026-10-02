@@ -73,6 +73,18 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.artifact-escaped-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects escaped bytes through the existing freeze boundary"},
+		'cli.golden.artifact-directory-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects directory bytes through the existing freeze boundary"},
+		'cli.golden.artifact-unreadable-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects unreadable bytes through the existing freeze boundary"},
+		'cli.golden.artifact-fifo-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects fifo bytes through the existing freeze boundary"},
+		'cli.golden.artifact-broken-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects broken bytes through the existing freeze boundary"},
+		'cli.golden.artifact-contained-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody admits contained bytes through the existing freeze boundary"},
+		'cli.golden.artifact-regular-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody admits regular bytes through the existing freeze boundary"},
+		'cli.golden.artifact-freeze-owner': {testFile:"tests/integration/development-artifacts.test.ts",testName:"native freeze rejects escaped artifact bytes before persisting or registering a candidate"},
+		'cli.golden.artifact-verify-owner': {testFile:"tests/integration/development-artifacts.test.ts",testName:"native candidate verification rejects escaped identical artifact bytes before its verifier"},
+		'cli.golden.artifact-alias-native': {testFile:"tests/integration/development-artifacts.test.ts",testName:"native owned artifact aliases preserve regular output verification and dirty candidate rules"},
+		'cli.golden.artifact-between-native': {testFile:"tests/integration/development-artifacts.test.ts",testName:"native candidate verification rejects identical escaped artifact bytes after its owned command"},
+		'cli.golden.artifact-fifo-native': {testFile:"tests/integration/development-artifacts.test.ts",testName:"native freeze rejects FIFO output promptly without a registered candidate or retained lock"},
 		'cli.golden.freeze-source-unit': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'freeze custody binds exact source snapshots independently of command success'},
 		'cli.golden.freeze-artifact-unit': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'freeze custody rejects changed or missing captured artifacts while allowing uncaptured outputs'},
 		'cli.golden.freeze-output-unit': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development closure excludes only declared artifact bytes while retaining source mutations'},

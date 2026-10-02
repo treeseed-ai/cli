@@ -7,7 +7,7 @@ import { developmentCandidateSchema, type DevelopmentRuntime, type DevelopmentTa
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
 import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
-import { artifactPaths, compatibilityAttestations, freezeCustody, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
+import { artifactPaths, compatibilityAttestations, freezeCustody, readDevelopmentArtifact, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
@@ -219,7 +219,7 @@ async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 			if (contract.status !== 0) throw new Error(`Contract generation failed for ${runtime.project.id}.${target.id}.`);
 			custody.assert(artifacts);
 		}
-		for (const pattern of target.freeze.artifacts) for (const path of artifactPaths(pattern, repository.worktree)) { const bytes = readFileSync(path); artifacts.push({ projectId: runtime.project.id, targetId: target.id, kind: target.freeze.kind, identity: relative(repository.worktree, path), digest: sha256(bytes), ...(target.freeze.kind === 'npm-package' ? { integrity: sha512Integrity(bytes) } : {}) }); }
+		for (const pattern of target.freeze.artifacts) for (const path of artifactPaths(pattern, repository.worktree)) { const bytes = readDevelopmentArtifact(repository.worktree,path); artifacts.push({ projectId: runtime.project.id, targetId: target.id, kind: target.freeze.kind, identity: relative(repository.worktree, path), digest: sha256(bytes), ...(target.freeze.kind === 'npm-package' ? { integrity: sha512Integrity(bytes) } : {}) }); }
 		if(!artifacts.some(artifact=>artifact.projectId===runtime.project.id&&artifact.targetId===target.id)) throw new Error(`Freeze produced no declared artifacts for ${runtime.project.id}.${target.id}.`);
 		}
 		if (!artifacts.length) throw new Error('Selected development closure produced no declared freeze artifacts.');
@@ -249,7 +249,7 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 		return {artifact,artifactPath,repository,operation:target.operations.verify};
 	});
 	const assertCustody = () => {
-	for (const {artifact,artifactPath} of bindings) if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification or changed sealed artifact: ${artifact.identity}.`);
+	for (const {artifact,artifactPath,repository} of bindings) if (!existsSync(artifactPath) || sha256(readDevelopmentArtifact(repository.worktree,artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification or changed sealed artifact: ${artifact.identity}.`);
 	for (const source of candidate.source) {
 		const runtime = record.runtimes.find((entry) => entry.project.id === source.projectId);
 		const repository = record.session.repositories.find((entry) => entry.projectId === source.projectId);
