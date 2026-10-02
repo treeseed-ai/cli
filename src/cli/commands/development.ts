@@ -82,12 +82,12 @@ async function containerOperation(context: CommandContext, sessionId: string, ru
 export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
 	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: state.workspaceRoot ?? dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
 }
-function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
-	const root = operation.cwd ? resolve(worktree, operation.cwd) : worktree;
+export function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
+	const root = developmentOperationDirectory(worktree,operation.cwd);
 	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'pipe', timeout: operation.timeoutSeconds * 1_000 });
 	if (result.status !== 0) throw new Error(`Development operation failed: ${operation.command} ${operation.args.join(' ')}.`);
+	if(developmentOperationDirectory(worktree,operation.cwd)!==root)throw new Error('Development command working directory custody changed during execution.');
 }
-
 function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
 	const operation = operationForMode(target, mode);
 	if (!operation) return null;
