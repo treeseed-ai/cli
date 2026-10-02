@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +7,7 @@ import { developmentCandidateSchema, type DevelopmentRuntime, type DevelopmentTa
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
 import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
-import { artifactPaths, compatibilityAttestations, withFreezeLock } from './development-support/candidate.js';
+import { artifactPaths, compatibilityAttestations, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
@@ -58,13 +58,6 @@ function loadState(env: NodeJS.ProcessEnv, sessionId?: unknown) {
 
 function sha256(value: string | Buffer) { return `sha256:${createHash('sha256').update(value).digest('hex')}`; }
 function sha512Integrity(value: Buffer) { return `sha512-${createHash('sha512').update(value).digest('base64')}`; }
-function git(root: string, args: string[]) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim(); }
-function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
-	const pathspec = excludedPaths.length ? ['--', '.', ...excludedPaths.map((path) => `:(exclude)${path}`)] : [];
-	const status = git(worktree, ['status', '--porcelain=v1', '--untracked-files=all', ...pathspec]);
-	const branch = git(worktree, ['branch', '--show-current']) || null;
-	return { projectId: runtime.project.id, repository: runtime.project.repository, worktree, commit: git(worktree, ['rev-parse', 'HEAD']), branch, dirty: Boolean(status), dirtyDigest: status ? sha256(`${status}\n${git(worktree, ['diff', '--binary', 'HEAD', ...pathspec])}`) : null, recipeDigest: sha256(JSON.stringify(runtime)) };
-}
 
 function operationForMode(target: DevelopmentTarget, mode: string) {
 	if (mode === 'released') return null;

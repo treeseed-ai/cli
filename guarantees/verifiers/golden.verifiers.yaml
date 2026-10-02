@@ -1,6 +1,61 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.source-bytes:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: development source digest binds same-size untracked binary bytes and newline paths
+  cli.golden.source-mode:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: development source digest binds untracked executable mode and symbolic link identity
+  cli.golden.source-ignore:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: development source digest retains tracked edits and ignores Git-excluded output
+  cli.golden.source-unreadable:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: development source planning rejects unreadable untracked bytes without manager effects
+  cli.golden.candidate-bytes:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-candidate.test.ts
+    testName: native candidate verification rejects untracked bytes changes without registering a pass
+  cli.golden.candidate-mode:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-candidate.test.ts
+    testName: native candidate verification rejects untracked mode changes without registering a pass
+  cli.golden.candidate-link:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-candidate.test.ts
+    testName: native candidate verification rejects untracked link changes without registering a pass
+  cli.golden.candidate-deletion:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-candidate.test.ts
+    testName: native candidate verification rejects untracked deleted changes without registering a pass
+  cli.golden.candidate-addition:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-candidate.test.ts
+    testName: native candidate verification rejects untracked added changes without registering a pass
+  cli.golden.candidate-mutation:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-candidate.test.ts
+    testName: native candidate verification rejects untracked during verification changes without registering a pass
+  cli.golden.dirty-candidate:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-candidate.test.ts
+    testName: native dirty candidate verification excludes generated artifact and remains non-promotable
   cli.golden.source-files:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

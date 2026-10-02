@@ -3,6 +3,39 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: source-bytes
+    action: { verifier: cli.golden.source-bytes }
+    expect: { status: passed }
+  - id: source-mode
+    action: { verifier: cli.golden.source-mode }
+    expect: { status: passed }
+  - id: source-ignore
+    action: { verifier: cli.golden.source-ignore }
+    expect: { status: passed }
+  - id: source-unreadable
+    action: { verifier: cli.golden.source-unreadable }
+    expect: { status: passed }
+  - id: candidate-bytes
+    action: { verifier: cli.golden.candidate-bytes }
+    expect: { status: passed }
+  - id: candidate-mode
+    action: { verifier: cli.golden.candidate-mode }
+    expect: { status: passed }
+  - id: candidate-link
+    action: { verifier: cli.golden.candidate-link }
+    expect: { status: passed }
+  - id: candidate-deletion
+    action: { verifier: cli.golden.candidate-deletion }
+    expect: { status: passed }
+  - id: candidate-addition
+    action: { verifier: cli.golden.candidate-addition }
+    expect: { status: passed }
+  - id: candidate-mutation
+    action: { verifier: cli.golden.candidate-mutation }
+    expect: { status: passed }
+  - id: dirty-candidate
+    action: { verifier: cli.golden.dirty-candidate }
+    expect: { status: passed }
   - id: source-files
     action: { verifier: cli.golden.source-files }
     expect: { status: passed }
