@@ -3,6 +3,24 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: freeze-context-native
+    action: { verifier: cli.golden.freeze-context-native }
+    expect: { status: passed }
+  - id: contract-context-native
+    action: { verifier: cli.golden.contract-context-native }
+    expect: { status: passed }
+  - id: freeze-workspace-native
+    action: { verifier: cli.golden.freeze-workspace-native }
+    expect: { status: passed }
+  - id: freeze-mode-native
+    action: { verifier: cli.golden.freeze-mode-native }
+    expect: { status: passed }
+  - id: freeze-context-unit
+    action: { verifier: cli.golden.freeze-context-unit }
+    expect: { status: passed }
+  - id: freeze-precedence-unit
+    action: { verifier: cli.golden.freeze-precedence-unit }
+    expect: { status: passed }
   - id: live-source-tracked-unit
     action: { verifier: cli.golden.live-source-tracked-unit }
     expect: { status: passed }

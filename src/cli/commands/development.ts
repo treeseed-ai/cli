@@ -77,8 +77,7 @@ function usesManagerBuild(target: DevelopmentTarget) {
 async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop' | 'status' | 'logs') {
 	return invoke(context, 'local.dev.container', {sessionId,projectId:runtime.project.id,targetId:target.id,action});
 }
-
-export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
+export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: state.workspaceRoot ?? dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
 }
 export function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, build?: {runtime:DevelopmentRuntime;target:DevelopmentTarget}) {
@@ -211,11 +210,12 @@ async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 		const artifacts: Array<{ projectId: string; targetId: string; kind: string; identity: string; digest: string; integrity?: string }> = [];
 		for (const runtime of record.runtimes) for (const target of runtime.targets) if (target.freeze && record.session.targets.some((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id && selected.mode !== 'released')) {
 		const repository = record.session.repositories.find((entry) => entry.projectId === runtime.project.id)!;
-		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: developmentOperationDirectory(repository.worktree,target.freeze.operation.cwd), env: { ...context.env, ...target.freeze.operation.environment }, stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
+		const mode = record.session.targets.find((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id)!.mode;
+		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: developmentOperationDirectory(repository.worktree,target.freeze.operation.cwd), env: developmentOperationEnvironment(state,repository.worktree,mode,context.env,{},target.freeze.operation.environment), stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
 		if (result.status !== 0) throw new Error(`Freeze failed for ${runtime.project.id}.${target.id}.`);
 		custody.assert(artifacts);
 		for (const contractOperation of target.freeze.contractOperations) {
-			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: developmentOperationDirectory(repository.worktree,contractOperation.cwd), env: { ...context.env, ...contractOperation.environment }, stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
+			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: developmentOperationDirectory(repository.worktree,contractOperation.cwd), env: developmentOperationEnvironment(state,repository.worktree,mode,context.env,{},contractOperation.environment), stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
 			if (contract.status !== 0) throw new Error(`Contract generation failed for ${runtime.project.id}.${target.id}.`);
 			custody.assert(artifacts);
 		}

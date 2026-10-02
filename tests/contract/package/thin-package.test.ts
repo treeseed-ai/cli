@@ -73,6 +73,12 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.freeze-context-native': {testFile:"tests/integration/development-freeze.test.ts",testName:"native freeze receives exact session workspace worktree and selected mode authority"},
+		'cli.golden.contract-context-native': {testFile:"tests/integration/development-freeze.test.ts",testName:"native contract receives exact session workspace worktree and selected mode authority"},
+		'cli.golden.freeze-workspace-native': {testFile:"tests/integration/development-freeze.test.ts",testName:"native freeze preserves explicit saved workspace authority independently of manifest location"},
+		'cli.golden.freeze-mode-native': {testFile:"tests/integration/development-freeze.test.ts",testName:"native freeze forwards the exact selected live mode without starting or switching runtime"},
+		'cli.golden.freeze-context-unit': {testFile:"tests/unit/command-boundary/development-session.test.ts",testName:"development operation context retains explicit saved workspace and exact session over ambient values"},
+		'cli.golden.freeze-precedence-unit': {testFile:"tests/unit/command-boundary/development-session.test.ts",testName:"development operation context preserves existing resolved and declared environment precedence"},
 		'cli.golden.live-source-tracked-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build source custody rejects changed tracked bytes after exactly one native build"},
 		'cli.golden.live-source-untracked-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build source custody rejects added undeclared source after exactly one native build"},
 		'cli.golden.live-source-output-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build source custody accepts unchanged dirty source and its declared output"},

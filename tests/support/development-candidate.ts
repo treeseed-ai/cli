@@ -74,7 +74,7 @@ development:
 		assert.equal(await invoke(['dev', 'session', 'start', sessionFile]), 0, output.join(''));
 		return invoke(['dev', 'freeze', '--allow-dirty']);
 	}
-	return { root, state, git, output, registrations, tryFreeze, tryPlan: () => invoke(['dev', 'session', 'start', file, '--plan']),
+	return { root, state, git, output, registrations, context, invoke, tryFreeze, tryPlan: () => invoke(['dev', 'session', 'start', file, '--plan']),
 		async plan() {
 			assert.equal(await invoke(['dev', 'session', 'start', file, '--plan']), 0, output.join(''));
 			return JSON.parse(output[0]!).result.session.repositories[0] as { dirty: boolean; dirtyDigest: string | null; commit: string };

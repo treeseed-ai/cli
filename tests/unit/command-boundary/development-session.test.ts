@@ -155,20 +155,20 @@ test('host runtime development planning is local and status uses the protected m
 
 test('development logs include bounded diagnostics for a selected managed container', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-container-logs-')), file = resolve(root, 'treeseed.package.yaml');
-	const calls: Array<{ handlerId: string; options: { payload: string } }> = [], output: string[] = [];
+	const calls: Array<{ handlerId: string; options: { payload?: string | boolean | string[] } }> = [], output: string[] = [];
 	try {
 		writeFileSync(file, manifest.replaceAll('admin', 'api').replace('id: web', 'id: service').replace('command: npm', 'command: docker'));
 		execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
 		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
 		const context = { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false,
-			hostInvoke: async (input: { handlerId: string; options: { payload: string } }) => { calls.push(input); return input.handlerId === 'local.dev.session.start' ? { session: { sessionId: 'dev-logtest' } } : { events: [{ code: '53300' }] }; },
+			hostInvoke: async (input: { handlerId: string; options: { payload?: string | boolean | string[] } }) => { calls.push(input); return input.handlerId === 'local.dev.session.start' ? { session: { sessionId: 'dev-logtest' } } : { events: [{ code: '53300' }] }; },
 			write: (value: string) => output.push(value) };
 		assert.equal(await runCommandLine(['dev', 'session', 'start', file, '--json'], context), 0, output.join('\n'));
-		const sessionId = JSON.parse(calls[0]!.options.payload).session.sessionId;
+		const sessionId = JSON.parse(String(calls[0]!.options.payload)).session.sessionId;
 		output.length = 0;
 		assert.equal(await runCommandLine(['dev', 'logs', '--session', sessionId, '--target', 'api.service', '--json'], context), 0, output.join('\n'));
 		assert.equal(calls[1]?.handlerId, 'local.dev.container');
-		assert.deepEqual(JSON.parse(calls[1]!.options.payload), { sessionId, projectId: 'api', targetId: 'service', action: 'logs' });
+		assert.deepEqual(JSON.parse(String(calls[1]!.options.payload)), { sessionId, projectId: 'api', targetId: 'service', action: 'logs' });
 		assert.deepEqual(JSON.parse(output[0]!).result.logs, [{ target: 'api.service', diagnostics: { events: [{ code: '53300' }] } }]);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -204,6 +204,20 @@ test('development operations receive portable workspace identity and overlays us
 	const target = relativeOverlayTarget(link, overlay);
 	assert.equal(target.startsWith('/'), false);
 	assert.equal(resolve(resolve(link, '..'), target), resolve(overlay, 'current'));
+});
+
+test('development operation context retains explicit saved workspace and exact session over ambient values',()=>{
+	const state={manifest:'/other/session.yaml',workspaceRoot:'/owned/workspace',sessionId:'exact-session'};
+	const original={PATH:'/bin',TREESEED_DEVELOPMENT_WORKSPACE_ROOT:'/stale',TREESEED_DEVELOPMENT_SESSION_ID:'stale'};
+	const environment=developmentOperationEnvironment(state,'/owned/workspace/packages/custom','candidate',original,{}, {CUSTOM_DECLARED:'exact'});
+	assert.deepEqual(environment,{PATH:'/bin',TREESEED_DEVELOPMENT_WORKSPACE_ROOT:'/owned/workspace',TREESEED_DEVELOPMENT_SESSION_ID:'exact-session',TREESEED_DEVELOPMENT_WORKTREE:'/owned/workspace/packages/custom',TREESEED_DEVELOPMENT_MODE:'candidate',CUSTOM_DECLARED:'exact'});
+	assert.equal(original.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,'/stale');
+});
+
+test('development operation context preserves existing resolved and declared environment precedence',()=>{
+	const environment=developmentOperationEnvironment({manifest:'/workspace/session.yaml',sessionId:'exact-session'},'/workspace/project','live',{PATH:'/ambient',VALUE:'ambient'},{VALUE:'resolved',RESOLVED:'present'},{VALUE:'declared',DECLARED:'present'});
+	assert.equal(environment.VALUE,'declared');assert.equal(environment.RESOLVED,'present');assert.equal(environment.DECLARED,'present');assert.equal(environment.PATH,'/ambient');
+	assert.equal(environment.TREESEED_DEVELOPMENT_MODE,'live');assert.equal(environment.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,'/workspace');
 });
 
 test('development CLI selection is an atomic, removable launcher input', () => {
