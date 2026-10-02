@@ -3,6 +3,15 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: sdk-agreement
+    action: { verifier: cli.golden.sdk-agreement }
+    expect: { status: passed }
+  - id: sbom-authority
+    action: { verifier: cli.golden.sbom-authority }
+    expect: { status: passed }
+  - id: sbom-native
+    action: { verifier: cli.golden.sbom-native }
+    expect: { status: passed }
   - id: workflow-triggers
     action: { verifier: cli.golden.workflow-triggers }
     expect: { status: passed }

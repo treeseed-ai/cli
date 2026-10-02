@@ -223,6 +223,8 @@ function assertPackageDependencyShape() {
 }
 
 assertNoLocalDependencyLinks();
+mkdirSync(resolve(packageRoot, 'artifacts'), { recursive: true });
+writeFileSync(resolve(packageRoot, 'artifacts', 'sbom.cdx.json'), `${run('npm', ['sbom', '--sbom-format', 'cyclonedx'], packageRoot, true)}\n`, 'utf8');
 run('npm', ['run', 'lint']);
 assertPackageDependencyShape();
 scanDirectory(resolve(packageRoot, 'dist'));
