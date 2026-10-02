@@ -3,6 +3,42 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: artifact-escaped-unit
+    action: { verifier: cli.golden.artifact-escaped-unit }
+    expect: { status: passed }
+  - id: artifact-directory-unit
+    action: { verifier: cli.golden.artifact-directory-unit }
+    expect: { status: passed }
+  - id: artifact-unreadable-unit
+    action: { verifier: cli.golden.artifact-unreadable-unit }
+    expect: { status: passed }
+  - id: artifact-fifo-unit
+    action: { verifier: cli.golden.artifact-fifo-unit }
+    expect: { status: passed }
+  - id: artifact-broken-unit
+    action: { verifier: cli.golden.artifact-broken-unit }
+    expect: { status: passed }
+  - id: artifact-contained-unit
+    action: { verifier: cli.golden.artifact-contained-unit }
+    expect: { status: passed }
+  - id: artifact-regular-unit
+    action: { verifier: cli.golden.artifact-regular-unit }
+    expect: { status: passed }
+  - id: artifact-freeze-owner
+    action: { verifier: cli.golden.artifact-freeze-owner }
+    expect: { status: passed }
+  - id: artifact-verify-owner
+    action: { verifier: cli.golden.artifact-verify-owner }
+    expect: { status: passed }
+  - id: artifact-alias-native
+    action: { verifier: cli.golden.artifact-alias-native }
+    expect: { status: passed }
+  - id: artifact-between-native
+    action: { verifier: cli.golden.artifact-between-native }
+    expect: { status: passed }
+  - id: artifact-fifo-native
+    action: { verifier: cli.golden.artifact-fifo-native }
+    expect: { status: passed }
   - id: freeze-source-unit
     action: { verifier: cli.golden.freeze-source-unit }
     expect: { status: passed }

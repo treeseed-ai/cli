@@ -39,6 +39,24 @@ export function artifactPaths(pattern: string, root: string) {
 	return readdirSync(directory).filter((name) => expression.test(name)).map((name) => resolve(directory, name));
 }
 
+/** Resolve aliases only within the owning repository; inspect the opened bytes. */
+export function readDevelopmentArtifact(root:string,path:string) {
+	let descriptor:number|undefined;
+	try {
+		const owner=realpathSync(root),identity=relative(resolve(root),resolve(path)),actual=realpathSync(path),inside=relative(owner,actual);
+		if(identity==='..'||identity.startsWith('../')||isAbsolute(identity)||inside==='..'||inside.startsWith('../')||isAbsolute(inside)) throw new Error('Artifact escaped its owner.');
+		const selected=lstatSync(actual);
+		descriptor=openSync(actual,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+		const before=fstatSync(descriptor);
+		if(!before.isFile()||(before.mode&0o444)===0||before.ino!==selected.ino||before.dev!==selected.dev) throw new Error('Artifact is not readable regular bytes.');
+		const bytes=readFileSync(descriptor),after=fstatSync(descriptor),current=lstatSync(actual);
+		if(bytes.length!==before.size||after.size!==before.size||after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs
+			||current.ino!==after.ino||current.dev!==after.dev||realpathSync(path)!==actual||realpathSync(root)!==owner) throw new Error('Artifact changed while reading.');
+		return bytes;
+	} catch {throw new Error('Development artifact custody failed: unchanged readable regular bytes inside its owner are required.');}
+	finally {if(descriptor!==undefined)closeSync(descriptor);}
+}
+
 /** Build outputs may change; the source closure and already captured artifacts may not. */
 export function freezeCustody(record:{session:{repositories:Array<{projectId:string;worktree:string}>;targets:Array<{projectId:string;targetId:string;mode:string}>};runtimes:DevelopmentRuntime[]}) {
 	const capture=()=>record.session.repositories.map(repository=>{
@@ -60,7 +78,7 @@ export function freezeCustody(record:{session:{repositories:Array<{projectId:str
 		for(const artifact of artifacts) {
 			const repository=record.session.repositories.find(entry=>entry.projectId===artifact.projectId)!;
 			const path=resolve(repository.worktree,artifact.identity);
-			if(!existsSync(path)||`sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`!==artifact.digest) throw new Error(`Candidate artifact changed during freeze: ${artifact.identity}.`);
+			if(!existsSync(path)||`sha256:${createHash('sha256').update(readDevelopmentArtifact(repository.worktree,path)).digest('hex')}`!==artifact.digest) throw new Error(`Candidate artifact changed during freeze: ${artifact.identity}.`);
 		}
 	}};
 }

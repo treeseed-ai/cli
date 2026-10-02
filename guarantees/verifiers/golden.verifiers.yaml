@@ -1,6 +1,66 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.artifact-escaped-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/artifact-custody.test.ts
+    testName: artifact custody rejects escaped bytes through the existing freeze boundary
+  cli.golden.artifact-directory-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/artifact-custody.test.ts
+    testName: artifact custody rejects directory bytes through the existing freeze boundary
+  cli.golden.artifact-unreadable-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/artifact-custody.test.ts
+    testName: artifact custody rejects unreadable bytes through the existing freeze boundary
+  cli.golden.artifact-fifo-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/artifact-custody.test.ts
+    testName: artifact custody rejects fifo bytes through the existing freeze boundary
+  cli.golden.artifact-broken-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/artifact-custody.test.ts
+    testName: artifact custody rejects broken bytes through the existing freeze boundary
+  cli.golden.artifact-contained-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/artifact-custody.test.ts
+    testName: artifact custody admits contained bytes through the existing freeze boundary
+  cli.golden.artifact-regular-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/artifact-custody.test.ts
+    testName: artifact custody admits regular bytes through the existing freeze boundary
+  cli.golden.artifact-freeze-owner:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-artifacts.test.ts
+    testName: native freeze rejects escaped artifact bytes before persisting or registering a candidate
+  cli.golden.artifact-verify-owner:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-artifacts.test.ts
+    testName: native candidate verification rejects escaped identical artifact bytes before its verifier
+  cli.golden.artifact-alias-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-artifacts.test.ts
+    testName: native owned artifact aliases preserve regular output verification and dirty candidate rules
+  cli.golden.artifact-between-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-artifacts.test.ts
+    testName: native candidate verification rejects identical escaped artifact bytes after its owned command
+  cli.golden.artifact-fifo-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-artifacts.test.ts
+    testName: native freeze rejects FIFO output promptly without a registered candidate or retained lock
   cli.golden.freeze-source-unit:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
