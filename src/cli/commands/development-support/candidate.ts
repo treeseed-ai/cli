@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, realpathSync, rmSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import type { DevelopmentRuntime } from '@treeseed/sdk/development';
 import { developmentStateRoot } from '../development-cli-selection.js';
 
@@ -37,6 +37,32 @@ export function artifactPaths(pattern: string, root: string) {
 	if (!pattern.includes('*')) return [resolve(root, pattern)];
 	const directory = resolve(root, dirname(pattern)), expression = new RegExp(`^${basename(pattern).replaceAll('.', '\\.').replaceAll('*', '.*')}$`, 'u');
 	return readdirSync(directory).filter((name) => expression.test(name)).map((name) => resolve(directory, name));
+}
+
+/** Build outputs may change; the source closure and already captured artifacts may not. */
+export function freezeCustody(record:{session:{repositories:Array<{projectId:string;worktree:string}>;targets:Array<{projectId:string;targetId:string;mode:string}>};runtimes:DevelopmentRuntime[]}) {
+	const capture=()=>record.session.repositories.map(repository=>{
+		const runtime=record.runtimes.find(entry=>entry.project.id===repository.projectId);
+		if(!runtime) throw new Error(`Development runtime is missing for ${repository.projectId}.`);
+		const outputs=runtime.targets.filter(target=>target.freeze&&record.session.targets.some(selected=>selected.projectId===runtime.project.id&&selected.targetId===target.id&&selected.mode!=='released'))
+			.flatMap(target=>target.freeze!.artifacts.flatMap(pattern=>pattern.includes('*')&&!existsSync(resolve(repository.worktree,dirname(pattern)))?[]:artifactPaths(pattern,repository.worktree)))
+			.map(path=>{
+				const identity=relative(repository.worktree,path);
+				if(identity.startsWith('..')||isAbsolute(identity)) throw new Error('Freeze artifact identity escapes its source repository.');
+				return identity;
+			});
+		return repositoryClosure(runtime,repository.worktree,outputs);
+	});
+	const source=capture();
+	return {source,assert(artifacts:Array<{projectId:string;identity:string;digest:string}>) {
+		const current=capture();
+		for(const [index,entry] of source.entries()) if(JSON.stringify(current[index])!==JSON.stringify(entry)) throw new Error(`Candidate source changed during freeze: ${entry.projectId}.`);
+		for(const artifact of artifacts) {
+			const repository=record.session.repositories.find(entry=>entry.projectId===artifact.projectId)!;
+			const path=resolve(repository.worktree,artifact.identity);
+			if(!existsSync(path)||`sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`!==artifact.digest) throw new Error(`Candidate artifact changed during freeze: ${artifact.identity}.`);
+		}
+	}};
 }
 
 export function compatibilityAttestations(repositories: Array<{ worktree: string }>) {

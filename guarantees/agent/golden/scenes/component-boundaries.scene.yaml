@@ -3,6 +3,51 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: freeze-source-unit
+    action: { verifier: cli.golden.freeze-source-unit }
+    expect: { status: passed }
+  - id: freeze-artifact-unit
+    action: { verifier: cli.golden.freeze-artifact-unit }
+    expect: { status: passed }
+  - id: freeze-output-unit
+    action: { verifier: cli.golden.freeze-output-unit }
+    expect: { status: passed }
+  - id: freeze-head-unit
+    action: { verifier: cli.golden.freeze-head-unit }
+    expect: { status: passed }
+  - id: freeze-tracked
+    action: { verifier: cli.golden.freeze-tracked }
+    expect: { status: passed }
+  - id: freeze-untracked
+    action: { verifier: cli.golden.freeze-untracked }
+    expect: { status: passed }
+  - id: freeze-head
+    action: { verifier: cli.golden.freeze-head }
+    expect: { status: passed }
+  - id: freeze-recipe
+    action: { verifier: cli.golden.freeze-recipe }
+    expect: { status: passed }
+  - id: freeze-contract
+    action: { verifier: cli.golden.freeze-contract }
+    expect: { status: passed }
+  - id: freeze-all-owners
+    action: { verifier: cli.golden.freeze-all-owners }
+    expect: { status: passed }
+  - id: freeze-earlier-artifact
+    action: { verifier: cli.golden.freeze-earlier-artifact }
+    expect: { status: passed }
+  - id: freeze-repeat
+    action: { verifier: cli.golden.freeze-repeat }
+    expect: { status: passed }
+  - id: freeze-failure
+    action: { verifier: cli.golden.freeze-failure }
+    expect: { status: passed }
+  - id: freeze-wildcard
+    action: { verifier: cli.golden.freeze-wildcard }
+    expect: { status: passed }
+  - id: freeze-empty-target
+    action: { verifier: cli.golden.freeze-empty-target }
+    expect: { status: passed }
   - id: source-parent
     action: { verifier: cli.golden.source-parent }
     expect: { status: passed }

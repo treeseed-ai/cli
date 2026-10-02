@@ -7,7 +7,7 @@ import { developmentCandidateSchema, type DevelopmentRuntime, type DevelopmentTa
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
 import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
-import { artifactPaths, compatibilityAttestations, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
+import { artifactPaths, compatibilityAttestations, freezeCustody, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
@@ -205,11 +205,7 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
 	return withFreezeLock(context.env, sessionId, async () => {
-		const source = record.session.repositories.map((repository) => {
-		const runtime = record.runtimes.find((entry) => entry.project.id === repository.projectId);
-		if (!runtime) throw new Error(`Development runtime is missing for ${repository.projectId}.`);
-		return repositoryClosure(runtime, repository.worktree);
-		});
+		const custody=freezeCustody(record),source=custody.source;
 		const dirty = source.some((entry) => entry.dirty);
 		if (dirty && invocation.options.allowDirty !== true) throw new Error('Freeze found dirty source; pass --allow-dirty to create a non-promotable candidate.');
 		const artifacts: Array<{ projectId: string; targetId: string; kind: string; identity: string; digest: string; integrity?: string }> = [];
@@ -217,13 +213,17 @@ async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 		const repository = record.session.repositories.find((entry) => entry.projectId === runtime.project.id)!;
 		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: target.freeze.operation.cwd ? resolve(repository.worktree, target.freeze.operation.cwd) : repository.worktree, env: { ...context.env, ...target.freeze.operation.environment }, stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
 		if (result.status !== 0) throw new Error(`Freeze failed for ${runtime.project.id}.${target.id}.`);
+		custody.assert(artifacts);
 		for (const contractOperation of target.freeze.contractOperations) {
 			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: contractOperation.cwd ? resolve(repository.worktree, contractOperation.cwd) : repository.worktree, env: { ...context.env, ...contractOperation.environment }, stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
 			if (contract.status !== 0) throw new Error(`Contract generation failed for ${runtime.project.id}.${target.id}.`);
+			custody.assert(artifacts);
 		}
 		for (const pattern of target.freeze.artifacts) for (const path of artifactPaths(pattern, repository.worktree)) { const bytes = readFileSync(path); artifacts.push({ projectId: runtime.project.id, targetId: target.id, kind: target.freeze.kind, identity: relative(repository.worktree, path), digest: sha256(bytes), ...(target.freeze.kind === 'npm-package' ? { integrity: sha512Integrity(bytes) } : {}) }); }
+		if(!artifacts.some(artifact=>artifact.projectId===runtime.project.id&&artifact.targetId===target.id)) throw new Error(`Freeze produced no declared artifacts for ${runtime.project.id}.${target.id}.`);
 		}
 		if (!artifacts.length) throw new Error('Selected development closure produced no declared freeze artifacts.');
+		custody.assert(artifacts);
 		const candidateId = `candidate-${randomUUID().slice(0, 12)}`;
 		const dependencyGenerations = Object.fromEntries(record.session.targets.map((target) => [`${target.projectId}.${target.targetId}`, target.generation]));
 		const candidate = developmentCandidateSchema.parse({ schemaVersion: 'treeseed.development-candidate/v1', candidateId, sessionId, createdAt: new Date().toISOString(), source, artifacts, configurationDigest: sha256(JSON.stringify(record.runtimes)), dependencyGenerations, compatibilityAttestations: compatibilityAttestations(record.session.repositories), verification: { status: 'pending', operations: [], completedAt: null }, promotable: false });

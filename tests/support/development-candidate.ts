@@ -70,14 +70,17 @@ development:
 		try { output.push(JSON.stringify({ result: await runDevelopment(parseInvocation(selected.command, [...selected.rest, '--json']), context) })); return 0; }
 		catch (error) { output.push(String(error)); return 1; }
 	}
-	return { root, git, output, registrations, tryPlan: () => invoke(['dev', 'session', 'start', file, '--plan']),
+	async function tryFreeze() {
+		assert.equal(await invoke(['dev', 'session', 'start', sessionFile]), 0, output.join(''));
+		return invoke(['dev', 'freeze', '--allow-dirty']);
+	}
+	return { root, state, git, output, registrations, tryFreeze, tryPlan: () => invoke(['dev', 'session', 'start', file, '--plan']),
 		async plan() {
 			assert.equal(await invoke(['dev', 'session', 'start', file, '--plan']), 0, output.join(''));
 			return JSON.parse(output[0]!).result.session.repositories[0] as { dirty: boolean; dirtyDigest: string | null; commit: string };
 		},
 		async freeze() {
-			assert.equal(await invoke(['dev', 'session', 'start', sessionFile]), 0, output.join(''));
-			assert.equal(await invoke(['dev', 'freeze', '--allow-dirty']), 0, output.join(''));
+			assert.equal(await tryFreeze(), 0, output.join(''));
 			return JSON.parse(output[0]!).result as { receipt: string };
 		}, verify: () => invoke(['dev', 'verify']),
 		readReceipt: (path: string) => JSON.parse(readFileSync(path, 'utf8')) as { promotable: boolean; verification: { status: string } },
