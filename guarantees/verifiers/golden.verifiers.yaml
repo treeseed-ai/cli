@@ -1,6 +1,16 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.source-files:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/source-custody.test.ts
+    testName: complete CLI source is readable owner files without undeclared external Git links
+  cli.golden.source-checkout:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/source-custody.test.ts
+    testName: fresh native Git checkout materializes every CLI source entry without missing-directory sentinels
   cli.golden.sdk-agreement:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

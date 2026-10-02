@@ -3,6 +3,12 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: source-files
+    action: { verifier: cli.golden.source-files }
+    expect: { status: passed }
+  - id: source-checkout
+    action: { verifier: cli.golden.source-checkout }
+    expect: { status: passed }
   - id: sdk-agreement
     action: { verifier: cli.golden.sdk-agreement }
     expect: { status: passed }

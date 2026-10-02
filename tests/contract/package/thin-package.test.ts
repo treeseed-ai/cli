@@ -73,6 +73,8 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.source-files': {testFile:'tests/unit/source-custody.test.ts',testName:'complete CLI source is readable owner files without undeclared external Git links'},
+		'cli.golden.source-checkout': {testFile:'tests/integration/source-custody.test.ts',testName:'fresh native Git checkout materializes every CLI source entry without missing-directory sentinels'},
 		'cli.golden.sdk-agreement': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'exact SDK artifact agrees with both dependency declarations before acceptance'},
 		'cli.golden.sbom-authority': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'strict SBOM is generated once by release verification before tests and candidate sealing'},
 		'cli.golden.sbom-native': {testFile:'tests/integration/dependency-sbom.test.ts',testName:'strict native SBOM accepts exact installed artifacts and refuses mismatched missing malformed dependencies'},
