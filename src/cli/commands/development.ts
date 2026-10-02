@@ -335,7 +335,7 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 async function rebuild(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
 	const runtimes = (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime);
-	await invoke(context, 'local.dev.session.refresh', { sessionId, runtimes });
+	if (invocation.options.plan !== true) await invoke(context, 'local.dev.session.refresh', { sessionId, runtimes });
 	const status = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
 	const record = { ...status, runtimes };
 	const selected = record.session.targets.find((entry) => entry.projectId === selection.projectId && entry.targetId === selection.targetId);
@@ -356,7 +356,7 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		await markRebuilt(context, sessionId, runtime.project.id, target.id, mode, target);
 	} else if (target.kind === 'package-watch') await rebuildPackage({ state, record, runtime, target, worktree: repository.worktree, mode, context });
 	else if (target.kind === 'rebuild-restart') {
-		if (usesManagerBuild(target)) {
+		if (usesManagerBuild(target) || (usesManagedContainer(target) && target.operations.build)) {
 			await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 		} else {
 		if (!target.operations.build) throw new Error(`${selection.projectId}.${selection.targetId} does not declare a build operation.`);
