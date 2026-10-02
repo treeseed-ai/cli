@@ -1,6 +1,21 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.sdk-agreement:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/dependency-sbom.test.ts
+    testName: exact SDK artifact agrees with both dependency declarations before acceptance
+  cli.golden.sbom-authority:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/dependency-sbom.test.ts
+    testName: strict SBOM is generated once by release verification before tests and candidate sealing
+  cli.golden.sbom-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/dependency-sbom.test.ts
+    testName: strict native SBOM accepts exact installed artifacts and refuses mismatched missing malformed dependencies
   cli.golden.workflow-triggers:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

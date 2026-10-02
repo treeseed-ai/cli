@@ -73,6 +73,9 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.sdk-agreement': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'exact SDK artifact agrees with both dependency declarations before acceptance'},
+		'cli.golden.sbom-authority': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'strict SBOM is generated once by release verification before tests and candidate sealing'},
+		'cli.golden.sbom-native': {testFile:'tests/integration/dependency-sbom.test.ts',testName:'strict native SBOM accepts exact installed artifacts and refuses mismatched missing malformed dependencies'},
 		'cli.golden.workflow-triggers': {testFile:'tests/contract/package/thin-package.test.ts',testName:'verification retains every PR protected branch and tag without duplicate topic pushes'},
 		'cli.golden.reporting-deadlines': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting cannot replace original suite deadlines or interrupt policy through reporting flags'},
 		'cli.golden.native-reporting': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native complete reporting preserves build discovery custody and nested subprocess defaults'},
