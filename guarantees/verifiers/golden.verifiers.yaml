@@ -1,6 +1,81 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.operation-build-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: freeze command custody rejects build working directories before source capture
+  cli.golden.operation-contract-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: freeze command custody rejects contract working directories before source capture
+  cli.golden.operation-missing-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: freeze command custody rejects missing working directories before source capture
+  cli.golden.operation-file-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: freeze command custody rejects file working directories before source capture
+  cli.golden.operation-cycle-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: freeze command custody rejects cycle working directories before source capture
+  cli.golden.operation-contained-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: freeze command custody preserves canonical contained directory aliases and default roots
+  cli.golden.operation-moved-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
+    testName: freeze command custody rejects an ignored directory alias moving after capture
+  cli.golden.operation-freeze-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native freeze rejects an escaped command directory before executing its actual subprocess
+  cli.golden.operation-contract-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native freeze preflights escaped contract directories before its otherwise valid build
+  cli.golden.operation-targets-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native freeze preflights every selected target directory before any native build
+  cli.golden.operation-verify-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native candidate verification rejects an escaped directory before its actual verifier
+  cli.golden.operation-verifiers-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native candidate verification preflights every verifier directory before the first native command
+  cli.golden.operation-alias-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native candidate commands preserve contained directory aliases and exact working-directory execution
+  cli.golden.operation-freeze-moved-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native freeze rejects ignored command directory movement after one actual execution
+  cli.golden.operation-verify-moved-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-operations.test.ts
+    testName: native verify rejects ignored command directory movement after one actual execution
   cli.golden.build-manager-unit:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

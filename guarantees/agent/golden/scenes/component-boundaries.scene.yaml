@@ -3,6 +3,51 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: operation-build-unit
+    action: { verifier: cli.golden.operation-build-unit }
+    expect: { status: passed }
+  - id: operation-contract-unit
+    action: { verifier: cli.golden.operation-contract-unit }
+    expect: { status: passed }
+  - id: operation-missing-unit
+    action: { verifier: cli.golden.operation-missing-unit }
+    expect: { status: passed }
+  - id: operation-file-unit
+    action: { verifier: cli.golden.operation-file-unit }
+    expect: { status: passed }
+  - id: operation-cycle-unit
+    action: { verifier: cli.golden.operation-cycle-unit }
+    expect: { status: passed }
+  - id: operation-contained-unit
+    action: { verifier: cli.golden.operation-contained-unit }
+    expect: { status: passed }
+  - id: operation-moved-unit
+    action: { verifier: cli.golden.operation-moved-unit }
+    expect: { status: passed }
+  - id: operation-freeze-native
+    action: { verifier: cli.golden.operation-freeze-native }
+    expect: { status: passed }
+  - id: operation-contract-native
+    action: { verifier: cli.golden.operation-contract-native }
+    expect: { status: passed }
+  - id: operation-targets-native
+    action: { verifier: cli.golden.operation-targets-native }
+    expect: { status: passed }
+  - id: operation-verify-native
+    action: { verifier: cli.golden.operation-verify-native }
+    expect: { status: passed }
+  - id: operation-verifiers-native
+    action: { verifier: cli.golden.operation-verifiers-native }
+    expect: { status: passed }
+  - id: operation-alias-native
+    action: { verifier: cli.golden.operation-alias-native }
+    expect: { status: passed }
+  - id: operation-freeze-moved-native
+    action: { verifier: cli.golden.operation-freeze-moved-native }
+    expect: { status: passed }
+  - id: operation-verify-moved-native
+    action: { verifier: cli.golden.operation-verify-moved-native }
+    expect: { status: passed }
   - id: build-manager-unit
     action: { verifier: cli.golden.build-manager-unit }
     expect: { status: passed }
