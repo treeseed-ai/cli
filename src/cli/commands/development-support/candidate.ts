@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, rmSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import type { DevelopmentRuntime } from '@treeseed/sdk/development';
 import { developmentStateRoot } from '../development-cli-selection.js';
 
 export function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
 	const git = (args: string[]) => execFileSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }).trim();
+	if(realpathSync(git(['rev-parse','--show-toplevel']))!==realpathSync(worktree)) throw new Error('Development closure requires its own exact Git source root.');
 	const pathspec = excludedPaths.length ? ['--', '.', ...excludedPaths.map(path => `:(exclude,literal)${path}`)] : [];
 	const status = git(['status', '--porcelain=v1', '--untracked-files=all', ...pathspec]);
 	const digest = createHash('sha256').update(`${status}\n${git(['diff', '--binary', 'HEAD', ...pathspec])}`);
