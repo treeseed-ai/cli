@@ -1,7 +1,36 @@
 import { createHash } from 'node:crypto';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, rmSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import type { DevelopmentRuntime } from '@treeseed/sdk/development';
 import { developmentStateRoot } from '../development-cli-selection.js';
+
+export function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
+	const git = (args: string[]) => execFileSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }).trim();
+	const pathspec = excludedPaths.length ? ['--', '.', ...excludedPaths.map(path => `:(exclude,literal)${path}`)] : [];
+	const status = git(['status', '--porcelain=v1', '--untracked-files=all', ...pathspec]);
+	const digest = createHash('sha256').update(`${status}\n${git(['diff', '--binary', 'HEAD', ...pathspec])}`);
+	// Git diff omits untracked bytes. NUL-delimited native discovery also preserves
+	// filenames containing whitespace/newlines, without parsing porcelain quoting.
+	for (const name of git(['ls-files', '--others', '--exclude-standard', '-z', ...pathspec]).split('\0').filter(Boolean)) {
+		const path = resolve(worktree, name), metadata = lstatSync(path);
+		let bytes: Buffer, mode: number;
+		if (metadata.isSymbolicLink()) { bytes = Buffer.from(readlinkSync(path)); mode = 0o120000; }
+		else {
+			const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+			try {
+				const opened = fstatSync(descriptor);
+				if (!opened.isFile()) throw new Error('Development source requires readable regular files or Git symbolic links.');
+				bytes = readFileSync(descriptor); mode = opened.mode & 0o111 ? 0o100755 : 0o100644;
+			} finally { closeSync(descriptor); }
+		}
+		digest.update(JSON.stringify([name, mode, bytes.length])).update('\0').update(bytes);
+	}
+	return { projectId: runtime.project.id, repository: runtime.project.repository, worktree,
+		commit: git(['rev-parse', 'HEAD']), branch: git(['branch', '--show-current']) || null, dirty: Boolean(status),
+		dirtyDigest: status ? `sha256:${digest.digest('hex')}` : null,
+		recipeDigest: `sha256:${createHash('sha256').update(JSON.stringify(runtime)).digest('hex')}` };
+}
 
 export function artifactPaths(pattern: string, root: string) {
 	if (!pattern.includes('*')) return [resolve(root, pattern)];

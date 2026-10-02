@@ -73,6 +73,17 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.source-bytes': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development source digest binds same-size untracked binary bytes and newline paths'},
+		'cli.golden.source-mode': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development source digest binds untracked executable mode and symbolic link identity'},
+		'cli.golden.source-ignore': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development source digest retains tracked edits and ignores Git-excluded output'},
+		'cli.golden.source-unreadable': {testFile:'tests/unit/command-boundary/development/source-closure.test.ts',testName:'development source planning rejects unreadable untracked bytes without manager effects'},
+		'cli.golden.candidate-bytes': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects untracked bytes changes without registering a pass'},
+		'cli.golden.candidate-mode': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects untracked mode changes without registering a pass'},
+		'cli.golden.candidate-link': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects untracked link changes without registering a pass'},
+		'cli.golden.candidate-deletion': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects untracked deleted changes without registering a pass'},
+		'cli.golden.candidate-addition': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects untracked added changes without registering a pass'},
+		'cli.golden.candidate-mutation': {testFile:'tests/integration/development-candidate.test.ts',testName:'native candidate verification rejects untracked during verification changes without registering a pass'},
+		'cli.golden.dirty-candidate': {testFile:'tests/integration/development-candidate.test.ts',testName:'native dirty candidate verification excludes generated artifact and remains non-promotable'},
 		'cli.golden.source-files': {testFile:'tests/unit/source-custody.test.ts',testName:'complete CLI source is readable owner files without undeclared external Git links'},
 		'cli.golden.source-checkout': {testFile:'tests/integration/source-custody.test.ts',testName:'fresh native Git checkout materializes every CLI source entry without missing-directory sentinels'},
 		'cli.golden.sdk-agreement': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'exact SDK artifact agrees with both dependency declarations before acceptance'},
