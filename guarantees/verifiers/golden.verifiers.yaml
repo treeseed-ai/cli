@@ -1,6 +1,36 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.schema-canonical:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI accepts exact canonical schema without changing Git or input bytes
+  cli.golden.schema-definitions:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI rejects every committed unconstrained canonical definition with local policy evidence
+  cli.golden.schema-union:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI rejects incomplete duplicate and runtime-only canonical stored-record unions
+  cli.golden.schema-untracked:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI denies untracked canonical authority instead of silently omitting it
+  cli.golden.schema-entrypoint:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: native CLI entrypoint accepts the exact canonical declaration
+  cli.golden.schema-entrypoint-denial:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: native CLI entrypoint denies changed assignment authority
   cli.golden.freeze-context-native:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

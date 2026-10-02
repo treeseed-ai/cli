@@ -3,6 +3,24 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: schema-canonical
+    action: { verifier: cli.golden.schema-canonical }
+    expect: { status: passed }
+  - id: schema-definitions
+    action: { verifier: cli.golden.schema-definitions }
+    expect: { status: passed }
+  - id: schema-union
+    action: { verifier: cli.golden.schema-union }
+    expect: { status: passed }
+  - id: schema-untracked
+    action: { verifier: cli.golden.schema-untracked }
+    expect: { status: passed }
+  - id: schema-entrypoint
+    action: { verifier: cli.golden.schema-entrypoint }
+    expect: { status: passed }
+  - id: schema-entrypoint-denial
+    action: { verifier: cli.golden.schema-entrypoint-denial }
+    expect: { status: passed }
   - id: freeze-context-native
     action: { verifier: cli.golden.freeze-context-native }
     expect: { status: passed }
