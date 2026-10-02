@@ -72,17 +72,39 @@ test('source contains no legacy implementation residue', () => {
 });
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
+	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.workflow-triggers': {testFile:'tests/contract/package/thin-package.test.ts',testName:'verification retains every PR protected branch and tag without duplicate topic pushes'},
+		'cli.golden.reporting-deadlines': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting cannot replace original suite deadlines or interrupt policy through reporting flags'},
+		'cli.golden.native-reporting': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native complete reporting preserves build discovery custody and nested subprocess defaults'},
+		'cli.golden.reporting-denial': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporter arguments reject filters unknown flags and malformed pairs before test side effects'},
+		'cli.golden.reporting-outcomes': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporting retains failed skipped todo empty and crashed suite outcomes'},
+		'cli.golden.reporting-unit': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting accepts only a complete nonempty reporting pair without test selection'},
+	};
+	const observedReporting = new Set<string>();
 	const files = readdirSync('guarantees', { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
 	assert.equal(files.length, 3);
 	for (const entry of files) {
 		assert.match(entry.name, /\.yaml$/u);
 		const document = parse(readFileSync(`${entry.parentPath}/${entry.name}`, 'utf8'));
 		assert.match(document.schemaVersion, /^treeseed\.(guarantee|scene|guarantee-verifiers)\/v1$/u);
-		if (document.verifiers) for (const verifier of Object.values(document.verifiers) as Array<{kind: string; ownerPackage: string; testFile: string}>) {
+		if (document.verifiers) for (const [ref,verifier] of Object.entries(document.verifiers) as Array<[string,{kind: string; ownerPackage: string; testFile: string;testName:string}]>) {
 			assert.equal(verifier.kind, 'nodeTestCase');
 			assert.equal(verifier.ownerPackage, '@treeseed/cli');
-			assert.match(verifier.testFile, /^tests\/unit\/command-boundary\//u);
+			if (Object.hasOwn(reporting,ref)) {
+				assert.deepEqual({testFile:verifier.testFile,testName:verifier.testName},reporting[ref]);
+				observedReporting.add(ref);
+			} else assert.match(verifier.testFile, /^tests\/unit\/command-boundary\//u);
 			assert.equal(existsSync(verifier.testFile), true);
 		}
 	}
+	assert.deepEqual([...observedReporting].sort(),Object.keys(reporting).sort());
+});
+
+test('verification retains every PR protected branch and tag without duplicate topic pushes',()=>{
+	const workflow=parse(readFileSync('.github/workflows/verify.yml','utf8'));
+	assert.deepEqual(workflow.on.push.branches,['staging','main']);
+	assert.deepEqual(workflow.on.push.tags,['**']);
+	assert.deepEqual(workflow.on.push['paths-ignore'],['docs/src/content/**']);
+	assert.deepEqual(workflow.on.pull_request['paths-ignore'],['docs/src/content/**']);
+	assert.equal(Object.hasOwn(workflow.on,'workflow_dispatch'),true);
 });
