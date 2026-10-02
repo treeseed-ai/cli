@@ -1,6 +1,56 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.build-manager-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: development build custody recognizes the existing protected manager target
+  cli.golden.build-docker-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: development build custody recognizes a caller-built Docker runtime
+  cli.golden.build-direct-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: development build custody leaves a direct native runtime in caller custody
+  cli.golden.build-once-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native development rebuild executes its caller build once before selecting exact output
+  cli.golden.build-non-idempotent-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native development rebuild does not repeat a non-idempotent successful build
+  cli.golden.build-failure-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native development rebuild preserves selection and avoids stop after a failed build
+  cli.golden.build-refused-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native development rebuild runs once and preserves selection when stop is refused
+  cli.golden.build-plan-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native development rebuild plan neither builds nor refreshes manager state
+  cli.golden.build-manager-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native development rebuild never executes a protected manager-owned build in the caller
+  cli.golden.build-missing-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native development rebuild rejects an undeclared caller build before stop or selection
   cli.golden.artifact-escaped-unit:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

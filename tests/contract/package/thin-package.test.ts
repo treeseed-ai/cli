@@ -74,6 +74,16 @@ test('source contains no legacy implementation residue', () => {
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
 		'cli.golden.artifact-escaped-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects escaped bytes through the existing freeze boundary"},
+		'cli.golden.build-manager-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"development build custody recognizes the existing protected manager target"},
+		'cli.golden.build-docker-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"development build custody recognizes a caller-built Docker runtime"},
+		'cli.golden.build-direct-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"development build custody leaves a direct native runtime in caller custody"},
+		'cli.golden.build-once-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild executes its caller build once before selecting exact output"},
+		'cli.golden.build-non-idempotent-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild does not repeat a non-idempotent successful build"},
+		'cli.golden.build-failure-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild preserves selection and avoids stop after a failed build"},
+		'cli.golden.build-refused-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild runs once and preserves selection when stop is refused"},
+		'cli.golden.build-plan-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild plan neither builds nor refreshes manager state"},
+		'cli.golden.build-manager-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild never executes a protected manager-owned build in the caller"},
+		'cli.golden.build-missing-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild rejects an undeclared caller build before stop or selection"},
 		'cli.golden.artifact-directory-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects directory bytes through the existing freeze boundary"},
 		'cli.golden.artifact-unreadable-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects unreadable bytes through the existing freeze boundary"},
 		'cli.golden.artifact-fifo-unit': {testFile:"tests/unit/command-boundary/development/artifact-custody.test.ts",testName:"artifact custody rejects fifo bytes through the existing freeze boundary"},

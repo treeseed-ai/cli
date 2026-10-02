@@ -3,6 +3,36 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: build-manager-unit
+    action: { verifier: cli.golden.build-manager-unit }
+    expect: { status: passed }
+  - id: build-docker-unit
+    action: { verifier: cli.golden.build-docker-unit }
+    expect: { status: passed }
+  - id: build-direct-unit
+    action: { verifier: cli.golden.build-direct-unit }
+    expect: { status: passed }
+  - id: build-once-native
+    action: { verifier: cli.golden.build-once-native }
+    expect: { status: passed }
+  - id: build-non-idempotent-native
+    action: { verifier: cli.golden.build-non-idempotent-native }
+    expect: { status: passed }
+  - id: build-failure-native
+    action: { verifier: cli.golden.build-failure-native }
+    expect: { status: passed }
+  - id: build-refused-native
+    action: { verifier: cli.golden.build-refused-native }
+    expect: { status: passed }
+  - id: build-plan-native
+    action: { verifier: cli.golden.build-plan-native }
+    expect: { status: passed }
+  - id: build-manager-native
+    action: { verifier: cli.golden.build-manager-native }
+    expect: { status: passed }
+  - id: build-missing-native
+    action: { verifier: cli.golden.build-missing-native }
+    expect: { status: passed }
   - id: artifact-escaped-unit
     action: { verifier: cli.golden.artifact-escaped-unit }
     expect: { status: passed }
