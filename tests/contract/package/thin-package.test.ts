@@ -73,6 +73,14 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.live-source-tracked-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build source custody rejects changed tracked bytes after exactly one native build"},
+		'cli.golden.live-source-untracked-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build source custody rejects added undeclared source after exactly one native build"},
+		'cli.golden.live-source-output-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build source custody accepts unchanged dirty source and its declared output"},
+		'cli.golden.live-source-head-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build source custody rejects a moved Git head after exactly one native build"},
+		'cli.golden.live-source-tracked-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild rejects tracked source mutation before stop and selection"},
+		'cli.golden.live-source-untracked-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild rejects added undeclared source before stop and selection"},
+		'cli.golden.live-source-head-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild rejects moved Git head before stop and selection"},
+		'cli.golden.live-source-output-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native live rebuild accepts unchanged dirty source and an exact declared nonignored output"},
 		'cli.golden.live-directory-escape-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build custody rejects an escaped directory before native side effects"},
 		'cli.golden.live-directory-moved-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build custody rejects directory movement after one native execution"},
 		'cli.golden.live-directory-alias-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"one-shot build custody preserves contained aliases and original environment authority"},

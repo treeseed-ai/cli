@@ -61,3 +61,30 @@ test('native live rebuild keeps unused manager-owned build directories out of ca
   assert.equal(await f.invoke(),0,f.output.join(''));assert.deepEqual(f.builds(),[]);assert.deepEqual(f.selectedBytes,['manager-owned']);assert.equal(f.mode(),'candidate');
  }finally{f.close();outside.close();}
 });
+test('native live rebuild rejects tracked source mutation before stop and selection',async()=>{
+ const f=await rebuildFixture();try{
+  configureBuild(f,'.',"import {appendFileSync,writeFileSync} from 'node:fs';appendFileSync('build.log','1\\n');appendFileSync('treeseed.package.yaml','\\n');writeFileSync('candidate.bin','built-from-moved-source');\n");
+  assert.equal(await f.invoke(),1,f.output.join(''));assert.match(f.output.join(''),/source.*changed/i);assert.deepEqual(f.builds(),['1']);
+  assert.equal(f.calls.includes('local.dev.container:stop'),false);assert.deepEqual(f.selectedBytes,[]);assert.equal(f.mode(),'candidate');assert.equal(readFileSync(resolve(f.root,'candidate.bin'),'utf8'),'built-from-moved-source');
+ }finally{f.close();}
+});
+test('native live rebuild rejects added undeclared source before stop and selection',async()=>{
+ const f=await rebuildFixture();try{
+  configureBuild(f,'.',"import {appendFileSync,writeFileSync} from 'node:fs';appendFileSync('build.log','1\\n');writeFileSync('scripts/added.ts','export const changed=true;');writeFileSync('candidate.bin','built-1');\n");
+  assert.equal(await f.invoke(),1,f.output.join(''));assert.match(f.output.join(''),/source.*changed/i);assert.deepEqual(f.builds(),['1']);
+  assert.equal(f.calls.includes('local.dev.container:stop'),false);assert.deepEqual(f.selectedBytes,[]);assert.equal(f.mode(),'candidate');assert.equal(readFileSync(resolve(f.root,'scripts/added.ts'),'utf8'),'export const changed=true;');
+ }finally{f.close();}
+});
+test('native live rebuild rejects moved Git head before stop and selection',async()=>{
+ const f=await rebuildFixture();try{
+  configureBuild(f,'.',"import {appendFileSync,writeFileSync} from 'node:fs';import {execFileSync} from 'node:child_process';appendFileSync('build.log','1\\n');execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','moved'],{timeout:5000,stdio:'pipe'});writeFileSync('candidate.bin','built-1');\n");
+  assert.equal(await f.invoke(),1,f.output.join(''));assert.match(f.output.join(''),/source.*changed/i);assert.deepEqual(f.builds(),['1']);assert.equal(f.calls.includes('local.dev.container:stop'),false);assert.deepEqual(f.selectedBytes,[]);assert.equal(f.mode(),'candidate');
+ }finally{f.close();}
+});
+test('native live rebuild accepts unchanged dirty source and an exact declared nonignored output',async()=>{
+ const f=await rebuildFixture();try{
+  const path=resolve(f.root,'treeseed.package.yaml'),document=JSON.parse(readFileSync(path,'utf8')) as {development:DevelopmentRuntime};
+  document.development.targets[0]!.outputs=[{path:'candidate.bin',mediaType:'application/octet-stream',digestAlgorithm:'sha256'}];writeFileSync(path,JSON.stringify(document));writeFileSync(resolve(f.root,'.gitignore'),'build.log\n');
+  assert.equal(await f.invoke(),0,f.output.join(''));assert.deepEqual(f.builds(),['1']);assert.deepEqual(f.selectedBytes,['built-1']);assert.equal(f.mode(),'candidate');assert.equal(readFileSync(resolve(f.root,'.gitignore'),'utf8'),'build.log\n');
+ }finally{f.close();}
+});
