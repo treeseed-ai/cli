@@ -9,7 +9,11 @@ function declareSecondArtifact(root: string, separateTarget=false) {
 	const manifest=resolve(root,'treeseed.package.yaml');
 	const document=parse(readFileSync(manifest,'utf8')) as {development:{targets:Array<{id:string;freeze:{artifacts:string[]}}>}};
 	const target=document.development.targets[0]!;
-	if(separateTarget)document.development.targets.push({...target,id:'second',freeze:{...target.freeze,artifacts:['second.bin']}});
+	if(separateTarget) {
+		document.development.targets.push({...target,id:'second',freeze:{...target.freeze,artifacts:['second.bin']}});
+		const session=resolve(root,'development.session.yaml');
+		writeFileSync(session,readFileSync(session,'utf8').replace('targets: [{ id: package, mode: candidate }]','targets: [{ id: package, mode: candidate }, { id: second, mode: candidate }]'));
+	}
 	else target.freeze.artifacts.push('second.bin');
 	writeFileSync(manifest,stringify(document));
 	writeFileSync(resolve(root,'scripts/freeze.ts'),"import { writeFileSync } from 'node:fs'; writeFileSync('candidate.bin','sealed'); writeFileSync('second.bin','sealed second');\n");
