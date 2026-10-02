@@ -1,12 +1,69 @@
 import assert from 'node:assert/strict';
-import { chmodSync, cpSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { candidateFixture } from '../../../support/development-candidate.ts';
-import { repositoryClosure } from '../../../../src/cli/commands/development-support/candidate.ts';
-import type { DevelopmentRuntime } from '@treeseed/sdk/development';
+import { freezeCustody, repositoryClosure } from '../../../../src/cli/commands/development-support/candidate.ts';
+import { developmentRuntimeSchema, type DevelopmentRuntime } from '@treeseed/sdk/development';
+import { parse } from 'yaml';
 
 const runtime = { project: { id: 'specimen', repository: 'example/specimen' } } as DevelopmentRuntime;
+
+function freezeRecord(root:string) {
+	return {session:{repositories:[{projectId:'specimen',worktree:root}],targets:[{projectId:'specimen',targetId:'package',mode:'candidate'}]},
+		runtimes:[developmentRuntimeSchema.parse(parse(readFileSync(resolve(root,'treeseed.package.yaml'),'utf8')).development)]};
+}
+
+test('freeze custody binds exact source snapshots independently of command success',()=>{
+	for(const kind of ['tracked','untracked','head','recipe','deleted'] as const) {
+		const fixture=candidateFixture();
+		try {
+			const custody=freezeCustody(freezeRecord(fixture.root)); custody.assert([]);
+			writeFileSync(resolve(fixture.root,'candidate.bin'),'generated'); custody.assert([]);
+			if(kind==='head')fixture.git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','moved');
+			else if(kind==='deleted')rmSync(resolve(fixture.root,'scripts/verify.ts'));
+			else writeFileSync(resolve(fixture.root,kind==='tracked'?'scripts/verify.ts':kind==='recipe'?'treeseed.package.yaml':'local-source.ts'),'changed');
+			assert.throws(()=>custody.assert([]),/source changed during freeze: specimen/);
+			assert.equal(fixture.registrations.length,0);
+		} finally {fixture.close();}
+	}
+});
+
+test('freeze custody rejects changed or missing captured artifacts while allowing uncaptured outputs',()=>{
+	const fixture=candidateFixture();
+	try {
+		const custody=freezeCustody(freezeRecord(fixture.root)),path=resolve(fixture.root,'candidate.bin');
+		writeFileSync(path,'sealed');
+		const artifacts=[{projectId:'specimen',identity:'candidate.bin',digest:`sha256:${createHash('sha256').update('sealed').digest('hex')}`}];
+		custody.assert(artifacts); writeFileSync(path,'changed'); custody.assert([]);
+		assert.throws(()=>custody.assert(artifacts),/artifact changed during freeze/);
+		rmSync(path); assert.throws(()=>custody.assert(artifacts),/artifact changed during freeze/);
+	} finally {fixture.close();}
+});
+
+test('development closure excludes only declared artifact bytes while retaining source mutations',()=>{
+	const fixture=candidateFixture();
+	try {
+		writeFileSync(resolve(fixture.root,'candidate.bin'),'before');
+		const before=repositoryClosure(runtime,fixture.root,['candidate.bin']);
+		writeFileSync(resolve(fixture.root,'candidate.bin'),'after');
+		assert.deepEqual(repositoryClosure(runtime,fixture.root,['candidate.bin']),before);
+		writeFileSync(resolve(fixture.root,'candidate.bin.ts'),'export {};');
+		assert.notDeepEqual(repositoryClosure(runtime,fixture.root,['candidate.bin']),before);
+	} finally {fixture.close();}
+});
+
+test('development closure detects moved HEAD with unchanged tracked source bytes',()=>{
+	const fixture=candidateFixture();
+	try {
+		const before=repositoryClosure(runtime,fixture.root);
+		fixture.git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','moved');
+		const after=repositoryClosure(runtime,fixture.root);
+		assert.notEqual(after.commit,before.commit);
+		assert.equal(after.dirtyDigest,before.dirtyDigest); assert.equal(after.dirty,false);
+	} finally {fixture.close();}
+});
 
 test('development closure rejects a selected directory borrowing its parent Git root', () => {
 	const fixture = candidateFixture();
