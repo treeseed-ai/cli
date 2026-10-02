@@ -17,6 +17,51 @@ function assertNoCandidate(fixture:ReturnType<typeof candidateFixture>) {
 	assert.equal(files(fixture.state).some(name=>name.startsWith('candidate-')||name==='freeze.lock'),false);
 }
 
+for(const phase of ['freeze','contract'] as const) {
+	test(`native ${phase} receives exact session workspace worktree and selected mode authority`,async()=>{
+		const fixture=candidateFixture();
+		try {
+			const code="import {writeFileSync} from 'node:fs'; writeFileSync('candidate.bin',JSON.stringify({workspace:process.env.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,worktree:process.env.TREESEED_DEVELOPMENT_WORKTREE,session:process.env.TREESEED_DEVELOPMENT_SESSION_ID,mode:process.env.TREESEED_DEVELOPMENT_MODE,ambient:process.env.CONTEXT_AMBIENT,declared:process.env.CONTEXT_DECLARED}));\n";
+			if(phase==='contract')contract(fixture.root,code);else writeFileSync(resolve(fixture.root,'scripts/freeze.ts'),code);
+			const path=resolve(fixture.root,'treeseed.package.yaml'),document=parse(readFileSync(path,'utf8'));
+			const operation=phase==='freeze'?document.development.targets[0].freeze.operation:document.development.targets[0].freeze.contractOperations[0];
+			operation.environment={CONTEXT_DECLARED:'exact declaration'};writeFileSync(path,stringify(document));
+			fixture.context.env.CONTEXT_AMBIENT='preserved ambient';
+			fixture.context.env.TREESEED_DEVELOPMENT_WORKSPACE_ROOT='stale ambient workspace';
+			fixture.context.env.TREESEED_DEVELOPMENT_WORKTREE='stale ambient worktree';
+			fixture.context.env.TREESEED_DEVELOPMENT_SESSION_ID='stale ambient session';
+			fixture.context.env.TREESEED_DEVELOPMENT_MODE='released';
+			const frozen=await fixture.freeze();
+			const state=JSON.parse(readFileSync(resolve(fixture.state,'treeseed/development/current.json'),'utf8'));
+			assert.deepEqual(JSON.parse(readFileSync(resolve(fixture.root,'candidate.bin'),'utf8')),{workspace:fixture.root,worktree:fixture.root,session:state.sessionId,mode:'candidate',ambient:'preserved ambient',declared:'exact declaration'});
+			assert.equal(fixture.readReceipt(frozen.receipt).verification.status,'pending');assert.equal(fixture.registrations.length,1);
+		} finally {fixture.close();}
+	});
+}
+
+test('native freeze preserves explicit saved workspace authority independently of manifest location',async()=>{
+	const fixture=candidateFixture();
+	try {
+		writeFileSync(resolve(fixture.root,'scripts/freeze.ts'),"import {writeFileSync} from 'node:fs'; writeFileSync('candidate.bin',String(process.env.TREESEED_DEVELOPMENT_WORKSPACE_ROOT));\n");
+		assert.equal(await fixture.invoke(['dev','session','start',resolve(fixture.root,'development.session.yaml')]),0);
+		const path=resolve(fixture.state,'treeseed/development/current.json'),state=JSON.parse(readFileSync(path,'utf8'));
+		state.workspaceRoot=fixture.state;writeFileSync(path,JSON.stringify(state));
+		assert.equal(await fixture.invoke(['dev','freeze','--allow-dirty']),0,fixture.output.join(''));
+		assert.equal(readFileSync(resolve(fixture.root,'candidate.bin'),'utf8'),fixture.state);
+		assert.equal(fixture.registrations.length,1);
+	} finally {fixture.close();}
+});
+
+test('native freeze forwards the exact selected live mode without starting or switching runtime',async()=>{
+	const fixture=candidateFixture();
+	try {
+		writeFileSync(resolve(fixture.root,'scripts/freeze.ts'),"import {writeFileSync} from 'node:fs'; writeFileSync('candidate.bin',String(process.env.TREESEED_DEVELOPMENT_MODE));\n");
+		const path=resolve(fixture.root,'development.session.yaml');writeFileSync(path,readFileSync(path,'utf8').replace('mode: candidate','mode: live'));
+		await fixture.freeze();assert.equal(readFileSync(resolve(fixture.root,'candidate.bin'),'utf8'),'live');
+		assert.equal(fixture.registrations.length,1);
+	} finally {fixture.close();}
+});
+
 for(const kind of ['tracked','untracked','head','recipe'] as const) {
 	test(`native freeze rejects ${kind} mutation before contract execution or candidate registration`,async()=>{
 		const fixture=candidateFixture();
