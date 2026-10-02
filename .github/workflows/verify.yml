@@ -2,6 +2,8 @@ name: Verify
 
 on:
   push:
+    branches: [staging, main]
+    tags: ["**"]
     paths-ignore: ["docs/src/content/**"]
   pull_request:
     paths-ignore: ["docs/src/content/**"]
@@ -38,7 +40,7 @@ jobs:
       - name: Verify package with exact SDK
         run: npm run verify:direct
       - name: Execute coded golden component scenes
-        uses: treeseed-ai/reviewer/.github/actions/run-scenes@dada120f921fdf81b5bd94235c784d248802e5ca
+        uses: treeseed-ai/reviewer/.github/actions/run-scenes@8ea02bb20d68b7427a05f875891a12752bc7db35
         with:
           ids: guarantee.cli.golden.component-boundaries
 

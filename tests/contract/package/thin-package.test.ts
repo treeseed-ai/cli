@@ -73,6 +73,8 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.workflow-triggers': {testFile:'tests/contract/package/thin-package.test.ts',testName:'verification retains every PR protected branch and tag without duplicate topic pushes'},
+		'cli.golden.reporting-deadlines': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting cannot replace original suite deadlines or interrupt policy through reporting flags'},
 		'cli.golden.native-reporting': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native complete reporting preserves build discovery custody and nested subprocess defaults'},
 		'cli.golden.reporting-denial': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporter arguments reject filters unknown flags and malformed pairs before test side effects'},
 		'cli.golden.reporting-outcomes': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporting retains failed skipped todo empty and crashed suite outcomes'},
@@ -96,4 +98,13 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 		}
 	}
 	assert.deepEqual([...observedReporting].sort(),Object.keys(reporting).sort());
+});
+
+test('verification retains every PR protected branch and tag without duplicate topic pushes',()=>{
+	const workflow=parse(readFileSync('.github/workflows/verify.yml','utf8'));
+	assert.deepEqual(workflow.on.push.branches,['staging','main']);
+	assert.deepEqual(workflow.on.push.tags,['**']);
+	assert.deepEqual(workflow.on.push['paths-ignore'],['docs/src/content/**']);
+	assert.deepEqual(workflow.on.pull_request['paths-ignore'],['docs/src/content/**']);
+	assert.equal(Object.hasOwn(workflow.on,'workflow_dispatch'),true);
 });

@@ -1,6 +1,16 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.workflow-triggers:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/contract/package/thin-package.test.ts
+    testName: verification retains every PR protected branch and tag without duplicate topic pushes
+  cli.golden.reporting-deadlines:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/native-suite-reporting.test.ts
+    testName: native reporting cannot replace original suite deadlines or interrupt policy through reporting flags
   cli.golden.native-reporting:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

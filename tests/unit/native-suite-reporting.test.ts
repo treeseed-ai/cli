@@ -17,3 +17,8 @@ test('native reporting accepts only a complete nonempty reporting pair without t
 		['--test-only'],['--test-shard=1/2'],['--test-skip-pattern=integration'],['tests/unit.test.ts'],['--test-concurrency=99'],
 	]) assert.throws(()=>reportingArguments(args),/reporting/i);
 });
+
+test('native reporting cannot replace original suite deadlines or interrupt policy through reporting flags',()=>{
+	for(const flag of ['--test-timeout=0','--test-timeout=25','--test-force-exit','--test-isolation=none'])
+		assert.throws(()=>reportingArguments(['--test-reporter=tap','--test-reporter-destination=stdout',flag]),/reporting/i);
+});

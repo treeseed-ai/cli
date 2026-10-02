@@ -55,15 +55,23 @@ test('native reporter arguments reject filters unknown flags and malformed pairs
 });
 
 test('native reporting retains failed skipped todo empty and crashed suite outcomes',()=>{
-	for(const mode of ['failure','skip','todo','empty','crash','cancelled']) {
+	for(const mode of ['failure','skip','todo','empty','crash','cancelled','expired']) {
 		const root=fixture();
 		try {
 			rmSync(resolve(root,'tests/unit.test.ts')); rmSync(resolve(root,'tests/nested/integration.test.ts'));
-			if(mode!=='empty')writeFileSync(resolve(root,'tests/result.test.ts'),mode==='crash' ? "throw new Error('fixture crash');" : mode==='cancelled' ? "import test from 'node:test'; test('cancelled',()=>new Promise(()=>{}));" : `import test from 'node:test'; import assert from 'node:assert/strict'; test${mode==='skip'?'.skip':mode==='todo'?'.todo':''}('outcome',()=>{assert.equal(${mode==='failure'},false);});`);
-			const result=spawnSync(process.execPath,['--import','tsx',runner,'--test-reporter=tap',`--test-reporter-destination=${resolve(root,'report.txt')}`],{cwd:root,encoding:'utf8',env:fixtureEnvironment});
+			if(mode!=='empty')writeFileSync(resolve(root,'tests/result.test.ts'),mode==='crash' ? "throw new Error('fixture crash');" : mode==='cancelled' ? "import test from 'node:test';const controller=new AbortController();test('cancelled',{signal:controller.signal},()=>new Promise(()=>{}));setTimeout(()=>controller.abort(),25);" : mode==='expired' ? "import test from 'node:test';test('cancelled',{timeout:25},()=>new Promise(()=>{}));" : `import test from 'node:test'; import assert from 'node:assert/strict'; test${mode==='skip'?'.skip':mode==='todo'?'.todo':''}('outcome',()=>{assert.equal(${mode==='failure'},false);});`);
+			const result=spawnSync(process.execPath,['--import','tsx',runner,'--test-reporter=tap',`--test-reporter-destination=${resolve(root,'report.txt')}`],{cwd:root,encoding:'utf8',env:fixtureEnvironment,timeout:10_000});
+			assert.equal(result.error,undefined,`${mode}: fixture must close with real native terminal evidence`);
 			assert.equal(result.status===0,mode==='skip'||mode==='todo',mode);
 			if(mode!=='empty')assert.equal(existsSync(resolve(root,'report.txt')),true,mode);
 			if(mode==='skip'||mode==='todo')assert.match(readFileSync(resolve(root,'report.txt'),'utf8'),mode==='skip'?/SKIP/:/TODO/);
+			if(mode==='cancelled'||mode==='expired') {
+				const terminal=readFileSync(resolve(root,'report.txt'),'utf8');
+				assert.match(terminal,/not ok 1 - cancelled/);assert.match(terminal,/# pass 0/);
+				const failed=Number(/^# fail (\d+)$/m.exec(terminal)?.[1]);
+				const cancelled=Number(/^# cancelled (\d+)$/m.exec(terminal)?.[1]);
+				assert.equal(failed+cancelled,1,'exactly one unsuccessful terminal outcome, regardless of Node classification');
+			}
 		} finally {rmSync(root,{recursive:true,force:true});}
 	}
 });
