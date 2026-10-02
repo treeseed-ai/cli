@@ -58,7 +58,6 @@ function loadState(env: NodeJS.ProcessEnv, sessionId?: unknown) {
 
 function sha256(value: string | Buffer) { return `sha256:${createHash('sha256').update(value).digest('hex')}`; }
 function sha512Integrity(value: Buffer) { return `sha512-${createHash('sha512').update(value).digest('base64')}`; }
-
 function operationForMode(target: DevelopmentTarget, mode: string) {
 	if (mode === 'released') return null;
 	if (String(target.kind) === 'source-check') return target.operations.verify ?? null;
@@ -82,11 +81,13 @@ async function containerOperation(context: CommandContext, sessionId: string, ru
 export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
 	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: state.workspaceRoot ?? dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
 }
-export function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
+export function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, build?: {runtime:DevelopmentRuntime;target:DevelopmentTarget}) {
 	const root = developmentOperationDirectory(worktree,operation.cwd);
+	const outputs=build?.target.outputs.map(output=>output.path)??[],source=build?repositoryClosure(build.runtime,worktree,outputs):undefined;
 	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'pipe', timeout: operation.timeoutSeconds * 1_000 });
 	if (result.status !== 0) throw new Error(`Development operation failed: ${operation.command} ${operation.args.join(' ')}.`);
 	if(developmentOperationDirectory(worktree,operation.cwd)!==root)throw new Error('Development command working directory custody changed during execution.');
+	if(build&&JSON.stringify(repositoryClosure(build.runtime,worktree,outputs))!==JSON.stringify(source))throw new Error('Development build source changed during execution.');
 }
 function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
 	const operation = operationForMode(target, mode);
@@ -105,7 +106,6 @@ function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, t
 		return state.processes[key] = { pid: child.pid, identity: processIdentity(child.pid), projectId: runtime.project.id, targetId: target.id, log };
 	} finally { closeSync(descriptor); }
 }
-
 function operationIsRunning(state: LocalSessionState, key: string) {
 	const existing = state.processes[key]; if (!existing) return false;
 	if (ownsDevelopmentProcess(existing, state.sessionId)) return true;
@@ -185,7 +185,7 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 				continue;
 			}
 			const running = operationIsRunning(state, `${runtime.project.id}.${target.id}`);
-			if (!usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			if (!usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {},{runtime,target});
 			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'start');
 			else startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			saveState(state, context.env);
@@ -280,7 +280,7 @@ async function rebuildPackage(input: { state: LocalSessionState; record: { sessi
 	if (!target.operations.build) throw new Error(`${runtime.project.id}.${target.id} does not declare a rebuild operation.`);
 	const overlayRoot = resolve(worktree, '.treeseed', 'cache', 'development-sessions', state.sessionId, target.id);
 	const previous = overlayGeneration(overlayRoot);
-	runOneShotOperation(state, target.operations.build, worktree, mode, context.env);
+	runOneShotOperation(state, target.operations.build, worktree, mode, context.env, {},{runtime,target});
 	await waitForNewPackageOverlay(target, worktree, overlayRoot, previous);
 	// Recovery can retain a healthy synchronizer while a consumer link has been
 	// restored to its released package. Every rebuild reasserts the selected
@@ -291,7 +291,7 @@ async function rebuildPackage(input: { state: LocalSessionState; record: { sessi
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
-	if (usesManagedContainer(target) && !usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
+	if (usesManagedContainer(target) && !usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {},{runtime,target});
 	await stopProcess(state, key);
 	if (usesManagedContainer(target)) {
 		// Preserve the live selection if manager custody refuses an active claim.
@@ -301,7 +301,7 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 	else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
 	if (!target.operations.start && target.kind === 'rebuild-restart' && target.operations.build) {
-		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
+		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {},{runtime,target});
 		await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
 	} else if (usesManagedContainer(target)) {
 		await containerOperation(context, state.sessionId, runtime, target, 'start');
@@ -363,7 +363,7 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		} else {
 		if (!target.operations.build) throw new Error(`${selection.projectId}.${selection.targetId} does not declare a build operation.`);
 		const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
-		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env, resolved.environment ?? {});
+		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env, resolved.environment ?? {},{runtime,target});
 		if (target.operations.start) await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 		else {
 			await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
@@ -384,7 +384,7 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		else if (action === 'build-only') {
 			const build = dependent.target.operations.build;
 			if (!build) throw new Error('Build-only dependent has no build operation.');
-			runOneShotOperation(state, build, dependentRepository.worktree, dependentSelection.mode, context.env);
+			runOneShotOperation(state, build, dependentRepository.worktree, dependentSelection.mode, context.env, {},{runtime:dependent.runtime,target:dependent.target});
 			await markRebuilt(context, sessionId, dependent.runtime.project.id, dependent.target.id, dependentSelection.mode, dependent.target);
 		} else await restartConsumer(dependentInput);
 	}
@@ -486,10 +486,10 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 		if (selection.projectId !== 'api' || selection.targetId !== 'service') throw new Error('The first development migration target is api.service.');
 		if (invocation.options.plan === true) return { action: 'migrate', sessionId, target: 'api.service', mutation: false };
 		const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
-		const { target } = selectedTarget(record, selection.projectId, selection.targetId);
+		const { runtime,target } = selectedTarget(record, selection.projectId, selection.targetId);
 		const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
 		if (!repository || !target.operations.build) throw new Error('API development build operation is unavailable.');
-		runOneShotOperation(state, target.operations.build, repository.worktree, 'candidate', context.env);
+		runOneShotOperation(state, target.operations.build, repository.worktree, 'candidate', context.env, {},{runtime,target});
 		return invoke(context, 'local.dev.migrate', { sessionId, projectId: 'api', targetId: 'service' });
 	}
 	if (invocation.command.name === 'dev restart') return restart(invocation, context, state, sessionId);

@@ -1,6 +1,46 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.live-source-tracked-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: one-shot build source custody rejects changed tracked bytes after exactly one native build
+  cli.golden.live-source-untracked-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: one-shot build source custody rejects added undeclared source after exactly one native build
+  cli.golden.live-source-output-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: one-shot build source custody accepts unchanged dirty source and its declared output
+  cli.golden.live-source-head-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/build-custody.test.ts
+    testName: one-shot build source custody rejects a moved Git head after exactly one native build
+  cli.golden.live-source-tracked-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild rejects tracked source mutation before stop and selection
+  cli.golden.live-source-untracked-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild rejects added undeclared source before stop and selection
+  cli.golden.live-source-head-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild rejects moved Git head before stop and selection
+  cli.golden.live-source-output-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/development-rebuild.test.ts
+    testName: native live rebuild accepts unchanged dirty source and an exact declared nonignored output
   cli.golden.live-directory-escape-unit:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

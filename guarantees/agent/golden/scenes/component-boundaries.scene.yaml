@@ -3,6 +3,30 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: live-source-tracked-unit
+    action: { verifier: cli.golden.live-source-tracked-unit }
+    expect: { status: passed }
+  - id: live-source-untracked-unit
+    action: { verifier: cli.golden.live-source-untracked-unit }
+    expect: { status: passed }
+  - id: live-source-output-unit
+    action: { verifier: cli.golden.live-source-output-unit }
+    expect: { status: passed }
+  - id: live-source-head-unit
+    action: { verifier: cli.golden.live-source-head-unit }
+    expect: { status: passed }
+  - id: live-source-tracked-native
+    action: { verifier: cli.golden.live-source-tracked-native }
+    expect: { status: passed }
+  - id: live-source-untracked-native
+    action: { verifier: cli.golden.live-source-untracked-native }
+    expect: { status: passed }
+  - id: live-source-head-native
+    action: { verifier: cli.golden.live-source-head-native }
+    expect: { status: passed }
+  - id: live-source-output-native
+    action: { verifier: cli.golden.live-source-output-native }
+    expect: { status: passed }
   - id: live-directory-escape-unit
     action: { verifier: cli.golden.live-directory-escape-unit }
     expect: { status: passed }
