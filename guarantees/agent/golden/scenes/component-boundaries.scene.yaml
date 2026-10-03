@@ -3,6 +3,12 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: architecture-workday-event-command
+    action: { verifier: cli.golden.architecture-workday-event-command }
+    expect: { status: passed }
+  - id: architecture-workday-event-native
+    action: { verifier: cli.golden.architecture-workday-event-native }
+    expect: { status: passed }
   - id: schema-canonical
     action: { verifier: cli.golden.schema-canonical }
     expect: { status: passed }
