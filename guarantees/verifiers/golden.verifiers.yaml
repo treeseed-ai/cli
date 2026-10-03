@@ -1,6 +1,11 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.architecture-assignment-pages-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/assignment-pages.test.ts
+    testName: "forwards exact assignment pages and transport denial through independent native CLI without hiding a failed tail"
   cli.golden.architecture-workday-event-command:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
