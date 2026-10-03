@@ -1,6 +1,11 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.architecture-usage-pages-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/usage-pages.test.ts
+    testName: "reads exact project workday measured usage pages and denies transport failure through independent native CLI"
   cli.golden.architecture-assignment-pages-1:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
