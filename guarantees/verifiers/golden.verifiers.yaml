@@ -1,6 +1,11 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.architecture-workspace-readback:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/workspace-readback.test.ts
+    testName: "reads exact closed and open workspace resources and preserves denied unavailable and missing authority through native CLI"
   cli.golden.architecture-usage-pages-1:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
