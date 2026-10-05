@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -44,7 +44,8 @@ test('teams use persists the active team and team commands inherit it', async ()
 test('leaf commands expose only catalog-derived high-level options', () => {
 	const byName = new Map(commandSpecs.map((command) => [command.name, command.options.map((option) => option.flag)]));
 	assert.deepEqual(byName.get('workdays start'), ['--server', '--team', '--preflight', '--digest', '--yes', '--json', '--idempotency-key', '--plan']);
-	assert.deepEqual(byName.get('plans show'), ['--server', '--json']);
+	assert.equal(byName.has('plans show'), false);
+	assert.deepEqual(byName.get('workdays stop'), ['--server', '--team', '--reason', '--yes', '--json', '--idempotency-key', '--plan']);
 	assert.deepEqual(byName.get('agents show'), ['--server', '--project', '--json']);
 	assert.deepEqual(byName.get('host status'), ['--server', '--json']);
 	assert.deepEqual(byName.get('host provider environment set'), ['--server', '--yes', '--json', '--plan', '--stdin']);
@@ -52,6 +53,7 @@ test('leaf commands expose only catalog-derived high-level options', () => {
 	assert.deepEqual(byName.get('providers environments grant'), ['--server', '--team', '--yes', '--json', '--if-match', '--idempotency-key', '--plan', '--input']);
 	assert.equal(commandSpecs.some((command) => command.options.some((option) => option.flag === '--execute' || option.flag === '--market')), false);
 });
+
 
 test('host commands preserve the SDK handler boundary and stable envelope', async () => {
 	const calls: unknown[] = []; const output: string[] = [];
@@ -61,6 +63,50 @@ test('host commands preserve the SDK handler boundary and stable envelope', asyn
 	assert.equal(exit, 0);
 	assert.deepEqual(calls, [{ handlerId: 'local.host.component.status', arguments: ['agent'], options: {} }]);
 	assert.deepEqual(JSON.parse(output[0]!).result, { componentId: 'agent', healthy: true });
+});
+
+
+test('host stop suspends a selected development session before stopping released workloads', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-stop-'));
+	const env = { XDG_STATE_HOME: root };
+	const stateRoot = resolve(root, 'treeseed', 'development'), sessionId = 'dev-test-session';
+	const local = { sessionId, manifest: '/fixture/manifest.yaml', processes: {}, overlays: [], candidates: [] };
+	const record = { session: { sessionId, status: 'active', targets: [{ projectId: 'admin', targetId: 'web', mode: 'live' }], repositories: [] },
+		runtimes: [{ project: { id: 'admin' }, targets: [{ id: 'web', kind: 'source-check', operations: {}, endpoints: [] }] }] };
+	mkdirSync(resolve(stateRoot, sessionId), { recursive: true });
+	for (const path of [resolve(root, 'treeseed'), stateRoot, resolve(stateRoot, sessionId)]) chmodSync(path, 0o700);
+	writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(local), { mode: 0o600 });
+	writeFileSync(resolve(stateRoot, sessionId, 'session.json'), JSON.stringify(local), { mode: 0o600 });
+	const calls: string[] = [];
+	const output: string[] = [];
+	try {
+		const exit = await runCommandLine(['host', 'stop', '--yes', '--json'], { env, interactiveUi: false, write: value => output.push(value),
+			hostInvoke: async (request: any) => {
+				calls.push(request.handlerId);
+				if (request.handlerId === 'local.dev.status') return JSON.parse(request.options.payload).all ? { sessions: [record] } : record;
+				if (request.handlerId === 'local.dev.session.suspend') return { ...record, session: { ...record.session, status: 'suspended' } };
+				return { state: 'stopped', changed: true };
+			},
+		});
+		assert.equal(exit, 0, output.join(''));
+		assert.deepEqual(calls, ['local.dev.status', 'local.dev.status', 'local.dev.session.suspend', 'local.host.stop']);
+		assert.equal(JSON.parse(readFileSync(resolve(stateRoot, sessionId, 'session.json'), 'utf8')).sessionId, sessionId);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('host stop fails before mutation when another owner holds a live development selection', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-owner-'));
+	const calls: string[] = []; const output: string[] = [];
+	try {
+		const exit = await runCommandLine(['host', 'stop', '--yes', '--json'], { env: { XDG_STATE_HOME: root }, interactiveUi: false,
+			write: value => output.push(value), hostInvoke: async (request: any) => {
+				calls.push(request.handlerId);
+				return { sessions: [{ session: { sessionId: 'dev-other-owner', status: 'active', targets: [{ mode: 'live' }] } }] };
+			} });
+		assert.equal(exit, 1);
+		assert.deepEqual(calls, ['local.dev.status']);
+		assert.match(output.join(''), /original owner/u);
+	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('AI mode commands use the same bounded host-manager authority', async () => {
@@ -87,6 +133,17 @@ test('host configuration adoption sends validated content and requires explicit 
 		assert.equal(calls[0]?.options.confirm, true);
 		assert.equal(calls[0]?.configuration.configurationId, 'development-workstation');
 		assert.deepEqual(calls[0]?.arguments, []);
+		const staged = await runCommandLine(['host', 'config', 'stage', file, '--yes', '--json'], {
+			interactiveUi: false, hostInvoke: async (value) => { calls.push(value); return { staged: true, lifecycle: 'stopped' }; }, write() {},
+		});
+		assert.equal(staged, 0);
+		assert.equal(calls.at(-1)?.handlerId, 'local.host.config.stage');
+		assert.equal(calls.at(-1)?.configuration.configurationId, 'development-workstation');
+		assert.equal(calls.at(-1)?.configuration.generation, 1);
+		assert.equal(await runCommandLine(['host', 'config', 'stage', resolve(root, 'missing.json'), '--yes', '--json'], {
+			interactiveUi: false, hostInvoke: async (value) => { calls.push(value); return {}; }, write() {},
+		}), 1);
+		assert.equal(calls.length, 2);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -95,6 +152,9 @@ test('host identity adoption is permanently bound to the protected local socket'
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config adopt' } as any }), true);
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host reset' } as any }), true);
 	assert.equal(hostUsesProtectedLocalTransport({ command: { name: 'host config apply' } as any }), false);
+	for (const name of ['host start', 'host stop', 'host config stage']) {
+		assert.equal(hostUsesProtectedLocalTransport({ command: { name } as any }), true, name);
+	}
 });
 
 test('host storage connect derives the active team and keeps bootstrap authority out of output', async () => {
@@ -174,6 +234,18 @@ test('plan mode prevents mutation operation invocation', async () => {
 	assert.equal(exit, 0);
 	assert.equal(invocations, 0);
 	assert.equal(JSON.parse(output[0]!).result.mutation, false);
+});
+
+test('execution reconciliation plan invokes the API-owned read-only diff', async () => {
+	const output: string[] = []; const invocations: Array<{ operationId: string; input: any }> = [];
+	const projectId = '22222222-2222-4222-8222-222222222222';
+	const exit = await runCommandLine(['execution', 'reconcile', '--team', '11111111-1111-4111-8111-111111111111', '--project', projectId, '--plan', '--json'], {
+		interactiveUi: false, operationInvoke: async (operationId, input) => { invocations.push({ operationId, input }); return { data: { changes: [] } }; },
+		write: (value) => output.push(value),
+	});
+	assert.equal(exit, 0);
+	assert.deepEqual(invocations, [{ operationId: 'execution.reconcile', input: { path: { teamId: '11111111-1111-4111-8111-111111111111' }, query: {}, body: { projectId, plan: true } } }]);
+	assert.deepEqual(JSON.parse(output[0]!).result, { changes: [] });
 });
 
 test('plan mode is non-mutating for local credential custody', async () => {

@@ -1,4 +1,4 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -21,7 +21,7 @@ function signature(root: string, outputs: string[], marker: string) {
 
 function publish(root: string, overlayRoot: string, outputs: string[], generation: number) {
 	const target = resolve(overlayRoot, `generation-${generation}`), next = resolve(overlayRoot, '.current-next'), current = resolve(overlayRoot, 'current');
-	rmSync(target, { recursive: true, force: true }); mkdirSync(target, { recursive: true, mode: 0o700 });
+	rmSync(target, { recursive: true, force: true }); mkdirSync(target, { recursive: true, mode: 0o750 }); chmodSync(target, 0o750);
 	cpSync(resolve(root, 'package.json'), resolve(target, 'package.json'));
 	if (existsSync(resolve(root, 'node_modules'))) symlinkSync(resolve(root, 'node_modules'), resolve(target, 'node_modules'), 'dir');
 	for (const output of outputs) {
@@ -37,7 +37,13 @@ function publish(root: string, overlayRoot: string, outputs: string[], generatio
 }
 
 export async function synchronizePackageOverlay(root: string, overlayRoot: string, outputs: string[], marker: string, intervalMs = 250) {
-	mkdirSync(overlayRoot, { recursive: true, mode: 0o700 });
+	const relativeRoot = relative(root, overlayRoot);
+	if (relativeRoot.startsWith('..') || relativeRoot === '') throw new Error('Package overlay root must be inside its source checkout.');
+	let directory = root;
+	for (const segment of relativeRoot.split('/')) {
+		directory = resolve(directory, segment);
+		mkdirSync(directory, { recursive: true, mode: 0o750 }); chmodSync(directory, 0o750);
+	}
 	let observed = '', stable = '', published = '', generation = 0, lastFailure = '';
 	while (true) {
 		try {

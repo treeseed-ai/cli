@@ -79,9 +79,23 @@ test('healthy exact managed snapshot is reusable; missing runtime requires start
     assert.equal(managedContainerAlreadyReady({ registered: false, state: null }, 'dev-test', 'operations-runner'), false);
 });
 
+test('healthy multi-container manager runtime is reusable', () => {
+	const instances = ['manager', 'runner'].map((name) => ({ name, sessionId: 'dev-test', target: 'agent.provider', running: true, health: 'healthy' }));
+	assert.equal(managedContainerAlreadyReady({ registered: true, instances, ready: true }, 'dev-test', 'provider'), true);
+	assert.equal(managedContainerAlreadyReady({ registered: true, instances: [{ ...instances[0], running: false }], ready: false }, 'dev-test', 'provider'), false);
+});
+
+test('managed Agent sandbox status recognizes exact active guest-image custody', () => {
+	const digest = `sha256:${'a'.repeat(64)}`;
+	assert.equal(managedContainerAlreadyReady({ registered: false, state: null }, 'dev-test', 'sandbox'), false);
+	assert.equal(managedContainerAlreadyReady({ registered: true, ready: true, digest, activeDigest: digest }, 'dev-test', 'sandbox'), true);
+	assert.equal(managedContainerAlreadyReady({ registered: true, ready: false, digest, activeDigest: `sha256:${'b'.repeat(64)}` }, 'dev-test', 'sandbox'), false);
+	assert.throws(() => managedContainerAlreadyReady({ registered: true, ready: true, digest: 'latest', activeDigest: digest }, 'dev-test', 'sandbox'), /identity/);
+});
+
 test('registered unhealthy, malformed, or wrong-instance state never authorizes overwrite', () => {
     const value = { Name: 'treeseed-dev-test-api-operations-runner', State: 'running', Health: 'unhealthy' };
-    assert.throws(() => managedContainerAlreadyReady({ registered: true, state: JSON.stringify(value) }, 'dev-test', 'operations-runner'), /dev restart/);
+    assert.equal(managedContainerAlreadyReady({ registered: true, state: JSON.stringify(value) }, 'dev-test', 'operations-runner'), false);
     value.Health = 'healthy'; value.Name = 'unrelated';
     assert.throws(() => managedContainerAlreadyReady({ registered: true, state: JSON.stringify(value) }, 'dev-test', 'operations-runner'), /identity/);
     for (const state of ['', 'not json', '{}\n{}']) assert.throws(() => managedContainerAlreadyReady({ registered: true, state }, 'dev-test', 'service'));

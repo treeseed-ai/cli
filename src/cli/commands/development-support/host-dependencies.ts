@@ -4,6 +4,13 @@ import { dirname, resolve, sep } from 'node:path';
 type Package = { dependencies?: Record<string, string>; optionalDependencies?: Record<string, string>; treeseed?: { hostRuntimeDependencies?: string[] } };
 const read = (root: string): Package => JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 
+function isCompletePackageOverlay(path: string, name: string) {
+	const marker = `${sep}.treeseed${sep}cache${sep}development-sessions${sep}`;
+	return path.includes(marker) && new RegExp(`${sep}package${sep}generation-[1-9][0-9]*$`, 'u').test(path)
+		&& existsSync(resolve(path, 'dist', '.treeseed-build-complete.json'))
+		&& (read(path) as Package & { name?: string }).name === name;
+}
+
 /** Deployment declares its runtime roots; npm's installed graph supplies their closure. */
 export function hostDependencyRoots(worktree: string): string[] {
 	const root = realpathSync(worktree), manifest = read(root);
@@ -19,11 +26,12 @@ export function hostDependencyRoots(worktree: string): string[] {
 			cursor = dirname(cursor);
 		}
 		if (!selected) { if (optional) return; throw new Error(`Host runtime dependency is missing: ${name}`); }
-		if (realpathSync(selected) !== selected) throw new Error('Host runtime dependency contains a symbolic link.');
+		const resolved = realpathSync(selected), overlay = resolved !== selected && isCompletePackageOverlay(resolved, name);
+		if (resolved !== selected && !overlay) throw new Error('Host runtime dependency contains a symbolic link.');
 		if (found.has(selected)) return;
 		found.add(selected);
 		const pkg = read(selected);
-		for (const dependency of Object.keys({ ...pkg.dependencies, ...pkg.optionalDependencies })) visit(dependency, selected, dependency in (pkg.optionalDependencies ?? {}));
+		for (const dependency of Object.keys({ ...pkg.dependencies, ...pkg.optionalDependencies })) visit(dependency, overlay ? root : selected, dependency in (pkg.optionalDependencies ?? {}));
 	}
 	for (const name of names) {
 		if (!(name in (manifest.dependencies ?? {}))) throw new Error('Host runtime root must be a production dependency.');

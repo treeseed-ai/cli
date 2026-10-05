@@ -1,22 +1,22 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { developmentCandidateSchema, developmentRuntimeSchema, type DevelopmentRuntime, type DevelopmentTarget } from '@treeseed/sdk/development';
-import { parse as parseYaml } from 'yaml';
+import { developmentCandidateSchema, type DevelopmentRuntime, type DevelopmentTarget } from '@treeseed/sdk/development';
 import type { CommandContext, ParsedInvocation } from '../types.js';
-import { invokeLocalHostManager } from '../support/host-client.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
 import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
-import { artifactPaths, compatibilityAttestations, withFreezeLock } from './development-support/candidate.js';
+import { artifactPaths, compatibilityAttestations, developmentOperationDirectory, freezeCustody, readDevelopmentArtifact, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
 import { developmentBootOrder } from './development-support/boot-order.js';
-import { managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
+import { assertNoSelectedDevelopmentCustody, managedContainerAlreadyReady, withDevelopmentLifecycle } from './development-support/lifecycle.js';
+import { loadDevelopmentRuntimes } from './development-support/runtime-loader.js';
+import { dependentDevelopmentAction, parseDevelopmentSelection as parseSelection, selectedDevelopmentTarget as selectedTarget } from './development-support/selection.js';
+import { invokeDevelopmentManager as invoke } from './development-support/manager/invoke.js';
 export { relativeOverlayTarget, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from './development-support/overlays.js';
-
 export { developmentCliEntrypointPath, selectDevelopmentCli } from './development-cli-selection.js';
 
 interface LocalSessionState {
@@ -28,8 +28,6 @@ interface LocalSessionState {
 	candidates: string[];
 }
 
-interface ProjectSelection { manifest: string; worktree?: string; targets?: Array<{ id: string; mode: 'released' | 'candidate' | 'live' }> }
-
 interface DevelopmentStatusRecord {
 	session: {
 		targets: Array<{ projectId: string; targetId: string; mode: 'released' | 'candidate' | 'live'; generation: number; health?: string }>;
@@ -37,13 +35,11 @@ interface DevelopmentStatusRecord {
 	};
 	runtimes: DevelopmentRuntime[];
 }
-
 function statePath(env: NodeJS.ProcessEnv) { return resolve(developmentStateRoot(env), 'current.json'); }
-
-function saveState(state: LocalSessionState, env: NodeJS.ProcessEnv) {
+function saveState(state: LocalSessionState, env: NodeJS.ProcessEnv, select = true) {
 	const path = statePath(env), temporary = `${path}.new`;
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-	writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 }); renameSync(temporary, path);
+	if (select) { writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 }); renameSync(temporary, path); }
 	const snapshot=resolve(developmentStateRoot(env),state.sessionId,'session.json');
 	mkdirSync(dirname(snapshot),{recursive:true,mode:0o700});
 	writeFileSync(`${snapshot}.new`,`${JSON.stringify(state,null,2)}\n`,{mode:0o600});renameSync(`${snapshot}.new`,snapshot);
@@ -62,62 +58,9 @@ function loadState(env: NodeJS.ProcessEnv, sessionId?: unknown) {
 
 function sha256(value: string | Buffer) { return `sha256:${createHash('sha256').update(value).digest('hex')}`; }
 function sha512Integrity(value: Buffer) { return `sha512-${createHash('sha512').update(value).digest('base64')}`; }
-
-function git(root: string, args: string[]) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim(); }
-
-function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
-	const pathspec = excludedPaths.length ? ['--', '.', ...excludedPaths.map((path) => `:(exclude)${path}`)] : [];
-	const status = git(worktree, ['status', '--porcelain=v1', '--untracked-files=all', ...pathspec]);
-	const branch = git(worktree, ['branch', '--show-current']) || null;
-	return { projectId: runtime.project.id, repository: runtime.project.repository, worktree, commit: git(worktree, ['rev-parse', 'HEAD']), branch, dirty: Boolean(status), dirtyDigest: status ? sha256(`${status}\n${git(worktree, ['diff', '--binary', 'HEAD', ...pathspec])}`) : null, recipeDigest: sha256(JSON.stringify(runtime)) };
-}
-
-function projectSelections(file: string): ProjectSelection[] {
-	const root = dirname(file), document = parseYaml(readFileSync(file, 'utf8')) as Record<string, unknown>;
-	if (document.development) return [{ manifest: file, worktree: root }];
-	if (!Array.isArray(document.projects) || document.projects.length === 0) throw new Error('Development session manifest requires a non-empty projects array.');
-	return document.projects.map((project) => {
-		if (!project || typeof project !== 'object' || Array.isArray(project)) throw new Error('Development project selection must be an object.');
-		const input = project as Record<string, unknown>;
-		if (typeof input.manifest !== 'string') throw new Error('Development project selection requires a manifest path.');
-		const manifest = isAbsolute(input.manifest) ? input.manifest : resolve(root, input.manifest);
-		const worktree = typeof input.worktree === 'string' ? (isAbsolute(input.worktree) ? input.worktree : resolve(root, input.worktree)) : dirname(manifest);
-		return { manifest, worktree, ...(Array.isArray(input.targets) ? { targets: input.targets as ProjectSelection['targets'] } : {}) };
-	});
-}
-
-function loadRuntimes(file: string) {
-	return projectSelections(file).map((selection) => {
-		const document = parseYaml(readFileSync(selection.manifest, 'utf8')) as { development?: unknown };
-		return { selection, runtime: developmentRuntimeSchema.parse(document.development) };
-	});
-}
-
-function hostCommand(handlerId: string, payload: unknown) {
-	return { handlerId, arguments: [], options: { payload: JSON.stringify(payload) } };
-}
-
-async function invoke(context: CommandContext, handlerId: string, payload: unknown) {
-	const command = hostCommand(handlerId, payload);
-	return context.hostInvoke ? context.hostInvoke(command) : invokeLocalHostManager(command);
-}
-
-function parseSelection(value: string) {
-	const match = /^([a-z][a-z0-9.-]{1,63})\.([a-z][a-z0-9.-]{1,63})=(released|candidate|live)$/u.exec(value);
-	if (!match) throw new Error(`Invalid development selection ${value}; expected project.target=mode.`);
-	return { projectId: match[1]!, targetId: match[2]!, mode: match[3]! as 'released' | 'candidate' | 'live' };
-}
-
-function selectedTarget(record: unknown, projectId: string, targetId: string) {
-	const value = record as { runtimes?: DevelopmentRuntime[] };
-	const runtime = value.runtimes?.find((entry) => entry.project.id === projectId);
-	const target = runtime?.targets.find((entry) => entry.id === targetId);
-	if (!runtime || !target) throw new Error(`Development target ${projectId}.${targetId} is not part of the current session.`);
-	return { runtime, target };
-}
-
 function operationForMode(target: DevelopmentTarget, mode: string) {
 	if (mode === 'released') return null;
+	if (String(target.kind) === 'source-check') return target.operations.verify ?? null;
 	if (target.kind === 'package-watch') return target.operations.watch ?? target.operations.build ?? null;
 	if (target.kind === 'rebuild-restart') return target.operations.start ?? null;
 	if (mode === 'candidate') return target.operations.build ?? target.operations.start ?? null;
@@ -125,23 +68,26 @@ function operationForMode(target: DevelopmentTarget, mode: string) {
 }
 
 export function usesManagedContainer(target: DevelopmentTarget) {
-	return target.operations.start?.command === 'docker';
+	return (target as DevelopmentTarget & { executionCustody?: string }).executionCustody === 'manager' || target.operations.start?.command === 'docker';
 }
 
+function usesManagerBuild(target: DevelopmentTarget) {
+	return (target as DevelopmentTarget & { executionCustody?: string }).executionCustody === 'manager';
+}
 async function containerOperation(context: CommandContext, sessionId: string, runtime: DevelopmentRuntime, target: DevelopmentTarget, action: 'start' | 'stop' | 'status' | 'logs') {
 	return invoke(context, 'local.dev.container', {sessionId,projectId:runtime.project.id,targetId:target.id,action});
 }
-
-export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}) {
+export function developmentOperationEnvironment(state: Pick<LocalSessionState, 'manifest' | 'sessionId' | 'workspaceRoot'>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, operationEnvironment: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 	return { ...env, ...resolvedEnvironment, TREESEED_DEVELOPMENT_SESSION_ID: state.sessionId, TREESEED_DEVELOPMENT_MODE: mode, TREESEED_DEVELOPMENT_WORKSPACE_ROOT: state.workspaceRoot ?? dirname(state.manifest), TREESEED_DEVELOPMENT_WORKTREE: worktree, ...operationEnvironment };
 }
-
-function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
-	const root = operation.cwd ? resolve(worktree, operation.cwd) : worktree;
-	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
+export function runOneShotOperation(state: LocalSessionState, operation: NonNullable<DevelopmentTarget['operations']['setup']>, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}, build?: {runtime:DevelopmentRuntime;target:DevelopmentTarget}) {
+	const root = developmentOperationDirectory(worktree,operation.cwd);
+	const outputs=build?.target.outputs.map(output=>output.path)??[],source=build?repositoryClosure(build.runtime,worktree,outputs):undefined;
+	const result = spawnSync(operation.command, operation.args, { cwd: root, env: developmentOperationEnvironment(state, worktree, mode, env, resolvedEnvironment, operation.environment), stdio: 'pipe', timeout: operation.timeoutSeconds * 1_000 });
 	if (result.status !== 0) throw new Error(`Development operation failed: ${operation.command} ${operation.args.join(' ')}.`);
+	if(developmentOperationDirectory(worktree,operation.cwd)!==root)throw new Error('Development command working directory custody changed during execution.');
+	if(build&&JSON.stringify(repositoryClosure(build.runtime,worktree,outputs))!==JSON.stringify(source))throw new Error('Development build source changed during execution.');
 }
-
 function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, target: DevelopmentTarget, worktree: string, mode: string, env: NodeJS.ProcessEnv, resolvedEnvironment: NodeJS.ProcessEnv = {}) {
 	const operation = operationForMode(target, mode);
 	if (!operation) return null;
@@ -159,13 +105,11 @@ function startOperation(state: LocalSessionState, runtime: DevelopmentRuntime, t
 		return state.processes[key] = { pid: child.pid, identity: processIdentity(child.pid), projectId: runtime.project.id, targetId: target.id, log };
 	} finally { closeSync(descriptor); }
 }
-
 function operationIsRunning(state: LocalSessionState, key: string) {
 	const existing = state.processes[key]; if (!existing) return false;
 	if (ownsDevelopmentProcess(existing, state.sessionId)) return true;
 	delete state.processes[key]; return false;
 }
-
 async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds: number, state?: LocalSessionState, key?: string) {
 	if (target.ready.kind === 'process') {
 		if (!state || !key) throw new Error(`Process readiness for ${target.id} requires tracked process state.`);
@@ -188,9 +132,10 @@ async function waitForDirectReadiness(target: DevelopmentTarget, timeoutSeconds:
 	}
 	throw new Error(`Readiness timed out for ${target.id}.`);
 }
-
 async function startSession(invocation: ParsedInvocation, context: CommandContext) {
-	const manifest = resolve(context.cwd, invocation.arguments[0]!); const projects = loadRuntimes(manifest);
+	const manifest = resolve(context.cwd, invocation.arguments[0]!);
+	if (invocation.options.plan !== true) assertNoSelectedDevelopmentCustody(context.env);
+	const projects = await loadDevelopmentRuntimes(manifest, invocation.options.plan !== true);
 	const now = new Date();
 	const sessionId = `dev-${randomUUID().slice(0, 12)}`;
 	const targets = projects.flatMap(({ selection, runtime }) => (selection.targets ?? runtime.targets.map((target) => ({ id: target.id, mode: target.kind === 'rebuild-restart' ? 'candidate' as const : 'released' as const }))).map((target) => ({ projectId: runtime.project.id, targetId: target.id, mode: target.mode, generation: 0, health: target.mode === 'released' ? 'ready' as const : 'pending' as const })));
@@ -203,10 +148,12 @@ async function startSession(invocation: ParsedInvocation, context: CommandContex
 
 async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'options'>, context: CommandContext) {
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
-	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { status?: string; repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
-	if (record.session.status === 'stopped') throw new Error('The development session has been explicitly stopped.');
 	const selections = [invocation.arguments[0]!, ...(Array.isArray(invocation.options.target) ? invocation.options.target : [])].map(parseSelection);
 	if (invocation.options.plan === true) return { sessionId, selections, mutation: false };
+	const runtimes = (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime);
+	await invoke(context, 'local.dev.session.refresh', { sessionId, runtimes });
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { status?: string; repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
+	if (record.session.status === 'stopped') throw new Error('The development session has been explicitly stopped.');
 	for (const selection of selections) {
 		const { runtime, target } = selectedTarget(record, selection.projectId, selection.targetId);
 		const repository = (record as { session: { repositories: Array<{ projectId: string; worktree: string }> } }).session.repositories.find((entry) => entry.projectId === selection.projectId);
@@ -224,13 +171,20 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 			if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, null);
 		} else {
 			if (usesManagedContainer(target) && managedContainerAlreadyReady(await containerOperation(context, sessionId, runtime, target, 'status'), sessionId, target.id)) {
-				await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+				await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(!usesManagerBuild(target) && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 				continue;
 			}
 			const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: selection.projectId, targetId: selection.targetId }) as { environment?: NodeJS.ProcessEnv };
 			if (target.operations.setup) runOneShotOperation(state, target.operations.setup, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			if (String(target.kind) === 'source-check') {
+				if (!target.operations.verify) throw new Error(`${selection.projectId}.${selection.targetId} does not declare verification.`);
+				runOneShotOperation(state, target.operations.verify, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+				await invoke(context, 'local.dev.rebuild', { sessionId, projectId: selection.projectId, targetId: selection.targetId });
+				await invoke(context, 'local.dev.use', { sessionId, ...selection });
+				continue;
+			}
 			const running = operationIsRunning(state, `${runtime.project.id}.${target.id}`);
-			if (target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
+			if (!usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build && !running) runOneShotOperation(state, target.operations.build, repository.worktree, selection.mode, context.env, resolved.environment ?? {},{runtime,target});
 			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'start');
 			else startOperation(state, runtime, target, repository.worktree, selection.mode, context.env, resolved.environment ?? {});
 			saveState(state, context.env);
@@ -242,7 +196,7 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 				if (selection.projectId === 'cli' && selection.targetId === 'package') selectDevelopmentCli(context.env, { entrypoint: resolve(overlayRoot, 'current', 'dist', 'cli', 'main.js') });
 			} else if (!usesManagedContainer(target)) await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds, state, `${runtime.project.id}.${target.id}`);
 		}
-		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+		await invoke(context, 'local.dev.use', { sessionId, ...selection, ...(selection.mode !== 'released' && !usesManagerBuild(target) && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	}
 	saveState(state, context.env); return invoke(context, 'local.dev.status', { sessionId, all: false });
 }
@@ -250,25 +204,26 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 async function freeze(invocation: ParsedInvocation, context: CommandContext) {
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
 	return withFreezeLock(context.env, sessionId, async () => {
-		const source = record.session.repositories.map((repository) => {
-		const runtime = record.runtimes.find((entry) => entry.project.id === repository.projectId);
-		if (!runtime) throw new Error(`Development runtime is missing for ${repository.projectId}.`);
-		return repositoryClosure(runtime, repository.worktree);
-		});
+		const custody=freezeCustody(record),source=custody.source;
 		const dirty = source.some((entry) => entry.dirty);
 		if (dirty && invocation.options.allowDirty !== true) throw new Error('Freeze found dirty source; pass --allow-dirty to create a non-promotable candidate.');
 		const artifacts: Array<{ projectId: string; targetId: string; kind: string; identity: string; digest: string; integrity?: string }> = [];
 		for (const runtime of record.runtimes) for (const target of runtime.targets) if (target.freeze && record.session.targets.some((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id && selected.mode !== 'released')) {
 		const repository = record.session.repositories.find((entry) => entry.projectId === runtime.project.id)!;
-		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: target.freeze.operation.cwd ? resolve(repository.worktree, target.freeze.operation.cwd) : repository.worktree, env: { ...context.env, ...target.freeze.operation.environment }, stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
+		const mode = record.session.targets.find((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id)!.mode;
+		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: developmentOperationDirectory(repository.worktree,target.freeze.operation.cwd), env: developmentOperationEnvironment(state,repository.worktree,mode,context.env,{},target.freeze.operation.environment), stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
 		if (result.status !== 0) throw new Error(`Freeze failed for ${runtime.project.id}.${target.id}.`);
+		custody.assert(artifacts);
 		for (const contractOperation of target.freeze.contractOperations) {
-			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: contractOperation.cwd ? resolve(repository.worktree, contractOperation.cwd) : repository.worktree, env: { ...context.env, ...contractOperation.environment }, stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
+			const contract = spawnSync(contractOperation.command, contractOperation.args, { cwd: developmentOperationDirectory(repository.worktree,contractOperation.cwd), env: developmentOperationEnvironment(state,repository.worktree,mode,context.env,{},contractOperation.environment), stdio: 'inherit', timeout: contractOperation.timeoutSeconds * 1_000 });
 			if (contract.status !== 0) throw new Error(`Contract generation failed for ${runtime.project.id}.${target.id}.`);
+			custody.assert(artifacts);
 		}
-		for (const pattern of target.freeze.artifacts) for (const path of artifactPaths(pattern, repository.worktree)) { const bytes = readFileSync(path); artifacts.push({ projectId: runtime.project.id, targetId: target.id, kind: target.freeze.kind, identity: relative(repository.worktree, path), digest: sha256(bytes), ...(target.freeze.kind === 'npm-package' ? { integrity: sha512Integrity(bytes) } : {}) }); }
+		for (const pattern of target.freeze.artifacts) for (const path of artifactPaths(pattern, repository.worktree)) { const bytes = readDevelopmentArtifact(repository.worktree,path); artifacts.push({ projectId: runtime.project.id, targetId: target.id, kind: target.freeze.kind, identity: relative(repository.worktree, path), digest: sha256(bytes), ...(target.freeze.kind === 'npm-package' ? { integrity: sha512Integrity(bytes) } : {}) }); }
+		if(!artifacts.some(artifact=>artifact.projectId===runtime.project.id&&artifact.targetId===target.id)) throw new Error(`Freeze produced no declared artifacts for ${runtime.project.id}.${target.id}.`);
 		}
 		if (!artifacts.length) throw new Error('Selected development closure produced no declared freeze artifacts.');
+		custody.assert(artifacts);
 		const candidateId = `candidate-${randomUUID().slice(0, 12)}`;
 		const dependencyGenerations = Object.fromEntries(record.session.targets.map((target) => [`${target.projectId}.${target.targetId}`, target.generation]));
 		const candidate = developmentCandidateSchema.parse({ schemaVersion: 'treeseed.development-candidate/v1', candidateId, sessionId, createdAt: new Date().toISOString(), source, artifacts, configurationDigest: sha256(JSON.stringify(record.runtimes)), dependencyGenerations, compatibilityAttestations: compatibilityAttestations(record.session.repositories), verification: { status: 'pending', operations: [], completedAt: null }, promotable: false });
@@ -285,24 +240,31 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 	const candidate = developmentCandidateSchema.parse(JSON.parse(readFileSync(selected, 'utf8')));
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
 	const operations: string[] = [];
-	for (const artifact of candidate.artifacts) {
+	const bindings = candidate.artifacts.map(artifact => {
 		const runtime = record.runtimes.find((entry) => entry.project.id === artifact.projectId), target = runtime?.targets.find((entry) => entry.id === artifact.targetId), repository = record.session.repositories.find((entry) => entry.projectId === artifact.projectId);
-		if (!target?.operations.verify || !repository) continue;
+		if (!target?.operations.verify || !repository || !candidate.source.some(source=>source.projectId===artifact.projectId)) throw new Error(`Candidate verification operation is unavailable for ${artifact.projectId}.${artifact.targetId}.`);
+		const directory=developmentOperationDirectory(repository.worktree,target.operations.verify.cwd);
 		const artifactPath = resolve(repository.worktree, artifact.identity);
 		const artifactRelative = relative(repository.worktree, artifactPath);
 		if (artifactRelative.startsWith('..') || isAbsolute(artifactRelative)) throw new Error(`Candidate artifact identity escapes its source repository: ${artifact.identity}.`);
-		if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification: ${artifact.identity}.`);
-		const operation = target.operations.verify, result = spawnSync(operation.command, operation.args, { cwd: operation.cwd ? resolve(repository.worktree, operation.cwd) : repository.worktree, env: { ...context.env, ...operation.environment }, stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
-		operations.push(`${artifact.projectId}.${artifact.targetId}:${operation.command} ${operation.args.join(' ')}`);
-		if (result.status !== 0) throw new Error(`Candidate verification failed for ${artifact.projectId}.${artifact.targetId}.`);
-		if (!existsSync(artifactPath) || sha256(readFileSync(artifactPath)) !== artifact.digest) throw new Error(`Candidate verification rebuilt or changed sealed artifact ${artifact.identity}.`);
-	}
-	if (!operations.length) throw new Error('Candidate verification requires at least one declared verification operation.');
+		return {artifact,artifactPath,repository,operation:target.operations.verify,directory};
+	});
+	const assertCustody = () => {
+	for(const {repository,operation,directory} of bindings)if(developmentOperationDirectory(repository.worktree,operation.cwd)!==directory)throw new Error('Development command working directory custody changed during verification.');
+	for (const {artifact,artifactPath,repository} of bindings) if (!existsSync(artifactPath) || sha256(readDevelopmentArtifact(repository.worktree,artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification or changed sealed artifact: ${artifact.identity}.`);
 	for (const source of candidate.source) {
 		const runtime = record.runtimes.find((entry) => entry.project.id === source.projectId);
 		const repository = record.session.repositories.find((entry) => entry.projectId === source.projectId);
 		const artifactPaths = candidate.artifacts.filter((artifact) => artifact.projectId === source.projectId).map((artifact) => artifact.identity);
 		if (!runtime || !repository || JSON.stringify(repositoryClosure(runtime, repository.worktree, artifactPaths)) !== JSON.stringify(source)) throw new Error(`Candidate source changed after freeze: ${source.projectId}.`);
+	}
+	};
+	assertCustody();
+	for (const {artifact,repository,operation} of new Map(bindings.map(binding=>[JSON.stringify([binding.artifact.projectId,binding.artifact.targetId]),binding])).values()) {
+		const result = spawnSync(operation.command, operation.args, { cwd: developmentOperationDirectory(repository.worktree,operation.cwd), env: { ...context.env, ...operation.environment }, stdio: 'inherit', timeout: operation.timeoutSeconds * 1_000 });
+		operations.push(`${artifact.projectId}.${artifact.targetId}:${operation.command} ${operation.args.join(' ')}`);
+		if (result.status !== 0) throw new Error(`Candidate verification failed for ${artifact.projectId}.${artifact.targetId}.`);
+		assertCustody();
 	}
 	const verified = developmentCandidateSchema.parse({ ...candidate, verification: { status: 'passed', operations, completedAt: new Date().toISOString() }, promotable: !candidate.source.some((source) => source.dirty) });
 	writeFileSync(selected, `${JSON.stringify(verified, null, 2)}\n`, { mode: 0o600 }); await invoke(context, 'local.dev.candidate.register', { sessionId, candidate: verified }); return { candidate: verified, receipt: selected };
@@ -310,32 +272,38 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 
 async function markRebuilt(context: CommandContext, sessionId: string, projectId: string, targetId: string, mode: 'candidate' | 'live', target: DevelopmentTarget) {
 	await invoke(context, 'local.dev.rebuild', { sessionId, projectId, targetId });
-	await invoke(context, 'local.dev.use', { sessionId, projectId, targetId, mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+	await invoke(context, 'local.dev.use', { sessionId, projectId, targetId, mode, ...(!usesManagerBuild(target) && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 }
 
-async function rebuildPackage(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext }) {
-	const { state, runtime, target, worktree, mode, context } = input;
+async function rebuildPackage(input: { state: LocalSessionState; record: { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] }; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext }) {
+	const { state, record, runtime, target, worktree, mode, context } = input;
 	if (!target.operations.build) throw new Error(`${runtime.project.id}.${target.id} does not declare a rebuild operation.`);
 	const overlayRoot = resolve(worktree, '.treeseed', 'cache', 'development-sessions', state.sessionId, target.id);
 	const previous = overlayGeneration(overlayRoot);
-	runOneShotOperation(state, target.operations.build, worktree, mode, context.env);
+	runOneShotOperation(state, target.operations.build, worktree, mode, context.env, {},{runtime,target});
 	await waitForNewPackageOverlay(target, worktree, overlayRoot, previous);
+	// Recovery can retain a healthy synchronizer while a consumer link has been
+	// restored to its released package. Every rebuild reasserts the selected
+	// package overlay before restarting dependants.
+	installPackageOverlay(state, record, runtime, target, worktree, overlayRoot);
 	await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
-
 async function restartConsumer(input: { state: LocalSessionState; runtime: DevelopmentRuntime; target: DevelopmentTarget; worktree: string; mode: 'candidate' | 'live'; context: CommandContext; recordGeneration?: boolean }) {
 	const { state, runtime, target, worktree, mode, context } = input, key = `${runtime.project.id}.${target.id}`;
-	if (usesManagedContainer(target)) await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
-	await stopProcess(state, key);
-	if (usesManagedContainer(target)) await containerOperation(context, state.sessionId, runtime, target, 'stop');
-	else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
+	if (usesManagedContainer(target) && !usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {},{runtime,target});
+	await stopProcess(state, key);
+	if (usesManagedContainer(target)) {
+		// Preserve the live selection if manager custody refuses an active claim.
+		await containerOperation(context, state.sessionId, runtime, target, 'stop');
+		await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
+	}
+	else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
 	if (!target.operations.start && target.kind === 'rebuild-restart' && target.operations.build) {
-		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
+		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {},{runtime,target});
 		await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
 	} else if (usesManagedContainer(target)) {
-		if (target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {});
 		await containerOperation(context, state.sessionId, runtime, target, 'start');
 	} else {
 		startOperation(state, runtime, target, worktree, mode, context.env, resolved.environment ?? {});
@@ -344,26 +312,34 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 	}
 	if (input.recordGeneration !== false) await markRebuilt(context, state.sessionId, runtime.project.id, target.id, mode, target);
 }
-
 async function restart(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
-	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+	const status = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+	const record = { ...status, runtimes: (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime) };
 	const selected = record.session.targets.find((entry) => entry.projectId === selection.projectId && entry.targetId === selection.targetId);
 	if (!selected || selected.mode === 'released') throw new Error(`${selection.projectId}.${selection.targetId} is not selected for local development.`);
 	const { runtime, target } = selectedTarget(record, selection.projectId, selection.targetId);
-	if (target.kind === 'package-watch') throw new Error('Package-watch targets rebuild atomically and do not support restart.');
 	const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
 	if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 	if (invocation.options.plan === true) return { sessionId, target: `${selection.projectId}.${selection.targetId}`, mode: selected.mode, restart: true, mutation: false };
+	if (String(target.kind) === 'source-check') {
+		if (!target.operations.verify) throw new Error(`${selection.projectId}.${selection.targetId} does not declare verification.`);
+		runOneShotOperation(state, target.operations.verify, repository.worktree, selected.mode, context.env);
+		await markRebuilt(context, sessionId, runtime.project.id, target.id, selected.mode as 'candidate' | 'live', target);
+		return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
+	}
+	if (target.kind === 'package-watch') throw new Error('Package-watch targets rebuild atomically and do not support restart.');
 	await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode: selected.mode as 'candidate' | 'live', context, recordGeneration: false });
 	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
-
 async function rebuild(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
-	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+	const runtimes = (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime);
+	if (invocation.options.plan !== true) await invoke(context, 'local.dev.session.refresh', { sessionId, runtimes });
+	const status = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+	const record = { ...status, runtimes };
 	const selected = record.session.targets.find((entry) => entry.projectId === selection.projectId && entry.targetId === selection.targetId);
 	if (!selected || selected.mode === 'released') throw new Error(`${selection.projectId}.${selection.targetId} is not selected for local development.`);
 	const { runtime, target } = selectedTarget(record, selection.projectId, selection.targetId);
@@ -376,15 +352,23 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		mode,
 		mutation: false,
 	};
-	if (target.kind === 'package-watch') await rebuildPackage({ state, runtime, target, worktree: repository.worktree, mode, context });
+	if (String(target.kind) === 'source-check') {
+		if (!target.operations.verify) throw new Error(`${selection.projectId}.${selection.targetId} does not declare verification.`);
+		runOneShotOperation(state, target.operations.verify, repository.worktree, mode, context.env);
+		await markRebuilt(context, sessionId, runtime.project.id, target.id, mode, target);
+	} else if (target.kind === 'package-watch') await rebuildPackage({ state, record, runtime, target, worktree: repository.worktree, mode, context });
 	else if (target.kind === 'rebuild-restart') {
+		if (usesManagerBuild(target) || (usesManagedContainer(target) && target.operations.build)) {
+			await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
+		} else {
 		if (!target.operations.build) throw new Error(`${selection.projectId}.${selection.targetId} does not declare a build operation.`);
 		const resolved = await invoke(context, 'local.dev.environment', { sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
-		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env, resolved.environment ?? {});
+		runOneShotOperation(state, target.operations.build, repository.worktree, mode, context.env, resolved.environment ?? {},{runtime,target});
 		if (target.operations.start) await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 		else {
 			await waitForDirectReadiness(target, target.ready.kind === 'process' ? target.ready.graceSeconds : target.ready.timeoutSeconds);
 			await markRebuilt(context, sessionId, runtime.project.id, target.id, mode, target);
+		}
 		}
 	} else await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode, context });
 	const manual: string[] = [];
@@ -392,29 +376,37 @@ async function rebuild(invocation: ParsedInvocation, context: CommandContext, st
 		const dependentSelection = record.session.targets.find((entry) => entry.projectId === dependent.runtime.project.id && entry.targetId === dependent.target.id);
 		const dependentRepository = record.session.repositories.find((entry) => entry.projectId === dependent.runtime.project.id);
 		if (!dependentSelection || dependentSelection.mode === 'released' || !dependentRepository) continue;
-		if (dependent.reaction === 'manual') { manual.push(`${dependent.runtime.project.id}.${dependent.target.id}`); continue; }
-		const dependentInput = { state, runtime: dependent.runtime, target: dependent.target, worktree: dependentRepository.worktree, mode: dependentSelection.mode as 'candidate' | 'live', context };
-		if (dependent.reaction === 'rebuild' && dependent.target.kind === 'package-watch') await rebuildPackage(dependentInput);
-		else if (dependent.reaction === 'rebuild' && dependent.target.operations.build) {
-			runOneShotOperation(state, dependent.target.operations.build, dependentRepository.worktree, dependentSelection.mode, context.env);
+		const action = dependentDevelopmentAction(dependent.reaction, dependent.target);
+		if (action === 'manual') { manual.push(`${dependent.runtime.project.id}.${dependent.target.id}`); continue; }
+		const dependentInput = { state, record, runtime: dependent.runtime, target: dependent.target, worktree: dependentRepository.worktree, mode: dependentSelection.mode as 'candidate' | 'live', context };
+		if (action === 'package-rebuild') await rebuildPackage(dependentInput);
+		else if (action === 'rebuild-restart') await restartConsumer(dependentInput);
+		else if (action === 'build-only') {
+			const build = dependent.target.operations.build;
+			if (!build) throw new Error('Build-only dependent has no build operation.');
+			runOneShotOperation(state, build, dependentRepository.worktree, dependentSelection.mode, context.env, {},{runtime:dependent.runtime,target:dependent.target});
 			await markRebuilt(context, sessionId, dependent.runtime.project.id, dependent.target.id, dependentSelection.mode, dependent.target);
 		} else await restartConsumer(dependentInput);
 	}
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, manual, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
-
 /** Resume only current manager selections; never reconstruct desired state from stale PIDs. */
 export async function resumeDevelopmentSession(sessionId: string, context: CommandContext) {
 	return withDevelopmentLifecycle(context.env, () => resumeDevelopmentUnlocked(sessionId, context), { waitForOwner: true });
 }
-
+export async function suspendDevelopmentSession(sessionId: string, context: CommandContext) {
+	return withDevelopmentLifecycle(context.env, () => closeDevelopmentSession(loadState(context.env, sessionId), sessionId, context, false)); }
 async function resumeDevelopmentUnlocked(sessionId: string, context: CommandContext) {
 	if (!/^dev-[a-z0-9-]{1,64}$/.test(sessionId)) throw new Error('An exact development session is required.');
 	loadState(context.env, sessionId);
 	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord & { session: { status: string } };
 	if (record.session.status === 'stopped') return;
+	const configuration = await invoke(context, 'local.host.config.show', {}) as { components?: Record<string, { enabled?: boolean }> };
+	if (!configuration.components) throw new Error('Manager did not return the authoritative host component selection.');
 	for (const target of developmentBootOrder(record.session.targets, record.runtimes)) {
+		const componentId = target.projectId === 'ai' ? target.targetId : target.projectId;
+		if (configuration.components[componentId]?.enabled === false) continue;
 		const current = await invoke(context, 'local.dev.status', { sessionId, all: false }) as typeof record;
 		if (current.session.status === 'stopped') return;
 		const selected = current.session.targets.find(entry => entry.projectId === target.projectId && entry.targetId === target.targetId);
@@ -422,7 +414,29 @@ async function resumeDevelopmentUnlocked(sessionId: string, context: CommandCont
 		await useTargets({ arguments: [`${target.projectId}.${target.targetId}=${target.mode}`], options: { session: sessionId } }, context);
 	}
 }
-
+async function closeDevelopmentSession(state: LocalSessionState, sessionId: string, context: CommandContext, permanent: boolean) {
+	const isSelected = JSON.parse(readFileSync(statePath(context.env), 'utf8')).sessionId === sessionId;
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+	const active = new Set((await stopProcesses(state)).map((entry) => `${entry.projectId}.${entry.targetId}`));
+	for (const selected of record.session.targets) {
+		const { runtime, target } = selectedTarget(record, selected.projectId, selected.targetId);
+		const repository = record.session.repositories.find((entry) => entry.projectId === selected.projectId);
+		if (usesManagedContainer(target)) {
+			let registered = true;
+			try {
+				const status = await containerOperation(context, sessionId, runtime, target, 'status') as { registered?: unknown };
+				registered = status.registered === true;
+			} catch { /* An unhealthy registered application may reject status; stopping it is the recovery path. */ }
+			if (registered) try { await containerOperation(context, sessionId, runtime, target, 'stop'); }
+			catch { /* Keep session closure available when an unhealthy container cannot stop itself. */ }
+		} else if (repository && active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup)
+			runOneShotOperation(state, target.operations.cleanup, repository.worktree, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
+	}
+	restoreOverlays(state);
+	if (isSelected) selectDevelopmentCli(context.env, null);
+	saveState(state, context.env, isSelected);
+	return invoke(context, permanent ? 'local.dev.session.stop' : 'local.dev.session.suspend', { sessionId });
+}
 export async function runDevelopment(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.options.plan === true || ['dev status', 'dev logs', 'dev plan', 'dev host status'].includes(invocation.command.name)) return runDevelopmentUnlocked(invocation, context);
 	return withDevelopmentLifecycle(context.env, () => runDevelopmentUnlocked(invocation, context));
@@ -451,20 +465,14 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
-		const running = await stopProcesses(state);
-		const active = new Set(running.map((entry) => `${entry.projectId}.${entry.targetId}`));
-		for (const { selection, runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
-			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
-			else if (active.has(`${runtime.project.id}.${target.id}`) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, selection.worktree!, 'released', context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
-		}
-		restoreOverlays(state); selectDevelopmentCli(context.env, null); saveState(state, context.env); return invoke(context, 'local.dev.session.stop', { sessionId });
+		return closeDevelopmentSession(state, sessionId, context, true);
 	}
 	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });
 	if (invocation.command.name === 'dev plan') return invoke(context, 'local.dev.plan', { sessionId, selected: [] });
 	if (invocation.command.name === 'dev logs') {
 		const selected = typeof invocation.options.target === 'string' ? invocation.options.target : null;
 		const logs: unknown[] = Object.entries(state.processes).filter(([key]) => !selected || key === selected).map(([target, processState]) => ({ target, path: processState.log, bytes: existsSync(processState.log) ? statSync(processState.log).size : 0 }));
-		for (const { runtime } of loadRuntimes(state.manifest)) for (const target of runtime.targets) {
+		for (const { runtime } of await loadDevelopmentRuntimes(state.manifest)) for (const target of runtime.targets) {
 			const key = `${runtime.project.id}.${target.id}`;
 			if (usesManagedContainer(target) && (!selected || selected === key)) logs.push({ target: key, diagnostics: await containerOperation(context, sessionId, runtime, target, 'logs') });
 		}
@@ -472,6 +480,17 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	}
 	if (invocation.command.name === 'dev rebuild') {
 		return rebuild(invocation, context, state, sessionId);
+	}
+	if (invocation.command.name === 'dev migrate') {
+		const selection = parseSelection(`${String(invocation.arguments[0] ?? '')}=candidate`);
+		if (selection.projectId !== 'api' || selection.targetId !== 'service') throw new Error('The first development migration target is api.service.');
+		if (invocation.options.plan === true) return { action: 'migrate', sessionId, target: 'api.service', mutation: false };
+		const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
+		const { runtime,target } = selectedTarget(record, selection.projectId, selection.targetId);
+		const repository = record.session.repositories.find((entry) => entry.projectId === selection.projectId);
+		if (!repository || !target.operations.build) throw new Error('API development build operation is unavailable.');
+		runOneShotOperation(state, target.operations.build, repository.worktree, 'candidate', context.env, {},{runtime,target});
+		return invoke(context, 'local.dev.migrate', { sessionId, projectId: 'api', targetId: 'service' });
 	}
 	if (invocation.command.name === 'dev restart') return restart(invocation, context, state, sessionId);
 	if (invocation.command.name === 'dev freeze') return freeze(invocation, context);

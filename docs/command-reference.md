@@ -22,10 +22,12 @@ Operation: mutation. Result schema: `treeseed.communication-send-receipt/v4`.
 Control-plane operation: `communications.send`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--team <value>`: Team id or slug.
+- `--team <value>`: One-command team override.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--proposal <value>`: Open project proposal to bind as exact discussion context.
+- `--workday <value>`: Attach addressed communication to this active workday and its allocation.
 - `--to <value>`: Deprecated validation-only address list.
 - `--timeout <value>`: Optional maximum seconds to listen for the complete response chain.
 - `--no-wait`: Return immediately after durable admission.
@@ -46,9 +48,9 @@ Control-plane operation: `communications.topics.list`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
+- `--status <value>`: Topic status.
+- `--limit <value>`: Maximum topics.
+- `--cursor <value>`: Pagination cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd topics show <topic>
@@ -100,9 +102,9 @@ Operation: read. Result schema: `treeseed.capability-page/v1`.
 Control-plane operation: `capabilities.list`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
+- `--status <value>`: Definition status.
+- `--limit <value>`: Maximum definitions.
+- `--cursor <value>`: Pagination cursor.
 - `--json`: Emit the stable JSON envelope.
 - `--family <value>`: Capability family filter.
 - `--namespace <value>`: Namespace filter.
@@ -213,6 +215,204 @@ Execution: `local.teams.use`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd proposals
+
+Proposals operations.
+
+### trsd proposals list
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `governance.proposals.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd proposals show <proposal>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `governance.proposals.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd proposals create <file>
+
+Create the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.create/v1`.
+Control-plane operation: `governance.proposals.create`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd proposals update <proposal>
+
+Update the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.update/v1`.
+Control-plane operation: `governance.proposals.update`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: YAML or JSON proposal update.
+
+### trsd proposals open <proposal>
+
+Open the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.open/v1`.
+Control-plane operation: `governance.proposals.open`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd proposals feedback
+
+Feedback operations.
+
+### trsd proposals feedback resolve <proposal>
+
+Resolve the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.resolve/v1`.
+Control-plane operation: `governance.proposals.feedback.resolve`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--feedback <value>`: Exact blocking feedback event identity.
+- `--input <value>`: YAML or JSON resolution evidence.
+
+## trsd proposals voting
+
+Voting operations.
+
+### trsd proposals voting start <proposal>
+
+Start the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.start/v1`.
+Control-plane operation: `governance.proposals.voting.start`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd proposals vote <proposal>
+
+Vote the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.vote/v1`.
+Control-plane operation: `governance.proposals.vote`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: YAML or JSON vote.
+
+### trsd proposals evaluate <proposal>
+
+Evaluate the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.evaluate/v1`.
+Control-plane operation: `governance.proposals.evaluate`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: Optional YAML or JSON evaluation decision.
+
+### trsd proposals withdraw <proposal>
+
+Withdraw the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.withdraw/v1`.
+Control-plane operation: `governance.proposals.withdraw`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: Optional YAML or JSON withdrawal reason and evidence.
+
+### trsd proposals supersede <proposal>
+
+Supersede the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.supersede/v1`.
+Control-plane operation: `governance.proposals.supersede`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: Optional YAML or JSON successor, reason, and evidence.
+
+## trsd decisions
+
+Decisions operations.
+
+### trsd decisions list
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `governance.decisions.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd decisions show <decision>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `governance.decisions.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+
 ## trsd secrets
 
 Secrets operations.
@@ -322,7 +522,7 @@ Verify a declarative Platform repository without package checkouts or a control-
 Operation: read. Result schema: `treeseed.platform-verification/v1`.
 Execution: `local.platform.verify`.
 
-- `--json`: Emit the stable JSON envelope.
+- `--json`: Emit the stable command-result envelope.
 - `--profile <value>`: Composable profile to verify.
 
 ### trsd platform workset
@@ -332,7 +532,7 @@ Plan or safely materialize exact primary source checkouts beneath packages/.
 Operation: mutation. Result schema: `treeseed.platform-workset-result/v1`.
 Execution: `local.platform.workset`.
 
-- `--json`: Emit the stable JSON envelope.
+- `--json`: Emit the stable command-result envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--apply`: Apply the frozen workset plan.
 - `--yes`: Confirm the planned checkout mutations.
@@ -351,8 +551,8 @@ Plan or reconcile a project, repository, template, library binding, and live inv
 Operation: mutation. Result schema: `treeseed.platform-project-create-result/v1`.
 Execution: `local.platform.project.create`.
 
-- `--yes`: Confirm authorized automation.
-- `--json`: Emit the stable JSON envelope.
+- `--yes`: Confirm authority-bearing project creation.
+- `--json`: Emit the stable command-result envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--apply`: Apply the accepted creation plan.
 - `--template <value>`: Published template identity.
@@ -379,7 +579,7 @@ Apply an exact agent-authorized hosted-topology plan through the operations runn
 Operation: mutation. Result schema: `treeseed.platform-operation/v1`.
 Execution: `local.platform.topology.apply`.
 
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm the authority-bearing mutation.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
@@ -399,7 +599,7 @@ Restore exact prior hosted-topology state from a known-good receipt.
 Operation: mutation. Result schema: `treeseed.platform-operation/v1`.
 Execution: `local.platform.topology.rollback`.
 
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm the destructive rollback.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
@@ -520,6 +720,17 @@ Execution: `local.dev.rebuild`.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--session <value>`: Development session identity.
 
+### trsd dev migrate <target>
+
+Migrate a local development session.
+
+Operation: mutation. Result schema: `treeseed.command.dev.migrate/v1`.
+Execution: `local.dev.migrate`.
+
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--session <value>`: Development session identity.
+
 ### trsd dev restart <target>
 
 Restart a local development session.
@@ -601,7 +812,7 @@ Operation: mutation. Result schema: `treeseed.host-initialization-result/v1`.
 Execution: `local.host.initialize`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm non-interactive execution after reviewing the plan.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--input-file <value>`: Team capacity installation configuration downloaded from Admin. Values are never printed.
@@ -662,6 +873,30 @@ Execution: `local.host.reconcile`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+### trsd host start
+
+Start the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.start/v1`.
+Execution: `local.host.start`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host stop
+
+Stop the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.stop/v1`.
+Execution: `local.host.stop`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
 ### trsd host events
 
 Events the selected resource.
@@ -702,6 +937,18 @@ Apply the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.apply/v1`.
 Execution: `local.host.config.apply`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+### trsd host config stage <file>
+
+Stage the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.stage/v1`.
+Execution: `local.host.config.stage`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--yes`: Confirm authorized automation.
@@ -784,6 +1031,35 @@ Execution: `local.host.provider.status`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
+
+## trsd host provider limits
+
+Limits operations.
+
+### trsd host provider limits show
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Execution: `local.host.provider.limits.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd host provider limits set <provider>
+
+Set the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.set/v1`.
+Execution: `local.host.provider.limits.set`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--daily-active-seconds <value>`: Daily active-time cap in seconds.
+- `--capability <value>`: Set only this capability; otherwise set the shared model and all its capabilities.
+- `--expected-generation <value>`: Reject if the host configuration generation changed.
 
 ## trsd host provider credentials
 
@@ -1317,7 +1593,7 @@ Operation: mutation. Result schema: `treeseed.host-uninstall-result/v1`.
 Execution: `local.host.uninstall`.
 
 - `--server <value>`: Control-plane server profile or URL.
-- `--yes`: Confirm authorized automation.
+- `--yes`: Confirm non-interactive execution after reviewing the plan.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--confirm`: Confirm removal of the reviewed TreeSeed resource inventory.
@@ -1352,31 +1628,91 @@ Control-plane operation: `agents.show`.
 - `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
-### trsd agents validate
+## trsd agents team
+
+Team operations.
+
+## trsd agents team clone
+
+Clone operations.
+
+### trsd agents team clone plan <source>
+
+Plan the selected resource.
+
+Operation: read. Result schema: `treeseed.command.plan/v1`.
+Control-plane operation: `agents.team.clone.plan`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--project <value>`: Target project; repeat to select projects.
+- `--json`: Emit the stable JSON envelope.
+- `--all`: Target every eligible project except the source.
+
+### trsd agents team clone apply <file>
+
+Apply the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.apply/v1`.
+Control-plane operation: `agents.team.clone.apply`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd agents handlers
+
+Handlers operations.
+
+### trsd agents handlers list
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `agents.handlers.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd agents handlers show <handler>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `agents.handlers.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+## trsd agents profiles
+
+Profiles operations.
+
+### trsd agents profiles show <profile>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `agents.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd agents profiles validate <profile>
 
 Validate the selected resource.
 
 Operation: read. Result schema: `treeseed.command.validate/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `agents.profiles.validate`.
 
-- `--json`: Emit the stable JSON envelope.
-
-### trsd agents diff
-
-Diff the selected resource.
-
-Operation: read. Result schema: `treeseed.command.diff/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--json`: Emit the stable JSON envelope.
-
-### trsd agents diagnose
-
-Diagnose the selected resource.
-
-Operation: read. Result schema: `treeseed.command.diagnose/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
+- `--server <value>`: Control-plane server profile or URL.
+- `--project <value>`: Project id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd agents classes
@@ -1403,37 +1739,6 @@ Control-plane operation: `agents.classes.show`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--project <value>`: Project id or slug.
-- `--json`: Emit the stable JSON envelope.
-
-## trsd agents bindings
-
-Bindings operations.
-
-### trsd agents bindings list
-
-List the selected resource.
-
-Operation: read. Result schema: `treeseed.command.list/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--json`: Emit the stable JSON envelope.
-
-### trsd agents bindings show <binding>
-
-Show the selected resource.
-
-Operation: read. Result schema: `treeseed.command.show/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--json`: Emit the stable JSON envelope.
-
-### trsd agents bindings explain <binding>
-
-Explain the selected resource.
-
-Operation: read. Result schema: `treeseed.command.explain/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd providers
@@ -1733,8 +2038,10 @@ Offers operations.
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `providers.offers.show`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd providers offers validate <file>
@@ -1861,7 +2168,12 @@ Control-plane operation: `capacity.usage`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
+- `--project <value>`: Project id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
+- `--workday <value>`: Restrict evidence to one workday.
 
 ### trsd capacity ledger
 
@@ -1872,10 +2184,12 @@ Control-plane operation: `capacity.ledger`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
+- `--project <value>`: Project id or slug.
 - `--status <value>`: Status filter.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
+- `--workday <value>`: Restrict evidence to one workday.
 
 ### trsd capacity audit
 
@@ -1891,52 +2205,6 @@ Control-plane operation: `capacity.audit`.
 - `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
-## trsd plans
-
-Plans operations.
-
-### trsd plans list
-
-List the selected resource.
-
-Operation: read. Result schema: `treeseed.command.list/v1`.
-Control-plane operation: `plans.list`.
-
-- `--server <value>`: Control-plane server profile or URL.
-- `--decision <value>`: Approved decision identity.
-- `--status <value>`: Status filter.
-- `--limit <value>`: Page size.
-- `--cursor <value>`: Opaque page cursor.
-- `--json`: Emit the stable JSON envelope.
-
-### trsd plans show <plan>
-
-Show the selected resource.
-
-Operation: read. Result schema: `treeseed.command.show/v1`.
-Control-plane operation: `plans.show`.
-
-- `--server <value>`: Control-plane server profile or URL.
-- `--json`: Emit the stable JSON envelope.
-
-### trsd plans explain <plan>
-
-Explain the selected resource.
-
-Operation: read. Result schema: `treeseed.command.explain/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--json`: Emit the stable JSON envelope.
-
-### trsd plans diff <left> <right>
-
-Compare two API-derived plans.
-
-Operation: read. Result schema: `treeseed.command.plans.diff/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--json`: Emit the stable JSON envelope.
-
 ## trsd workdays
 
 Workdays operations.
@@ -1950,8 +2218,12 @@ Profiles operations.
 List the selected resource.
 
 Operation: read. Result schema: `treeseed.command.list/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `workdays.profiles.list`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ### trsd workdays profiles show <profile>
@@ -1959,29 +2231,39 @@ Availability: fail-closed (`standards_migration_not_enabled`). This capability i
 Show the selected resource.
 
 Operation: read. Result schema: `treeseed.command.show/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `workdays.profiles.show`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
 - `--json`: Emit the stable JSON envelope.
 
-### trsd workdays profiles validate <file>
+### trsd workdays profiles update <profile>
 
-Validate the selected resource.
+Update the selected resource.
 
-Operation: read. Result schema: `treeseed.command.validate/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Operation: mutation. Result schema: `treeseed.command.update/v1`.
+Control-plane operation: `workdays.profiles.update`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
+- `--if-match <value>`: Exact current resource version, or new when unconfigured.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--input <value>`: YAML or JSON workday policy document.
 
 ### trsd workdays plan
 
-Plan the selected resource.
+Plan a workday with optional targeted cooperative planning; acting stays decision-governed.
 
-Operation: mutation. Result schema: `treeseed.command.plan/v1`.
+Operation: mutation. Result schema: `treeseed.command.workdays.plan/v1`.
 Control-plane operation: `workdays.plan`.
 
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--profile <value>`: Workday profile identity.
+- `--decision <value>`: Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.
 - `--projects <value>`: Project scope or comma-separated projects.
 - `--start <value>`: ISO start time.
 - `--end <value>`: ISO end time.
@@ -1989,7 +2271,19 @@ Control-plane operation: `workdays.plan`.
 - `--objective <value>`: Objective filter.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
-- `--plan`: Return the exact proposed outcome without mutation.
+- `--planning-percent <value>`: Planning share of workday time and capacity (default 20%).
+- `--allocation-weight <value>`: Relative share among eligible concurrent workdays (default 1).
+- `--planning-turn-maximum-seconds <value>`: Maximum active seconds per planning turn (default 180).
+- `--project-percentages <value>`: JSON project allocation targets; normalized among selected projects.
+- `--agent-class-percentages <value>`: JSON class allocation targets keyed by project.
+- `--plan`: Return the request without creating a preflight.
+- `--planning-only`: Run cooperative planning profiles without admitting accepted acting work.
+- `--execution-mode <value>`: Select simulation or production custody; both consume real capacity.
+- `--proposal <value>`: Governed proposal id for cooperative planning; repeat or comma-separate.
+- `--continue-from <value>`: Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.
+- `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
+- `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
+- `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
 
 ### trsd workdays start
 
@@ -2041,48 +2335,19 @@ Availability: fail-closed (`standards_migration_not_enabled`). This capability i
 
 - `--json`: Emit the stable JSON envelope.
 
-### trsd workdays pause <workday>
-
-Pause the selected resource.
-
-Operation: mutation. Result schema: `treeseed.command.pause/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--yes`: Confirm authorized automation.
-- `--json`: Emit the stable JSON envelope.
-- `--plan`: Return the exact proposed outcome without mutation.
-
-### trsd workdays resume <workday>
-
-Resume the selected resource.
-
-Operation: mutation. Result schema: `treeseed.command.resume/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--yes`: Confirm authorized automation.
-- `--json`: Emit the stable JSON envelope.
-- `--plan`: Return the exact proposed outcome without mutation.
-
 ### trsd workdays stop <workday>
 
 Stop the selected resource.
 
 Operation: mutation. Result schema: `treeseed.command.stop/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
+Control-plane operation: `workdays.stop`.
 
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--reason <value>`: Audited operator reason.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
-- `--plan`: Return the exact proposed outcome without mutation.
-
-### trsd workdays cancel <workday>
-
-Cancel the selected resource.
-
-Operation: mutation. Result schema: `treeseed.command.cancel/v1`.
-Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
-
-- `--yes`: Confirm authorized automation.
-- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
 ## trsd workdays schedules
@@ -2128,12 +2393,29 @@ Control-plane operation: `workdays.schedules.create`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--profile <value>`: Workday profile identity.
+- `--decision <value>`: Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.
 - `--projects <value>`: Project scope or comma-separated projects.
+- `--start <value>`: ISO start time.
+- `--end <value>`: ISO end time.
 - `--duration <value>`: Duration in seconds.
+- `--objective <value>`: Objective filter.
 - `--yes`: Confirm authorized automation.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
+- `--planning-percent <value>`: Planning share of workday time and capacity (default 20%).
+- `--allocation-weight <value>`: Relative share among eligible concurrent workdays (default 1).
+- `--planning-turn-maximum-seconds <value>`: Maximum active seconds per planning turn (default 180).
+- `--project-percentages <value>`: JSON project allocation targets; normalized among selected projects.
+- `--agent-class-percentages <value>`: JSON class allocation targets keyed by project.
+- `--planning-only`: Run cooperative planning profiles without admitting accepted acting work.
+- `--execution-mode <value>`: Select simulation or production custody; both consume real capacity.
+- `--proposal <value>`: Governed proposal id for cooperative planning; repeat or comma-separate.
+- `--continue-from <value>`: Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.
+- `--agent <value>`: Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.
+- `--activity <value>`: Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.
+- `--class <value>`: Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.
+- `--cadence-seconds <value>`: Seconds between recurring workday starts.
 
 ### trsd workdays schedules pause <schedule>
 
@@ -2254,6 +2536,99 @@ Artifacts the selected resource.
 Operation: read. Result schema: `treeseed.command.artifacts/v1`.
 Availability: fail-closed (`standards_migration_not_enabled`). This capability is not enabled until its control-plane operation is accepted.
 
+- `--json`: Emit the stable JSON envelope.
+
+## trsd execution
+
+Execution operations.
+
+## trsd execution graph
+
+Graph operations.
+
+### trsd execution graph show
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `execution.graph.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--project <value>`: Filter the team graph by project.
+- `--decision <value>`: Filter the team graph by decision.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd execution graph watch
+
+Watch the selected resource.
+
+Operation: read. Result schema: `treeseed.command.watch/v1`.
+Control-plane operation: `execution.graph.watch`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--cursor <value>`: Resume after this graph event cursor.
+- `--json`: Emit the stable JSON envelope.
+- `--wait <value>`: Long-poll duration in seconds.
+- `--json-stream`: Emit graph events as NDJSON.
+
+## trsd execution node
+
+Node operations.
+
+### trsd execution node show <node>
+
+Show the selected resource.
+
+Operation: read. Result schema: `treeseed.command.show/v1`.
+Control-plane operation: `execution.nodes.show`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd execution node explain <node>
+
+Explain the selected resource.
+
+Operation: read. Result schema: `treeseed.command.explain/v1`.
+Control-plane operation: `execution.nodes.explain`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--json`: Emit the stable JSON envelope.
+
+### trsd execution reconcile
+
+Reconcile the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.reconcile/v1`.
+Control-plane operation: `execution.reconcile`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--project <value>`: Reconcile one affected project component.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+
+## trsd execution assignments
+
+Assignments operations.
+
+### trsd execution assignments list
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `execution.assignments.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--status <value>`: Filter by assignment status.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
 
 ## trsd projects
@@ -2543,7 +2918,7 @@ Control-plane operation: `ai.instances.storage.put`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--team <value>`: Team id or slug.
 - `--node <value>`: Registered AI node identity.
-- `--connection <value>`: Trusted service connection identity.
+- `--connection <value>`: Team object-storage service connection ID.
 - `--json`: Emit the stable JSON envelope.
 - `--if-match <value>`: Exact current resource version, or new when unconfigured.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.

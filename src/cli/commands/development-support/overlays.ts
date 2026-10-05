@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { DevelopmentRuntime, DevelopmentTarget } from '@treeseed/sdk/development';
@@ -27,6 +27,14 @@ export async function stopProcesses(state: OverlaySessionState) {
 export function restoreOverlays(state: OverlaySessionState, projectId?: string, removeGenerations = true) {
 	const retained: OverlaySessionState['overlays'] = [];
 	for (const overlay of state.overlays ?? []) {
+		if (projectId && overlay.projectId !== projectId) continue;
+		if (overlay.backup) {
+			try {
+				if (lstatSync(overlay.backup).isSymbolicLink()) throw new Error(`Development overlay backup is not a release directory: ${overlay.backup}.`);
+			} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+		}
+	}
+	for (const overlay of state.overlays ?? []) {
 		if (projectId && overlay.projectId !== projectId) { retained.push(overlay); continue; }
 		if (existsSync(overlay.link) || (() => { try { lstatSync(overlay.link); return true; } catch { return false; } })()) rmSync(overlay.link, { recursive: true, force: true });
 		if (overlay.backup && existsSync(overlay.backup)) renameSync(overlay.backup, overlay.link);
@@ -53,21 +61,41 @@ export function installPackageOverlay(state: OverlaySessionState, record: { sess
 	if (target.kind !== 'package-watch') return;
 	const packageName = (JSON.parse(readFileSync(resolve(worktree, 'package.json'), 'utf8')) as { name?: string }).name;
 	if (!packageName) throw new Error(`${runtime.project.id} package overlay has no package name.`);
-	const planned: Array<{ link: string; backup: string; owned: boolean }> = [];
+	const planned: Array<{ link: string; backup: string; owned: boolean; repair: boolean }> = [];
 	for (const consumerId of affectedConsumers(record.runtimes, runtime.project.id, target.id)) {
 		const consumer = record.session.repositories.find((entry) => entry.projectId === consumerId); if (!consumer) continue;
 		const link = resolve(consumer.worktree, 'node_modules', ...packageName.split('/'));
 		const backup = `${link}.treeseed-release-${state.sessionId}`;
 		let owned = false;
 		try { owned = lstatSync(link).isSymbolicLink() && resolve(dirname(link), readlinkSync(link)) === resolve(overlayRoot, 'current'); } catch { /* No existing link. */ }
-		if (existsSync(backup) && !owned) throw new Error(`Stale development overlay backup blocks ${link}.`);
-		planned.push({ link, backup, owned });
+		const recorded = state.overlays.some(overlay => overlay.projectId === runtime.project.id && overlay.link === link
+			&& resolve(overlay.overlayRoot) === resolve(overlayRoot));
+		let repair = false;
+		if (!owned) {
+			try {
+				if (lstatSync(link).isSymbolicLink()) {
+					if (recorded) repair = true;
+					else throw new Error(`Another development overlay blocks ${link}; stop or recover its owning session first.`);
+				}
+			} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+		}
+		try {
+			if (lstatSync(backup).isSymbolicLink()) throw new Error(`Development overlay backup is not a release directory: ${backup}.`);
+		} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+		if (existsSync(backup) && !owned && !repair) throw new Error(`Stale development overlay backup blocks ${link}.`);
+		planned.push({ link, backup, owned, repair });
 	}
 	// Validate every ownership boundary before changing any consumer. A recovered
 	// exact link is evidence of ownership; a similarly named backup alone is not.
-	for (const { link, backup, owned } of planned) {
+	for (const { link, backup, owned, repair } of planned) {
 		if (owned) {
 			if (!state.overlays.some(overlay => overlay.link === link)) state.overlays.push({ projectId: runtime.project.id, packageName, link, backup: existsSync(backup) ? backup : null, overlayRoot });
+			continue;
+		}
+		if (repair) {
+			// This path was verified as our recorded symbolic link, not a directory.
+			unlinkSync(link);
+			symlinkSync(relativeOverlayTarget(link, overlayRoot), link, 'dir');
 			continue;
 		}
 		mkdirSync(dirname(link), { recursive: true });
@@ -143,7 +171,7 @@ export async function stopProcess(state: OverlaySessionState, key: string) {
 }
 
 export function dependentReactions(runtimes: DevelopmentRuntime[], projectId: string, targetId: string) {
-	const result: Array<{ runtime: DevelopmentRuntime; target: DevelopmentTarget; reaction: string }> = [], queued = [`${projectId}.${targetId}`], seen = new Set(queued);
+	const result: Array<{ runtime: DevelopmentRuntime; target: DevelopmentTarget; reaction: DevelopmentTarget['dependencies'][number]['reaction'] }> = [], queued = [`${projectId}.${targetId}`], seen = new Set(queued);
 	while (queued.length) {
 		const selected = queued.shift()!;
 		for (const runtime of runtimes) for (const target of runtime.targets) for (const dependency of target.dependencies) {

@@ -59,6 +59,16 @@
           "type": "string"
         },
         {
+          "name": "--proposal",
+          "description": "Open project proposal to bind as exact discussion context.",
+          "type": "string"
+        },
+        {
+          "name": "--workday",
+          "description": "Attach addressed communication to this active workday and its allocation.",
+          "type": "string"
+        },
+        {
           "name": "--to",
           "description": "Deprecated validation-only address list.",
           "type": "string[]"
@@ -127,6 +137,22 @@
             "field": "recipients",
             "source": "option",
             "name": "to",
+            "required": false,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "proposalId",
+            "source": "option",
+            "name": "proposal",
+            "required": false,
+            "transform": "identity"
+          },
+          {
+            "target": "body",
+            "field": "parentWorkdayId",
+            "source": "option",
+            "name": "workday",
             "required": false,
             "transform": "identity"
           },
@@ -708,6 +734,714 @@
           "execution": {
             "kind": "local",
             "handlerId": "local.teams.use"
+          }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "proposals",
+      "description": "Proposals operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.list",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.show",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "create",
+          "description": "Create the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "file",
+              "description": "file identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.create",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.create/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.create",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "argument",
+                "name": "file",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "update",
+          "description": "Update the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--input",
+              "description": "YAML or JSON proposal update.",
+              "type": "string",
+              "required": true
+            }
+          ],
+          "authorization": {
+            "capability": "command.update",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.update/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.update",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "option",
+                "name": "input",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "open",
+          "description": "Open the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.open",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.open/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.open",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "feedback",
+          "description": "Feedback operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "resolve",
+              "description": "Resolve the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "proposal",
+                  "description": "proposal identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--feedback",
+                  "description": "Exact blocking feedback event identity.",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "--input",
+                  "description": "YAML or JSON resolution evidence.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.resolve",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.resolve/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "governance.proposals.feedback.resolve",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "context",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "proposalId",
+                    "source": "argument",
+                    "name": "proposal",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "feedbackId",
+                    "source": "option",
+                    "name": "feedback",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "file",
+                    "source": "option",
+                    "name": "input",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "voting",
+          "description": "Voting operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "start",
+              "description": "Start the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "proposal",
+                  "description": "proposal identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.start",
+                "confirmation": "never"
+              },
+              "resultSchemaId": "treeseed.command.start/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "governance.proposals.voting.start",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "context",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "proposalId",
+                    "source": "argument",
+                    "name": "proposal",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "vote",
+          "description": "Vote the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--input",
+              "description": "YAML or JSON vote.",
+              "type": "string",
+              "required": true
+            }
+          ],
+          "authorization": {
+            "capability": "command.vote",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.vote/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.vote",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "option",
+                "name": "input",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "evaluate",
+          "description": "Evaluate the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--input",
+              "description": "Optional YAML or JSON evaluation decision.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "command.evaluate",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.evaluate/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.evaluate",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "option",
+                "name": "input",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "withdraw",
+          "description": "Withdraw the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--input",
+              "description": "Optional YAML or JSON withdrawal reason and evidence.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "command.withdraw",
+            "confirmation": "destructive"
+          },
+          "resultSchemaId": "treeseed.command.withdraw/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.withdraw",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "option",
+                "name": "input",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "supersede",
+          "description": "Supersede the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "proposal",
+              "description": "proposal identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--input",
+              "description": "Optional YAML or JSON successor, reason, and evidence.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "command.supersede",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.supersede/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.proposals.supersede",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "proposalId",
+                "source": "argument",
+                "name": "proposal",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "file",
+                "source": "option",
+                "name": "input",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "decisions",
+      "description": "Decisions operations.",
+      "children": [
+        {
+          "nodeType": "leaf",
+          "segment": "list",
+          "description": "List the selected resource.",
+          "kind": "read",
+          "resultSchemaId": "treeseed.command.list/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.decisions.list",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "show",
+          "description": "Show the selected resource.",
+          "kind": "read",
+          "arguments": [
+            {
+              "name": "decision",
+              "description": "decision identity or path.",
+              "required": true
+            }
+          ],
+          "resultSchemaId": "treeseed.command.show/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "governance.decisions.show",
+            "input": [
+              {
+                "target": "path",
+                "field": "projectId",
+                "source": "context",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "decisionId",
+                "source": "argument",
+                "name": "decision",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
           }
         }
       ]
@@ -1533,6 +2267,40 @@
         },
         {
           "nodeType": "leaf",
+          "segment": "migrate",
+          "description": "Migrate a local development session.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "target",
+              "description": "target value.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--session",
+              "description": "Development session identity.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "development.migrate",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.dev.migrate/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.dev.migrate"
+          }
+        },
+        {
+          "nodeType": "leaf",
           "segment": "restart",
           "description": "Restart a local development session.",
           "kind": "mutation",
@@ -1832,6 +2600,50 @@
         },
         {
           "nodeType": "leaf",
+          "segment": "start",
+          "description": "Start the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.start",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.start/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.start"
+          }
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "stop",
+          "description": "Stop the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            }
+          ],
+          "authorization": {
+            "capability": "command.stop",
+            "confirmation": "authority"
+          },
+          "resultSchemaId": "treeseed.command.stop/v1",
+          "execution": {
+            "kind": "local",
+            "handlerId": "local.host.stop"
+          }
+        },
+        {
+          "nodeType": "leaf",
           "segment": "events",
           "description": "Events the selected resource.",
           "kind": "read",
@@ -1902,6 +2714,35 @@
               "execution": {
                 "kind": "local",
                 "handlerId": "local.host.config.apply"
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "stage",
+              "description": "Stage the selected resource.",
+              "kind": "mutation",
+              "arguments": [
+                {
+                  "name": "file",
+                  "description": "file identity or path.",
+                  "required": true
+                }
+              ],
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                }
+              ],
+              "authorization": {
+                "capability": "command.stage",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.stage/v1",
+              "execution": {
+                "kind": "local",
+                "handlerId": "local.host.config.stage"
               }
             },
             {
@@ -2031,6 +2872,69 @@
                 "kind": "local",
                 "handlerId": "local.host.provider.status"
               }
+            },
+            {
+              "nodeType": "branch",
+              "segment": "limits",
+              "description": "Limits operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "show",
+                  "description": "Show the selected resource.",
+                  "kind": "read",
+                  "resultSchemaId": "treeseed.command.show/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.limits.show"
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "set",
+                  "description": "Set the selected resource.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "provider",
+                      "description": "provider identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    },
+                    {
+                      "name": "--daily-active-seconds",
+                      "description": "Daily active-time cap in seconds.",
+                      "type": "number",
+                      "required": true
+                    },
+                    {
+                      "name": "--capability",
+                      "description": "Set only this capability; otherwise set the shared model and all its capabilities.",
+                      "type": "string"
+                    },
+                    {
+                      "name": "--expected-generation",
+                      "description": "Reject if the host configuration generation changed.",
+                      "type": "number"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.set",
+                    "confirmation": "authority"
+                  },
+                  "resultSchemaId": "treeseed.command.set/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.provider.limits.set"
+                  }
+                }
+              ]
             },
             {
               "nodeType": "branch",
@@ -3157,40 +4061,272 @@
           }
         },
         {
-          "nodeType": "leaf",
-          "segment": "validate",
-          "description": "Validate the selected resource.",
-          "kind": "read",
-          "resultSchemaId": "treeseed.command.validate/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
+          "nodeType": "branch",
+          "segment": "team",
+          "description": "Team operations.",
+          "children": [
+            {
+              "nodeType": "branch",
+              "segment": "clone",
+              "description": "Clone operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "plan",
+                  "description": "Plan the selected resource.",
+                  "kind": "read",
+                  "arguments": [
+                    {
+                      "name": "source",
+                      "description": "source identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--project",
+                      "description": "Target project; repeat to select projects.",
+                      "type": "string[]"
+                    },
+                    {
+                      "name": "--all",
+                      "description": "Target every eligible project except the source.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.command.plan/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "agents.team.clone.plan",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "teamId",
+                        "source": "context",
+                        "name": "team",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "sourceProject",
+                        "source": "argument",
+                        "name": "source",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "targetProjects",
+                        "source": "option",
+                        "name": "project",
+                        "required": false,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "allEligible",
+                        "source": "option",
+                        "name": "all",
+                        "required": false,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "nodeType": "leaf",
+                  "segment": "apply",
+                  "description": "Apply the selected resource.",
+                  "kind": "mutation",
+                  "arguments": [
+                    {
+                      "name": "file",
+                      "description": "file identity or path.",
+                      "required": true
+                    }
+                  ],
+                  "options": [
+                    {
+                      "name": "--plan",
+                      "description": "Return the exact proposed outcome without mutation.",
+                      "type": "boolean"
+                    }
+                  ],
+                  "authorization": {
+                    "capability": "command.apply",
+                    "confirmation": "authority"
+                  },
+                  "resultSchemaId": "treeseed.command.apply/v1",
+                  "execution": {
+                    "kind": "operation",
+                    "operationId": "agents.team.clone.apply",
+                    "input": [
+                      {
+                        "target": "path",
+                        "field": "teamId",
+                        "source": "context",
+                        "name": "team",
+                        "required": true,
+                        "transform": "identity"
+                      },
+                      {
+                        "target": "body",
+                        "field": "file",
+                        "source": "argument",
+                        "name": "file",
+                        "required": true,
+                        "transform": "identity"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
-          "nodeType": "leaf",
-          "segment": "diff",
-          "description": "Diff the selected resource.",
-          "kind": "read",
-          "resultSchemaId": "treeseed.command.diff/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
+          "nodeType": "branch",
+          "segment": "handlers",
+          "description": "Handlers operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "resultSchemaId": "treeseed.command.list/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "agents.handlers.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "context",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "handler",
+                  "description": "handler identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "agents.handlers.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "context",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "handlerId",
+                    "source": "argument",
+                    "name": "handler",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
         },
         {
-          "nodeType": "leaf",
-          "segment": "diagnose",
-          "description": "Diagnose the selected resource.",
-          "kind": "read",
-          "resultSchemaId": "treeseed.command.diagnose/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
+          "nodeType": "branch",
+          "segment": "profiles",
+          "description": "Profiles operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "profile",
+                  "description": "profile identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "agents.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "context",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "agentSlug",
+                    "source": "argument",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "validate",
+              "description": "Validate the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "profile",
+                  "description": "profile identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.validate/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "agents.profiles.validate",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "projectId",
+                    "source": "context",
+                    "name": "project",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "agentSlug",
+                    "source": "argument",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
         },
         {
           "nodeType": "branch",
@@ -3252,63 +4388,6 @@
                     "transform": "identity"
                   }
                 ]
-              }
-            }
-          ]
-        },
-        {
-          "nodeType": "branch",
-          "segment": "bindings",
-          "description": "Bindings operations.",
-          "children": [
-            {
-              "nodeType": "leaf",
-              "segment": "list",
-              "description": "List the selected resource.",
-              "kind": "read",
-              "resultSchemaId": "treeseed.command.list/v1",
-              "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
-              }
-            },
-            {
-              "nodeType": "leaf",
-              "segment": "show",
-              "description": "Show the selected resource.",
-              "kind": "read",
-              "arguments": [
-                {
-                  "name": "binding",
-                  "description": "binding identity or path.",
-                  "required": true
-                }
-              ],
-              "resultSchemaId": "treeseed.command.show/v1",
-              "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
-              }
-            },
-            {
-              "nodeType": "leaf",
-              "segment": "explain",
-              "description": "Explain the selected resource.",
-              "kind": "read",
-              "arguments": [
-                {
-                  "name": "binding",
-                  "description": "binding identity or path.",
-                  "required": true
-                }
-              ],
-              "resultSchemaId": "treeseed.command.explain/v1",
-              "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
               }
             }
           ]
@@ -4218,9 +5297,26 @@
               ],
               "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "providers.offers.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "providerId",
+                    "source": "argument",
+                    "name": "connection",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -4545,6 +5641,23 @@
           "segment": "usage",
           "description": "Usage the selected resource.",
           "kind": "read",
+          "options": [
+            {
+              "name": "--workday",
+              "description": "Restrict evidence to one workday.",
+              "type": "string"
+            },
+            {
+              "name": "--limit",
+              "description": "Page size.",
+              "type": "number"
+            },
+            {
+              "name": "--cursor",
+              "description": "Opaque page cursor.",
+              "type": "string"
+            }
+          ],
           "resultSchemaId": "treeseed.command.usage/v1",
           "execution": {
             "kind": "operation",
@@ -4557,6 +5670,46 @@
                 "name": "team",
                 "required": true,
                 "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "projectId",
+                "source": "option",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "workDayId",
+                "source": "option",
+                "name": "workday",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "status",
+                "source": "option",
+                "name": "status",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "limit",
+                "source": "option",
+                "name": "limit",
+                "required": false,
+                "transform": "integer"
+              },
+              {
+                "target": "query",
+                "field": "cursor",
+                "source": "option",
+                "name": "cursor",
+                "required": false,
+                "transform": "identity"
               }
             ]
           }
@@ -4566,6 +5719,13 @@
           "segment": "ledger",
           "description": "Ledger the selected resource.",
           "kind": "read",
+          "options": [
+            {
+              "name": "--workday",
+              "description": "Restrict evidence to one workday.",
+              "type": "string"
+            }
+          ],
           "resultSchemaId": "treeseed.command.ledger/v1",
           "execution": {
             "kind": "operation",
@@ -4577,6 +5737,22 @@
                 "source": "context",
                 "name": "team",
                 "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "projectId",
+                "source": "option",
+                "name": "project",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "workDayId",
+                "source": "option",
+                "name": "workday",
+                "required": false,
                 "transform": "identity"
               },
               {
@@ -4655,129 +5831,6 @@
     },
     {
       "nodeType": "branch",
-      "segment": "plans",
-      "description": "Plans operations.",
-      "children": [
-        {
-          "nodeType": "leaf",
-          "segment": "list",
-          "description": "List the selected resource.",
-          "kind": "read",
-          "resultSchemaId": "treeseed.command.list/v1",
-          "execution": {
-            "kind": "operation",
-            "operationId": "plans.list",
-            "input": [
-              {
-                "target": "path",
-                "field": "decisionId",
-                "source": "option",
-                "name": "decision",
-                "required": true,
-                "transform": "identity"
-              },
-              {
-                "target": "query",
-                "field": "status",
-                "source": "option",
-                "name": "status",
-                "required": false,
-                "transform": "identity"
-              },
-              {
-                "target": "query",
-                "field": "limit",
-                "source": "option",
-                "name": "limit",
-                "required": false,
-                "transform": "integer"
-              },
-              {
-                "target": "query",
-                "field": "cursor",
-                "source": "option",
-                "name": "cursor",
-                "required": false,
-                "transform": "identity"
-              }
-            ]
-          }
-        },
-        {
-          "nodeType": "leaf",
-          "segment": "show",
-          "description": "Show the selected resource.",
-          "kind": "read",
-          "arguments": [
-            {
-              "name": "plan",
-              "description": "plan identity or path.",
-              "required": true
-            }
-          ],
-          "resultSchemaId": "treeseed.command.show/v1",
-          "execution": {
-            "kind": "operation",
-            "operationId": "plans.show",
-            "input": [
-              {
-                "target": "path",
-                "field": "capacityPlanId",
-                "source": "argument",
-                "name": "plan",
-                "required": true,
-                "transform": "identity"
-              }
-            ]
-          }
-        },
-        {
-          "nodeType": "leaf",
-          "segment": "explain",
-          "description": "Explain the selected resource.",
-          "kind": "read",
-          "arguments": [
-            {
-              "name": "plan",
-              "description": "plan identity or path.",
-              "required": true
-            }
-          ],
-          "resultSchemaId": "treeseed.command.explain/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
-        },
-        {
-          "nodeType": "leaf",
-          "segment": "diff",
-          "description": "Compare two API-derived plans.",
-          "kind": "read",
-          "arguments": [
-            {
-              "name": "left",
-              "description": "Left plan identity.",
-              "required": true
-            },
-            {
-              "name": "right",
-              "description": "Right plan identity.",
-              "required": true
-            }
-          ],
-          "resultSchemaId": "treeseed.command.plans.diff/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
-        }
-      ]
-    },
-    {
-      "nodeType": "branch",
       "segment": "workdays",
       "description": "Workdays operations.",
       "children": [
@@ -4793,9 +5846,32 @@
               "kind": "read",
               "resultSchemaId": "treeseed.command.list/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "workdays.profiles.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
@@ -4812,28 +5888,87 @@
               ],
               "resultSchemaId": "treeseed.command.show/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "workdays.profiles.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "profileId",
+                    "source": "argument",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             },
             {
               "nodeType": "leaf",
-              "segment": "validate",
-              "description": "Validate the selected resource.",
-              "kind": "read",
+              "segment": "update",
+              "description": "Update the selected resource.",
+              "kind": "mutation",
               "arguments": [
                 {
-                  "name": "file",
-                  "description": "file identity or path.",
+                  "name": "profile",
+                  "description": "profile identity or path.",
                   "required": true
                 }
               ],
-              "resultSchemaId": "treeseed.command.validate/v1",
+              "options": [
+                {
+                  "name": "--plan",
+                  "description": "Return the exact proposed outcome without mutation.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--input",
+                  "description": "YAML or JSON workday policy document.",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "authorization": {
+                "capability": "command.update",
+                "confirmation": "authority"
+              },
+              "resultSchemaId": "treeseed.command.update/v1",
               "execution": {
-                "kind": "unavailable",
-                "code": "standards_migration_not_enabled",
-                "reason": "This capability is not enabled until its control-plane operation is accepted."
+                "kind": "operation",
+                "operationId": "workdays.profiles.update",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "profileId",
+                    "source": "argument",
+                    "name": "profile",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "file",
+                    "source": "option",
+                    "name": "input",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
               }
             }
           ]
@@ -4841,20 +5976,85 @@
         {
           "nodeType": "leaf",
           "segment": "plan",
-          "description": "Plan the selected resource.",
+          "description": "Plan a workday with optional targeted cooperative planning; acting stays decision-governed.",
           "kind": "mutation",
           "options": [
             {
+              "name": "--planning-percent",
+              "description": "Planning share of workday time and capacity (default 20%).",
+              "type": "number"
+            },
+            {
+              "name": "--allocation-weight",
+              "description": "Relative share among eligible concurrent workdays (default 1).",
+              "type": "number"
+            },
+            {
+              "name": "--planning-turn-maximum-seconds",
+              "description": "Maximum active seconds per planning turn (default 180).",
+              "type": "number"
+            },
+            {
+              "name": "--project-percentages",
+              "description": "JSON project allocation targets; normalized among selected projects.",
+              "type": "string"
+            },
+            {
+              "name": "--agent-class-percentages",
+              "description": "JSON class allocation targets keyed by project.",
+              "type": "string"
+            },
+            {
               "name": "--plan",
-              "description": "Return the exact proposed outcome without mutation.",
+              "description": "Return the request without creating a preflight.",
               "type": "boolean"
+            },
+            {
+              "name": "--planning-only",
+              "description": "Run cooperative planning profiles without admitting accepted acting work.",
+              "type": "boolean"
+            },
+            {
+              "name": "--execution-mode",
+              "description": "Select simulation or production custody; both consume real capacity.",
+              "type": "string"
+            },
+            {
+              "name": "--proposal",
+              "description": "Governed proposal id for cooperative planning; repeat or comma-separate.",
+              "type": "string[]"
+            },
+            {
+              "name": "--decision",
+              "description": "Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.",
+              "type": "string[]"
+            },
+            {
+              "name": "--continue-from",
+              "description": "Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.",
+              "type": "string"
+            },
+            {
+              "name": "--agent",
+              "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
+              "type": "string[]"
+            },
+            {
+              "name": "--activity",
+              "description": "Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.",
+              "type": "string[]"
+            },
+            {
+              "name": "--class",
+              "description": "Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.",
+              "type": "string[]"
             }
           ],
           "authorization": {
             "capability": "command.plan",
             "confirmation": "never"
           },
-          "resultSchemaId": "treeseed.command.plan/v1",
+          "resultSchemaId": "treeseed.command.workdays.plan/v1",
           "execution": {
             "kind": "operation",
             "operationId": "workdays.plan",
@@ -4882,6 +6082,14 @@
                 "name": "projects",
                 "required": false,
                 "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "executionMode",
+                "source": "option",
+                "name": "executionMode",
+                "required": false,
+                "transform": "identity"
               },
               {
                 "target": "body",
@@ -4913,6 +6121,94 @@
                 "source": "option",
                 "name": "objective",
                 "required": false,
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "planningOnly",
+                "source": "option",
+                "name": "planningOnly",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "proposalIds",
+                "source": "option",
+                "name": "proposal",
+                "required": false,
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "decisionIds",
+                "source": "option",
+                "name": "decision",
+                "required": false,
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "continueFromWorkdayId",
+                "source": "option",
+                "name": "continueFrom",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "allocation.planningPercent",
+                "source": "option",
+                "name": "planningPercent",
+                "transform": "number"
+              },
+              {
+                "target": "body",
+                "field": "allocation.allocationWeight",
+                "source": "option",
+                "name": "allocationWeight",
+                "transform": "number"
+              },
+              {
+                "target": "body",
+                "field": "allocation.planningTurnMaximumSeconds",
+                "source": "option",
+                "name": "planningTurnMaximumSeconds",
+                "transform": "integer"
+              },
+              {
+                "target": "body",
+                "field": "allocation.projectPercentages",
+                "source": "option",
+                "name": "projectPercentages",
+                "transform": "json"
+              },
+              {
+                "target": "body",
+                "field": "allocation.agentClassPercentages",
+                "source": "option",
+                "name": "agentClassPercentages",
+                "transform": "json"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.agentSlugs",
+                "source": "option",
+                "name": "agent",
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.activityTypes",
+                "source": "option",
+                "name": "activity",
+                "transform": "csv"
+              },
+              {
+                "target": "body",
+                "field": "agentSelection.classSlugs",
+                "source": "option",
+                "name": "class",
                 "transform": "csv"
               }
             ]
@@ -5068,66 +6364,6 @@
         },
         {
           "nodeType": "leaf",
-          "segment": "pause",
-          "description": "Pause the selected resource.",
-          "kind": "mutation",
-          "arguments": [
-            {
-              "name": "workday",
-              "description": "workday identity or path.",
-              "required": true
-            }
-          ],
-          "options": [
-            {
-              "name": "--plan",
-              "description": "Return the exact proposed outcome without mutation.",
-              "type": "boolean"
-            }
-          ],
-          "authorization": {
-            "capability": "command.pause",
-            "confirmation": "authority"
-          },
-          "resultSchemaId": "treeseed.command.pause/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
-        },
-        {
-          "nodeType": "leaf",
-          "segment": "resume",
-          "description": "Resume the selected resource.",
-          "kind": "mutation",
-          "arguments": [
-            {
-              "name": "workday",
-              "description": "workday identity or path.",
-              "required": true
-            }
-          ],
-          "options": [
-            {
-              "name": "--plan",
-              "description": "Return the exact proposed outcome without mutation.",
-              "type": "boolean"
-            }
-          ],
-          "authorization": {
-            "capability": "command.resume",
-            "confirmation": "authority"
-          },
-          "resultSchemaId": "treeseed.command.resume/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
-        },
-        {
-          "nodeType": "leaf",
           "segment": "stop",
           "description": "Stop the selected resource.",
           "kind": "mutation",
@@ -5147,43 +6383,38 @@
           ],
           "authorization": {
             "capability": "command.stop",
-            "confirmation": "destructive"
+            "confirmation": "authority"
           },
           "resultSchemaId": "treeseed.command.stop/v1",
           "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
-          }
-        },
-        {
-          "nodeType": "leaf",
-          "segment": "cancel",
-          "description": "Cancel the selected resource.",
-          "kind": "mutation",
-          "arguments": [
-            {
-              "name": "workday",
-              "description": "workday identity or path.",
-              "required": true
-            }
-          ],
-          "options": [
-            {
-              "name": "--plan",
-              "description": "Return the exact proposed outcome without mutation.",
-              "type": "boolean"
-            }
-          ],
-          "authorization": {
-            "capability": "command.cancel",
-            "confirmation": "destructive"
-          },
-          "resultSchemaId": "treeseed.command.cancel/v1",
-          "execution": {
-            "kind": "unavailable",
-            "code": "standards_migration_not_enabled",
-            "reason": "This capability is not enabled until its control-plane operation is accepted."
+            "kind": "operation",
+            "operationId": "workdays.stop",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "runId",
+                "source": "argument",
+                "name": "workday",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "reason",
+                "source": "option",
+                "name": "reason",
+                "required": false,
+                "transform": "identity"
+              }
+            ]
           }
         },
         {
@@ -5253,6 +6484,76 @@
                   "name": "--plan",
                   "description": "Return the exact proposed outcome without mutation.",
                   "type": "boolean"
+                },
+                {
+                  "name": "--planning-percent",
+                  "description": "Planning share of workday time and capacity (default 20%).",
+                  "type": "number"
+                },
+                {
+                  "name": "--allocation-weight",
+                  "description": "Relative share among eligible concurrent workdays (default 1).",
+                  "type": "number"
+                },
+                {
+                  "name": "--planning-turn-maximum-seconds",
+                  "description": "Maximum active seconds per planning turn (default 180).",
+                  "type": "number"
+                },
+                {
+                  "name": "--project-percentages",
+                  "description": "JSON project allocation targets; normalized among selected projects.",
+                  "type": "string"
+                },
+                {
+                  "name": "--agent-class-percentages",
+                  "description": "JSON class allocation targets keyed by project.",
+                  "type": "string"
+                },
+                {
+                  "name": "--planning-only",
+                  "description": "Run cooperative planning profiles without admitting accepted acting work.",
+                  "type": "boolean"
+                },
+                {
+                  "name": "--execution-mode",
+                  "description": "Select simulation or production custody; both consume real capacity.",
+                  "type": "string"
+                },
+                {
+                  "name": "--proposal",
+                  "description": "Governed proposal id for cooperative planning; repeat or comma-separate.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--decision",
+                  "description": "Accepted decision id; repeat or comma-separate. The API derives and verifies acting authority.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--continue-from",
+                  "description": "Settled workday whose exact accepted results and review history should continue. Omit for a fresh simulation.",
+                  "type": "string"
+                },
+                {
+                  "name": "--agent",
+                  "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--activity",
+                  "description": "Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--class",
+                  "description": "Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.",
+                  "type": "string[]"
+                },
+                {
+                  "name": "--cadence-seconds",
+                  "description": "Seconds between recurring workday starts.",
+                  "type": "number"
                 }
               ],
               "authorization": {
@@ -5274,7 +6575,7 @@
                   },
                   {
                     "target": "body",
-                    "field": "profile",
+                    "field": "intent.profileId",
                     "source": "option",
                     "name": "profile",
                     "required": false,
@@ -5282,7 +6583,7 @@
                   },
                   {
                     "target": "body",
-                    "field": "projects",
+                    "field": "intent.projects",
                     "source": "option",
                     "name": "projects",
                     "required": false,
@@ -5290,9 +6591,137 @@
                   },
                   {
                     "target": "body",
-                    "field": "duration",
+                    "field": "intent.executionMode",
+                    "source": "option",
+                    "name": "executionMode",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.startsAt",
+                    "source": "option",
+                    "name": "start",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.endsAt",
+                    "source": "option",
+                    "name": "end",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.durationSeconds",
                     "source": "option",
                     "name": "duration",
+                    "required": false,
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.objectiveFilters",
+                    "source": "option",
+                    "name": "objective",
+                    "required": false,
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.planningOnly",
+                    "source": "option",
+                    "name": "planningOnly",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.proposalIds",
+                    "source": "option",
+                    "name": "proposal",
+                    "required": false,
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.decisionIds",
+                    "source": "option",
+                    "name": "decision",
+                    "required": false,
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.continueFromWorkdayId",
+                    "source": "option",
+                    "name": "continueFrom",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.planningPercent",
+                    "source": "option",
+                    "name": "planningPercent",
+                    "transform": "number"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.allocationWeight",
+                    "source": "option",
+                    "name": "allocationWeight",
+                    "transform": "number"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.planningTurnMaximumSeconds",
+                    "source": "option",
+                    "name": "planningTurnMaximumSeconds",
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.projectPercentages",
+                    "source": "option",
+                    "name": "projectPercentages",
+                    "transform": "json"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.allocation.agentClassPercentages",
+                    "source": "option",
+                    "name": "agentClassPercentages",
+                    "transform": "json"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.agentSelection.agentSlugs",
+                    "source": "option",
+                    "name": "agent",
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.agentSelection.activityTypes",
+                    "source": "option",
+                    "name": "activity",
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.agentSelection.classSlugs",
+                    "source": "option",
+                    "name": "class",
+                    "transform": "csv"
+                  },
+                  {
+                    "target": "body",
+                    "field": "cadenceSeconds",
+                    "source": "option",
+                    "name": "cadenceSeconds",
                     "required": false,
                     "transform": "integer"
                   }
@@ -5662,6 +7091,324 @@
             "code": "standards_migration_not_enabled",
             "reason": "This capability is not enabled until its control-plane operation is accepted."
           }
+        }
+      ]
+    },
+    {
+      "nodeType": "branch",
+      "segment": "execution",
+      "description": "Execution operations.",
+      "children": [
+        {
+          "nodeType": "branch",
+          "segment": "graph",
+          "description": "Graph operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "options": [
+                {
+                  "name": "--project",
+                  "description": "Filter the team graph by project.",
+                  "type": "string"
+                },
+                {
+                  "name": "--decision",
+                  "description": "Filter the team graph by decision.",
+                  "type": "string"
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "execution.graph.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "projectId",
+                    "source": "option",
+                    "name": "project",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "decisionId",
+                    "source": "option",
+                    "name": "decision",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "watch",
+              "description": "Watch the selected resource.",
+              "kind": "read",
+              "options": [
+                {
+                  "name": "--cursor",
+                  "description": "Resume after this graph event cursor.",
+                  "type": "string"
+                },
+                {
+                  "name": "--wait",
+                  "description": "Long-poll duration in seconds.",
+                  "type": "number"
+                },
+                {
+                  "name": "--json-stream",
+                  "description": "Emit graph events as NDJSON.",
+                  "type": "boolean"
+                }
+              ],
+              "resultSchemaId": "treeseed.command.watch/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "execution.graph.watch",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "waitSeconds",
+                    "source": "option",
+                    "name": "wait",
+                    "required": false,
+                    "transform": "integer"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
+          "segment": "node",
+          "description": "Node operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "show",
+              "description": "Show the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "node",
+                  "description": "node identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.show/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "execution.nodes.show",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "argument",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            },
+            {
+              "nodeType": "leaf",
+              "segment": "explain",
+              "description": "Explain the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "node",
+                  "description": "node identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.explain/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "execution.nodes.explain",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "nodeId",
+                    "source": "argument",
+                    "name": "node",
+                    "required": true,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "leaf",
+          "segment": "reconcile",
+          "description": "Reconcile the selected resource.",
+          "kind": "mutation",
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--project",
+              "description": "Reconcile one affected project component.",
+              "type": "string"
+            }
+          ],
+          "authorization": {
+            "capability": "command.reconcile",
+            "confirmation": "never"
+          },
+          "resultSchemaId": "treeseed.command.reconcile/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "execution.reconcile",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "projectId",
+                "source": "option",
+                "name": "project",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "plan",
+                "source": "option",
+                "name": "plan",
+                "required": false,
+                "transform": "boolean"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "branch",
+          "segment": "assignments",
+          "description": "Assignments operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "options": [
+                {
+                  "name": "--status",
+                  "description": "Filter by assignment status.",
+                  "type": "string"
+                },
+                {
+                  "name": "--limit",
+                  "description": "Page size.",
+                  "type": "number"
+                },
+                {
+                  "name": "--cursor",
+                  "description": "Opaque page cursor.",
+                  "type": "string"
+                }
+              ],
+              "resultSchemaId": "treeseed.command.list/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "execution.assignments.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "status",
+                    "source": "option",
+                    "name": "status",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "required": false,
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
         }
       ]
     },

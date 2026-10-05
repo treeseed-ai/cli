@@ -20,3 +20,20 @@ test('host custody includes nested production dependencies but not development-o
 		assert.throws(() => hostDependencyRoots(root), /symbolic link/);
 	} finally { rmSync(root, { recursive: true }); }
 });
+
+test('host custody accepts a complete local package generation while resolving its closure from the host worktree', () => {
+	const root = mkdtempSync(join(tmpdir(), 'host-overlay-'));
+	const pkg = (path: string, data: unknown) => { mkdirSync(path, { recursive: true }); writeFileSync(join(path, 'package.json'), JSON.stringify(data)); };
+	try {
+		pkg(root, { dependencies: { '@treeseed/sdk': '1' }, treeseed: { hostRuntimeDependencies: ['@treeseed/sdk'] } });
+		const generation = join(root, 'sdk/.treeseed/cache/development-sessions/dev-test/package/generation-1');
+		pkg(generation, { name: '@treeseed/sdk', dependencies: { zod: '1' } });
+		mkdirSync(join(generation, 'dist')); writeFileSync(join(generation, 'dist/.treeseed-build-complete.json'), '{}');
+		pkg(join(root, 'node_modules/zod'), { name: 'zod' });
+		mkdirSync(join(root, 'node_modules/@treeseed'), { recursive: true });
+		symlinkSync(generation, join(root, 'node_modules/@treeseed/sdk'));
+		assert.deepEqual(hostDependencyRoots(root), [join(root, 'node_modules/@treeseed/sdk'), join(root, 'node_modules/zod')]);
+		rmSync(join(generation, 'dist/.treeseed-build-complete.json'));
+		assert.throws(() => hostDependencyRoots(root), /symbolic link/);
+	} finally { rmSync(root, { recursive: true }); }
+});

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -76,6 +76,70 @@ test('development session start uses one protected manager command and private l
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('development session start refuses existing package-overlay custody before manager mutation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-')), file = resolve(root, 'treeseed.package.yaml'), output: string[] = [];
+	try {
+		writeFileSync(file, manifest); execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' };
+		const stateRoot = resolve(env.XDG_STATE_HOME, 'treeseed/development'); mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify({ sessionId: 'dev-existing', manifest: file, processes: {}, overlays: [{ projectId: 'sdk' }], candidates: [] }));
+		let managerCalls = 0;
+		const exit = await runCommandLine(['dev', 'session', 'start', file, '--json'], { cwd: root, env, interactiveUi: false,
+			hostInvoke: async () => { managerCalls += 1; }, write: (value) => output.push(value) });
+		assert.notEqual(exit, 0); assert.equal(managerCalls, 0); assert.match(output.join(''), /still owns local processes or package overlays/);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('stopping another session preserves the selected session and skips unregistered managed targets', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-stop-'));
+	try {
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, stateRoot = resolve(root, 'state/treeseed/development');
+		const current = { sessionId: 'dev-current', manifest: '/current.yaml', processes: {}, overlays: [], candidates: [] };
+		const stale = { sessionId: 'dev-stale', manifest: '/missing.yaml', processes: {}, overlays: [], candidates: [] };
+		mkdirSync(stateRoot, { recursive: true, mode: 0o700 }); mkdirSync(resolve(stateRoot, 'dev-stale'), { mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(current));
+		writeFileSync(resolve(stateRoot, 'dev-stale/session.json'), JSON.stringify(stale));
+		const target = { id: 'service', kind: 'live-api', executionCustody: 'manager', operations: {}, endpoints: [] };
+		const record = { session: { sessionId: 'dev-stale', status: 'active', repositories: [{ projectId: 'api', worktree: '/workspace/api' }], targets: [{ projectId: 'api', targetId: 'service', mode: 'released' }] }, runtimes: [{ project: { id: 'api' }, targets: [target] }] };
+		const calls: Array<{ handlerId: string; options: { payload?: string } }> = [], output: string[] = [];
+		const exit = await runCommandLine(['dev', 'session', 'stop', '--session', 'dev-stale', '--json'], { env, interactiveUi: false,
+			hostInvoke: async (input) => { calls.push(input as typeof calls[number]); if (input.handlerId === 'local.dev.status') return record;
+				if (input.handlerId === 'local.dev.container') return { registered: false, state: null }; return { session: { sessionId: 'dev-stale', status: 'stopped' } }; },
+			write: (value) => output.push(value) });
+		assert.equal(exit, 0, output.join('\n'));
+		assert.equal(JSON.parse(readFileSync(resolve(stateRoot, 'current.json'), 'utf8')).sessionId, 'dev-current');
+		const containerCalls = calls.filter((call) => call.handlerId === 'local.dev.container').map((call) => JSON.parse(String(call.options.payload)));
+		assert.deepEqual(containerCalls, [{ sessionId: 'dev-stale', projectId: 'api', targetId: 'service', action: 'status' }]);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('stopping a session recovers an unhealthy registered managed target', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-stop-unhealthy-'));
+	try {
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, stateRoot = resolve(root, 'state/treeseed/development');
+		const state = { sessionId: 'dev-unhealthy', manifest: '/missing.yaml', processes: {}, overlays: [], candidates: [] };
+		mkdirSync(resolve(stateRoot, 'dev-unhealthy'), { recursive: true, mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(state));
+		writeFileSync(resolve(stateRoot, 'dev-unhealthy/session.json'), JSON.stringify(state));
+		const target = { id: 'service', kind: 'live-api', executionCustody: 'manager', operations: {}, endpoints: [] };
+		const record = { session: { sessionId: 'dev-unhealthy', status: 'active', repositories: [{ projectId: 'api', worktree: '/workspace/api' }], targets: [{ projectId: 'api', targetId: 'service', mode: 'candidate' }] }, runtimes: [{ project: { id: 'api' }, targets: [target] }] };
+		const actions: string[] = [], output: string[] = [];
+		const exit = await runCommandLine(['dev', 'session', 'stop', '--session', 'dev-unhealthy', '--json'], { env, interactiveUi: false,
+			hostInvoke: async (input) => {
+				if (input.handlerId === 'local.dev.status') return record;
+				if (input.handlerId === 'local.dev.container') {
+					const action = JSON.parse(String(input.options.payload)).action as string; actions.push(action);
+					if (action === 'status' || action === 'stop') throw new Error('Managed development application_unhealthy.');
+					return {};
+				}
+				return { session: { sessionId: 'dev-unhealthy', status: 'stopped' } };
+			}, write: (value) => output.push(value) });
+		assert.equal(exit, 0, output.join('\n'));
+		assert.deepEqual(actions, ['status', 'stop']);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('host runtime development planning is local and status uses the protected manager socket', async () => {
 	const output: string[] = [], calls: any[] = [];
 	const hostInvoke = async (input: any) => { calls.push(input); return { generationId: 'installed', status: 'installed' }; };
@@ -91,20 +155,20 @@ test('host runtime development planning is local and status uses the protected m
 
 test('development logs include bounded diagnostics for a selected managed container', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-container-logs-')), file = resolve(root, 'treeseed.package.yaml');
-	const calls: Array<{ handlerId: string; options: { payload: string } }> = [], output: string[] = [];
+	const calls: Array<{ handlerId: string; options: { payload?: string | boolean | string[] } }> = [], output: string[] = [];
 	try {
 		writeFileSync(file, manifest.replaceAll('admin', 'api').replace('id: web', 'id: service').replace('command: npm', 'command: docker'));
 		execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
 		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
 		const context = { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false,
-			hostInvoke: async (input: { handlerId: string; options: { payload: string } }) => { calls.push(input); return input.handlerId === 'local.dev.session.start' ? { session: { sessionId: 'dev-logtest' } } : { events: [{ code: '53300' }] }; },
+			hostInvoke: async (input: { handlerId: string; options: { payload?: string | boolean | string[] } }) => { calls.push(input); return input.handlerId === 'local.dev.session.start' ? { session: { sessionId: 'dev-logtest' } } : { events: [{ code: '53300' }] }; },
 			write: (value: string) => output.push(value) };
 		assert.equal(await runCommandLine(['dev', 'session', 'start', file, '--json'], context), 0, output.join('\n'));
-		const sessionId = JSON.parse(calls[0]!.options.payload).session.sessionId;
+		const sessionId = JSON.parse(String(calls[0]!.options.payload)).session.sessionId;
 		output.length = 0;
 		assert.equal(await runCommandLine(['dev', 'logs', '--session', sessionId, '--target', 'api.service', '--json'], context), 0, output.join('\n'));
 		assert.equal(calls[1]?.handlerId, 'local.dev.container');
-		assert.deepEqual(JSON.parse(calls[1]!.options.payload), { sessionId, projectId: 'api', targetId: 'service', action: 'logs' });
+		assert.deepEqual(JSON.parse(String(calls[1]!.options.payload)), { sessionId, projectId: 'api', targetId: 'service', action: 'logs' });
 		assert.deepEqual(JSON.parse(output[0]!).result.logs, [{ target: 'api.service', diagnostics: { events: [{ code: '53300' }] } }]);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -140,6 +204,20 @@ test('development operations receive portable workspace identity and overlays us
 	const target = relativeOverlayTarget(link, overlay);
 	assert.equal(target.startsWith('/'), false);
 	assert.equal(resolve(resolve(link, '..'), target), resolve(overlay, 'current'));
+});
+
+test('development operation context retains explicit saved workspace and exact session over ambient values',()=>{
+	const state={manifest:'/other/session.yaml',workspaceRoot:'/owned/workspace',sessionId:'exact-session'};
+	const original={PATH:'/bin',TREESEED_DEVELOPMENT_WORKSPACE_ROOT:'/stale',TREESEED_DEVELOPMENT_SESSION_ID:'stale'};
+	const environment=developmentOperationEnvironment(state,'/owned/workspace/packages/custom','candidate',original,{}, {CUSTOM_DECLARED:'exact'});
+	assert.deepEqual(environment,{PATH:'/bin',TREESEED_DEVELOPMENT_WORKSPACE_ROOT:'/owned/workspace',TREESEED_DEVELOPMENT_SESSION_ID:'exact-session',TREESEED_DEVELOPMENT_WORKTREE:'/owned/workspace/packages/custom',TREESEED_DEVELOPMENT_MODE:'candidate',CUSTOM_DECLARED:'exact'});
+	assert.equal(original.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,'/stale');
+});
+
+test('development operation context preserves existing resolved and declared environment precedence',()=>{
+	const environment=developmentOperationEnvironment({manifest:'/workspace/session.yaml',sessionId:'exact-session'},'/workspace/project','live',{PATH:'/ambient',VALUE:'ambient'},{VALUE:'resolved',RESOLVED:'present'},{VALUE:'declared',DECLARED:'present'});
+	assert.equal(environment.VALUE,'declared');assert.equal(environment.RESOLVED,'present');assert.equal(environment.DECLARED,'present');assert.equal(environment.PATH,'/ambient');
+	assert.equal(environment.TREESEED_DEVELOPMENT_MODE,'live');assert.equal(environment.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,'/workspace');
 });
 
 test('development CLI selection is an atomic, removable launcher input', () => {
@@ -184,6 +262,8 @@ test('package synchronizer launches the CLI development module and publishes a c
 		const deadline = Date.now() + 2_000;
 		while (!existsSync(resolve(overlay, 'current')) && Date.now() < deadline) await new Promise((accept) => setTimeout(accept, 25));
 		assert.equal(existsSync(resolve(overlay, 'current', 'dist/index.js')), true, readFileSync(state.processes['overlay-sync.sdk.package']!.log, 'utf8'));
+		assert.equal(statSync(overlay).mode & 0o050, 0o050, 'manager-side consumers require group traversal');
+		assert.equal(statSync(resolve(overlay, 'current')).mode & 0o050, 0o050, 'completed generations require group traversal');
 	} finally {
 		await stopProcess(state, 'overlay-sync.sdk.package');
 		rmSync(root, { recursive: true, force: true }); rmSync(stateRoot, { recursive: true, force: true });

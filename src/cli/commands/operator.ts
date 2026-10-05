@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
+import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, validateWorkdayIntentSelection, normalizeWorkdayAgentSelection, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
 import { ControlPlaneClientError, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
+import { workdayAllocationOverridesSchema, workdayPolicySchema } from '@treeseed/sdk/agent-capacity';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { launchApplication } from '../application/launch.js';
 import { runInteractiveChat } from '../communication/interactive-chat.js';
@@ -11,6 +12,8 @@ import { controlPlaneServerRegistry, createControlPlaneClient } from '../support
 import { loadServerSession } from '../support/server-custody.js';
 import { renderCommunicationResponses } from '../support/human-renderer.js';
 import { resolveExplicitTeam } from '../support/selectors/team.js';
+import { resolveExplicitProject } from '../support/selectors/project.js';
+import { getOperationInputField, setOperationInputField } from '../support/operations/input-fields.js';
 
 function activeTeam(invocation: ParsedInvocation, context: CommandContext) {
 	const registry = controlPlaneServerRegistry(context);
@@ -30,13 +33,24 @@ function sourceValue(binding: CommandInputBinding, invocation: ParsedInvocation,
 }
 
 function transform(value: unknown, binding: CommandInputBinding) {
-	if (value === undefined || value === null || value === '') return undefined;
+	if (value === undefined || value === null) return undefined;
+	if (binding.transform === 'csv') return (Array.isArray(value) ? value : [value]).flatMap(item => String(item).split(',').map(part => part.trim()));
+	if (binding.transform === 'json') {
+		try { return JSON.parse(String(value)); } catch { throw Object.assign(new Error(`Invalid JSON for --${binding.name}.`),
+			{ category: 'invalid_input', code: 'command_json_invalid' }); }
+	}
+	if (value === '') return undefined;
+	if (binding.transform === 'number') {
+		const parsed = Number(value);
+		if (!Number.isFinite(parsed)) throw Object.assign(new Error(`${binding.name} must be a finite number.`),
+			{ category: 'invalid_input', code: 'command_number_invalid' });
+		return parsed;
+	}
 	if (binding.transform === 'integer') {
 		const parsed = Number(value);
 		if (!Number.isInteger(parsed)) throw new Error(`${binding.name} must be an integer.`);
 		return parsed;
 	}
-	if (binding.transform === 'csv') return Array.isArray(value) ? value : String(value).split(',').map((item) => item.trim()).filter(Boolean);
 	return value;
 }
 
@@ -65,9 +79,26 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 	for (const binding of invocation.command.execution.input) {
 		const value = transform(sourceValue(binding, invocation, context), binding);
 		if (binding.required && value === undefined) { deferred.push(binding); continue; }
-		if (value !== undefined) input[binding.target][binding.field] = value;
+		if (value !== undefined) setOperationInputField(input[binding.target], binding.field, value);
 	}
 	const operation = controlPlaneOperation(invocation.command.execution.operationId);
+	if (operation.descriptor.operationId === 'workdays.plan' && input.body.allocation !== undefined) {
+		const parsed = workdayAllocationOverridesSchema.safeParse(input.body.allocation);
+		if (!parsed.success) throw Object.assign(new Error(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(' ')),
+			{ category: 'invalid_input', code: 'workday_allocation_invalid' });
+	}
+	if (operation.descriptor.operationId === 'workdays.plan' && input.body.agentSelection !== undefined) {
+		const diagnostics = validateWorkdayIntentSelection(input.body.agentSelection);
+		if (diagnostics.length) throw Object.assign(new Error(diagnostics.map(item => `${item.path}: ${item.message}`).join(' ')), { category: 'invalid_input', code: 'workday_agent_selection_invalid' });
+		input.body.agentSelection = normalizeWorkdayAgentSelection(input.body.agentSelection);
+	}
+	if (operation.descriptor.operationId === 'workdays.plan' && input.body.decisionIds !== undefined) {
+		const values = Array.isArray(input.body.decisionIds) ? input.body.decisionIds : [];
+		if (!values.length || values.length > 64 || values.some(value => typeof value !== 'string' || !value.trim() || value.length > 128)) {
+			throw Object.assign(new Error('decisionIds must contain one to 64 non-empty decision identities.'), { category: 'invalid_input', code: 'workday_decision_selection_invalid' });
+		}
+		input.body.decisionIds = [...new Set(values.map(value => String(value).trim()))].sort();
+	}
 	if (operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
 		const parsed = await portableSeedBundle(input.body.file, context);
 		delete input.body.file;
@@ -90,9 +121,14 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		const parsed = parseYaml(await inputDocument(input.body.file, context));
 		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Object.assign(new Error('Input file must contain one YAML or JSON object.'), { category: 'invalid_input', code: 'command_input_file_invalid' });
 		delete input.body.file;
-		Object.assign(input.body, parsed);
+		if (operation.descriptor.operationId === 'workdays.profiles.update') {
+			const policy = workdayPolicySchema.safeParse(parsed);
+			if (!policy.success) throw Object.assign(new Error(policy.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')),
+				{ category: 'invalid_input', code: 'workday_policy_file_invalid' });
+			input.body.policy = policy.data;
+		} else Object.assign(input.body, parsed);
 	}
-	for (const binding of deferred) if (input[binding.target][binding.field] === undefined) {
+	for (const binding of deferred) if (getOperationInputField(input[binding.target], binding.field) === undefined) {
 		throw Object.assign(new Error(`Missing required ${binding.source}: ${binding.name}`), { category: 'ambiguous_context', code: `${binding.name}_required` });
 	}
 	const body = Object.keys(input.body).length
@@ -113,6 +149,17 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 			for (const slot of slots) slot.teamId = teamId;
 		}
 	}
+	if (typeof invocation.options.project === 'string') {
+		const slots = [input.path, input.query, input.body].filter((slot): slot is Record<string, unknown> => Boolean(slot) && slot?.projectId === invocation.options.project);
+		if (slots.length) {
+			const teamId = typeof input.path.teamId === 'string' ? input.path.teamId
+				: typeof input.query.teamId === 'string' ? input.query.teamId
+					: typeof input.body?.teamId === 'string' ? input.body.teamId
+						: activeTeam(invocation, context);
+			const projectId = await resolveExplicitProject(invocation, context, invocation.options.project, teamId);
+			for (const slot of slots) slot.projectId = projectId;
+		}
+	}
 	if (operation.descriptor.operationId === 'communications.send' && !input.body?.message) {
 		if (!context.interactiveUi || !process.stdin.isTTY || !process.stdout.isTTY || invocation.options.json || invocation.options.jsonStream) return runInteractiveChat(invocation, context, String(input.path.teamId), typeof input.path.channel === 'string' ? input.path.channel : undefined);
 		return launchApplication(context, { server: typeof invocation.options.server === 'string' ? invocation.options.server : undefined, workspace: 'chat' });
@@ -127,7 +174,11 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 			new Error(`Deprecated --to target ${target} is not addressed in the message.`), { category: 'invalid_input', code: 'communication_to_not_mentioned' });
 		if (input.body) input.body.recipients = compatibility.length ? compatibility : undefined;
 	}
-	if (invocation.options.plan === true) return { operationId: operation.descriptor.operationId, input, mutation: false };
+	// Reconciliation planning is itself an API-owned read-only computation over
+	// current TreeDX and graph state. Invoke that explicit plan contract instead
+	// of returning the generic client-side mutation preview.
+	const serverSidePlan = invocation.options.plan === true && operation.descriptor.operationId === 'execution.reconcile';
+	if (invocation.options.plan === true && !serverSidePlan) return { operationId: operation.descriptor.operationId, input, mutation: false };
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
 	const options = operation.descriptor.kind === 'mutation' ? { idempotencyKey: String(invocation.options.idempotencyKey ?? randomUUID()), headers: {} as Record<string, string> } : { headers: {} as Record<string, string> };

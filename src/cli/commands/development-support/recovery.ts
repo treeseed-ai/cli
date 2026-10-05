@@ -72,7 +72,8 @@ export function planDevelopmentRecovery(record: Record, env: NodeJS.ProcessEnv, 
 			const currentTarget = current.targets.find(entry => entry.id === target.id);
 			if (currentTarget?.kind !== target.kind || JSON.stringify(currentTarget.operations.start) !== JSON.stringify(target.operations.start)
 				|| JSON.stringify(currentTarget.operations.watch) !== JSON.stringify(target.operations.watch)) throw new Error('Active development recipe changed; recovery requires reconciled runtime custody.');
-			if (target.operations.start?.command === 'docker') continue; // The supervisor owns container custody.
+			if ((target as typeof target & { executionCustody?: string }).executionCustody === 'manager' || target.operations.start?.command === 'docker') continue; // The supervisor owns container custody.
+			if (String(target.kind) === 'source-check') continue; // Verification targets own no persistent process.
 			const operation = target.kind === 'package-watch' ? target.operations.watch ?? target.operations.build : target.operations.start;
 			if (!operation) throw new Error('Active target has no recoverable process operation.');
 			const found = matchDevelopmentProcess(candidates, { sessionId: session.sessionId, worktree, cwd: operation.cwd ? resolve(worktree, operation.cwd) : worktree, command: operation.command, args: operation.args });

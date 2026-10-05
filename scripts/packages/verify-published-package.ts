@@ -6,7 +6,7 @@ import { readBackPublishedPackage } from './published-package-readback.ts';
 
 const root = resolve(import.meta.dirname, '../..');
 const packageDocument = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { name: string; version: string };
-const tagName = process.env.GITHUB_REF_NAME ?? '';
+const tagName = process.env.TREESEED_RELEASE_TAG ?? process.env.GITHUB_REF_NAME ?? '';
 const release = parseCliReleaseVersion(tagName, packageDocument.version);
 const packageDigest = process.env.EXPECTED_SHA256?.trim();
 const previousLatest = process.env.EXPECTED_LATEST?.trim();
