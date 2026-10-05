@@ -6,8 +6,7 @@ on:
     tags: ["**"]
     paths-ignore: ["docs/src/content/**"]
   pull_request:
-    paths-ignore: ["docs/src/content/**"]
-    # Preserve the docs exclusion; verify the original merged-PR lineage reconciliation here.
+    # Required verification must also run for ancestry-only reconciliation PRs.
   workflow_dispatch:
 
 jobs:
