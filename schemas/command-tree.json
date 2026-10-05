@@ -526,6 +526,11 @@
               "name": "--issuer",
               "description": "Choose an authorization server advertised by the selected API.",
               "type": "string"
+            },
+            {
+              "name": "--scope",
+              "description": "Comma-separated additional API scopes to request explicitly, such as treeseed:admin. Does not grant application permissions.",
+              "type": "string"
             }
           ],
           "authorization": {
