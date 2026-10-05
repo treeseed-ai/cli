@@ -1,0 +1,344 @@
+schemaVersion: treeseed.scene/v1
+id: cli.golden.component-boundaries
+title: Golden operator component boundaries
+scope: local-component-tests
+workflow:
+  - id: freeze-context-native
+    action: { verifier: cli.golden.freeze-context-native }
+    expect: { status: passed }
+  - id: contract-context-native
+    action: { verifier: cli.golden.contract-context-native }
+    expect: { status: passed }
+  - id: freeze-workspace-native
+    action: { verifier: cli.golden.freeze-workspace-native }
+    expect: { status: passed }
+  - id: freeze-mode-native
+    action: { verifier: cli.golden.freeze-mode-native }
+    expect: { status: passed }
+  - id: freeze-context-unit
+    action: { verifier: cli.golden.freeze-context-unit }
+    expect: { status: passed }
+  - id: freeze-precedence-unit
+    action: { verifier: cli.golden.freeze-precedence-unit }
+    expect: { status: passed }
+  - id: live-source-tracked-unit
+    action: { verifier: cli.golden.live-source-tracked-unit }
+    expect: { status: passed }
+  - id: live-source-untracked-unit
+    action: { verifier: cli.golden.live-source-untracked-unit }
+    expect: { status: passed }
+  - id: live-source-output-unit
+    action: { verifier: cli.golden.live-source-output-unit }
+    expect: { status: passed }
+  - id: live-source-head-unit
+    action: { verifier: cli.golden.live-source-head-unit }
+    expect: { status: passed }
+  - id: live-source-tracked-native
+    action: { verifier: cli.golden.live-source-tracked-native }
+    expect: { status: passed }
+  - id: live-source-untracked-native
+    action: { verifier: cli.golden.live-source-untracked-native }
+    expect: { status: passed }
+  - id: live-source-head-native
+    action: { verifier: cli.golden.live-source-head-native }
+    expect: { status: passed }
+  - id: live-source-output-native
+    action: { verifier: cli.golden.live-source-output-native }
+    expect: { status: passed }
+  - id: live-directory-escape-unit
+    action: { verifier: cli.golden.live-directory-escape-unit }
+    expect: { status: passed }
+  - id: live-directory-moved-unit
+    action: { verifier: cli.golden.live-directory-moved-unit }
+    expect: { status: passed }
+  - id: live-directory-alias-unit
+    action: { verifier: cli.golden.live-directory-alias-unit }
+    expect: { status: passed }
+  - id: live-directory-escape-native
+    action: { verifier: cli.golden.live-directory-escape-native }
+    expect: { status: passed }
+  - id: live-directory-moved-native
+    action: { verifier: cli.golden.live-directory-moved-native }
+    expect: { status: passed }
+  - id: live-directory-alias-native
+    action: { verifier: cli.golden.live-directory-alias-native }
+    expect: { status: passed }
+  - id: live-directory-manager-native
+    action: { verifier: cli.golden.live-directory-manager-native }
+    expect: { status: passed }
+  - id: operation-build-unit
+    action: { verifier: cli.golden.operation-build-unit }
+    expect: { status: passed }
+  - id: operation-contract-unit
+    action: { verifier: cli.golden.operation-contract-unit }
+    expect: { status: passed }
+  - id: operation-missing-unit
+    action: { verifier: cli.golden.operation-missing-unit }
+    expect: { status: passed }
+  - id: operation-file-unit
+    action: { verifier: cli.golden.operation-file-unit }
+    expect: { status: passed }
+  - id: operation-cycle-unit
+    action: { verifier: cli.golden.operation-cycle-unit }
+    expect: { status: passed }
+  - id: operation-contained-unit
+    action: { verifier: cli.golden.operation-contained-unit }
+    expect: { status: passed }
+  - id: operation-moved-unit
+    action: { verifier: cli.golden.operation-moved-unit }
+    expect: { status: passed }
+  - id: operation-freeze-native
+    action: { verifier: cli.golden.operation-freeze-native }
+    expect: { status: passed }
+  - id: operation-contract-native
+    action: { verifier: cli.golden.operation-contract-native }
+    expect: { status: passed }
+  - id: operation-targets-native
+    action: { verifier: cli.golden.operation-targets-native }
+    expect: { status: passed }
+  - id: operation-verify-native
+    action: { verifier: cli.golden.operation-verify-native }
+    expect: { status: passed }
+  - id: operation-verifiers-native
+    action: { verifier: cli.golden.operation-verifiers-native }
+    expect: { status: passed }
+  - id: operation-alias-native
+    action: { verifier: cli.golden.operation-alias-native }
+    expect: { status: passed }
+  - id: operation-freeze-moved-native
+    action: { verifier: cli.golden.operation-freeze-moved-native }
+    expect: { status: passed }
+  - id: operation-verify-moved-native
+    action: { verifier: cli.golden.operation-verify-moved-native }
+    expect: { status: passed }
+  - id: build-manager-unit
+    action: { verifier: cli.golden.build-manager-unit }
+    expect: { status: passed }
+  - id: build-docker-unit
+    action: { verifier: cli.golden.build-docker-unit }
+    expect: { status: passed }
+  - id: build-direct-unit
+    action: { verifier: cli.golden.build-direct-unit }
+    expect: { status: passed }
+  - id: build-once-native
+    action: { verifier: cli.golden.build-once-native }
+    expect: { status: passed }
+  - id: build-non-idempotent-native
+    action: { verifier: cli.golden.build-non-idempotent-native }
+    expect: { status: passed }
+  - id: build-failure-native
+    action: { verifier: cli.golden.build-failure-native }
+    expect: { status: passed }
+  - id: build-refused-native
+    action: { verifier: cli.golden.build-refused-native }
+    expect: { status: passed }
+  - id: build-plan-native
+    action: { verifier: cli.golden.build-plan-native }
+    expect: { status: passed }
+  - id: build-manager-native
+    action: { verifier: cli.golden.build-manager-native }
+    expect: { status: passed }
+  - id: build-missing-native
+    action: { verifier: cli.golden.build-missing-native }
+    expect: { status: passed }
+  - id: artifact-escaped-unit
+    action: { verifier: cli.golden.artifact-escaped-unit }
+    expect: { status: passed }
+  - id: artifact-directory-unit
+    action: { verifier: cli.golden.artifact-directory-unit }
+    expect: { status: passed }
+  - id: artifact-unreadable-unit
+    action: { verifier: cli.golden.artifact-unreadable-unit }
+    expect: { status: passed }
+  - id: artifact-fifo-unit
+    action: { verifier: cli.golden.artifact-fifo-unit }
+    expect: { status: passed }
+  - id: artifact-broken-unit
+    action: { verifier: cli.golden.artifact-broken-unit }
+    expect: { status: passed }
+  - id: artifact-contained-unit
+    action: { verifier: cli.golden.artifact-contained-unit }
+    expect: { status: passed }
+  - id: artifact-regular-unit
+    action: { verifier: cli.golden.artifact-regular-unit }
+    expect: { status: passed }
+  - id: artifact-freeze-owner
+    action: { verifier: cli.golden.artifact-freeze-owner }
+    expect: { status: passed }
+  - id: artifact-verify-owner
+    action: { verifier: cli.golden.artifact-verify-owner }
+    expect: { status: passed }
+  - id: artifact-alias-native
+    action: { verifier: cli.golden.artifact-alias-native }
+    expect: { status: passed }
+  - id: artifact-between-native
+    action: { verifier: cli.golden.artifact-between-native }
+    expect: { status: passed }
+  - id: artifact-fifo-native
+    action: { verifier: cli.golden.artifact-fifo-native }
+    expect: { status: passed }
+  - id: freeze-source-unit
+    action: { verifier: cli.golden.freeze-source-unit }
+    expect: { status: passed }
+  - id: freeze-artifact-unit
+    action: { verifier: cli.golden.freeze-artifact-unit }
+    expect: { status: passed }
+  - id: freeze-output-unit
+    action: { verifier: cli.golden.freeze-output-unit }
+    expect: { status: passed }
+  - id: freeze-head-unit
+    action: { verifier: cli.golden.freeze-head-unit }
+    expect: { status: passed }
+  - id: freeze-tracked
+    action: { verifier: cli.golden.freeze-tracked }
+    expect: { status: passed }
+  - id: freeze-untracked
+    action: { verifier: cli.golden.freeze-untracked }
+    expect: { status: passed }
+  - id: freeze-head
+    action: { verifier: cli.golden.freeze-head }
+    expect: { status: passed }
+  - id: freeze-recipe
+    action: { verifier: cli.golden.freeze-recipe }
+    expect: { status: passed }
+  - id: freeze-contract
+    action: { verifier: cli.golden.freeze-contract }
+    expect: { status: passed }
+  - id: freeze-all-owners
+    action: { verifier: cli.golden.freeze-all-owners }
+    expect: { status: passed }
+  - id: freeze-earlier-artifact
+    action: { verifier: cli.golden.freeze-earlier-artifact }
+    expect: { status: passed }
+  - id: freeze-repeat
+    action: { verifier: cli.golden.freeze-repeat }
+    expect: { status: passed }
+  - id: freeze-failure
+    action: { verifier: cli.golden.freeze-failure }
+    expect: { status: passed }
+  - id: freeze-wildcard
+    action: { verifier: cli.golden.freeze-wildcard }
+    expect: { status: passed }
+  - id: freeze-empty-target
+    action: { verifier: cli.golden.freeze-empty-target }
+    expect: { status: passed }
+  - id: source-parent
+    action: { verifier: cli.golden.source-parent }
+    expect: { status: passed }
+  - id: source-git-loss
+    action: { verifier: cli.golden.source-git-loss }
+    expect: { status: passed }
+  - id: source-linked-root
+    action: { verifier: cli.golden.source-linked-root }
+    expect: { status: passed }
+  - id: candidate-preflight-source
+    action: { verifier: cli.golden.candidate-preflight-source }
+    expect: { status: passed }
+  - id: candidate-preflight-owner
+    action: { verifier: cli.golden.candidate-preflight-owner }
+    expect: { status: passed }
+  - id: candidate-preflight-artifact
+    action: { verifier: cli.golden.candidate-preflight-artifact }
+    expect: { status: passed }
+  - id: candidate-between-source
+    action: { verifier: cli.golden.candidate-between-source }
+    expect: { status: passed }
+  - id: candidate-between-artifact
+    action: { verifier: cli.golden.candidate-between-artifact }
+    expect: { status: passed }
+  - id: candidate-once
+    action: { verifier: cli.golden.candidate-once }
+    expect: { status: passed }
+  - id: source-bytes
+    action: { verifier: cli.golden.source-bytes }
+    expect: { status: passed }
+  - id: source-mode
+    action: { verifier: cli.golden.source-mode }
+    expect: { status: passed }
+  - id: source-ignore
+    action: { verifier: cli.golden.source-ignore }
+    expect: { status: passed }
+  - id: source-unreadable
+    action: { verifier: cli.golden.source-unreadable }
+    expect: { status: passed }
+  - id: candidate-bytes
+    action: { verifier: cli.golden.candidate-bytes }
+    expect: { status: passed }
+  - id: candidate-mode
+    action: { verifier: cli.golden.candidate-mode }
+    expect: { status: passed }
+  - id: candidate-link
+    action: { verifier: cli.golden.candidate-link }
+    expect: { status: passed }
+  - id: candidate-deletion
+    action: { verifier: cli.golden.candidate-deletion }
+    expect: { status: passed }
+  - id: candidate-addition
+    action: { verifier: cli.golden.candidate-addition }
+    expect: { status: passed }
+  - id: candidate-mutation
+    action: { verifier: cli.golden.candidate-mutation }
+    expect: { status: passed }
+  - id: dirty-candidate
+    action: { verifier: cli.golden.dirty-candidate }
+    expect: { status: passed }
+  - id: source-files
+    action: { verifier: cli.golden.source-files }
+    expect: { status: passed }
+  - id: source-checkout
+    action: { verifier: cli.golden.source-checkout }
+    expect: { status: passed }
+  - id: sdk-agreement
+    action: { verifier: cli.golden.sdk-agreement }
+    expect: { status: passed }
+  - id: sbom-authority
+    action: { verifier: cli.golden.sbom-authority }
+    expect: { status: passed }
+  - id: sbom-native
+    action: { verifier: cli.golden.sbom-native }
+    expect: { status: passed }
+  - id: workflow-triggers
+    action: { verifier: cli.golden.workflow-triggers }
+    expect: { status: passed }
+  - id: reporting-deadlines
+    action: { verifier: cli.golden.reporting-deadlines }
+    expect: { status: passed }
+  - id: native-reporting
+    action: { verifier: cli.golden.native-reporting }
+    expect: { status: passed }
+  - id: reporting-denial
+    action: { verifier: cli.golden.reporting-denial }
+    expect: { status: passed }
+  - id: reporting-outcomes
+    action: { verifier: cli.golden.reporting-outcomes }
+    expect: { status: passed }
+  - id: reporting-unit
+    action: { verifier: cli.golden.reporting-unit }
+    expect: { status: passed }
+  - id: refused-rebuild
+    action: { verifier: cli.golden.refused-rebuild }
+    expect: { status: passed }
+  - id: allocations
+    action: { verifier: cli.golden.allocations }
+    expect: { status: passed }
+  - id: selection
+    action: { verifier: cli.golden.selection }
+    expect: { status: passed }
+  - id: decisions
+    action: { verifier: cli.golden.decisions }
+    expect: { status: passed }
+  - id: decision-denial
+    action: { verifier: cli.golden.decision-denial }
+    expect: { status: passed }
+  - id: input-isolation
+    action: { verifier: cli.golden.input-isolation }
+    expect: { status: passed }
+  - id: diagnostics
+    action: { verifier: cli.golden.diagnostics }
+    expect: { status: passed }
+  - id: runtime-readback
+    action: { verifier: cli.golden.runtime-readback }
+    expect: { status: passed }
+  - id: lifecycle-lock
+    action: { verifier: cli.golden.lifecycle-lock }
+    expect: { status: passed }

@@ -1,6 +1,6 @@
 {
   "name": "@treeseed/cli",
-  "version": "0.12.59-dev.fix-sdk-package-lock-integrity.20260818T135645Z",
+  "version": "0.13.0-rc.85",
   "description": "Operator-facing Treeseed CLI package.",
   "license": "Apache-2.0",
   "repository": {
@@ -17,11 +17,12 @@
   "engines": {
     "node": ">=22"
   },
-  "types": "./dist/index.d.ts",
   "files": [
     "README.md",
+    "completions",
     "dist",
-    "scripts/support/verify-driver.ts"
+    "docs/command-reference.md",
+    "schemas"
   ],
   "publishConfig": {
     "access": "public"
@@ -34,36 +35,53 @@
     "check:file-architecture": "node --import tsx ./scripts/support/check-file-architecture.ts",
     "lint": "npm run check:file-lengths && npm run build:dist",
     "test": "npm run build:dist && node --import tsx ./scripts/testing/run-tests.ts",
-    "build:dist": "node --import tsx ./scripts/build/build-dist.ts",
+    "accept:host-lifecycle": "node --import tsx ./scripts/testing/accept-host-lifecycle.ts",
+    "build:operator-docs": "node --import tsx ./scripts/build/generate-operator-docs.ts",
+    "build:dist": "npm run build:operator-docs && node --import tsx ./scripts/build/build-dist.ts",
+    "dev:tui": "node --import tsx ./scripts/development/tui-watch.ts",
     "prepare": "node --import tsx ./scripts/support/prepare.ts",
     "prepack": "npm run build:dist",
-    "verify:direct": "npm run release:verify && npm run pack:tool-closure",
-    "verify:local": "TREESEED_VERIFY_DRIVER=direct TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
-    "verify:action": "TREESEED_VERIFY_DRIVER=act TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
-    "verify": "TMPDIR=/tmp node --import tsx ./scripts/support/verify-driver.ts",
+    "verify:direct": "npm run release:verify && npm run pack:artifact",
+    "verify:local": "npm run verify:direct",
+    "verify": "npm run verify:direct",
     "release:setup": "npm run setup:ci",
-    "pack:tool-closure": "node --import tsx ./scripts/packages/pack-tool-closure.ts",
+    "pack:artifact": "node --import tsx ./scripts/packages/pack-package-artifact.ts",
     "release:check-tag": "node --import tsx ./scripts/packages/assert-release-tag-version.ts",
     "release:verify": "node --import tsx ./scripts/packages/release-verify.ts",
-    "release:publish": "node --import tsx ./scripts/packages/publish-package.ts"
+    "release:publish": "node --import tsx ./scripts/packages/publish-package.ts",
+    "release:custody": "node --import tsx ./scripts/packages/release-custody.ts"
   },
   "dependencies": {
-    "@treeseed/agent": "github:treeseed-ai/agent#6e1a7345e6ec1c75d8020ce4c08c68bea7ad99e7",
-    "@treeseed/core": "github:treeseed-ai/core#32a5c1eeb5f6e5e655910f679c684bf4f2cad244",
-    "@treeseed/sdk": "github:treeseed-ai/sdk#f843c3cb11853db737d28ecc6bcc3d5df5e183e9",
-    "@treeseed/ui": "github:treeseed-ai/ui#d622525826d4222ced78e7748880750f6c1377bb",
-    "ink": "^7.0.0",
-    "react": "^19.2.5",
-    "yaml": "^2.8.1"
+    "@treeseed/identity": "0.1.0-rc.23",
+    "@treeseed/sdk": "0.13.0-rc.122",
+    "ink": "^7.1.1",
+    "react": "^19.2.8",
+    "string-width": "^8.2.2",
+    "yaml": "2.9.0"
   },
+  "bundledDependencies": [
+    "ink",
+    "react",
+    "string-width",
+    "yaml"
+  ],
   "devDependencies": {
+    "@treeseed/deployment": "https://github.com/treeseed-ai/deployment/releases/download/0.1.0-rc.277/treeseed-deployment-runtime-0.1.0-rc.277.tgz",
+    "@treeseed/ui": ">=0.12.18-rc.12 <0.14.0",
     "@types/node": "^24.6.0",
+    "@types/react": "^19.2.14",
     "esbuild": "^0.25.10",
+    "jose": "6.2.12",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "bin": {
-    "treeseed": "./dist/cli/main.js",
     "trsd": "./dist/cli/main.js"
-  }
+  },
+  "bundleDependencies": [
+    "ink",
+    "react",
+    "string-width",
+    "yaml"
+  ]
 }

@@ -1,175 +1,124 @@
 # @treeseed/cli
 
-`@treeseed/cli` publishes the `treeseed` and `trsd` command surfaces. Use it to configure Treeseed, run local development, save/stage/release work, reconcile hosting, operate capacity providers, manage package images, and inspect workflow state.
+`trsd inbox` and interactive `trsd send` share TreeSeed's full-screen terminal workbench: mouse and keyboard navigation, responsive panes, syntax-highlighted Markdown, stable selection during live updates, and reliable terminal cleanup. The inbox defaults to unresolved questions and proposals and keeps private feedback and proposal-revision drafts on the server.
 
-The CLI is the human and automation entrypoint over package-owned capabilities. It delegates platform logic to `@treeseed/sdk`, web runtime orchestration to `@treeseed/core`, backend behavior to API surfaces, capacity runtime to `@treeseed/agent`, and TreeDX image workflows to package manifests.
+`@treeseed/cli` publishes one executable: `trsd`. It is the human and automation interface to TreeSeed's authoritative control-plane API.
 
-## What You Can Do With The CLI
-
-- configure local, staging, and production environments
-- start and inspect local development instances
-- save, stage, close, resume, and release multi-repo work
-- plan/apply/verify hosted infrastructure through reconciliation
-- run operations-runner smoke checks
-- build and operate capacity provider runtime lifecycle
-- inspect capacity plans, provider sessions, assignments, mode runs, and usage
-- manage TreeDX package image workflows
-- inspect package drift, workflow locks, and interrupted runs
+The CLI accepts high-level intent, renders read projections, and returns durable receipts. It does not let clients author derived capacity plans, assignments, leases, reservations, settlements, or repository integration records.
 
 ## Install
 
-```bash
-npm install @treeseed/cli
-```
-
-After installation:
-
-```bash
-treeseed --help
+```sh
+npm install --global @treeseed/cli
 trsd --help
 ```
 
-In this workspace, use `npx trsd ...` from the root.
+## Command contract
 
-## Primary Commands
+Public commands are hierarchical, contain no aliases or colon-separated names, and are generated from the SDK command-tree contract. The main resource groups are:
 
-```bash
-treeseed status --json
-treeseed config
-treeseed ready local --json
-treeseed switch feature/my-change --plan --json
-treeseed switch release --worktree --json
-treeseed dev start --web-runtime local --json
-treeseed save --verify local --json "describe the checkpoint"
-treeseed stage --plan --json "describe the staging change"
-treeseed release --patch --verify-deployed-resources --plan --json
-treeseed recover --json
+```text
+trsd auth ...
+trsd secrets ...
+trsd agents ...
+trsd providers ...
+trsd capacity ...
+trsd plans ...
+trsd workdays ...
+trsd assignments ...
+trsd save
+trsd stage
+trsd release
+trsd status
+trsd diagnose
 ```
 
-Runtime diagnostics:
+Run `trsd help <command path>` for leaf and intermediate-node help. The complete generated reference is in [`docs/command-reference.md`](docs/command-reference.md).
 
-```bash
-treeseed operations smoke --environment local --service operationsRunner --json
-treeseed ready staging --json
-treeseed hosting plan --environment staging --service api --json
-treeseed hosting verify --environment staging --service operationsRunner --live --json
-treeseed operations smoke --environment staging --service operationsRunner --json
+## Mutation behavior
+
+- Read commands execute immediately.
+- Mutations execute by default after any required confirmation.
+- `--plan` returns the exact request projection without performing a mutation.
+- `--yes` confirms authorized noninteractive work; it never bypasses API policy.
+- `--json` emits the stable `treeseed.command-result/v1` envelope.
+
+Examples:
+
+```sh
+trsd auth login --server local
+trsd agents list --project sdk --json
+trsd capacity status --team treeseed --json
+trsd workdays list --team treeseed --json
 ```
 
-Capacity providers:
+Commands default to the local control plane at `http://127.0.0.1:3002`. `TREESEED_API_BASE_URL` overrides that address. Server profiles and encrypted OAuth sessions are owned locally by the CLI; control-plane behavior remains API-owned.
 
-```bash
-treeseed capacity build
-treeseed capacity up
-treeseed capacity status
-treeseed capacity logs
-treeseed capacity down
-treeseed capacity test-local
+Identity sign-in requires the API's trusted HTTPS address (the managed local edge is
+`https://api.treeseed.localhost`), not its internal HTTP listener. Configure that address
+in the server profile or `TREESEED_API_BASE_URL`. `trsd auth login` discovers the API's
+advertised identity provider and uses browser PKCE with a temporary loopback callback.
+Use `--device` on a headless machine; use `--issuer` only to select among authorities
+advertised by that API. The CLI never collects the identity-provider password.
+
+Administrative operations require an explicitly scoped login:
+
+```sh
+trsd auth login --server local --scope treeseed:admin
 ```
 
-Capacity lifecycle commands reconcile or inspect provider runtime. Assignment policy, provider sessions, assignments, mode runs, and usage settlement are API control-plane records exposed through explicit inspection/diagnostic commands; CLI must not become a hidden scheduler.
+`--scope` adds comma-separated scopes to the normal login request and works with
+`--device` too. The API must advertise them and Identity must grant them. This
+does not assign roles: `platform_admin` already has all application permissions,
+while a team owner remains limited to that team's authorized operations. Logging
+in again without `--scope` returns to the default least-privilege scope set.
 
-Capacity coordination inspection:
+Tokens stay in OS-encrypted local custody, bound to the exact API, issuer, subject,
+and client. Refresh, logout, and team selection serialize through one OS transaction.
+Old unbound sessions require fresh sign-in, not a fallback to the retired token issuer.
+`trsd auth logout` removes the local session even if upstream revocation is unavailable;
+the JSON result reports whether upstream revocation succeeded.
 
-```bash
-treeseed capacity diagnostics --market local --project project_123 --environment local --json
-treeseed capacity allocation-sets --market local --team team_123 --json
-treeseed capacity agent-classes --market local --project project_123 --json
-treeseed capacity availability-sessions --market local --team team_123 --provider provider_123 --json
-treeseed capacity assignments --market local --team team_123 --status leased --json
-treeseed capacity mode-runs --market local --project project_123 --mode planning --json
-treeseed capacity decision-planning --market local --decision decision_123 --json
-treeseed capacity execution-inputs --market local --decision decision_123 --json
-treeseed capacity capacity-plans --market local --decision decision_123 --json
-treeseed capacity capacity-plan --market local --capacity-plan capacity_plan_123 --json
-treeseed capacity workday-summary --market local --workday workday_123 --json
-treeseed capacity assignment-explanation --market local --team team_123 --assignment assignment_123 --json
-```
+## Team discussions
 
-TreeDX package image:
+`trsd send` opens the active team's topic browser; `trsd send <topic>` opens it with a topic selected. The workbench keeps per-topic composers and recipient selections, shows all listeners and lifecycle events, and can export the visible transcript to Markdown. `trsd send <topic> <message>` remains the one-shot form.
 
-```bash
-treeseed package image --package treedx --branch staging --plan --json
-treeseed package image --package treedx --branch staging --sync-config --json
-treeseed package image --package treedx --branch staging --execute --json
-```
+Messages address agents across the active team without a project option. `@sdk/architect` selects one exact project agent; `@architect` expands to every chat-enabled Architect in the team. The one-shot command listens until the full required and optional response chain settles, unless the user presses Ctrl+C, supplies `--timeout`, or chooses `--no-wait`. Human output streams only each `@project/agent` handle, response time, highlighted Markdown, and a strong separator; `--json` retains the complete automation receipt.
 
-Use `treeseed help <command>` for command-specific usage and examples.
+## Workdays and capacity
 
-## Managed Package Set
+A workday is a team-portfolio time, budget, provider, and allocation envelope. Repository-governed profiles divide capacity among agent classes with minimum, target, maximum, and audited borrowing rules. The API compiles eligible demand and provider availability into an immutable preflight receipt. `workdays start` consumes that exact receipt and fails if its inputs changed.
 
-The CLI coordinates the root market repo plus checked-out package repositories:
+Capacity plans are API-derived records. The CLI can list, show, explain, and compare them, but cannot create or edit their content. Acting assignments still require approved decision authority; planning and research demand follow the selected workday profile.
 
-- `@treeseed/sdk`
-- `@treeseed/ui`
-- `@treeseed/core`
-- `@treeseed/admin`
-- `@treeseed/api`
-- `@treeseed/cli`
-- `@treeseed/agent`
-- `packages/treedx`
+## Providers and agents
 
-Workflow commands save package repos in dependency order, update workspace submodule pointers when this checkout uses them, verify package release gates, and avoid one-off provider mutation. Those submodule pointer updates are package-workspace mechanics; project architecture and imported content are modeled separately through repository identity, `rootPath`, `sitePath`, `contentPath`, and local materialization policy.
+Agent definitions, classes, and bindings are repository-governed content indexed by the API. CLI commands inspect and diagnose the accepted generation; definition changes flow through GitHub branches and pull requests.
 
-## Save, Stage, And Release
+Provider credentials and host authority remain outside agent workspaces. `providers connect` is the high-level bootstrap surface; the Agent package's low-level provider executable is private to trusted runtime containers.
 
-`treeseed save` is the default checkpoint command. It saves dirty package repositories first, restores workspace links, performs lightweight release-candidate validation, and then saves the root market repo.
+## Generated automation artifacts
 
-```bash
-treeseed save --json "describe the checkpoint"
-treeseed save --verify local --json "describe the checkpoint"
-treeseed save --lane promotion --json "describe the checkpoint"
-```
+The build generates all public interface artifacts from the same SDK command tree:
 
-`treeseed stage` and `treeseed release` are promotion-grade commands. Use `--plan` before risky operations:
+- `docs/command-reference.md`
+- `schemas/command-tree.json`
+- `schemas/command-tree.schema.json`
+- `schemas/command-result.schema.json`
+- `completions/trsd.bash`
 
-```bash
-treeseed stage --plan --json "describe the staging change"
-treeseed stage --verify action --json "describe the staging change"
-treeseed stage --verify none --json "handoff to staging agent"
-treeseed release --patch --verify-deployed-resources --plan --json
-```
+The package exposes only the `trsd` executable. It has no JavaScript library export and ships no backend, integration, UI, Agent-runtime, or repository-workflow implementation.
 
-Managed task worktrees created by `treeseed switch <branch> --worktree --json` live under `.treeseed/worktrees/<branch-slug>`. A branch may have only one active managed worktree. Successful `stage` merges `staging` down into the task branch first, runs local proof by default, promotes exact verified refs to `staging`, and preserves the staged branch/worktree by default. Use `--cleanup success` only when source cleanup is intentionally safe after promotion. It does not wait on hosted CI/CD or provider resource checks by default; staging release repair is a separate workflow. If a root or package merge conflicts, the workflow records the conflicted paths, preserves the feature branch/worktree, and stops before staging is mutated.
+## Development
 
-Interrupted workflow runs are journaled under `.treeseed/workflow`:
-
-```bash
-treeseed recover --json
-treeseed resume <run-id> --json
-```
-
-## How CLI Fits With Other Packages
-
-- `@treeseed/sdk` owns workflow, reconciliation, config, package discovery, and platform primitives.
-- `@treeseed/core` owns the local web runtime used by `treeseed dev`.
-- `@treeseed/admin` and `@treeseed/ui` are consumed by the web app; CLI does not own those routes or components.
-- `@treeseed/api` owns backend API and operations-runner implementation.
-- `@treeseed/api` owns durable capacity coordination records and assignment APIs.
-- `@treeseed/agent` owns capacity-provider runtime artifacts that CLI starts or reconciles.
-- TreeDX owns its service/image; CLI exposes package-image workflow commands.
-
-## Package Development
-
-From this package root:
-
-```bash
-npm install
-npm run build
+```sh
+npm ci
+npm run lint
 npm test
 npm run release:verify
+npm pack --json --ignore-scripts
 ```
 
-Release verification checks the packaged command surface, parser/help behavior, build output, and publishable artifact shape.
+The release gate builds generated artifacts, runs the retained deterministic suite, packs the package, installs it in isolation, asserts that only `trsd` is present, and exercises the installed command tree.
 
-## What CLI Does Not Own
-
-- SDK reconciliation internals
-- Core web runtime internals
-- Admin routes or UI components
-- backend API implementation
-- capacity-provider runtime implementation
-- TreeDX service internals
-- root market content or ecommerce
-
-See the root [Package Ownership](../../docs/package-ownership.md) guide for cross-package boundaries.
+This prerelease cutover keeps production and unscoped release fail-closed. GitHub-backed `save`, `stage`, and `release` execution remains unavailable until the corresponding trusted work-provider routes are active.

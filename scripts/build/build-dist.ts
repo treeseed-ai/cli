@@ -1,11 +1,12 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { build } from 'esbuild';
-import ts from 'typescript';
 import { packageRoot } from '../packages/package-tools.ts';
 
 const srcRoot = resolve(packageRoot, 'src');
 const distRoot = resolve(packageRoot, 'dist');
+const stagingRoot = resolve(packageRoot, `.treeseed-dist-${process.pid}`);
+const backupRoot = resolve(packageRoot, '.treeseed-dist-previous');
 
 function walkFiles(root) {
 	const files = [];
@@ -20,7 +21,7 @@ function walkFiles(root) {
 	return files;
 }
 
-const publishableSourceFiles = walkFiles(srcRoot).filter((filePath) => filePath.endsWith('.ts') && !filePath.endsWith('.d.ts'));
+const publishableSourceFiles = walkFiles(srcRoot).filter((filePath) => /\.tsx?$/u.test(filePath) && !filePath.endsWith('.d.ts') && !filePath.endsWith('/types.ts'));
 
 function ensureDir(filePath) {
 	mkdirSync(dirname(filePath), { recursive: true });
@@ -31,54 +32,39 @@ function rewriteRuntimeSpecifiers(contents) {
 }
 
 async function compileModule(filePath) {
-	const outputFile = resolve(distRoot, relative(srcRoot, filePath).replace(/\.ts$/u, '.js'));
+	const outputFile = resolve(stagingRoot, relative(srcRoot, filePath).replace(/\.tsx?$/u, '.js'));
 	ensureDir(outputFile);
+	const sharedUiRuntime = filePath.endsWith('/cli/application/ui-runtime.ts');
+	const sharedCustodyRuntime = filePath.endsWith('/cli/support/server-custody.ts');
 	await build({
 		entryPoints: [filePath],
 		outfile: outputFile,
 		platform: 'node',
 		format: 'esm',
-		bundle: false,
+		bundle: sharedUiRuntime || sharedCustodyRuntime,
+		external: sharedUiRuntime ? ['react', 'react/*', 'ink', 'ink/*'] : sharedCustodyRuntime ? ['@treeseed/sdk', '@treeseed/sdk/*'] : undefined,
 		logLevel: 'silent',
 	});
 	writeFileSync(outputFile, rewriteRuntimeSpecifiers(readFileSync(outputFile, 'utf8')), 'utf8');
 }
 
-function emitDeclarations() {
-	const program = ts.createProgram({
-		rootNames: publishableSourceFiles,
-		options: {
-			allowImportingTsExtensions: true,
-			target: ts.ScriptTarget.ES2022,
-			module: ts.ModuleKind.ESNext,
-			moduleResolution: ts.ModuleResolutionKind.Bundler,
-			strict: true,
-			noEmit: false,
-			declaration: true,
-			emitDeclarationOnly: true,
-			declarationDir: distRoot,
-			types: ['node'],
-		},
-	});
-	const result = program.emit();
-	if (result.emitSkipped) {
-		const diagnostics = ts.formatDiagnosticsWithColorAndContext(result.diagnostics, {
-			getCanonicalFileName: (fileName) => fileName,
-			getCurrentDirectory: () => process.cwd(),
-			getNewLine: () => '\n',
-		});
-		throw new Error(`Declaration build failed.\n${diagnostics}`);
-	}
-}
-
-rmSync(distRoot, { recursive: true, force: true });
+rmSync(stagingRoot, { recursive: true, force: true });
 
 for (const filePath of publishableSourceFiles) {
 	await compileModule(filePath);
 }
 
-emitDeclarations();
-
 if (existsSync(resolve(packageRoot, 'README.md'))) {
 	copyFileSync(resolve(packageRoot, 'README.md'), resolve(distRoot, '..', 'README.md'));
 }
+
+const marker = resolve(stagingRoot, '.treeseed-build-complete.json');
+writeFileSync(marker, `${JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' })}\n`);
+rmSync(backupRoot, { recursive: true, force: true });
+if (existsSync(distRoot)) renameSync(distRoot, backupRoot);
+try { renameSync(stagingRoot, distRoot); }
+catch (error) {
+	if (existsSync(backupRoot) && !existsSync(distRoot)) renameSync(backupRoot, distRoot);
+	throw error;
+}
+rmSync(backupRoot, { recursive: true, force: true });

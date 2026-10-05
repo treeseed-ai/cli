@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseCliReleaseVersion } from './release-version.ts';
 
 const packageRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const packageJson = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
@@ -12,14 +13,10 @@ if (!tagName) {
 	process.exit(1);
 }
 
-if (!/^\d+\.\d+\.\d+$/.test(tagName)) {
-	console.error(`Release tag "${tagName}" must use plain semver format "x.y.z".`);
-	process.exit(1);
-}
-
-const taggedVersion = tagName;
-if (taggedVersion !== packageVersion) {
-	console.error(`Release tag version "${taggedVersion}" does not match @treeseed/cli version "${packageVersion}".`);
+try {
+	parseCliReleaseVersion(tagName, packageVersion);
+} catch (error) {
+	console.error(error instanceof Error ? error.message : String(error));
 	process.exit(1);
 }
 

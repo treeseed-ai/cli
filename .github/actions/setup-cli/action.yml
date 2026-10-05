@@ -1,0 +1,27 @@
+name: Setup TreeSeed CLI
+description: Install one exact published TreeSeed CLI release.
+inputs:
+  version:
+    description: Exact published CLI semantic version.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: 24.12.0
+        registry-url: https://registry.npmjs.org
+    - name: Validate exact version
+      shell: bash
+      env:
+        TREESEED_CLI_VERSION: ${{ inputs.version }}
+      run: |
+        [[ "$TREESEED_CLI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
+    - name: Install exact CLI release
+      shell: bash
+      env:
+        TREESEED_CLI_VERSION: ${{ inputs.version }}
+      run: npm install --global --ignore-scripts --no-audit --no-fund "@treeseed/cli@${TREESEED_CLI_VERSION}"
+    - name: Verify command surface
+      shell: bash
+      run: trsd help platform

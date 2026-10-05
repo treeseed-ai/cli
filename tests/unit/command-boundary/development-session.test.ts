@@ -1,0 +1,314 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import test from 'node:test';
+import { runCommandLine } from '../../../src/cli/runtime.ts';
+import { developmentCliEntrypointPath, developmentOperationEnvironment, relativeOverlayTarget, selectDevelopmentCli, startPackageSynchronizer, stopProcess, waitForNewPackageOverlay } from '../../../src/cli/commands/development.ts';
+import { hostDevelopmentRuntimeManifest } from '../../../src/cli/commands/development-support/host-runtime.ts';
+
+const manifest = `schemaVersion: treeseed.package/v1
+development:
+  schemaVersion: treeseed.development-runtime/v1
+  project: { id: admin, repository: treeseed-ai/admin }
+  defaults: { leaseSeconds: 3600, restoreOnFailure: true }
+  targets:
+    - id: web
+      kind: live-web
+      platforms: [linux-amd64]
+      runtimeRequirements: [node>=22]
+      sourceRoots: [src]
+      ignoredPaths: [dist]
+      operations:
+        start: { command: npm, args: [run, dev], environment: {}, timeoutSeconds: 600 }
+      ready: { kind: http, path: /healthz, expectedStatus: 200, timeoutSeconds: 30 }
+      outputs: []
+      endpoints:
+        - { id: http, protocol: http, port: 4322, canonicalAlias: admin.treeseed.localhost, visibility: host, authentication: application }
+      dependencies: []
+      statePolicy: stateless
+      migrationPolicy: none
+      secretRefs: {}
+      shutdown: { graceSeconds: 30, activeWorkPolicy: block }
+      resources: {}
+      logs: [.treeseed/dev/admin.log]
+      forbiddenOperations: [manager-socket]
+      promotion: { liveAdmissible: false, candidateRequiresVerification: true }
+`;
+
+test('development rejects the retired lease duration option', async () => {
+	const output: string[] = [];
+	const exit = await runCommandLine(['dev', 'session', 'start', 'unused.yaml', '--lease-seconds', '600', '--plan', '--json'], {
+		interactiveUi: false, write: value => output.push(value), hostInvoke: async () => { throw new Error('must not call manager'); },
+	});
+	assert.notEqual(exit, 0);
+	assert.match(output.join(''), /unknown.option|Unknown option|Unexpected option/iu);
+});
+
+test('development session planning records exact source without manager mutation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-')), file = resolve(root, 'treeseed.package.yaml'), output: string[] = [];
+	try {
+		writeFileSync(file, manifest); execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		let managerCalls = 0;
+		const exit = await runCommandLine(['dev', 'session', 'start', file, '--actor', 'test-developer', '--plan', '--json'], { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false, hostInvoke: async () => { managerCalls += 1; }, write: (value) => output.push(value) });
+		assert.equal(exit, 0); assert.equal(managerCalls, 0);
+		const result = JSON.parse(output[0]!).result;
+		assert.equal(result.mutation, false); assert.equal(result.session.actor, 'test-developer');
+		assert.equal(result.session.schemaVersion, 'treeseed.development-session/v2');
+		assert.equal('expiresAt' in result.session, false);
+		assert.equal('leaseSeconds' in result.runtimes[0].defaults, false);
+		assert.equal(result.session.repositories[0].dirty, false); assert.match(result.session.repositories[0].commit, /^[a-f0-9]{40}$/u);
+		assert.equal(result.runtimes[0].targets[0].endpoints[0].canonicalAlias, 'admin.treeseed.localhost');
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('development session start uses one protected manager command and private local custody', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-')), file = resolve(root, 'treeseed.package.yaml'), calls: unknown[] = [], output: string[] = [];
+	try {
+		writeFileSync(file, manifest); execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		const exit = await runCommandLine(['dev', 'session', 'start', file, '--json'], { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false, hostInvoke: async (input) => { calls.push(input); return { session: { sessionId: 'accepted' } }; }, write: (value) => output.push(value) });
+		assert.equal(exit, 0); assert.equal(calls.length, 1); assert.equal((calls[0] as { handlerId: string }).handlerId, 'local.dev.session.start');
+		const payload = JSON.parse((calls[0] as { options: { payload: string } }).options.payload);
+		assert.equal(payload.runtimes[0].project.id, 'admin'); assert.equal(payload.session.targets[0].mode, 'released');
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('development session start refuses existing package-overlay custody before manager mutation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-')), file = resolve(root, 'treeseed.package.yaml'), output: string[] = [];
+	try {
+		writeFileSync(file, manifest); execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' };
+		const stateRoot = resolve(env.XDG_STATE_HOME, 'treeseed/development'); mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify({ sessionId: 'dev-existing', manifest: file, processes: {}, overlays: [{ projectId: 'sdk' }], candidates: [] }));
+		let managerCalls = 0;
+		const exit = await runCommandLine(['dev', 'session', 'start', file, '--json'], { cwd: root, env, interactiveUi: false,
+			hostInvoke: async () => { managerCalls += 1; }, write: (value) => output.push(value) });
+		assert.notEqual(exit, 0); assert.equal(managerCalls, 0); assert.match(output.join(''), /still owns local processes or package overlays/);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('stopping another session preserves the selected session and skips unregistered managed targets', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-stop-'));
+	try {
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, stateRoot = resolve(root, 'state/treeseed/development');
+		const current = { sessionId: 'dev-current', manifest: '/current.yaml', processes: {}, overlays: [], candidates: [] };
+		const stale = { sessionId: 'dev-stale', manifest: '/missing.yaml', processes: {}, overlays: [], candidates: [] };
+		mkdirSync(stateRoot, { recursive: true, mode: 0o700 }); mkdirSync(resolve(stateRoot, 'dev-stale'), { mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(current));
+		writeFileSync(resolve(stateRoot, 'dev-stale/session.json'), JSON.stringify(stale));
+		const target = { id: 'service', kind: 'live-api', executionCustody: 'manager', operations: {}, endpoints: [] };
+		const record = { session: { sessionId: 'dev-stale', status: 'active', repositories: [{ projectId: 'api', worktree: '/workspace/api' }], targets: [{ projectId: 'api', targetId: 'service', mode: 'released' }] }, runtimes: [{ project: { id: 'api' }, targets: [target] }] };
+		const calls: Array<{ handlerId: string; options: { payload?: string } }> = [], output: string[] = [];
+		const exit = await runCommandLine(['dev', 'session', 'stop', '--session', 'dev-stale', '--json'], { env, interactiveUi: false,
+			hostInvoke: async (input) => { calls.push(input as typeof calls[number]); if (input.handlerId === 'local.dev.status') return record;
+				if (input.handlerId === 'local.dev.container') return { registered: false, state: null }; return { session: { sessionId: 'dev-stale', status: 'stopped' } }; },
+			write: (value) => output.push(value) });
+		assert.equal(exit, 0, output.join('\n'));
+		assert.equal(JSON.parse(readFileSync(resolve(stateRoot, 'current.json'), 'utf8')).sessionId, 'dev-current');
+		const containerCalls = calls.filter((call) => call.handlerId === 'local.dev.container').map((call) => JSON.parse(String(call.options.payload)));
+		assert.deepEqual(containerCalls, [{ sessionId: 'dev-stale', projectId: 'api', targetId: 'service', action: 'status' }]);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('stopping a session recovers an unhealthy registered managed target', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-development-stop-unhealthy-'));
+	try {
+		const env = { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, stateRoot = resolve(root, 'state/treeseed/development');
+		const state = { sessionId: 'dev-unhealthy', manifest: '/missing.yaml', processes: {}, overlays: [], candidates: [] };
+		mkdirSync(resolve(stateRoot, 'dev-unhealthy'), { recursive: true, mode: 0o700 });
+		writeFileSync(resolve(stateRoot, 'current.json'), JSON.stringify(state));
+		writeFileSync(resolve(stateRoot, 'dev-unhealthy/session.json'), JSON.stringify(state));
+		const target = { id: 'service', kind: 'live-api', executionCustody: 'manager', operations: {}, endpoints: [] };
+		const record = { session: { sessionId: 'dev-unhealthy', status: 'active', repositories: [{ projectId: 'api', worktree: '/workspace/api' }], targets: [{ projectId: 'api', targetId: 'service', mode: 'candidate' }] }, runtimes: [{ project: { id: 'api' }, targets: [target] }] };
+		const actions: string[] = [], output: string[] = [];
+		const exit = await runCommandLine(['dev', 'session', 'stop', '--session', 'dev-unhealthy', '--json'], { env, interactiveUi: false,
+			hostInvoke: async (input) => {
+				if (input.handlerId === 'local.dev.status') return record;
+				if (input.handlerId === 'local.dev.container') {
+					const action = JSON.parse(String(input.options.payload)).action as string; actions.push(action);
+					if (action === 'status' || action === 'stop') throw new Error('Managed development application_unhealthy.');
+					return {};
+				}
+				return { session: { sessionId: 'dev-unhealthy', status: 'stopped' } };
+			}, write: (value) => output.push(value) });
+		assert.equal(exit, 0, output.join('\n'));
+		assert.deepEqual(actions, ['status', 'stop']);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('host runtime development planning is local and status uses the protected manager socket', async () => {
+	const output: string[] = [], calls: any[] = [];
+	const hostInvoke = async (input: any) => { calls.push(input); return { generationId: 'installed', status: 'installed' }; };
+	const context = { cwd: resolve(import.meta.dirname, '../../..'), interactiveUi: false, hostInvoke, write: (value: string) => output.push(value) };
+	assert.equal(await runCommandLine(['dev', 'host', 'activate', '../deployment', '--plan', '--json'], context), 0);
+	assert.equal(calls.length, 0);
+	assert.equal(JSON.parse(output[0]!).result.mutation, false);
+	assert.equal(await runCommandLine(['dev', 'host', 'status', '--json'], context), 0);
+	assert.equal(calls[0].handlerId, 'local.dev.host.status');
+	assert.equal(await runCommandLine(['dev', 'host', 'deactivate', '--plan', '--json'], context), 0);
+	assert.equal(calls.length, 1);
+});
+
+test('development logs include bounded diagnostics for a selected managed container', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-container-logs-')), file = resolve(root, 'treeseed.package.yaml');
+	const calls: Array<{ handlerId: string; options: { payload?: string | boolean | string[] } }> = [], output: string[] = [];
+	try {
+		writeFileSync(file, manifest.replaceAll('admin', 'api').replace('id: web', 'id: service').replace('command: npm', 'command: docker'));
+		execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		const context = { cwd: root, env: { XDG_STATE_HOME: resolve(root, 'state'), USER: 'tester' }, interactiveUi: false,
+			hostInvoke: async (input: { handlerId: string; options: { payload?: string | boolean | string[] } }) => { calls.push(input); return input.handlerId === 'local.dev.session.start' ? { session: { sessionId: 'dev-logtest' } } : { events: [{ code: '53300' }] }; },
+			write: (value: string) => output.push(value) };
+		assert.equal(await runCommandLine(['dev', 'session', 'start', file, '--json'], context), 0, output.join('\n'));
+		const sessionId = JSON.parse(String(calls[0]!.options.payload)).session.sessionId;
+		output.length = 0;
+		assert.equal(await runCommandLine(['dev', 'logs', '--session', sessionId, '--target', 'api.service', '--json'], context), 0, output.join('\n'));
+		assert.equal(calls[1]?.handlerId, 'local.dev.container');
+		assert.deepEqual(JSON.parse(String(calls[1]!.options.payload)), { sessionId, projectId: 'api', targetId: 'service', action: 'logs' });
+		assert.deepEqual(JSON.parse(output[0]!).result.logs, [{ target: 'api.service', diagnostics: { events: [{ code: '53300' }] } }]);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('host runtime includes the SDK capacity-provider contracts required by Deployment', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-host-runtime-'));
+	try {
+		for (const directory of ['dist', 'node_modules/@treeseed/sdk/dist/deployment', 'node_modules/@treeseed/sdk/dist/development', 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts', 'node_modules/yaml', 'node_modules/zod']) mkdirSync(resolve(root, directory), { recursive: true });
+		writeFileSync(resolve(root, 'package.json'), JSON.stringify({ dependencies: { '@treeseed/sdk': '1' }, treeseed: { hostRuntimeDependencies: ['@treeseed/sdk'] } }));
+		writeFileSync(resolve(root, 'dist/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/package.json'), '{}\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/deployment/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/development/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/yaml/index.js'), 'export {};\n');
+		writeFileSync(resolve(root, 'node_modules/zod/index.js'), 'export {};\n');
+		symlinkSync(resolve(root,'node_modules'),resolve(root,'node_modules/@treeseed/sdk/node_modules'),'dir');
+		assert.equal(hostDevelopmentRuntimeManifest(root).some((entry) => entry.path === 'node_modules/@treeseed/sdk/dist/capacity-provider/contracts/index.js'), true);
+		symlinkSync(resolve(root,'package.json'),resolve(root,'dist/escape.js'));
+		assert.throws(()=>hostDevelopmentRuntimeManifest(root),/symbolic link/);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('development operations receive portable workspace identity and overlays use relative links', () => {
+	const state = { manifest: '/workspace/development.session.yaml', sessionId: 'session-1' };
+	const environment = developmentOperationEnvironment(state, '/workspace/packages/api', 'live', { PATH: '/usr/bin' }, { TREESEED_API_BASE_URL: 'https://api.treeseed.localhost' });
+	assert.equal(environment.TREESEED_DEVELOPMENT_WORKSPACE_ROOT, '/workspace');
+	assert.equal(environment.TREESEED_DEVELOPMENT_WORKTREE, '/workspace/packages/api');
+	assert.equal(environment.TREESEED_DEVELOPMENT_SESSION_ID, 'session-1');
+	assert.equal(environment.TREESEED_API_BASE_URL, 'https://api.treeseed.localhost');
+	const link = '/workspace/packages/api/node_modules/@treeseed/sdk';
+	const overlay = '/workspace/packages/sdk/.treeseed/cache/development-sessions/session-1/package';
+	const target = relativeOverlayTarget(link, overlay);
+	assert.equal(target.startsWith('/'), false);
+	assert.equal(resolve(resolve(link, '..'), target), resolve(overlay, 'current'));
+});
+
+test('development operation context retains explicit saved workspace and exact session over ambient values',()=>{
+	const state={manifest:'/other/session.yaml',workspaceRoot:'/owned/workspace',sessionId:'exact-session'};
+	const original={PATH:'/bin',TREESEED_DEVELOPMENT_WORKSPACE_ROOT:'/stale',TREESEED_DEVELOPMENT_SESSION_ID:'stale'};
+	const environment=developmentOperationEnvironment(state,'/owned/workspace/packages/custom','candidate',original,{}, {CUSTOM_DECLARED:'exact'});
+	assert.deepEqual(environment,{PATH:'/bin',TREESEED_DEVELOPMENT_WORKSPACE_ROOT:'/owned/workspace',TREESEED_DEVELOPMENT_SESSION_ID:'exact-session',TREESEED_DEVELOPMENT_WORKTREE:'/owned/workspace/packages/custom',TREESEED_DEVELOPMENT_MODE:'candidate',CUSTOM_DECLARED:'exact'});
+	assert.equal(original.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,'/stale');
+});
+
+test('development operation context preserves existing resolved and declared environment precedence',()=>{
+	const environment=developmentOperationEnvironment({manifest:'/workspace/session.yaml',sessionId:'exact-session'},'/workspace/project','live',{PATH:'/ambient',VALUE:'ambient'},{VALUE:'resolved',RESOLVED:'present'},{VALUE:'declared',DECLARED:'present'});
+	assert.equal(environment.VALUE,'declared');assert.equal(environment.RESOLVED,'present');assert.equal(environment.DECLARED,'present');assert.equal(environment.PATH,'/ambient');
+	assert.equal(environment.TREESEED_DEVELOPMENT_MODE,'live');assert.equal(environment.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,'/workspace');
+});
+
+test('development CLI selection is an atomic, removable launcher input', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-selection-')), entrypoint = resolve(root, 'generation/dist/cli/main.js');
+	try {
+		mkdirSync(resolve(entrypoint, '..'), { recursive: true }); writeFileSync(entrypoint, 'export {};\n');
+		const env = { XDG_STATE_HOME: resolve(root, 'state') };
+		selectDevelopmentCli(env, { entrypoint });
+		assert.equal(execFileSync('cat', [developmentCliEntrypointPath(env)], { encoding: 'utf8' }), `treeseed.development-cli-selection/v2\n${entrypoint}\n`);
+		selectDevelopmentCli(env, null);
+		assert.throws(() => execFileSync('cat', [developmentCliEntrypointPath(env)], { stdio: 'ignore' }));
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('package rebuild waits for a new marker-complete atomic generation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-overlay-')), overlay = resolve(root, 'overlay');
+	try {
+		mkdirSync(resolve(overlay, 'generation-1'), { recursive: true });
+		symlinkSync(resolve(overlay, 'generation-1'), resolve(overlay, 'current'));
+		const target = { id: 'package', ready: { kind: 'marker', path: 'dist/.complete.json', timeoutSeconds: 2 } } as any;
+		const waiting = waitForNewPackageOverlay(target, root, overlay, resolve(overlay, 'generation-1'));
+		setTimeout(() => {
+			mkdirSync(resolve(root, 'dist'), { recursive: true }); writeFileSync(resolve(root, 'dist/.complete.json'), '{}');
+			mkdirSync(resolve(overlay, 'generation-2')); symlinkSync(resolve(overlay, 'generation-2'), resolve(overlay, '.next')); renameSync(resolve(overlay, '.next'), resolve(overlay, 'current'));
+		}, 50);
+		assert.equal(await waiting, resolve(overlay, 'generation-2'));
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('package synchronizer launches the CLI development module and publishes a completed generation', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-overlay-sync-'));
+	const stateRoot = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-overlay-state-'));
+	const state = { sessionId: 'session-test', processes: {} as Record<string, any>, overlays: [] as any[] };
+	try {
+		writeFileSync(resolve(root, 'package.json'), '{"name":"@treeseed/test-overlay"}\n');
+		mkdirSync(resolve(root, 'dist'), { recursive: true });
+		writeFileSync(resolve(root, 'dist/index.js'), 'export const ready = true;\n');
+		writeFileSync(resolve(root, 'dist/.complete.json'), '{}\n');
+		const runtime = { project: { id: 'sdk' } } as any;
+		const target = { id: 'package', ready: { kind: 'marker', path: 'dist/.complete.json', timeoutSeconds: 2 }, outputs: [{ path: 'dist' }] } as any;
+		const overlay = startPackageSynchronizer(state, runtime, target, root, { ...process.env, XDG_STATE_HOME: stateRoot });
+		const deadline = Date.now() + 2_000;
+		while (!existsSync(resolve(overlay, 'current')) && Date.now() < deadline) await new Promise((accept) => setTimeout(accept, 25));
+		assert.equal(existsSync(resolve(overlay, 'current', 'dist/index.js')), true, readFileSync(state.processes['overlay-sync.sdk.package']!.log, 'utf8'));
+		assert.equal(statSync(overlay).mode & 0o050, 0o050, 'manager-side consumers require group traversal');
+		assert.equal(statSync(resolve(overlay, 'current')).mode & 0o050, 0o050, 'completed generations require group traversal');
+	} finally {
+		await stopProcess(state, 'overlay-sync.sdk.package');
+		rmSync(root, { recursive: true, force: true }); rmSync(stateRoot, { recursive: true, force: true });
+	}
+});
+
+test('freeze binds completed generations and attestations while verify rejects artifact substitution', async () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-candidate-'));
+	const stateRoot = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-candidate-state-'));
+	const packageManifest = resolve(root, 'treeseed.package.yaml'), sessionManifest = resolve(root, 'development.session.yaml');
+	const output: string[] = [];
+	try {
+		mkdirSync(resolve(root, 'scripts'), { recursive: true });
+		writeFileSync(resolve(root, 'scripts/freeze.mjs'), "import { writeFileSync } from 'node:fs'; writeFileSync('candidate.bin', 'sealed-candidate');\n");
+		writeFileSync(resolve(root, 'scripts/verify.mjs'), "process.stdout.write('verified\\n');\n");
+		mkdirSync(resolve(root, '.treeseed/standards'), { recursive: true });
+		writeFileSync(resolve(root, '.treeseed/standards/compatibility-attestation.json'), `${JSON.stringify({ contractId: '@treeseed/admin/browser', result: { sufficient: true, required: 'patch' } })}\n`);
+		writeFileSync(packageManifest, `${manifest.replace(
+			"operations:\n        start: { command: npm, args: [run, dev], environment: {}, timeoutSeconds: 600 }",
+			"operations:\n        start: { command: npm, args: [run, dev], environment: {}, timeoutSeconds: 600 }\n        verify: { command: node, args: [scripts/verify.mjs], environment: {}, timeoutSeconds: 60 }",
+		).replace(
+			"promotion: { liveAdmissible: false, candidateRequiresVerification: true }",
+			"freeze:\n        kind: archive\n        operation: { command: node, args: [scripts/freeze.mjs], environment: {}, timeoutSeconds: 60 }\n        artifacts: [candidate.bin]\n        contractOperations: []\n      promotion: { liveAdmissible: false, candidateRequiresVerification: true }",
+		)}\n`);
+		writeFileSync(sessionManifest, `projects:\n  - manifest: treeseed.package.yaml\n    worktree: .\n    targets:\n      - { id: web, mode: candidate }\n`);
+		execFileSync('git', ['init', '-b', 'staging'], { cwd: root }); execFileSync('git', ['add', '.'], { cwd: root });
+		execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture'], { cwd: root });
+		let record: any, registered: any;
+		const hostInvoke = async (input: any) => {
+			const payload = JSON.parse(input.options.payload);
+			if (input.handlerId === 'local.dev.session.start') { record = { session: payload.session, runtimes: payload.runtimes }; record.session.targets[0].generation = 7; return record; }
+			if (input.handlerId === 'local.dev.status') return record;
+			if (input.handlerId === 'local.dev.candidate.register') { registered = payload.candidate; return record; }
+			throw new Error(`Unexpected manager call ${input.handlerId}`);
+		};
+		const context = { cwd: root, env: { ...process.env, XDG_STATE_HOME: stateRoot, USER: 'tester' }, interactiveUi: false, hostInvoke, write: (value: string) => output.push(value) };
+		assert.equal(await runCommandLine(['dev', 'session', 'start', sessionManifest, '--json'], context), 0);
+		assert.equal(await runCommandLine(['dev', 'freeze', '--json'], context), 0, output.at(-1));
+		assert.equal(registered.dependencyGenerations['admin.web'], 7);
+		assert.equal(registered.compatibilityAttestations[0].contractId, '@treeseed/admin/browser');
+		assert.equal(registered.promotable, false);
+		assert.equal(await runCommandLine(['dev', 'verify', '--json'], context), 0);
+		assert.equal(registered.promotable, true);
+		writeFileSync(resolve(root, 'candidate.bin'), 'substituted');
+		assert.equal(await runCommandLine(['dev', 'verify', '--json'], context), 1);
+		assert.match(output.at(-1)!, /artifact custody failed/u);
+	} finally { rmSync(root, { recursive: true, force: true }); rmSync(stateRoot, { recursive: true, force: true }); }
+});
