@@ -6,7 +6,8 @@ on:
     tags: ["**"]
     paths-ignore: ["docs/src/content/**"]
   pull_request:
-    # Required verification also covers ancestry-only reconciliation PRs.
+    paths-ignore: ["docs/src/content/**"]
+    # Preserve the docs exclusion; this reconciliation records its CI verification here.
   workflow_dispatch:
 
 jobs:
