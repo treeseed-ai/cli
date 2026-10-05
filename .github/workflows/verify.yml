@@ -7,7 +7,7 @@ on:
     paths-ignore: ["docs/src/content/**"]
   pull_request:
     paths-ignore: ["docs/src/content/**"]
-    # Preserve the docs exclusion; this reconciliation records its CI verification here.
+    # Preserve the docs exclusion; verify the original merged-PR lineage reconciliation here.
   workflow_dispatch:
 
 jobs:
