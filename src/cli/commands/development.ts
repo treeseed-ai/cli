@@ -441,7 +441,6 @@ export async function runDevelopment(invocation: ParsedInvocation, context: Comm
 	if (invocation.options.plan === true || ['dev status', 'dev logs', 'dev plan', 'dev host status'].includes(invocation.command.name)) return runDevelopmentUnlocked(invocation, context);
 	return withDevelopmentLifecycle(context.env, () => runDevelopmentUnlocked(invocation, context));
 }
-
 async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: CommandContext) {
 	if (invocation.command.name === 'dev session recover') {
 		const sessionId = String(invocation.options.session ?? '');
@@ -463,6 +462,7 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	if (invocation.command.name === 'dev session start') return startSession(invocation, context);
 	if (invocation.command.name === 'dev use') return useTargets(invocation, context);
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
+	if (invocation.options.plan === true && ['dev freeze', 'dev verify'].includes(invocation.command.name)) return { sessionId, action: invocation.command.name.slice(4), mutation: false };
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
 		return closeDevelopmentSession(state, sessionId, context, true);

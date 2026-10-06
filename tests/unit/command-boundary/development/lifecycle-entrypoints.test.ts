@@ -1,11 +1,38 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { resumeDevelopmentSession, runDevelopment } from '../../../../src/cli/commands/development.ts';
 import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import type { CommandContext, ParsedInvocation } from '../../../../src/cli/types.ts';
+import { parseInvocation } from '../../../../src/cli/parser.ts';
+import { resolveCommand } from '../../../../src/cli/registry.ts';
+
+test('development freeze and verify planning returns exact nonmutating actions without manager dispatch', async () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'provider-plan-unit-'));
+    const directory = resolve(root, 'treeseed/development'), sessionId = 'dev-unit';
+    const state = { sessionId, manifest: resolve(root, 'manifest.yaml'), processes: {}, overlays: [], candidates: [] };
+    mkdirSync(resolve(directory, sessionId), { recursive: true });
+    const paths = [resolve(directory, 'current.json'), resolve(directory, sessionId, 'session.json')];
+    for (const path of paths) writeFileSync(path, JSON.stringify(state));
+    const before = paths.map(path => readFileSync(path));
+    let dispatches = 0;
+    const context: CommandContext = { cwd: root, env: { ...process.env, XDG_STATE_HOME: root },
+        interactiveUi: false, outputFormat: 'json', write() {},
+        hostInvoke: async () => { dispatches++; throw new Error('Planning dispatched a manager operation'); } };
+    try {
+        const outcomes = await Promise.allSettled(['freeze', 'verify'].map(action => {
+            const selected = resolveCommand(['dev', action, '--plan', '--session', sessionId]);
+            assert.ok(selected);
+            return runDevelopment(parseInvocation(selected.command, selected.rest), context);
+        }));
+        assert.deepEqual(outcomes, ['freeze', 'verify'].map(action => ({ status: 'fulfilled',
+            value: { sessionId, action, mutation: false } })));
+        assert.equal(dispatches, 0);
+        paths.forEach((path, index) => assert.deepEqual(readFileSync(path), before[index]));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test('boot resume and manual use re-read state under the same lifecycle lock', { skip: process.platform !== 'linux' }, async () => {
     const root = mkdtempSync(resolve(tmpdir(), 'lifecycle-entry-'));
