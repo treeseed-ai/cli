@@ -17,6 +17,46 @@ function assertNoCandidate(fixture:ReturnType<typeof candidateFixture>) {
 	assert.equal(files(fixture.state).some(name=>name.startsWith('candidate-')||name==='freeze.lock'),false);
 }
 
+test('native development freeze and verify plans preserve candidate source outputs and verification history across real execution', async () => {
+    const fixture = candidateFixture();
+    const snapshot = (root: string): Array<[string, Buffer]> => readdirSync(root, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name)).flatMap(entry => entry.isDirectory()
+            ? snapshot(resolve(root, entry.name)) : [[resolve(root, entry.name), readFileSync(resolve(root, entry.name))] as [string, Buffer]]);
+    try {
+        assert.equal(await fixture.invoke(['dev', 'session', 'start', resolve(fixture.root, 'development.session.yaml')]), 0);
+        const local = JSON.parse(readFileSync(resolve(fixture.state, 'treeseed/development/current.json'), 'utf8'));
+        const source = snapshot(fixture.root), state = snapshot(fixture.state);
+        // Observe both original paths before assertions, retaining any real child/file failures.
+        const observations = [];
+        for (const action of ['freeze', 'verify']) {
+            const exit = await fixture.invoke(['dev', action, '--plan', ...(action === 'freeze' ? ['--allow-dirty'] : [])]);
+            observations.push({ exit, output: [...fixture.output] });
+        }
+        assert.deepEqual(observations, ['freeze', 'verify'].map(action => ({ exit: 0,
+            output: [JSON.stringify({ result: { sessionId: local.sessionId, action, mutation: false } })] })));
+        assert.deepEqual(snapshot(fixture.root), source); assert.deepEqual(snapshot(fixture.state), state);
+        assertNoCandidate(fixture); assert.equal(existsSync(resolve(fixture.root, 'candidate.bin')), false);
+        assert.equal(existsSync(resolve(fixture.root, 'verification.log')), false);
+        assert.equal(await fixture.invoke(['dev', 'freeze', '--allow-dirty']), 0, fixture.output.join(''));
+        const frozen = JSON.parse(fixture.output[0]!).result;
+        assert.equal(typeof frozen.receipt, 'string');
+        const receipt = readFileSync(frozen.receipt);
+        const sealed = readFileSync(resolve(fixture.root, 'candidate.bin'));
+        const afterFreeze = snapshot(fixture.state);
+        for (let round = 0; round < 2; round++) for (const action of ['freeze', 'verify']) {
+            assert.equal(await fixture.invoke(['dev', action, '--plan']), 0, fixture.output.join(''));
+            assert.deepEqual(JSON.parse(fixture.output[0]!).result, { sessionId: local.sessionId, action, mutation: false });
+        }
+        assert.equal(fixture.registrations.length, 1); assert.deepEqual(snapshot(fixture.state), afterFreeze);
+        assert.deepEqual(readFileSync(frozen.receipt), receipt); assert.deepEqual(readFileSync(resolve(fixture.root, 'candidate.bin')), sealed);
+        assert.equal(existsSync(resolve(fixture.root, 'verification.log')), false);
+        assert.equal(await fixture.verify(), 0, fixture.output.join(''));
+        assert.equal(readFileSync(resolve(fixture.root, 'verification.log'), 'utf8'), 'verified\n');
+        assert.equal(fixture.readReceipt(frozen.receipt).verification.status, 'passed');
+        assert.equal(fixture.registrations.length, 2);
+    } finally { fixture.close(); }
+});
+
 for(const phase of ['freeze','contract'] as const) {
 	test(`native ${phase} receives exact session workspace worktree and selected mode authority`,async()=>{
 		const fixture=candidateFixture();

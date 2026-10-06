@@ -73,6 +73,8 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+        'cli.golden.provider-plan-unit': {testFile:'tests/unit/command-boundary/development/lifecycle-entrypoints.test.ts',testName:'development freeze and verify planning returns exact nonmutating actions without manager dispatch'},
+        'cli.golden.provider-plan-native': {testFile:'tests/integration/development-freeze.test.ts',testName:'native development freeze and verify plans preserve candidate source outputs and verification history across real execution'},
 		'cli.golden.schema-canonical': {testFile:'tests/integration/platform-schema.test.ts',testName:'public CLI accepts exact canonical schema without changing Git or input bytes'},
 		'cli.golden.schema-definitions': {testFile:'tests/integration/platform-schema.test.ts',testName:'public CLI rejects every committed unconstrained canonical definition with local policy evidence'},
 		'cli.golden.schema-union': {testFile:'tests/integration/platform-schema.test.ts',testName:'public CLI rejects incomplete duplicate and runtime-only canonical stored-record unions'},
