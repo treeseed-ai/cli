@@ -3,6 +3,33 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: execution-retired-command-unit-1
+    action: { verifier: cli.golden.execution-retired-command-unit-1 }
+    expect: { status: passed }
+  - id: execution-handler-inspection-unit-1
+    action: { verifier: cli.golden.execution-handler-inspection-unit-1 }
+    expect: { status: passed }
+  - id: execution-handler-inspection-unit-2
+    action: { verifier: cli.golden.execution-handler-inspection-unit-2 }
+    expect: { status: passed }
+  - id: execution-handler-inspection-native-1
+    action: { verifier: cli.golden.execution-handler-inspection-native-1 }
+    expect: { status: passed }
+  - id: architecture-decision-intent-unit-1
+    action: { verifier: cli.golden.architecture-decision-intent-unit-1 }
+    expect: { status: passed }
+  - id: architecture-decision-intent-unit-2
+    action: { verifier: cli.golden.architecture-decision-intent-unit-2 }
+    expect: { status: passed }
+  - id: architecture-preflight-start-unit-1
+    action: { verifier: cli.golden.architecture-preflight-start-unit-1 }
+    expect: { status: passed }
+  - id: architecture-decision-start-native-1
+    action: { verifier: cli.golden.architecture-decision-start-native-1 }
+    expect: { status: passed }
+  - id: architecture-graph-watch-1
+    action: { verifier: cli.golden.architecture-graph-watch-1 }
+    expect: { status: passed }
   - id: architecture-workspace-readback
     action: { verifier: cli.golden.architecture-workspace-readback }
     expect: { status: passed }
