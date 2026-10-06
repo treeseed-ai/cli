@@ -66,6 +66,37 @@ export function readDevelopmentArtifact(root:string,path:string) {
 	finally {if(descriptor!==undefined)closeSync(descriptor);}
 }
 
+/** Narrow only explicit roots; retain every declared dependency and its source. */
+export function developmentFreezeClosure<T extends { session: { repositories: Array<{projectId:string;worktree:string}>; targets: Array<{projectId:string;targetId:string;mode:string;generation:number}> }; runtimes: DevelopmentRuntime[] }>(record:T, input:unknown):T {
+	if (input === undefined) return record;
+	if (!Array.isArray(input) || !input.length || input.some(key => typeof key !== 'string' || !/^[a-z0-9-]+\.[a-z0-9-]+$/u.test(key))
+		|| new Set(input).size !== input.length) throw new Error('Development freeze target roots must be nonempty unique exact project.target identities.');
+	const contracts = new Map(record.runtimes.flatMap(runtime => runtime.targets.map(target => [`${runtime.project.id}.${target.id}`, target] as const)));
+	const selections = new Map(record.session.targets.map(target => [`${target.projectId}.${target.targetId}`, target] as const));
+	if (contracts.size !== record.runtimes.reduce((count,runtime) => count + runtime.targets.length,0)
+		|| selections.size !== record.session.targets.length) throw new Error('Development freeze target authority is ambiguous.');
+	const keys = new Set<string>(), visiting = new Set<string>();
+	const visit = (key:string) => {
+		if (visiting.has(key)) throw new Error('Development freeze dependency cycle is unresolved.');
+		if (keys.has(key)) return;
+		const target = contracts.get(key), selected = selections.get(key);
+		if (!target || !selected) throw new Error(`Development freeze dependency authority is missing for ${key}.`);
+		visiting.add(key);
+		for (const dependency of target.dependencies) visit(`${dependency.id}.${dependency.target}`);
+		visiting.delete(key); keys.add(key);
+	};
+	for (const key of input) {
+		const selected = selections.get(key), target = contracts.get(key);
+		if (!selected || selected.mode === 'released' || !target?.freeze) throw new Error(`Development freeze target is unavailable: ${key}.`);
+		visit(key);
+	}
+	const projects = new Set([...keys].map(key => selections.get(key)!.projectId));
+	for (const project of projects) if (record.session.repositories.filter(source => source.projectId === project).length !== 1)
+		throw new Error(`Development freeze dependency source is missing or ambiguous for ${project}.`);
+	return { ...record, session: { ...record.session,
+		targets: [...keys].map(key => selections.get(key)!), repositories: record.session.repositories.filter(source => projects.has(source.projectId)) } };
+}
+
 /** Build outputs may change; the source closure and already captured artifacts may not. */
 export function freezeCustody(record:{session:{repositories:Array<{projectId:string;worktree:string}>;targets:Array<{projectId:string;targetId:string;mode:string}>};runtimes:DevelopmentRuntime[]}) {
 	const directories:Array<{root:string;cwd?:string;directory:string}>=[];
