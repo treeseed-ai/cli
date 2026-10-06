@@ -37,7 +37,10 @@ test('native development freeze and verify plans preserve candidate source outpu
         assert.deepEqual(snapshot(fixture.root), source); assert.deepEqual(snapshot(fixture.state), state);
         assertNoCandidate(fixture); assert.equal(existsSync(resolve(fixture.root, 'candidate.bin')), false);
         assert.equal(existsSync(resolve(fixture.root, 'verification.log')), false);
-        const frozen = await fixture.freeze(), receipt = readFileSync(frozen.receipt);
+        assert.equal(await fixture.invoke(['dev', 'freeze', '--allow-dirty']), 0, fixture.output.join(''));
+        const frozen = JSON.parse(fixture.output[0]!).result;
+        assert.equal(typeof frozen.receipt, 'string');
+        const receipt = readFileSync(frozen.receipt);
         const sealed = readFileSync(resolve(fixture.root, 'candidate.bin'));
         const afterFreeze = snapshot(fixture.state);
         for (let round = 0; round < 2; round++) for (const action of ['freeze', 'verify']) {
