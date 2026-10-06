@@ -601,6 +601,11 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/native-suite-reporting.test.ts
     testName: native reporting cannot replace original suite deadlines or interrupt policy through reporting flags
+  cli.golden.component-scene-os-boundary:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/native-suite-reporting.test.ts
+    testName: component scene case execution inherits the same declared test-only OS boundary as complete suites without changing runtime or host acceptance
   cli.golden.native-reporting:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

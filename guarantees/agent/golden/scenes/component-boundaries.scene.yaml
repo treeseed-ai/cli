@@ -375,6 +375,9 @@ workflow:
   - id: reporting-unit
     action: { verifier: cli.golden.reporting-unit }
     expect: { status: passed }
+  - id: component-scene-os-boundary
+    action: { verifier: cli.golden.component-scene-os-boundary }
+    expect: { status: passed }
   - id: refused-rebuild
     action: { verifier: cli.golden.refused-rebuild }
     expect: { status: passed }
