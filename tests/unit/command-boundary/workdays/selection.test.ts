@@ -108,12 +108,12 @@ test('nested bindings reject prototype traversal, collisions, and excessive dept
 });
 
 test('normalizes exact repeated CSV decision bytes for direct and scheduled intents without deriving acting authority', async () => {
-	// Literal independent code-point order; canonically distinct and case-distinct IDs stay distinct.
-	const expected = ['A', 'Z', 'a', 'e\u0301', 'é', '\uE000', '\u{10000}'];
+	// Literal canonical ASCII order; case-distinct identifiers remain distinct.
+	const expected = ['A', 'Z', 'a', 'a-1', 'a.1', 'a/1', 'a:1'];
 	const variants = [
-		['--decision', ' \u{10000},é,a ', '--decision', '\uE000,Z,e\u0301,A', '--decision', 'A'],
-		['--decision', 'A,Z,a,e\u0301,é,\uE000,\u{10000}'],
-		['--decision', 'é', '--decision', ' A ', '--decision', 'a,Z,\u{10000},\uE000,e\u0301,é'],
+		['--decision', ' a:1,a.1,a ', '--decision', 'a/1,Z,a-1,A', '--decision', 'A'],
+		['--decision', 'A,Z,a,a-1,a.1,a/1,a:1'],
+		['--decision', 'a.1', '--decision', ' A ', '--decision', 'a,Z,a:1,a/1,a-1,a.1'],
 	];
 	for (const scheduled of [false, true]) for (const selection of variants) {
 		const argv = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600', ...selection] : [...base, ...selection];
@@ -126,13 +126,13 @@ test('normalizes exact repeated CSV decision bytes for direct and scheduled inte
 		} }]);
 		assert.equal(output.length, 1); const envelope = JSON.parse(output[0]!);
 		assert.equal(envelope.ok, true); assert.deepEqual(envelope.result, { accepted: true }); assert.deepEqual(envelope.warnings, []);
-		assert.deepEqual(argv, before); assert.deepEqual(expected, ['A', 'Z', 'a', 'e\u0301', 'é', '\uE000', '\u{10000}']);
+		assert.deepEqual(argv, before); assert.deepEqual(expected, ['A', 'Z', 'a', 'a-1', 'a.1', 'a/1', 'a:1']);
 	}
 	for (const scheduled of [false, true]) {
-		const ids = Array.from({ length: 64 }, (_, index) => `decision-${String(index).padStart(2, '0')}`); ids[63] = 'z'.repeat(128);
+		const ids = Array.from({ length: 64 }, (_, index) => `decision-${String(index).padStart(2, '0')}`); ids[63] = 'z'.repeat(200);
 		const argv = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600'] : [...base];
 		const calls: unknown[] = [];
-		assert.equal(await runCommandLine([...argv, '--decision', ids.join(',')], { interactiveUi: false, write() {},
+		assert.equal(await runCommandLine([...argv, '--decision', ids.join(','), '--decision', ids[0]!], { interactiveUi: false, write() {},
 			operationInvoke: async (_id, input) => { calls.push(input); return { data: {} }; } }), 0);
 		const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600, decisionIds: ids };
 		assert.deepEqual(calls, [{ path: { teamId: base[3] }, query: {}, body: scheduled ? { intent, cadenceSeconds: 3600 } : intent }]);
@@ -144,7 +144,7 @@ test('normalizes exact repeated CSV decision bytes for direct and scheduled inte
 });
 
 test('denies every malformed direct or scheduled decision selection and retired derived option before invocation', async () => {
-	const invalid = ['', ' ', ',', 'decision,', ',decision', 'decision,,other', 'decision, ', 'x'.repeat(129),
+	const invalid = ['', ' ', ',', 'decision,', ',decision', 'decision,,other', 'decision, ', 'x'.repeat(201), 'é', 'e\u0301', '\uE000', '\u{10000}', 'decision?',
 		Array.from({ length: 65 }, (_, index) => `decision-${index}`).join(',')];
 	for (const scheduled of [false, true]) for (const value of invalid) {
 		const argv = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600', '--decision', value]
@@ -191,7 +191,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 	const entryBytes = readFileSync(entrypoint), packageBytes = readFileSync(resolve('package.json'));
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-cli-decision-start-'));
 	const teamId = base[3]!, digest = `sha256:${'a'.repeat(64)}`, wrongDigest = `sha256:${'b'.repeat(64)}`;
-	const selected = ['A', 'Z', 'a', 'e\u0301', 'é', '\uE000', '\u{10000}'];
+	const selected = ['A', 'Z', 'a', 'a-1', 'a.1', 'a/1', 'a:1'];
 	const preflight = { id: 'preflight-1', preflightDigest: digest };
 	const confirmation = { schemaVersion: 'treeseed.confirmation-state/v1', principalId: 'isolated-operator', clientId: 'trsd',
 		operationId: 'workdays.start', argumentsDigest: `sha256:${'c'.repeat(64)}`, expiresAt: '2030-01-01T00:00:00.000Z', nonce: 'original-nonce', signature: 'controlled-signature' };
@@ -234,16 +234,22 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
 			assert.deepEqual(argv, before); return { code, stdout, stderr };
 		};
-		const plan = await execute([...base.slice(0, -1), '--decision', ' \u{10000},é,a ', '--decision', '\uE000,Z,e\u0301,A', '--decision', 'A']);
+		const plan = await execute([...base.slice(0, -1), '--decision', ' a:1,a.1,a ', '--decision', 'a/1,Z,a-1,A', '--decision', 'A']);
 		assert.equal(plan.code, 0); assert.equal(plan.stderr, ''); const planEnvelope = JSON.parse(plan.stdout);
 		assert.equal(planEnvelope.ok, true); assert.deepEqual(planEnvelope.result, preflight); assert.deepEqual(planEnvelope.warnings, []);
 		assert.deepEqual(requests, [{ method: 'POST', path: `/v1/teams/${teamId}/workday-runs/preflight`, body: JSON.stringify({
 			profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600, decisionIds: selected,
 		}), idempotency: requests[0]?.idempotency, confirmed: false }]);
 		assert.ok(requests[0]!.idempotency);
+		const boundaryOffset = requests.length, boundaryId = 'z'.repeat(200);
+		const boundary = await execute([...base.slice(0, -1), '--decision', ` ${boundaryId} `, '--decision', boundaryId]);
+		assert.equal(boundary.code, 0); assert.equal(boundary.stderr, ''); assert.equal(JSON.parse(boundary.stdout).ok, true);
+		assert.equal(requests.length, boundaryOffset + 1);
+		assert.equal(requests[boundaryOffset]!.body, JSON.stringify({ profileId: 'documentation', projects: ['sdk'],
+			startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600, decisionIds: [boundaryId] }));
 		const scheduleOffset = requests.length;
 		const schedule = await execute(['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600',
-			'--decision', ' \u{10000},é,a ', '--decision', '\uE000,Z,e\u0301,A', '--decision', 'A', '--yes', '--idempotency-key', 'original-schedule-key']);
+			'--decision', ' a:1,a.1,a ', '--decision', 'a/1,Z,a-1,A', '--decision', 'A', '--yes', '--idempotency-key', 'original-schedule-key']);
 		assert.equal(schedule.code, 0); assert.equal(schedule.stderr, ''); const scheduleEnvelope = JSON.parse(schedule.stdout);
 		assert.equal(scheduleEnvelope.ok, true); assert.deepEqual(scheduleEnvelope.result, { scheduled: true }); assert.deepEqual(scheduleEnvelope.warnings, []);
 		assert.deepEqual(requests.slice(scheduleOffset), [false, true].map(confirmed => ({ method: 'POST', path: `/v1/teams/${teamId}/workday-schedules`,
@@ -264,6 +270,9 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 				body: JSON.stringify({ preflightId: preflight.id, preflightDigest: selectedMode === 'stale' ? wrongDigest : digest }), idempotency: 'original-start-key', confirmed: successful && index === 1 })));
 		}
 		for (const argv of [[...base.slice(0, -1), '--decision', 'decision,'], ['workdays', 'start', '--team', teamId, '--preflight', preflight.id],
+			[...base.slice(0, -1), '--decision', 'é'], [...base.slice(0, -1), '--decision', 'x'.repeat(201)],
+			['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--decision', 'é'],
+			['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--decision', 'x'.repeat(201)],
 			[...start, '--execution-plan', 'caller-derived'], [...base.slice(0, -1), '--activity', 'acting']]) {
 			const offset = requests.length, result = await execute(argv);
 			assert.equal(result.code, 1); assert.equal(result.stdout, ''); const envelope = JSON.parse(result.stderr);

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { controlPlaneOperation, encodeConfirmationState, parseCommunicationAddresses, validateWorkdayIntentSelection, normalizeWorkdayAgentSelection, type CommandInputBinding } from '@treeseed/sdk/operator-contracts';
 import { ControlPlaneClientError, resolveControlPlaneServer } from '@treeseed/sdk/control-plane-client';
-import { workdayAllocationOverridesSchema, workdayPolicySchema } from '@treeseed/sdk/agent-capacity';
+import { exactEntityReferenceSchema, workdayAllocationOverridesSchema, workdayPolicySchema } from '@treeseed/sdk/agent-capacity';
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { launchApplication } from '../application/launch.js';
 import { runInteractiveChat } from '../communication/interactive-chat.js';
@@ -82,22 +82,27 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 		if (value !== undefined) setOperationInputField(input[binding.target], binding.field, value);
 	}
 	const operation = controlPlaneOperation(invocation.command.execution.operationId);
-	if (operation.descriptor.operationId === 'workdays.plan' && input.body.allocation !== undefined) {
-		const parsed = workdayAllocationOverridesSchema.safeParse(input.body.allocation);
+	const selectedIntent = operation.descriptor.operationId === 'workdays.plan' ? input.body
+		: operation.descriptor.operationId === 'workdays.schedules.create' ? getOperationInputField(input.body, 'intent') : undefined;
+	const intent = selectedIntent && typeof selectedIntent === 'object' && !Array.isArray(selectedIntent) ? selectedIntent as Record<string, unknown> : undefined;
+	if (intent?.allocation !== undefined) {
+		const parsed = workdayAllocationOverridesSchema.safeParse(intent.allocation);
 		if (!parsed.success) throw Object.assign(new Error(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(' ')),
 			{ category: 'invalid_input', code: 'workday_allocation_invalid' });
 	}
-	if (operation.descriptor.operationId === 'workdays.plan' && input.body.agentSelection !== undefined) {
-		const diagnostics = validateWorkdayIntentSelection(input.body.agentSelection);
+	if (intent?.agentSelection !== undefined) {
+		const diagnostics = validateWorkdayIntentSelection(intent.agentSelection);
 		if (diagnostics.length) throw Object.assign(new Error(diagnostics.map(item => `${item.path}: ${item.message}`).join(' ')), { category: 'invalid_input', code: 'workday_agent_selection_invalid' });
-		input.body.agentSelection = normalizeWorkdayAgentSelection(input.body.agentSelection);
+		intent.agentSelection = normalizeWorkdayAgentSelection(intent.agentSelection);
 	}
-	if (operation.descriptor.operationId === 'workdays.plan' && input.body.decisionIds !== undefined) {
-		const values = Array.isArray(input.body.decisionIds) ? input.body.decisionIds : [];
-		if (!values.length || values.length > 64 || values.some(value => typeof value !== 'string' || !value.trim() || value.length > 128)) {
+	if (intent?.decisionIds !== undefined) {
+		const values = Array.isArray(intent.decisionIds) ? intent.decisionIds : [];
+		if (!values.length || values.some(value => typeof value !== 'string' || !exactEntityReferenceSchema.innerType().shape.id.safeParse(value.trim()).success)) {
 			throw Object.assign(new Error('decisionIds must contain one to 64 non-empty decision identities.'), { category: 'invalid_input', code: 'workday_decision_selection_invalid' });
 		}
-		input.body.decisionIds = [...new Set(values.map(value => String(value).trim()))].sort();
+		const normalized = [...new Set(values.map(value => String(value).trim()))].sort();
+		if (normalized.length > 64) throw Object.assign(new Error('At most 64 distinct decision identities are permitted.'), { category: 'invalid_input', code: 'workday_decision_selection_invalid' });
+		intent.decisionIds = normalized;
 	}
 	if (operation.descriptor.operationId.startsWith('seeds.') && typeof input.body.file === 'string') {
 		const parsed = await portableSeedBundle(input.body.file, context);
