@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -7,6 +7,9 @@ import { candidateFixture } from '../../../support/development-candidate.ts';
 import { freezeCustody, repositoryClosure } from '../../../../src/cli/commands/development-support/candidate.ts';
 import { developmentRuntimeSchema, type DevelopmentRuntime } from '@treeseed/sdk/development';
 import { parse } from 'yaml';
+import { runDevelopment } from '../../../../src/cli/commands/development.ts';
+import { resolveCommand } from '../../../../src/cli/registry.ts';
+import { parseInvocation } from '../../../../src/cli/parser.ts';
 
 const runtime = { project: { id: 'specimen', repository: 'example/specimen' } } as DevelopmentRuntime;
 
@@ -178,4 +181,23 @@ test('development source planning rejects unreadable untracked bytes without man
 		assert.equal(fixture.registrations.length, 0);
 		assert.match(fixture.output.join(''), /EACCES|permission denied/);
 	} finally { chmodSync(file, 0o644); fixture.close(); }
+});
+
+test('scoped provider freeze rejects every malformed unknown or duplicate root before executing or registering a candidate', async () => {
+	const targets = [[], [''], [' '], ['specimen.unknown'], ['specimen.package', 'specimen.package'],
+		['specimen.package=live'], ['specimen.*'], ['specimen.package.extra'], 'specimen.package', null, [3]];
+	const outcomes = [];
+	for (const target of targets) {
+		const fixture = candidateFixture();
+		try {
+			assert.equal(await fixture.invoke(['dev', 'session', 'start', resolve(fixture.root, 'development.session.yaml')]), 0);
+			const selected = resolveCommand(['dev', 'freeze']); assert.ok(selected);
+			const invocation = parseInvocation(selected.command, ['--json']); Object.assign(invocation.options, { target });
+			let message = ''; try { await runDevelopment(invocation, fixture.context); } catch (error) { message = String(error); }
+			outcomes.push({ denied: /Development freeze target/u.test(message), registrations: fixture.registrations.length,
+				built: existsSync(resolve(fixture.root, 'candidate.bin')) });
+			assert.equal(readFileSync(resolve(fixture.root, 'scripts/freeze.ts'), 'utf8').includes('sealed'), true);
+		} finally { fixture.close(); }
+	}
+	assert.deepEqual(outcomes, targets.map(() => ({ denied: true, registrations: 0, built: false })));
 });
