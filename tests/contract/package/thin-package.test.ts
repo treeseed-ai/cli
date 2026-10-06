@@ -203,6 +203,8 @@ test('verification retains every PR protected branch and tag without duplicate t
 	assert.deepEqual(workflow.on.push.branches,['staging','main']);
 	assert.deepEqual(workflow.on.push.tags,['**']);
 	assert.deepEqual(workflow.on.push['paths-ignore'],['docs/src/content/**']);
-	assert.deepEqual(workflow.on.pull_request['paths-ignore'],['docs/src/content/**']);
+	// Required PR checks include documentation and ancestry-only changes; push filtering stays unchanged.
+	assert.equal(Object.hasOwn(workflow.on,'pull_request'),true);
+	assert.equal(workflow.on.pull_request == null || !Object.hasOwn(workflow.on.pull_request,'paths-ignore'),true);
 	assert.equal(Object.hasOwn(workflow.on,'workflow_dispatch'),true);
 });

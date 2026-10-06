@@ -6,7 +6,7 @@ on:
     tags: ["**"]
     paths-ignore: ["docs/src/content/**"]
   pull_request:
-    paths-ignore: ["docs/src/content/**"]
+    # Required verification must also run for ancestry-only reconciliation PRs.
   workflow_dispatch:
 
 jobs:
