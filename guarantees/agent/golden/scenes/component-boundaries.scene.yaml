@@ -3,6 +3,66 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: execution-retired-command-unit-1
+    action: { verifier: cli.golden.execution-retired-command-unit-1 }
+    expect: { status: passed }
+  - id: execution-handler-inspection-unit-1
+    action: { verifier: cli.golden.execution-handler-inspection-unit-1 }
+    expect: { status: passed }
+  - id: execution-handler-inspection-unit-2
+    action: { verifier: cli.golden.execution-handler-inspection-unit-2 }
+    expect: { status: passed }
+  - id: execution-handler-inspection-native-1
+    action: { verifier: cli.golden.execution-handler-inspection-native-1 }
+    expect: { status: passed }
+  - id: architecture-decision-intent-unit-1
+    action: { verifier: cli.golden.architecture-decision-intent-unit-1 }
+    expect: { status: passed }
+  - id: architecture-decision-intent-unit-2
+    action: { verifier: cli.golden.architecture-decision-intent-unit-2 }
+    expect: { status: passed }
+  - id: architecture-preflight-start-unit-1
+    action: { verifier: cli.golden.architecture-preflight-start-unit-1 }
+    expect: { status: passed }
+  - id: architecture-decision-start-native-1
+    action: { verifier: cli.golden.architecture-decision-start-native-1 }
+    expect: { status: passed }
+  - id: architecture-graph-watch-1
+    action: { verifier: cli.golden.architecture-graph-watch-1 }
+    expect: { status: passed }
+  - id: architecture-workspace-readback
+    action: { verifier: cli.golden.architecture-workspace-readback }
+    expect: { status: passed }
+  - id: architecture-usage-pages-1
+    action: { verifier: cli.golden.architecture-usage-pages-1 }
+    expect: { status: passed }
+  - id: architecture-assignment-pages-1
+    action: { verifier: cli.golden.architecture-assignment-pages-1 }
+    expect: { status: passed }
+  - id: architecture-workday-event-command
+    action: { verifier: cli.golden.architecture-workday-event-command }
+    expect: { status: passed }
+  - id: architecture-workday-event-native
+    action: { verifier: cli.golden.architecture-workday-event-native }
+    expect: { status: passed }
+  - id: schema-canonical
+    action: { verifier: cli.golden.schema-canonical }
+    expect: { status: passed }
+  - id: schema-definitions
+    action: { verifier: cli.golden.schema-definitions }
+    expect: { status: passed }
+  - id: schema-union
+    action: { verifier: cli.golden.schema-union }
+    expect: { status: passed }
+  - id: schema-untracked
+    action: { verifier: cli.golden.schema-untracked }
+    expect: { status: passed }
+  - id: schema-entrypoint
+    action: { verifier: cli.golden.schema-entrypoint }
+    expect: { status: passed }
+  - id: schema-entrypoint-denial
+    action: { verifier: cli.golden.schema-entrypoint-denial }
+    expect: { status: passed }
   - id: freeze-context-native
     action: { verifier: cli.golden.freeze-context-native }
     expect: { status: passed }
@@ -315,6 +375,9 @@ workflow:
   - id: reporting-unit
     action: { verifier: cli.golden.reporting-unit }
     expect: { status: passed }
+  - id: component-scene-os-boundary
+    action: { verifier: cli.golden.component-scene-os-boundary }
+    expect: { status: passed }
   - id: refused-rebuild
     action: { verifier: cli.golden.refused-rebuild }
     expect: { status: passed }
@@ -323,6 +386,9 @@ workflow:
     expect: { status: passed }
   - id: selection
     action: { verifier: cli.golden.selection }
+    expect: { status: passed }
+  - id: execution-public-selection-unit
+    action: { verifier: cli.golden.execution-public-selection-unit }
     expect: { status: passed }
   - id: decisions
     action: { verifier: cli.golden.decisions }

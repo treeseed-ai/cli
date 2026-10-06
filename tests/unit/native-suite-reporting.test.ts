@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
 import { reportingArguments } from '../../scripts/testing/run-tests.ts';
+
+test('component scene case execution inherits the same declared test-only OS boundary as complete suites without changing runtime or host acceptance', () => {
+	const workflow = parse(readFileSync('.github/workflows/verify.yml', 'utf8'));
+	const job = workflow.jobs.verify;
+	const scenes = job.steps.filter((step: { uses?: string }) => step.uses?.includes('reviewer/.github/actions/run-scenes@'));
+	assert.equal(scenes.length, 1);
+	assert.equal(scenes[0].with.ids, 'guarantee.cli.golden.component-boundaries');
+	assert.equal(scenes[0].env?.NODE_OPTIONS, '--import=${{ github.workspace }}/tests/support/os-custody.mjs');
+	assert.equal(Object.hasOwn(job.env, 'NODE_OPTIONS'), false);
+	assert.match(readFileSync('scripts/testing/run-tests.ts', 'utf8'), /tests\/support\/os-custody\.mjs/u);
+});
 
 test('native reporting accepts only a complete nonempty reporting pair without test selection',()=>{
 	assert.deepEqual(reportingArguments([]),[]);

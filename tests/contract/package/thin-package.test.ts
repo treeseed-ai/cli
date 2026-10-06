@@ -73,6 +73,12 @@ test('source contains no legacy implementation residue', () => {
 
 test('guarantee metadata binds owner tests without adding a second CLI implementation', () => {
 	const reporting: Record<string,{testFile:string;testName:string}> = {
+		'cli.golden.schema-canonical': {testFile:'tests/integration/platform-schema.test.ts',testName:'public CLI accepts exact canonical schema without changing Git or input bytes'},
+		'cli.golden.schema-definitions': {testFile:'tests/integration/platform-schema.test.ts',testName:'public CLI rejects every committed unconstrained canonical definition with local policy evidence'},
+		'cli.golden.schema-union': {testFile:'tests/integration/platform-schema.test.ts',testName:'public CLI rejects incomplete duplicate and runtime-only canonical stored-record unions'},
+		'cli.golden.schema-untracked': {testFile:'tests/integration/platform-schema.test.ts',testName:'public CLI denies untracked canonical authority instead of silently omitting it'},
+		'cli.golden.schema-entrypoint': {testFile:'tests/integration/platform-schema.test.ts',testName:'native CLI entrypoint accepts the exact canonical declaration'},
+		'cli.golden.schema-entrypoint-denial': {testFile:'tests/integration/platform-schema.test.ts',testName:'native CLI entrypoint denies changed assignment authority'},
 		'cli.golden.freeze-context-native': {testFile:"tests/integration/development-freeze.test.ts",testName:"native freeze receives exact session workspace worktree and selected mode authority"},
 		'cli.golden.contract-context-native': {testFile:"tests/integration/development-freeze.test.ts",testName:"native contract receives exact session workspace worktree and selected mode authority"},
 		'cli.golden.freeze-workspace-native': {testFile:"tests/integration/development-freeze.test.ts",testName:"native freeze preserves explicit saved workspace authority independently of manifest location"},
@@ -177,6 +183,7 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 		'cli.golden.reporting-denial': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporter arguments reject filters unknown flags and malformed pairs before test side effects'},
 		'cli.golden.reporting-outcomes': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporting retains failed skipped todo empty and crashed suite outcomes'},
 		'cli.golden.reporting-unit': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting accepts only a complete nonempty reporting pair without test selection'},
+		'cli.golden.component-scene-os-boundary': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'component scene case execution inherits the same declared test-only OS boundary as complete suites without changing runtime or host acceptance'},
 	};
 	const observedReporting = new Set<string>();
 	const files = readdirSync('guarantees', { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
@@ -200,6 +207,12 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 
 test('verification retains every PR protected branch and tag without duplicate topic pushes',()=>{
 	const workflow=parse(readFileSync('.github/workflows/verify.yml','utf8'));
+	assert.equal(workflow.jobs.verify.env.TREESEED_DEVELOPMENT_WORKSPACE_ROOT,'${{ github.workspace }}/.treeseed/platform-authority');
+	const authority=workflow.jobs.verify.steps.filter((step:{with?:{repository?:string}})=>step.with?.repository==='treeseed-ai/platform');
+	assert.equal(authority.length,1);
+	assert.deepEqual(authority[0].with,{repository:'treeseed-ai/platform',ref:'e4c4cad1e526f53d3549c8fc27c3e60122b20ee4',
+		path:'.treeseed/platform-authority','persist-credentials':false});
+	assert.ok(workflow.jobs.verify.steps.indexOf(authority[0])<workflow.jobs.verify.steps.findIndex((step:{name?:string})=>step.name==='Verify package with exact SDK'));
 	assert.deepEqual(workflow.on.push.branches,['staging','main']);
 	assert.deepEqual(workflow.on.push.tags,['**']);
 	assert.deepEqual(workflow.on.push['paths-ignore'],['docs/src/content/**']);

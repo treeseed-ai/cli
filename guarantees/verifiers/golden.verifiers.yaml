@@ -1,6 +1,106 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.execution-retired-command-unit-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "rejects every retired execution authority command before any invocation in both plan and execute mode and retains a valid original planning retry"
+  cli.golden.execution-handler-inspection-unit-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/agents/handlers.test.ts
+    testName: "generated handler inspection uses exact project and renamed handler bytes through read only list and show bindings"
+  cli.golden.execution-handler-inspection-unit-2:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/agents/handlers.test.ts
+    testName: "handler inspection denies omitted empty authority and execution options before invocation while preserving unknown and denied handler errors"
+  cli.golden.execution-handler-inspection-native-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/agents/handlers.test.ts
+    testName: "packaged native handler inspection preserves exact read paths origins and failed transport history through unchanged retry without execution requests"
+  cli.golden.architecture-decision-intent-unit-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "normalizes exact repeated CSV decision bytes for direct and scheduled intents without deriving acting authority"
+  cli.golden.architecture-decision-intent-unit-2:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "denies every malformed direct or scheduled decision selection and retired derived option before invocation"
+  cli.golden.architecture-preflight-start-unit-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "binds start only to the supplied exact preflight identity and digest and never infers omitted authority"
+  cli.golden.architecture-decision-start-native-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "packaged native CLI preserves decision and preflight bytes through confirmation denial and exact retry without derived writes"
+  cli.golden.architecture-graph-watch-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/graph-watch.test.ts
+    testName: "native generated graph watch preserves exact full tail terminal cursors and denied transport without mutating input"
+  cli.golden.architecture-workspace-readback:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/workspace-readback.test.ts
+    testName: "reads exact closed and open workspace resources and preserves denied unavailable and missing authority through native CLI"
+  cli.golden.architecture-usage-pages-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/usage-pages.test.ts
+    testName: "reads exact project workday measured usage pages and denies transport failure through independent native CLI"
+  cli.golden.architecture-assignment-pages-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/assignment-pages.test.ts
+    testName: "forwards exact assignment pages and transport denial through independent native CLI without hiding a failed tail"
+  cli.golden.architecture-workday-event-command:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/workday-events.test.ts
+    testName: "requires one generated read command for exact workday events with cursor and page limit"
+  cli.golden.architecture-workday-event-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/workday-events.test.ts
+    testName: "retrieves a later exact event page through independent native CLI and real HTTP transport"
+  cli.golden.schema-canonical:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI accepts exact canonical schema without changing Git or input bytes
+  cli.golden.schema-definitions:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI rejects every committed unconstrained canonical definition with local policy evidence
+  cli.golden.schema-union:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI rejects incomplete duplicate and runtime-only canonical stored-record unions
+  cli.golden.schema-untracked:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: public CLI denies untracked canonical authority instead of silently omitting it
+  cli.golden.schema-entrypoint:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: native CLI entrypoint accepts the exact canonical declaration
+  cli.golden.schema-entrypoint-denial:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/platform-schema.test.ts
+    testName: native CLI entrypoint denies changed assignment authority
   cli.golden.freeze-context-native:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
@@ -501,6 +601,11 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/native-suite-reporting.test.ts
     testName: native reporting cannot replace original suite deadlines or interrupt policy through reporting flags
+  cli.golden.component-scene-os-boundary:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/native-suite-reporting.test.ts
+    testName: component scene case execution inherits the same declared test-only OS boundary as complete suites without changing runtime or host acceptance
   cli.golden.native-reporting:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
@@ -536,6 +641,11 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/workdays/selection.test.ts
     testName: repeated and CSV selectors become a normalized intersecting nested intent
+  cli.golden.execution-public-selection-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: manual and scheduled agent selectors omit empty internal arrays and satisfy the same canonical public intent
   cli.golden.decisions:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
