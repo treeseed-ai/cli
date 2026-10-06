@@ -4,6 +4,7 @@ import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, open
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import type { DevelopmentRuntime } from '@treeseed/sdk/development';
 import { developmentStateRoot } from '../development-cli-selection.js';
+import { developmentBootOrder } from './boot-order.js';
 
 export function repositoryClosure(runtime: DevelopmentRuntime, worktree: string, excludedPaths: string[] = []) {
 	const git = (args: string[]) => execFileSync('git', ['-C', worktree, ...args], { encoding: 'utf8' }).trim();
@@ -95,6 +96,22 @@ export function developmentFreezeClosure<T extends { session: { repositories: Ar
 		throw new Error(`Development freeze dependency source is missing or ambiguous for ${project}.`);
 	return { ...record, session: { ...record.session,
 		targets: [...keys].map(key => selections.get(key)!), repositories: record.session.repositories.filter(source => projects.has(source.projectId)) } };
+}
+
+/** Bind the original dependency order to each owning freeze operation. */
+export function developmentFreezeTargets(record: Parameters<typeof freezeCustody>[0]) {
+	return developmentBootOrder(record.session.targets, record.runtimes).flatMap(selected => {
+		const runtime = record.runtimes.find(runtime => runtime.project.id === selected.projectId)!;
+		const target = runtime.targets.find(target => target.id === selected.targetId)!;
+		return target.freeze ? [{ runtime, target, mode: selected.mode }] : [];
+	});
+}
+
+export function assertDevelopmentGenerations(generations: Record<string,number>, targets: Array<{projectId:string;targetId:string;generation:number}>) {
+	for (const [key,generation] of Object.entries(generations)) {
+		const selected = targets.filter(target => `${target.projectId}.${target.targetId}` === key);
+		if (selected.length !== 1 || selected[0]!.generation !== generation) throw new Error(`Candidate dependency generation changed after freeze: ${key}.`);
+	}
 }
 
 /** Build outputs may change; the source closure and already captured artifacts may not. */
