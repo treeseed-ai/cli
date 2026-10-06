@@ -694,15 +694,15 @@ verifiers:
   cli.golden.provider-scoped-freeze-closure-native:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
-    testFile: tests/integration/development-freeze.test.ts
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
     testName: native scoped provider freeze seals every declared dependency before its consumer while leaving unrelated dirty owners and commands untouched
   cli.golden.provider-scoped-freeze-missing-native:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
-    testFile: tests/integration/development-freeze.test.ts
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
     testName: native scoped provider freeze refuses a missing declared dependency before any owning build or candidate
   cli.golden.provider-scoped-freeze-generation-native:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
-    testFile: tests/integration/development-candidate.test.ts
+    testFile: tests/unit/command-boundary/development/source-closure.test.ts
     testName: native provider candidate verification denies a moved dependency generation before another command without replacing its sealed receipt

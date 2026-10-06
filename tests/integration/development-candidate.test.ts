@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import { parse, stringify } from 'yaml';
 import { candidateFixture } from '../support/development-candidate.ts';
-import { developmentSessionSchema } from '@treeseed/sdk/development';
 
 function declareSecondArtifact(root: string, separateTarget=false) {
 	const manifest=resolve(root,'treeseed.package.yaml');
@@ -136,24 +135,5 @@ test('native dirty candidate verification excludes generated artifact and remain
 		assert.equal(await fixture.verify(), 1);
 		assert.match(fixture.output.join(''), /artifact custody failed/);
 		assert.equal(fixture.registrations.length, 3);
-	} finally { fixture.close(); }
-});
-
-test('native provider candidate verification denies a moved dependency generation before another command without replacing its sealed receipt', async () => {
-	const fixture = candidateFixture();
-	try {
-		const frozen = await fixture.freeze(), receipt = readFileSync(frozen.receipt), invoke = fixture.context.hostInvoke!;
-		fixture.context.hostInvoke = async input => {
-			const value = await invoke(input);
-			if (input.handlerId !== 'local.dev.status') return value;
-			assert.ok(value && typeof value === 'object' && !Array.isArray(value));
-			const record: Record<string, unknown> = Object.fromEntries(Object.entries(value));
-			const session = developmentSessionSchema.parse(record.session);
-			session.targets[0]!.generation += 1;
-			return { ...record, session };
-		};
-		assert.equal(await fixture.verify(), 1); assert.match(fixture.output.join(''), /Candidate dependency generation/);
-		assert.equal(existsSync(resolve(fixture.root, 'verification.log')), false);
-		assert.equal(fixture.registrations.length, 1); assert.deepEqual(readFileSync(frozen.receipt), receipt);
 	} finally { fixture.close(); }
 });

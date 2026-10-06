@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import { parse, stringify } from 'yaml';
 import { candidateFixture } from '../support/development-candidate.ts';
-import { developmentCandidateSchema, developmentRuntimeSchema } from '@treeseed/sdk/development';
 
 function contract(root:string,code:string) {
 	writeFileSync(resolve(root,'scripts/contract.ts'),code);
@@ -206,61 +205,4 @@ test('native freeze blocks a target with no declared outputs before executing a 
 		assert.match(fixture.output.join(''),/Freeze produced no declared artifacts for specimen.package/);
 		assert.equal(existsSync(resolve(fixture.root,'second.bin')),false);
 	} finally {fixture.close();}
-});
-
-test('native scoped provider freeze seals every declared dependency before its consumer while leaving unrelated dirty owners and commands untouched', async () => {
-	const fixture = candidateFixture(), dependency = candidateFixture(), unrelated = candidateFixture();
-	try {
-		for (const [input, id] of [[dependency, 'dependency'], [unrelated, 'unrelated']] as const) {
-			const path = resolve(input.root, 'treeseed.package.yaml');
-			const runtime = developmentRuntimeSchema.parse(parse(readFileSync(path, 'utf8')).development);
-			runtime.project.id = id; writeFileSync(path, stringify({ schemaVersion: 'treeseed.package/v1', development: runtime }));
-		}
-		const path = resolve(fixture.root, 'treeseed.package.yaml');
-		const runtime = developmentRuntimeSchema.parse(parse(readFileSync(path, 'utf8')).development);
-		runtime.targets[0]!.dependencies = [{ id: 'dependency', target: 'package', locality: 'local', reaction: 'rebuild' }];
-		writeFileSync(path, stringify({ schemaVersion: 'treeseed.package/v1', development: runtime }));
-		writeFileSync(resolve(fixture.root, 'scripts/freeze.ts'), `import {readFileSync,writeFileSync} from 'node:fs';if(readFileSync(${JSON.stringify(resolve(dependency.root, 'candidate.bin'))},'utf8')!=='sealed')throw Error('owning dependency was not frozen first');writeFileSync('candidate.bin','sealed consumer');\n`);
-		writeFileSync(resolve(fixture.root, 'development.session.yaml'), stringify({ projects: [fixture, dependency, unrelated].map(input => ({
-			manifest: resolve(input.root, 'treeseed.package.yaml'), worktree: input.root, targets: [{ id: 'package', mode: 'candidate' }],
-		})) }));
-		for (const input of [fixture, dependency, unrelated]) {
-			input.git('add', '.'); input.git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'scoped inputs');
-		}
-		writeFileSync(resolve(unrelated.root, 'unrelated-source.ts'), 'unrelated dirty bytes retained\n');
-		const unrelatedHead = unrelated.git('rev-parse', 'HEAD'), unrelatedBytes = readFileSync(resolve(unrelated.root, 'unrelated-source.ts'));
-		assert.equal(await fixture.invoke(['dev', 'session', 'start', resolve(fixture.root, 'development.session.yaml')]), 0);
-		assert.equal(await fixture.invoke(['dev', 'freeze', '--target', 'specimen.package']), 0, fixture.output.join(''));
-		const frozen = JSON.parse(fixture.output[0]!).result, candidate = developmentCandidateSchema.parse(frozen.candidate);
-		assert.deepEqual(candidate.source.map(owner => owner.projectId).sort(), ['dependency', 'specimen']);
-		assert.deepEqual(candidate.artifacts.map(artifact => `${artifact.projectId}.${artifact.targetId}`), ['dependency.package', 'specimen.package']);
-		assert.deepEqual(Object.keys(candidate.dependencyGenerations).sort(), ['dependency.package', 'specimen.package']);
-		assert.equal(candidate.source.some(owner => owner.dirty), false); assert.equal(candidate.verification.status, 'pending');
-		assert.equal(existsSync(resolve(unrelated.root, 'candidate.bin')), false); assert.equal(fixture.registrations.length, 1);
-		assert.equal(await fixture.verify(), 0, fixture.output.join(''));
-		assert.equal(fixture.readReceipt(frozen.receipt).verification.status, 'passed'); assert.equal(fixture.readReceipt(frozen.receipt).promotable, true);
-		const receipt = readFileSync(frozen.receipt), source = readFileSync(resolve(dependency.root, 'scripts/verify.ts'));
-		writeFileSync(resolve(dependency.root, 'scripts/verify.ts'), 'changed required dependency\n');
-		assert.equal(await fixture.verify(), 1); assert.match(fixture.output.join(''), /Candidate source changed after freeze/);
-		assert.deepEqual(readFileSync(frozen.receipt), receipt); assert.equal(fixture.registrations.length, 2);
-		assert.equal(readFileSync(resolve(dependency.root, 'scripts/verify.ts'), 'utf8'), 'changed required dependency\n');
-		writeFileSync(resolve(dependency.root, 'scripts/verify.ts'), source);
-		assert.deepEqual(readFileSync(resolve(unrelated.root, 'unrelated-source.ts')), unrelatedBytes); assert.equal(unrelated.git('rev-parse', 'HEAD'), unrelatedHead);
-		assert.equal(existsSync(resolve(unrelated.root, 'verification.log')), false);
-	} finally { fixture.close(); dependency.close(); unrelated.close(); }
-});
-
-test('native scoped provider freeze refuses a missing declared dependency before any owning build or candidate', async () => {
-	const fixture = candidateFixture();
-	try {
-		const path = resolve(fixture.root, 'treeseed.package.yaml');
-		const runtime = developmentRuntimeSchema.parse(parse(readFileSync(path, 'utf8')).development);
-		runtime.targets[0]!.dependencies = [{ id: 'absent', target: 'package', locality: 'local', reaction: 'rebuild' }];
-		writeFileSync(path, stringify({ schemaVersion: 'treeseed.package/v1', development: runtime }));
-		fixture.git('add', '.'); fixture.git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'missing dependency input');
-		assert.equal(await fixture.invoke(['dev', 'session', 'start', resolve(fixture.root, 'development.session.yaml')]), 0);
-		assert.equal(await fixture.invoke(['dev', 'freeze', '--target', 'specimen.package']), 1);
-		assert.match(fixture.output.join(''), /Development freeze dependency/); assertNoCandidate(fixture);
-		assert.equal(existsSync(resolve(fixture.root, 'candidate.bin')), false);
-	} finally { fixture.close(); }
 });
