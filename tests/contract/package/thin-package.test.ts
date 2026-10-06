@@ -183,6 +183,7 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 		'cli.golden.reporting-denial': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporter arguments reject filters unknown flags and malformed pairs before test side effects'},
 		'cli.golden.reporting-outcomes': {testFile:'tests/integration/native-suite-reporting.test.ts',testName:'native reporting retains failed skipped todo empty and crashed suite outcomes'},
 		'cli.golden.reporting-unit': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting accepts only a complete nonempty reporting pair without test selection'},
+		'cli.golden.component-scene-os-boundary': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'component scene case execution inherits the same declared test-only OS boundary as complete suites without changing runtime or host acceptance'},
 	};
 	const observedReporting = new Set<string>();
 	const files = readdirSync('guarantees', { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
