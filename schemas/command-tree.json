@@ -6419,6 +6419,73 @@
         },
         {
           "nodeType": "branch",
+          "segment": "events",
+          "description": "Events operations.",
+          "children": [
+            {
+              "nodeType": "leaf",
+              "segment": "list",
+              "description": "List the selected resource.",
+              "kind": "read",
+              "arguments": [
+                {
+                  "name": "workday",
+                  "description": "workday identity or path.",
+                  "required": true
+                }
+              ],
+              "resultSchemaId": "treeseed.command.list/v1",
+              "execution": {
+                "kind": "operation",
+                "operationId": "workdays.events.list",
+                "input": [
+                  {
+                    "target": "path",
+                    "field": "teamId",
+                    "source": "context",
+                    "name": "team",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "path",
+                    "field": "runId",
+                    "source": "argument",
+                    "name": "workday",
+                    "required": true,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "status",
+                    "source": "option",
+                    "name": "status",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "limit",
+                    "source": "option",
+                    "name": "limit",
+                    "required": false,
+                    "transform": "integer"
+                  },
+                  {
+                    "target": "query",
+                    "field": "cursor",
+                    "source": "option",
+                    "name": "cursor",
+                    "required": false,
+                    "transform": "identity"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "nodeType": "branch",
           "segment": "schedules",
           "description": "Schedules operations.",
           "children": [
@@ -7336,7 +7403,7 @@
                 "source": "option",
                 "name": "plan",
                 "required": false,
-                "transform": "boolean"
+                "transform": "identity"
               }
             ]
           }

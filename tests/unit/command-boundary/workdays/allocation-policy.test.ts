@@ -26,7 +26,7 @@ test('assignment explain preserves allocator evidence without inventing a CLI bu
 test('workday profile update sends a validated policy document under the API policy field', async () => {
 	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-workday-policy-'));
 	const file = resolve(root, 'policy.json');
-	const policy = { durationSeconds: 28_800, maximumConcurrency: 1, communicationConcurrency: 1,
+	const policy = { durationSeconds: 28_800, maximumConcurrency: 1, communicationConcurrency: 1, allocationWeight: 1, planningTurnMaximumSeconds: 180,
 		planningPercent: 20, projectPercentages: { sdk: 100 }, agentClassPercentages: { sdk: { engineer: 100 } } };
 	const calls: Array<{ operationId: string; input: any }> = [];
 	const output: string[] = [];
@@ -37,7 +37,7 @@ test('workday profile update sends a validated policy document under the API pol
 			operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { id: 'default', teamId: '11111111-1111-4111-8111-111111111111', revision: 2, policy } }; } });
 		assert.equal(exit, 0, output.join(''));
 		assert.equal(calls[0]?.operationId, 'workdays.profiles.update');
-		assert.deepEqual(calls[0]?.input.body.policy, { ...policy, allocationWeight: 1, planningTurnMaximumSeconds: 180 });
+		assert.deepEqual(calls[0]?.input.body.policy, policy);
 		assert.equal(calls[0]?.input.body.file, undefined);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });

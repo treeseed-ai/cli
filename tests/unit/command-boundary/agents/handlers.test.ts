@@ -12,7 +12,10 @@ import { saveServerSession } from '../../../../src/cli/support/server-custody.ts
 const projectId = '22222222-2222-4222-8222-222222222222';
 const handlers = [{ id: 'actor', origin: 'agent-package' }, { id: 'configured/renamed-handler', origin: 'project-runtime' }];
 
-test('generated handler inspection uses exact project and renamed handler bytes through read only list and show bindings', async () => {
+test('generated handler inspection uses exact project and renamed handler bytes through read only list and show bindings', async context => {
+	const root = mkdtempSync(resolve(tmpdir(), 'cli-handler-unit-'));
+	context.after(() => rmSync(root, { recursive: true, force: true }));
+	const env = { TREESEED_CONFIG_HOME: root };
 	for (const show of [false, true]) {
 		const operationId = show ? 'agents.handlers.show' : 'agents.handlers.list';
 		const specs = commandSpecs.filter(value => value.execution.kind === 'operation' && value.execution.operationId === operationId);
@@ -22,7 +25,7 @@ test('generated handler inspection uses exact project and renamed handler bytes 
 		const argv = [...spec.path, ...(show ? [handlers[1]!.id] : []), '--project', projectId, '--json'];
 		const frozen = structuredClone(argv), calls: Array<{ operationId: string; input: unknown }> = [], output: string[] = [];
 		const supplied = show ? { projectId, handler: handlers[1] } : { projectId, handlers }, before = structuredClone(supplied);
-		assert.equal(await runCommandLine(argv, { interactiveUi: false, env: {}, write: text => output.push(text),
+		assert.equal(await runCommandLine(argv, { interactiveUi: false, env, write: text => output.push(text),
 			operationInvoke: async (id, input) => { calls.push({ operationId: id, input }); return { data: supplied }; } }), 0);
 		assert.deepEqual(calls, [{ operationId, input: { path: { projectId, ...(show ? { handlerId: handlers[1]!.id } : {}) }, query: {}, body: undefined } }]);
 		assert.equal(output.length, 1); const envelope = JSON.parse(output[0]!);
@@ -31,7 +34,10 @@ test('generated handler inspection uses exact project and renamed handler bytes 
 	}
 });
 
-test('handler inspection denies omitted empty authority and execution options before invocation while preserving unknown and denied handler errors', async () => {
+test('handler inspection denies omitted empty authority and execution options before invocation while preserving unknown and denied handler errors', async context => {
+	const root = mkdtempSync(resolve(tmpdir(), 'cli-handler-denial-unit-'));
+	context.after(() => rmSync(root, { recursive: true, force: true }));
+	const env = { TREESEED_CONFIG_HOME: root };
 	for (const argv of [
 		['agents', 'handlers', 'list'], ['agents', 'handlers', 'list', '--project', ''],
 		['agents', 'handlers', 'show', '--project', projectId], ['agents', 'handlers', 'show', '', '--project', projectId],
@@ -39,7 +45,7 @@ test('handler inspection denies omitted empty authority and execution options be
 		['agents', 'handlers', 'show', handlers[1]!.id, '--project', projectId, '--yes'],
 	]) {
 		const input = [...argv, '--json'], frozen = structuredClone(input), output: string[] = []; let invoked = 0;
-		assert.equal(await runCommandLine(input, { interactiveUi: false, env: {}, write: text => output.push(text), operationInvoke: async () => { invoked++; } }), 1);
+		assert.equal(await runCommandLine(input, { interactiveUi: false, env, write: text => output.push(text), operationInvoke: async () => { invoked++; } }), 1);
 		assert.equal(invoked, 0); assert.equal(output.length, 1); const envelope = JSON.parse(output[0]!);
 		assert.equal(envelope.ok, false); assert.equal(envelope.result, null); assert.deepEqual(envelope.warnings, []); assert.deepEqual(input, frozen);
 	}
@@ -47,7 +53,7 @@ test('handler inspection denies omitted empty authority and execution options be
 		[503, 'handler_inventory_unavailable', 'provider_unavailable']] as const) {
 		const cause = Object.assign(new Error('Original inspection denial'), { status, code }), output: string[] = []; let invoked = 0;
 		const input = ['agents', 'handlers', 'show', 'configured/unavailable', '--project', projectId, '--json'], frozen = structuredClone(input);
-		assert.equal(await runCommandLine(input, { interactiveUi: false, env: {}, write: text => output.push(text), operationInvoke: async () => { invoked++; throw cause; } }), 1);
+		assert.equal(await runCommandLine(input, { interactiveUi: false, env, write: text => output.push(text), operationInvoke: async () => { invoked++; throw cause; } }), 1);
 		assert.equal(invoked, 1); const envelope = JSON.parse(output[0]!);
 		assert.equal(envelope.ok, false); assert.equal(envelope.result, null); assert.equal(envelope.error.code, code); assert.equal(envelope.error.category, category);
 		assert.deepEqual(envelope.warnings, []); assert.deepEqual(input, frozen); assert.equal(cause.message, 'Original inspection denial');

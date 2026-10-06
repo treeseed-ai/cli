@@ -29,7 +29,7 @@ test('retrieves a later exact event page through independent native CLI and real
 		status: 'failed', createdAt: '2026-10-02T21:00:01Z' }], page: { limit: 50, hasMore: false, nextCursor: null } };
 	const server = createServer((request, response) => {
 		requests.push(request.url ?? ''); response.writeHead(200, { 'content-type': 'application/json' });
-		response.end(JSON.stringify(result));
+		response.end(JSON.stringify({ data: result }));
 	});
 	let child: ReturnType<typeof spawn> | undefined;
 	try {
