@@ -2350,6 +2350,24 @@ Control-plane operation: `workdays.stop`.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+## trsd workdays events
+
+Events operations.
+
+### trsd workdays events list <workday>
+
+List the selected resource.
+
+Operation: read. Result schema: `treeseed.command.list/v1`.
+Control-plane operation: `workdays.events.list`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--status <value>`: Status filter.
+- `--limit <value>`: Page size.
+- `--cursor <value>`: Opaque page cursor.
+- `--json`: Emit the stable JSON envelope.
+
 ## trsd workdays schedules
 
 Schedules operations.
