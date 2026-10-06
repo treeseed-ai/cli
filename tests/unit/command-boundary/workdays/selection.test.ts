@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { controlPlaneOperation } from '@treeseed/sdk/operator-contracts';
 import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import { getOperationInputField, setOperationInputField } from '../../../../src/cli/support/operations/input-fields.ts';
 import { saveServerSession } from '../../../../src/cli/support/server-custody.ts';
@@ -61,8 +62,24 @@ test('repeated and CSV selectors become a normalized intersecting nested intent'
 		interactiveUi: false, write() {}, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: {} }; },
 	});
 	assert.equal(exit, 0); assert.equal(calls.length, 1); assert.equal(calls[0]!.operationId, 'workdays.plan');
-	assert.deepEqual(calls[0]!.input.body.agentSelection, { classIds: [], classSlugs: ['engineering'], agentSlugs: ['architect', 'reviewer'], activityTypes: ['reviewing'], mode: 'intersection' });
+	assert.deepEqual(calls[0]!.input.body.agentSelection, { classSlugs: ['engineering'], agentSlugs: ['architect', 'reviewer'], activityTypes: ['reviewing'], mode: 'intersection' });
 	assert.equal(Object.keys(calls[0]!.input.body).some(key => key.includes('.')), false);
+});
+
+test('manual and scheduled agent selectors omit empty internal arrays and satisfy the same canonical public intent', async () => {
+	for (const scheduled of [false, true]) {
+		const argv = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600'] : [...base];
+		argv.push('--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering');
+		const held = structuredClone(argv), calls: unknown[] = [];
+		assert.equal(await runCommandLine(argv, { interactiveUi: false, write() {}, operationInvoke: async (id, input) => {
+			assert.equal(controlPlaneOperation(id).schema.body.safeParse(input.body).success, true, 'Actual SDK public request must accept CLI selectors');
+			calls.push(input); return { data: {} };
+		} }), 0);
+		const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600,
+			agentSelection: { classSlugs: ['engineering'], agentSlugs: ['architect', 'reviewer'], activityTypes: ['reviewing'], mode: 'intersection' } };
+		assert.deepEqual(calls, [{ path: { teamId: base[3] }, query: {}, body: scheduled ? { intent, cadenceSeconds: 3600 } : intent }]);
+		assert.deepEqual(argv, held);
+	}
 });
 
 test('repeated and CSV accepted decisions become one normalized selection', async () => {
@@ -294,6 +311,17 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		assert.equal(requests.length, retryOffset + 1);
 		assert.equal(requests[retryOffset]!.path, `/v1/teams/${teamId}/workday-runs/preflight`);
 		assert.equal(requests[retryOffset]!.body, JSON.stringify({ profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600 }));
+		for (const scheduled of [false, true]) {
+			const offset = requests.length, args = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--yes'] : base.slice(0, -1);
+			const result = await execute([...args, '--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering', '--idempotency-key', 'selector-key']);
+			assert.equal(result.code, 0); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, true);
+			const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600,
+				agentSelection: { agentSlugs: ['architect', 'reviewer'], classSlugs: ['engineering'], activityTypes: ['reviewing'], mode: 'intersection' } };
+			assert.deepEqual(requests.slice(offset), Array.from({ length: scheduled ? 2 : 1 }, (_, index) => ({ method: 'POST',
+				path: `/v1/teams/${teamId}/${scheduled ? 'workday-schedules' : 'workday-runs/preflight'}`,
+				body: JSON.stringify(scheduled ? { intent, cadenceSeconds: 3600 } : intent), idempotency: 'selector-key', confirmed: scheduled && index === 1 })));
+		}
+		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation, scheduleConfirmation]);
 		assert.deepEqual({ selected, preflight, confirmation, scheduleConfirmation }, frozen);
 		assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve('package.json')), packageBytes);
 	} finally {

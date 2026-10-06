@@ -93,7 +93,8 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 	if (intent?.agentSelection !== undefined) {
 		const diagnostics = validateWorkdayIntentSelection(intent.agentSelection);
 		if (diagnostics.length) throw Object.assign(new Error(diagnostics.map(item => `${item.path}: ${item.message}`).join(' ')), { category: 'invalid_input', code: 'workday_agent_selection_invalid' });
-		intent.agentSelection = normalizeWorkdayAgentSelection(intent.agentSelection);
+		intent.agentSelection = Object.fromEntries(Object.entries(normalizeWorkdayAgentSelection(intent.agentSelection))
+			.filter(([, value]) => !Array.isArray(value) || value.length > 0));
 	}
 	if (intent?.decisionIds !== undefined) {
 		const values = Array.isArray(intent.decisionIds) ? intent.decisionIds : [];

@@ -384,6 +384,9 @@ workflow:
   - id: selection
     action: { verifier: cli.golden.selection }
     expect: { status: passed }
+  - id: execution-public-selection-unit
+    action: { verifier: cli.golden.execution-public-selection-unit }
+    expect: { status: passed }
   - id: decisions
     action: { verifier: cli.golden.decisions }
     expect: { status: passed }
