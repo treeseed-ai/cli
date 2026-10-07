@@ -1,6 +1,21 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.execution-library-lookup-unit-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/selectors/project.test.ts
+    testName: "library lookup resolves a paginated slug to exact project and library bytes without deriving execution authority"
+  cli.golden.execution-library-lookup-unit-2:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/selectors/project.test.ts
+    testName: "library lookup retains missing ambiguous unbound and denied observations without invoking execution or repairing identity"
+  cli.golden.execution-library-lookup-native-1:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/selectors/project.test.ts
+    testName: "packaged native library lookup preserves paginated active team identity and failed read history through exact retry without execution writes"
   cli.golden.provider-plan-unit:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
