@@ -34,7 +34,9 @@ test('library lookup resolves a paginated slug to exact project and library byte
 	const argv = ['library', 'show', project.slug, '--json'], held = structuredClone(argv);
 	assert.equal(await runCommandLine(argv, { interactiveUi: false, write: value => output.push(value), operationInvoke: async (id, input) => {
 		calls.push({ id, input });
-		return { data: id === 'projects.list' ? input.query.cursor === 'original-next'
+		const next = input !== null && typeof input === 'object' && 'query' in input && input.query !== null
+			&& typeof input.query === 'object' && 'cursor' in input.query && input.query.cursor === 'original-next';
+		return { data: id === 'projects.list' ? next
 			? { items: [project] } : { items: [], nextCursor: 'original-next' } : library };
 	} }), 0);
 	assert.deepEqual(calls, [{ id: 'projects.list', input: { path: {}, query: { limit: 200 }, body: undefined } },
