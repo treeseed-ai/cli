@@ -3,6 +3,15 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: execution-library-lookup-unit-1
+    action: { verifier: cli.golden.execution-library-lookup-unit-1 }
+    expect: { status: passed }
+  - id: execution-library-lookup-unit-2
+    action: { verifier: cli.golden.execution-library-lookup-unit-2 }
+    expect: { status: passed }
+  - id: execution-library-lookup-native-1
+    action: { verifier: cli.golden.execution-library-lookup-native-1 }
+    expect: { status: passed }
   - id: provider-plan-unit
     action: { verifier: cli.golden.provider-plan-unit }
     expect: { status: passed }

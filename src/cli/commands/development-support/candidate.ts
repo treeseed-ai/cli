@@ -72,8 +72,8 @@ export function developmentFreezeClosure<T extends { session: { repositories: Ar
 	if (input === undefined) return record;
 	if (!Array.isArray(input) || !input.length || input.some(key => typeof key !== 'string' || !/^[a-z0-9-]+\.[a-z0-9-]+$/u.test(key))
 		|| new Set(input).size !== input.length) throw new Error('Development freeze target roots must be nonempty unique exact project.target identities.');
-	const contracts = new Map(record.runtimes.flatMap(runtime => runtime.targets.map(target => [`${runtime.project.id}.${target.id}`, target] as const)));
-	const selections = new Map(record.session.targets.map(target => [`${target.projectId}.${target.targetId}`, target] as const));
+	const contracts = new Map<string, DevelopmentRuntime['targets'][number]>(record.runtimes.flatMap(runtime => runtime.targets.map(target => [`${runtime.project.id}.${target.id}`, target] as const)));
+	const selections = new Map<string, T['session']['targets'][number]>(record.session.targets.map(target => [`${target.projectId}.${target.targetId}`, target] as const));
 	if (contracts.size !== record.runtimes.reduce((count,runtime) => count + runtime.targets.length,0)
 		|| selections.size !== record.session.targets.length) throw new Error('Development freeze target authority is ambiguous.');
 	const keys = new Set<string>(), visiting = new Set<string>();
@@ -103,7 +103,7 @@ export function developmentFreezeTargets(record: Parameters<typeof freezeCustody
 	return developmentBootOrder(record.session.targets, record.runtimes).flatMap(selected => {
 		const runtime = record.runtimes.find(runtime => runtime.project.id === selected.projectId)!;
 		const target = runtime.targets.find(target => target.id === selected.targetId)!;
-		return target.freeze ? [{ runtime, target, mode: selected.mode }] : [];
+		return target.freeze ? [{ runtime, target: { ...target, freeze: target.freeze }, mode: selected.mode }] : [];
 	});
 }
 
