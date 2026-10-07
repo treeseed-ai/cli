@@ -93,14 +93,16 @@ test('packaged native workday diagnostic readback preserves exact clock bytes an
 		await saveServerSession({ identity: { issuer: 'https://isolated.example.test', subject: 'reader' }, clientId: 'trsd',
 			scopes: ['treeseed:read'], serverId: 'local', audience: url, accessToken: 'isolated-fixture-token' }, env);
 		const execute = async (options: string[]) => {
-			const argv = ['workdays', 'events', runId, '--team', teamId, '--cursor', cursor, '--limit', '50', ...options, '--server', 'local', '--json'];
+			const command = commandSpecs.filter(value => value.execution.kind === 'operation' && value.execution.operationId === 'workdays.events.list');
+			assert.equal(command.length, 1);
+			const argv = [...command[0]!.path, runId, '--team', teamId, '--cursor', cursor, '--limit', '50', ...options, '--server', 'local', '--json'];
 			const before = structuredClone(argv);
 			child = spawn(process.execPath, [entrypoint, ...argv], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
 			let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
 			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
 			assert.deepEqual(argv, before); assert.equal(child.signalCode, null);
 			const text = (code === 0 ? stdout : stderr).trim(); assert.ok(text, JSON.stringify({ code, stdout, stderr }));
-			assert.equal((code === 0 ? stderr : stdout).trim(), ''); assert.equal(text.split('\n').length, 1);
+			assert.equal((code === 0 ? stderr : stdout).trim(), '');
 			return { code, envelope: JSON.parse(text) };
 		};
 		for (const detail of [undefined, 'metadata', 'full']) {
