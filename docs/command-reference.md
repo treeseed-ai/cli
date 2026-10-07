@@ -786,6 +786,7 @@ Execution: `local.dev.freeze`.
 - `--json`: Emit the stable JSON envelope.
 - `--plan`: Return the exact proposed outcome without mutation.
 - `--session <value>`: Development session identity.
+- `--target <value>`: Freeze only these exact project.target roots and their declared dependencies.
 - `--allow-dirty`: Create a non-promotable dirty-source candidate.
 
 ### trsd dev verify

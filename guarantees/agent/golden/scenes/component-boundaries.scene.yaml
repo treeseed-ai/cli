@@ -414,3 +414,15 @@ workflow:
   - id: lifecycle-lock
     action: { verifier: cli.golden.lifecycle-lock }
     expect: { status: passed }
+  - id: provider-scoped-freeze-validation-unit
+    action: { verifier: cli.golden.provider-scoped-freeze-validation-unit }
+    expect: { status: passed }
+  - id: provider-scoped-freeze-closure-native
+    action: { verifier: cli.golden.provider-scoped-freeze-closure-native }
+    expect: { status: passed }
+  - id: provider-scoped-freeze-missing-native
+    action: { verifier: cli.golden.provider-scoped-freeze-missing-native }
+    expect: { status: passed }
+  - id: provider-scoped-freeze-generation-native
+    action: { verifier: cli.golden.provider-scoped-freeze-generation-native }
+    expect: { status: passed }
