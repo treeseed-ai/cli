@@ -14,7 +14,7 @@ export function parseInvocation(command: CommandSpec, argv: string[]): ParsedInv
 		if (!spec) throw new Error(`Unknown option: ${flag}`);
 		if (spec.kind === 'boolean') { options[spec.name] = true; continue; }
 		const value = inline ?? remaining.shift();
-		if (!value) throw new Error(`Missing value for ${flag}`);
+		if (!value || inline === undefined && byFlag.has(value)) throw new Error(`Missing value for ${flag}`);
 		if (spec.kind === 'number') {
 			const parsed = Number(value);
 			if (!Number.isFinite(parsed)) throw new Error(`Invalid number for ${flag}`);
