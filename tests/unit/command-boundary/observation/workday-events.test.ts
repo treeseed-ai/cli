@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import { encodeCapacityPageCursor } from '@treeseed/sdk/capacity-pagination';
 import { commandSpecs } from '../../../../src/cli/registry.ts';
+import { parseInvocation } from '../../../../src/cli/parser.ts';
 import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import { saveServerSession } from '../../../../src/cli/support/server-custody.ts';
 
@@ -33,6 +34,9 @@ test('binds optional workday diagnostic detail to the sole generated read operat
 	assert.deepEqual(command.execution.input.filter(binding => binding.field === 'diagnostics'), [
 		{ target: 'query', field: 'diagnostics', source: 'option', name: 'diagnostics', required: false, transform: 'identity' },
 	]);
+	for (const next of command.options) assert.throws(() => parseInvocation(command, ['workday-fixture', '--diagnostics', next.flag]), /Missing value for --diagnostics/u);
+	assert.equal(parseInvocation(command, ['workday-fixture', '--diagnostics=--json']).options.diagnostics, '--json');
+	assert.equal(parseInvocation(command, ['workday-fixture', '--cursor', '-literal']).options.cursor, '-literal');
 	const teamId = '11111111-1111-4111-8111-111111111111', runId = 'workday-fixture';
 	for (const detail of [undefined, 'metadata', 'full']) {
 		const argv = [...command.path, runId, '--team', teamId, '--limit', '50', '--cursor', 'exact-cursor',
