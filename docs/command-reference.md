@@ -2368,6 +2368,7 @@ Control-plane operation: `workdays.events.list`.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
+- `--diagnostics <value>`: Diagnostic detail: metadata or full.
 
 ## trsd workdays schedules
 

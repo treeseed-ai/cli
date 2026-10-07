@@ -6439,6 +6439,13 @@
                   "required": true
                 }
               ],
+              "options": [
+                {
+                  "name": "--diagnostics",
+                  "description": "Diagnostic detail: metadata or full.",
+                  "type": "string"
+                }
+              ],
               "resultSchemaId": "treeseed.command.list/v1",
               "execution": {
                 "kind": "operation",
@@ -6481,6 +6488,14 @@
                     "field": "cursor",
                     "source": "option",
                     "name": "cursor",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "query",
+                    "field": "diagnostics",
+                    "source": "option",
+                    "name": "diagnostics",
                     "required": false,
                     "transform": "identity"
                   }
