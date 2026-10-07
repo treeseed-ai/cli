@@ -7,7 +7,7 @@ import { developmentCandidateSchema, type DevelopmentRuntime, type DevelopmentTa
 import type { CommandContext, ParsedInvocation } from '../types.js';
 import { developmentStateRoot, selectDevelopmentCli } from './development-cli-selection.js';
 import { dependentReactions, installPackageOverlay, overlayGeneration, relativeOverlayTarget, restoreOverlays, startPackageSynchronizer, stopProcess, stopProcesses, waitForNewPackageOverlay, waitForPackageOverlay } from './development-support/overlays.js';
-import { artifactPaths, compatibilityAttestations, developmentOperationDirectory, freezeCustody, readDevelopmentArtifact, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
+import { artifactPaths, assertDevelopmentGenerations, compatibilityAttestations, developmentFreezeClosure, developmentFreezeTargets, developmentOperationDirectory, freezeCustody, readDevelopmentArtifact, repositoryClosure, withFreezeLock } from './development-support/candidate.js';
 import { runHostDevelopment } from './development-support/host-runtime.js';
 import { applyDevelopmentRecovery, planDevelopmentRecovery } from './development-support/recovery.js';
 import { ownsDevelopmentProcess, processIdentity } from './development-support/process-identity.js';
@@ -202,15 +202,14 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 }
 
 async function freeze(invocation: ParsedInvocation, context: CommandContext) {
-	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId), record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] };
+	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId), record = developmentFreezeClosure(await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string; dirty: boolean }>; targets: Array<{ projectId: string; targetId: string; mode: string; generation: number }> }; runtimes: DevelopmentRuntime[] }, invocation.options.target);
 	return withFreezeLock(context.env, sessionId, async () => {
 		const custody=freezeCustody(record),source=custody.source;
 		const dirty = source.some((entry) => entry.dirty);
 		if (dirty && invocation.options.allowDirty !== true) throw new Error('Freeze found dirty source; pass --allow-dirty to create a non-promotable candidate.');
 		const artifacts: Array<{ projectId: string; targetId: string; kind: string; identity: string; digest: string; integrity?: string }> = [];
-		for (const runtime of record.runtimes) for (const target of runtime.targets) if (target.freeze && record.session.targets.some((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id && selected.mode !== 'released')) {
+		for (const {runtime,target,mode} of developmentFreezeTargets(record)) {
 		const repository = record.session.repositories.find((entry) => entry.projectId === runtime.project.id)!;
-		const mode = record.session.targets.find((selected) => selected.projectId === runtime.project.id && selected.targetId === target.id)!.mode;
 		const result = spawnSync(target.freeze.operation.command, target.freeze.operation.args, { cwd: developmentOperationDirectory(repository.worktree,target.freeze.operation.cwd), env: developmentOperationEnvironment(state,repository.worktree,mode,context.env,{},target.freeze.operation.environment), stdio: 'inherit', timeout: target.freeze.operation.timeoutSeconds * 1_000 });
 		if (result.status !== 0) throw new Error(`Freeze failed for ${runtime.project.id}.${target.id}.`);
 		custody.assert(artifacts);
@@ -238,7 +237,7 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 	const selected = typeof invocation.options.candidate === 'string' ? state.candidates.find((path) => path.includes(invocation.options.candidate as string)) : state.candidates.at(-1);
 	if (!selected || !existsSync(selected)) throw new Error('No local development candidate is available for verification.');
 	const candidate = developmentCandidateSchema.parse(JSON.parse(readFileSync(selected, 'utf8')));
-	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string }> }; runtimes: DevelopmentRuntime[] };
+	const record = await invoke(context, 'local.dev.status', { sessionId, all: false }) as { session: { repositories: Array<{ projectId: string; worktree: string }>; targets:Array<{projectId:string;targetId:string;generation:number}> }; runtimes: DevelopmentRuntime[] };
 	const operations: string[] = [];
 	const bindings = candidate.artifacts.map(artifact => {
 		const runtime = record.runtimes.find((entry) => entry.project.id === artifact.projectId), target = runtime?.targets.find((entry) => entry.id === artifact.targetId), repository = record.session.repositories.find((entry) => entry.projectId === artifact.projectId);
@@ -250,6 +249,7 @@ async function verifyCandidate(invocation: ParsedInvocation, context: CommandCon
 		return {artifact,artifactPath,repository,operation:target.operations.verify,directory};
 	});
 	const assertCustody = () => {
+	assertDevelopmentGenerations(candidate.dependencyGenerations,record.session.targets);
 	for(const {repository,operation,directory} of bindings)if(developmentOperationDirectory(repository.worktree,operation.cwd)!==directory)throw new Error('Development command working directory custody changed during verification.');
 	for (const {artifact,artifactPath,repository} of bindings) if (!existsSync(artifactPath) || sha256(readDevelopmentArtifact(repository.worktree,artifactPath)) !== artifact.digest) throw new Error(`Candidate artifact custody failed before verification or changed sealed artifact: ${artifact.identity}.`);
 	for (const source of candidate.source) {

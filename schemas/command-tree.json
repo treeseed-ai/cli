@@ -2424,6 +2424,11 @@
               "type": "string"
             },
             {
+              "name": "--target",
+              "description": "Freeze only these exact project.target roots and their declared dependencies.",
+              "type": "string[]"
+            },
+            {
               "name": "--allow-dirty",
               "description": "Create a non-promotable dirty-source candidate.",
               "type": "boolean"
