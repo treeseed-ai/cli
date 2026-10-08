@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { resumeDevelopmentSession, runDevelopment } from '../../../../src/cli/commands/development.ts';
@@ -8,6 +8,9 @@ import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import type { CommandContext, ParsedInvocation } from '../../../../src/cli/types.ts';
 import { parseInvocation } from '../../../../src/cli/parser.ts';
 import { resolveCommand } from '../../../../src/cli/registry.ts';
+import type { DevelopmentRuntime, DevelopmentTarget } from '@treeseed/sdk/development';
+import { startPackageSynchronizer, stopProcess, waitForPackageOverlay } from '../../../../src/cli/commands/development-support/overlays.ts';
+import { rebuildTarget } from '../../../support/development-rebuild.ts';
 
 test('development freeze and verify planning returns exact nonmutating actions without manager dispatch', async () => {
     const root = mkdtempSync(resolve(tmpdir(), 'provider-plan-unit-'));
@@ -103,4 +106,68 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
         await resumeDevelopmentSession(sessionId, context);
         assert.equal(starts, 2, 'Repeating resume must not duplicate the managed container');
     } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+function packageReleaseFixture() {
+    const root = mkdtempSync(resolve(tmpdir(), 'package-release-')), sessionId = 'dev-test';
+    const env = { ...process.env, XDG_STATE_HOME: root, NODE_OPTIONS: undefined }, manifest = resolve(root, 'treeseed.package.yaml');
+    const target: DevelopmentTarget = { ...rebuildTarget(), id: 'package', kind: 'package-watch', operations: {},
+        ready: { kind: 'marker', path: 'dist/.complete', timeoutSeconds: 10 },
+        outputs: [{ path: 'dist', mediaType: 'application/javascript', digestAlgorithm: 'sha256' }] };
+    const runtime: DevelopmentRuntime = { schemaVersion: 'treeseed.development-runtime/v2',
+        project: { id: 'specimen', repository: 'example/specimen' }, defaults: { restoreOnFailure: true }, targets: [target] };
+    writeFileSync(manifest, JSON.stringify({ development: runtime }));
+    writeFileSync(resolve(root, 'package.json'), '{"name":"@test/specimen"}');
+    mkdirSync(resolve(root, 'dist')); writeFileSync(resolve(root, 'dist/.complete'), '{"completedAt":"2026-10-08T00:00:00Z"}');
+    writeFileSync(resolve(root, 'dist/candidate.js'), 'export const specimen = true;\n');
+    const state: Parameters<typeof startPackageSynchronizer>[0] & { manifest: string; candidates: string[] } = {
+        sessionId, manifest, processes: {}, overlays: [], candidates: [] };
+    const directory = resolve(root, 'treeseed/development'), snapshot = resolve(directory, sessionId, 'session.json');
+    mkdirSync(resolve(root, 'treeseed'), { mode: 0o700 }); mkdirSync(directory, { mode: 0o700 });
+    const save = () => { mkdirSync(resolve(directory, sessionId), { recursive: true, mode: 0o700 });
+        for (const path of [resolve(directory, 'current.json'), snapshot]) writeFileSync(path, JSON.stringify(state)); };
+    const calls: string[] = [], output: string[] = [];
+    const record = { session: { sessionId, status: 'active', repositories: [{ projectId: 'specimen', worktree: root }] }, runtimes: [runtime] };
+    const context: CommandContext = { cwd: root, env, interactiveUi: false, outputFormat: 'json', write: value => output.push(value),
+        hostInvoke: async request => { calls.push(request.handlerId);
+            if (['local.dev.session.refresh', 'local.dev.status', 'local.dev.use'].includes(request.handlerId)) return record;
+            throw new Error(`Unexpected package release operation ${request.handlerId}`); } };
+    return { root, sessionId, env, state, runtime, target, snapshot, save, calls, output,
+        release: () => runCommandLine(['dev', 'use', 'specimen.package=released', '--session', sessionId, '--json'], context),
+        close: async () => { await stopProcess(state, 'overlay-sync.specimen.package');
+            rmSync(root, { recursive: true, force: true }); assert.equal(existsSync(root), false); } };
+}
+
+test('package release drops only stale selected synchronizer custody without signaling an unowned process', async () => {
+    const f = packageReleaseFixture();
+    try {
+        const unowned = { pid: process.pid, identity: 'not-the-current-process', projectId: 'specimen', targetId: 'package', log: resolve(f.root, 'unused.log') };
+        const unrelated = { ...unowned, projectId: 'unrelated' };
+        f.state.processes = { 'overlay-sync.specimen.package': unowned, 'unrelated.worker': unrelated }; f.save();
+        assert.equal(await f.release(), 0, f.output.join(''));
+        const saved: typeof f.state = JSON.parse(readFileSync(f.snapshot, 'utf8'));
+        assert.deepEqual(saved.processes, { 'unrelated.worker': unrelated });
+        assert.doesNotThrow(() => process.kill(process.pid, 0));
+        assert.equal(f.calls.some(call => call === 'local.dev.container'), false);
+    } finally { await f.close(); }
+});
+
+test('native public package release stops its owned synchronizer before removing generations and retains exact replay', async () => {
+    const f = packageReleaseFixture();
+    try {
+        const overlay = startPackageSynchronizer(f.state, f.runtime, f.target, f.root, f.env);
+        await waitForPackageOverlay(f.target, f.root, overlay);
+        const entry = f.state.processes['overlay-sync.specimen.package']!;
+        f.state.overlays = [{ projectId: 'specimen', packageName: '@test/specimen', link: resolve(f.root, 'unused-consumer'), backup: null, overlayRoot: overlay }];
+        f.save(); const bytes = readFileSync(resolve(f.root, 'dist/candidate.js'));
+        assert.equal(await f.release(), 0, f.output.join(''));
+        assert.throws(() => process.kill(entry.pid, 0), { code: 'ESRCH' });
+        const saved: typeof f.state = JSON.parse(readFileSync(f.snapshot, 'utf8'));
+        assert.deepEqual(saved.processes, {}); assert.deepEqual(saved.overlays, []); assert.equal(existsSync(overlay), false);
+        writeFileSync(resolve(f.root, 'dist/.complete'), '{"completedAt":"2026-10-08T00:00:01Z"}');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        assert.equal(existsSync(overlay), false); assert.deepEqual(readFileSync(resolve(f.root, 'dist/candidate.js')), bytes);
+        assert.equal(await f.release(), 0, f.output.join(''));
+        assert.deepEqual(JSON.parse(readFileSync(f.snapshot, 'utf8')), saved);
+    } finally { await f.close(); }
 });

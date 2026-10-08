@@ -761,3 +761,13 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/recovery/overlay-readoption.test.ts
     testName: native selected overlay restoration preserves foreign duplicate links backups and records through exact replay
+  cli.golden.execution-package-release-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/lifecycle-entrypoints.test.ts
+    testName: package release drops only stale selected synchronizer custody without signaling an unowned process
+  cli.golden.execution-package-release-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/development/lifecycle-entrypoints.test.ts
+    testName: native public package release stops its owned synchronizer before removing generations and retains exact replay
