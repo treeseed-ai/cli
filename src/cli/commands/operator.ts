@@ -184,6 +184,9 @@ export async function runOperator(invocation: ParsedInvocation, context: Command
 	// current TreeDX and graph state. Invoke that explicit plan contract instead
 	// of returning the generic client-side mutation preview.
 	const serverSidePlan = invocation.options.plan === true && operation.descriptor.operationId === 'execution.reconcile';
+	const bodyValidation = operation.schema.body.safeParse(input.body);
+	if (!bodyValidation.success) throw Object.assign(new Error(bodyValidation.error.issues
+		.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(' ')), { category: 'invalid_input', code: 'command_body_invalid' });
 	if (invocation.options.plan === true && !serverSidePlan) return { operationId: operation.descriptor.operationId, input, mutation: false };
 	if (context.operationInvoke) return context.operationInvoke(operation.descriptor.operationId, input);
 	const { client, profile } = await createControlPlaneClient(invocation, context, operation.descriptor.authentication !== 'anonymous');
