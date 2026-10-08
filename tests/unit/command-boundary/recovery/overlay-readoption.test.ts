@@ -147,6 +147,12 @@ test('native exact-link re-adoption reconciles an observed regular release backu
 		f.install();
 		const owned: Parameters<typeof restoreOverlays>[0]['overlays'] = structuredClone(f.state.overlays);
 		const bytes = owned.map(item => readFileSync(resolve(item.backup!, 'original')));
+		const first = owned[0]!, invalid = Buffer.from('not a release directory');
+		rmSync(first.backup!, { recursive: true }); writeFileSync(first.backup!, invalid);
+		const held = structuredClone(f.state), link = readlinkSync(first.link);
+		assert.throws(f.install, /backup is not a release directory/u);
+		assert.deepEqual(f.state, held); assert.equal(readlinkSync(first.link), link); assert.deepEqual(readFileSync(first.backup!), invalid);
+		unlinkSync(first.backup!); mkdirSync(first.backup!); writeFileSync(resolve(first.backup!, 'original'), bytes[0]!);
 		const retained = { projectId: 'unrelated', packageName: '@test/unrelated', link: resolve(f.root, 'retained'),
 			backup: null, overlayRoot: resolve(f.root, 'retained-overlay') };
 		f.state.overlays = [{ ...owned[0]!, backup: null }, ...owned, retained, ...structuredClone(owned)];
