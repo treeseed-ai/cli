@@ -143,7 +143,7 @@ test('package release drops only stale selected synchronizer custody without sig
     try {
         const unowned = { pid: process.pid, identity: 'not-the-current-process', projectId: 'specimen', targetId: 'package', log: resolve(f.root, 'unused.log') };
         const unrelated = { ...unowned, projectId: 'unrelated' };
-        f.state.processes = { 'overlay-sync.specimen.package': unowned, 'unrelated.worker': unrelated }; f.save();
+        f.state.processes = { 'specimen.package': unowned, 'overlay-sync.specimen.package': unowned, 'unrelated.worker': unrelated }; f.save();
         assert.equal(await f.release(), 0, f.output.join(''));
         const saved: typeof f.state = JSON.parse(readFileSync(f.snapshot, 'utf8'));
         assert.deepEqual(saved.processes, { 'unrelated.worker': unrelated });
