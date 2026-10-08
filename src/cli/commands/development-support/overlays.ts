@@ -26,7 +26,15 @@ export async function stopProcesses(state: OverlaySessionState) {
 
 export function restoreOverlays(state: OverlaySessionState, projectId?: string, removeGenerations = true) {
 	const retained: OverlaySessionState['overlays'] = [];
+	const unique = new Map<string, OverlaySessionState['overlays'][number]>();
 	for (const overlay of state.overlays ?? []) {
+		const previous = unique.get(overlay.link);
+		if (previous && (['projectId', 'packageName', 'backup', 'overlayRoot'] as const)
+			.some(key => previous[key] !== overlay[key]))
+			throw new Error(`Conflicting development overlay custody for ${overlay.link}.`);
+		if (!previous) unique.set(overlay.link, overlay);
+	}
+	for (const overlay of unique.values()) {
 		if (projectId && overlay.projectId !== projectId) continue;
 		if (overlay.backup) {
 			try {
@@ -34,7 +42,7 @@ export function restoreOverlays(state: OverlaySessionState, projectId?: string, 
 			} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
 		}
 	}
-	for (const overlay of state.overlays ?? []) {
+	for (const overlay of unique.values()) {
 		if (projectId && overlay.projectId !== projectId) { retained.push(overlay); continue; }
 		if (existsSync(overlay.link) || (() => { try { lstatSync(overlay.link); return true; } catch { return false; } })()) rmSync(overlay.link, { recursive: true, force: true });
 		if (overlay.backup && existsSync(overlay.backup)) renameSync(overlay.backup, overlay.link);

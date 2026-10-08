@@ -441,3 +441,9 @@ workflow:
   - id: provider-scoped-freeze-generation-native
     action: { verifier: cli.golden.provider-scoped-freeze-generation-native }
     expect: { status: passed }
+  - id: execution-overlay-conflict-unit
+    action: { verifier: cli.golden.execution-overlay-conflict-unit }
+    expect: { status: passed }
+  - id: execution-overlay-restore-native
+    action: { verifier: cli.golden.execution-overlay-restore-native }
+    expect: { status: passed }
