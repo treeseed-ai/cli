@@ -6919,6 +6919,13 @@
           "segment": "list",
           "description": "List the selected resource.",
           "kind": "read",
+          "options": [
+            {
+              "name": "--workday",
+              "description": "Restrict assignments to one exact workday.",
+              "type": "string"
+            }
+          ],
           "resultSchemaId": "treeseed.command.list/v1",
           "execution": {
             "kind": "operation",
@@ -6930,6 +6937,14 @@
                 "source": "context",
                 "name": "team",
                 "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "query",
+                "field": "workdayId",
+                "source": "option",
+                "name": "workday",
+                "required": false,
                 "transform": "identity"
               },
               {

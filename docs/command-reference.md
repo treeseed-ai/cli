@@ -2487,6 +2487,7 @@ Control-plane operation: `assignments.list`.
 - `--limit <value>`: Page size.
 - `--cursor <value>`: Opaque page cursor.
 - `--json`: Emit the stable JSON envelope.
+- `--workday <value>`: Restrict assignments to one exact workday.
 
 ### trsd assignments show <assignment>
 

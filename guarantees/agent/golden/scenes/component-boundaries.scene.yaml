@@ -465,3 +465,9 @@ workflow:
   - id: execution-package-release-native
     action: { verifier: cli.golden.execution-package-release-native }
     expect: { status: passed }
+  - id: assignment-workday-unit
+    action: { verifier: cli.golden.assignment-workday-unit }
+    expect: { status: passed }
+  - id: assignment-workday-native
+    action: { verifier: cli.golden.assignment-workday-native }
+    expect: { status: passed }
