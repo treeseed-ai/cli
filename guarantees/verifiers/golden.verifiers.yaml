@@ -741,3 +741,13 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/recovery/overlay-readoption.test.ts
     testName: native duplicate overlay restoration preserves exact release bytes and unrelated ownership through replay
+  cli.golden.execution-overlay-readoption-conflict-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/recovery/overlay-readoption.test.ts
+    testName: re-adoption rejects contradictory recorded identity before changing any native consumer or custody
+  cli.golden.execution-overlay-readoption-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/recovery/overlay-readoption.test.ts
+    testName: native exact-link re-adoption reconciles an observed regular release backup once and preserves release bytes through restoration
