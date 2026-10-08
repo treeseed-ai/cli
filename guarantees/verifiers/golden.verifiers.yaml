@@ -771,3 +771,13 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/development/lifecycle-entrypoints.test.ts
     testName: native public package release stops its owned synchronizer before removing generations and retains exact replay
+  cli.golden.assignment-workday-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/assignment-pages.test.ts
+    testName: "transports optional exact assignment workday and cursor without broadening or inventing read authority"
+  cli.golden.assignment-workday-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/observation/assignment-pages.test.ts
+    testName: "native CLI retains exact workday filter through both pages denial and unchanged retry"
