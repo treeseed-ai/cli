@@ -28,6 +28,10 @@ export function restoreOverlays(state: OverlaySessionState, projectId?: string, 
 	const retained: OverlaySessionState['overlays'] = [];
 	const unique = new Map<string, OverlaySessionState['overlays'][number]>();
 	for (const overlay of state.overlays ?? []) {
+		if (projectId && overlay.projectId !== projectId && !state.overlays.some(selected =>
+			selected.projectId === projectId && selected.link === overlay.link)) {
+			retained.push(overlay); continue;
+		}
 		const previous = unique.get(overlay.link);
 		if (previous && (['projectId', 'packageName', 'backup', 'overlayRoot'] as const)
 			.some(key => previous[key] !== overlay[key]))
