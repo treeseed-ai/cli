@@ -453,3 +453,9 @@ workflow:
   - id: execution-overlay-readoption-native
     action: { verifier: cli.golden.execution-overlay-readoption-native }
     expect: { status: passed }
+  - id: execution-overlay-scoped-restore-unit
+    action: { verifier: cli.golden.execution-overlay-scoped-restore-unit }
+    expect: { status: passed }
+  - id: execution-overlay-scoped-restore-native
+    action: { verifier: cli.golden.execution-overlay-scoped-restore-native }
+    expect: { status: passed }

@@ -166,3 +166,45 @@ test('native exact-link re-adoption reconciles an observed regular release backu
 		}
 	} finally { rmSync(f.root, { recursive: true, force: true }); assert.equal(existsSync(f.root), false); }
 });
+
+test('selected overlay restoration leaves unrelated contradictory custody unmodified while full restoration still denies', () => {
+	const unrelated = { projectId: 'unrelated', packageName: '@test/unrelated', link: '/unused/unrelated-link',
+		backup: null, overlayRoot: '/unused/unrelated-overlay' };
+	const state: Parameters<typeof restoreOverlays>[0] = { sessionId: 'dev-test', processes: {},
+		overlays: [unrelated, { ...unrelated, backup: '/unused/unrelated-release' }] };
+	const held = structuredClone(state);
+	assert.doesNotThrow(() => restoreOverlays(state, 'source', false));
+	assert.deepEqual(state, held);
+	assert.throws(() => restoreOverlays(state, undefined, false), /Conflicting development overlay custody/u);
+	assert.deepEqual(state, held);
+});
+
+test('native selected overlay restoration preserves foreign duplicate links backups and records through exact replay', () => {
+	const f = fixture();
+	try {
+		f.install();
+		const owned: Parameters<typeof restoreOverlays>[0]['overlays'] = structuredClone(f.state.overlays);
+		const releases = owned.map(item => readFileSync(resolve(item.backup!, 'original')));
+		const link = resolve(f.root, 'unrelated-link'), backup = resolve(f.root, 'unrelated-release');
+		mkdirSync(backup); const bytes = Buffer.from('retained unrelated release\n');
+		writeFileSync(resolve(backup, 'original'), bytes); symlinkSync(f.overlay, link);
+		const retained = [{ projectId: 'unrelated', packageName: '@test/unrelated', link, backup: null,
+			overlayRoot: f.overlay }, { projectId: 'unrelated', packageName: '@test/unrelated', link, backup,
+			overlayRoot: f.overlay }];
+		f.state.overlays = [...owned, ...retained];
+		for (let replay = 0; replay < 2; replay++) {
+			restoreOverlays(f.state, 'source', false);
+			assert.deepEqual(f.state.overlays, retained);
+			for (const [index, item] of owned.entries()) {
+				assert.deepEqual(readFileSync(resolve(item.link, 'original')), releases[index]);
+				assert.equal(existsSync(item.backup!), false);
+			}
+			assert.equal(readlinkSync(link), f.overlay);
+			assert.deepEqual(readFileSync(resolve(backup, 'original')), bytes);
+		}
+		const held = structuredClone(f.state);
+		assert.throws(() => restoreOverlays(f.state, undefined, false), /Conflicting development overlay custody/u);
+		assert.deepEqual(f.state, held); assert.equal(readlinkSync(link), f.overlay);
+		assert.deepEqual(readFileSync(resolve(backup, 'original')), bytes);
+	} finally { rmSync(f.root, { recursive: true, force: true }); assert.equal(existsSync(f.root), false); }
+});

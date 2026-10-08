@@ -751,3 +751,13 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/recovery/overlay-readoption.test.ts
     testName: native exact-link re-adoption reconciles an observed regular release backup once and preserves release bytes through restoration
+  cli.golden.execution-overlay-scoped-restore-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/recovery/overlay-readoption.test.ts
+    testName: selected overlay restoration leaves unrelated contradictory custody unmodified while full restoration still denies
+  cli.golden.execution-overlay-scoped-restore-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/recovery/overlay-readoption.test.ts
+    testName: native selected overlay restoration preserves foreign duplicate links backups and records through exact replay
