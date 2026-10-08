@@ -7177,6 +7177,81 @@
         },
         {
           "nodeType": "leaf",
+          "segment": "recover",
+          "description": "Recover the selected resource.",
+          "kind": "mutation",
+          "arguments": [
+            {
+              "name": "assignment",
+              "description": "assignment identity or path.",
+              "required": true
+            }
+          ],
+          "options": [
+            {
+              "name": "--plan",
+              "description": "Return the exact proposed outcome without mutation.",
+              "type": "boolean"
+            },
+            {
+              "name": "--state-version",
+              "description": "Exact expired assignment state version.",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "--reason",
+              "description": "Why actual usage remains unresolved.",
+              "type": "string",
+              "required": true
+            }
+          ],
+          "authorization": {
+            "capability": "command.recover",
+            "confirmation": "destructive"
+          },
+          "resultSchemaId": "treeseed.command.recover/v1",
+          "execution": {
+            "kind": "operation",
+            "operationId": "assignments.recover",
+            "input": [
+              {
+                "target": "path",
+                "field": "teamId",
+                "source": "context",
+                "name": "team",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "path",
+                "field": "assignmentId",
+                "source": "argument",
+                "name": "assignment",
+                "required": true,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "expectedStateVersion",
+                "source": "option",
+                "name": "stateVersion",
+                "required": true,
+                "transform": "integer"
+              },
+              {
+                "target": "body",
+                "field": "reason",
+                "source": "option",
+                "name": "reason",
+                "required": true,
+                "transform": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "nodeType": "leaf",
           "segment": "artifacts",
           "description": "Artifacts the selected resource.",
           "kind": "read",

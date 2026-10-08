@@ -2550,6 +2550,22 @@ Control-plane operation: `assignments.cancel`.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
 
+### trsd assignments recover <assignment>
+
+Recover the selected resource.
+
+Operation: mutation. Result schema: `treeseed.command.recover/v1`.
+Control-plane operation: `assignments.recover`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--team <value>`: Team id or slug.
+- `--reason <value>`: Why actual usage remains unresolved.
+- `--yes`: Confirm authorized automation.
+- `--json`: Emit the stable JSON envelope.
+- `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
+- `--plan`: Return the exact proposed outcome without mutation.
+- `--state-version <value>`: Exact expired assignment state version.
+
 ### trsd assignments artifacts <assignment>
 
 Artifacts the selected resource.
