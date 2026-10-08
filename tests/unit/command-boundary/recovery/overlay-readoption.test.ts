@@ -69,3 +69,55 @@ test('restore refuses a symlinked backup without removing the active overlay', (
 		assert.equal(existsSync(item.link), true);
 	} finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+
+test('duplicate overlay ownership conflicts deny restoration before changing recorded custody', () => {
+	const root = mkdtempSync(resolve(tmpdir(), 'treeseed-overlay-conflict-'));
+	try {
+		const original = { projectId: 'source', packageName: '@test/source', link: resolve(root, 'link'),
+			backup: resolve(root, 'release'), overlayRoot: resolve(root, 'overlay') };
+		const conflicts = [
+			{ projectId: 'foreign' }, { packageName: '@test/foreign' },
+			{ backup: null }, { backup: resolve(root, 'foreign-release') },
+			{ overlayRoot: resolve(root, 'foreign-overlay') },
+		];
+		const observations = conflicts.map(conflict => {
+			const state = { sessionId: 'dev-test', processes: {}, overlays: [original, { ...original, ...conflict }] };
+			const held = structuredClone(state);
+			let failure: unknown;
+			try { restoreOverlays(state, 'source', false); } catch (error) { failure = error; }
+			return { state, held, failure };
+		});
+		for (const { state, held, failure } of observations) {
+			assert.ok(failure instanceof Error && /Conflicting development overlay custody/u.test(failure.message));
+			assert.deepEqual(state, held);
+		}
+	} finally { rmSync(root, { recursive: true, force: true }); assert.equal(existsSync(root), false); }
+});
+
+test('native duplicate overlay restoration preserves exact release bytes and unrelated ownership through replay', () => {
+	const f = fixture();
+	try {
+		const releases = new Map(f.consumers.map(item => [item.worktree,
+			readFileSync(resolve(item.worktree, 'node_modules/@test/source/original'))]));
+		f.install();
+		const owned: Parameters<typeof restoreOverlays>[0]['overlays'] = structuredClone(f.state.overlays);
+		const retained = { projectId: 'unrelated', packageName: '@test/unrelated',
+			link: resolve(f.root, 'unrelated/link'), backup: null, overlayRoot: resolve(f.root, 'unrelated/overlay') };
+		mkdirSync(retained.link, { recursive: true }); writeFileSync(resolve(retained.link, 'held'), 'unrelated');
+		const unrelated = readFileSync(resolve(retained.link, 'held'));
+		f.state.overlays = [...owned, retained, ...structuredClone(owned), ...structuredClone(owned)];
+		restoreOverlays(f.state, 'source', false);
+		for (const item of f.consumers) {
+			assert.deepEqual(readFileSync(resolve(item.worktree, 'node_modules/@test/source/original')), releases.get(item.worktree));
+		}
+		for (const item of owned) assert.equal(existsSync(item.backup!), false);
+		assert.deepEqual(f.state.overlays, [retained]);
+		assert.deepEqual(readFileSync(resolve(retained.link, 'held')), unrelated);
+		restoreOverlays(f.state, 'source', false);
+		for (const item of f.consumers) {
+			assert.deepEqual(readFileSync(resolve(item.worktree, 'node_modules/@test/source/original')), releases.get(item.worktree));
+		}
+		assert.deepEqual(f.state.overlays, [retained]);
+		assert.deepEqual(readFileSync(resolve(retained.link, 'held')), unrelated);
+	} finally { rmSync(f.root, { recursive: true, force: true }); assert.equal(existsSync(f.root), false); }
+});
