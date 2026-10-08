@@ -471,3 +471,12 @@ workflow:
   - id: assignment-workday-native
     action: { verifier: cli.golden.assignment-workday-native }
     expect: { status: passed }
+  - id: operator-unresolved-recovery-unit
+    action: { verifier: cli.golden.operator-unresolved-recovery-unit }
+    expect: { status: passed }
+  - id: operator-unresolved-recovery-denial-unit
+    action: { verifier: cli.golden.operator-unresolved-recovery-denial-unit }
+    expect: { status: passed }
+  - id: operator-unresolved-recovery-native
+    action: { verifier: cli.golden.operator-unresolved-recovery-native }
+    expect: { status: passed }
