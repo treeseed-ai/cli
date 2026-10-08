@@ -165,6 +165,7 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 				await stopProcesses({ ...state, processes: { [`${selection.projectId}.${selection.targetId}`]: processState } });
 				delete state.processes[`${selection.projectId}.${selection.targetId}`];
 			}
+			if (target.kind === 'package-watch') await stopProcess(state, `overlay-sync.${selection.projectId}.${selection.targetId}`);
 			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
 			else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 			restoreOverlays(state, selection.projectId);
