@@ -781,3 +781,18 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/observation/assignment-pages.test.ts
     testName: "native CLI retains exact workday filter through both pages denial and unchanged retry"
+  cli.golden.operator-unresolved-recovery-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/assignments/recovery.test.ts
+    testName: "generated recovery transports only exact assignment version and reason without creating measured usage authority"
+  cli.golden.operator-unresolved-recovery-denial-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/assignments/recovery.test.ts
+    testName: "generated recovery denies missing malformed versions reasons and every supplied measurement selector before invocation"
+  cli.golden.operator-unresolved-recovery-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/assignments/recovery.test.ts
+    testName: "packaged native recovery retains exact confirmation denial version and unresolved response through immutable retry without usage writes"
