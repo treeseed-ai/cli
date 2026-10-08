@@ -88,8 +88,14 @@ export function installPackageOverlay(state: OverlaySessionState, record: { sess
 			} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
 		}
 		try {
-			if (lstatSync(backup).isSymbolicLink()) throw new Error(`Development overlay backup is not a release directory: ${backup}.`);
+			if (!lstatSync(backup).isDirectory()) throw new Error(`Development overlay backup is not a release directory: ${backup}.`);
 		} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+		for (const previous of state.overlays.filter(item => item.link === link)) {
+			if (previous.projectId !== runtime.project.id || previous.packageName !== packageName
+				|| resolve(previous.overlayRoot) !== resolve(overlayRoot)
+				|| (previous.backup !== null && previous.backup !== backup))
+				throw new Error(`Conflicting development overlay custody for ${link}.`);
+		}
 		if (existsSync(backup) && !owned && !repair) throw new Error(`Stale development overlay backup blocks ${link}.`);
 		planned.push({ link, backup, owned, repair });
 	}
@@ -111,6 +117,16 @@ export function installPackageOverlay(state: OverlaySessionState, record: { sess
 		try { lstatSync(link); renameSync(link, backup); retained = backup; } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
 		symlinkSync(relativeOverlayTarget(link, overlayRoot), link, 'dir'); state.overlays.push({ projectId: runtime.project.id, packageName, link, backup: retained, overlayRoot });
 	}
+	// Re-adoption derives backup custody from the exact owned link and its
+	// original regular backup, never from the order of stale duplicate records.
+	const refreshed = new Map(planned.map(({ link, backup }) => [link,
+		{ projectId: runtime.project.id, packageName, link, backup: existsSync(backup) ? backup : null, overlayRoot }]));
+	state.overlays = state.overlays.flatMap(previous => {
+		if (!planned.some(item => item.link === previous.link)) return [previous];
+		const current = refreshed.get(previous.link); refreshed.delete(previous.link);
+		return current ? [current] : [];
+	});
+	state.overlays.push(...refreshed.values());
 }
 
 export function relativeOverlayTarget(link: string, overlayRoot: string) {
