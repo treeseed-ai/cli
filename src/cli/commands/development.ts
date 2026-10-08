@@ -160,11 +160,8 @@ async function useTargets(invocation: Pick<ParsedInvocation, 'arguments' | 'opti
 		if (!repository) throw new Error(`No worktree is registered for ${selection.projectId}.`);
 		if (selection.mode === 'released') {
 			if (usesManagedContainer(target)) await invoke(context, 'local.dev.use', {sessionId,...selection});
-			const processState = state.processes[`${selection.projectId}.${selection.targetId}`];
-			if (processState) {
-				await stopProcesses({ ...state, processes: { [`${selection.projectId}.${selection.targetId}`]: processState } });
-				delete state.processes[`${selection.projectId}.${selection.targetId}`];
-			}
+			await stopProcess(state, `${selection.projectId}.${selection.targetId}`);
+			if (target.kind === 'package-watch') await stopProcess(state, `overlay-sync.${selection.projectId}.${selection.targetId}`);
 			if (usesManagedContainer(target)) await containerOperation(context, sessionId, runtime, target, 'stop');
 			else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, repository.worktree, selection.mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'session' });
 			restoreOverlays(state, selection.projectId);
