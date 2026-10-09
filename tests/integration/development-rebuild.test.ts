@@ -17,7 +17,7 @@ test('native restart refreshes changed caller recipe and retains one exact build
   assert.equal(await f.invoke('restart'),1,f.output.join(''));
   assert.deepEqual(f.managerRuntimes(),[document.development]);
   assert.deepEqual(f.calls.slice(0,2),['local.dev.session.refresh','local.dev.status']);
-  assert.deepEqual(f.builds(),['1']);assert.deepEqual(f.selectedBytes,[]);assert.deepEqual(f.uses,[]);
+  assert.deepEqual(f.builds(),['1']);assert.deepEqual(f.selectedBytes,[]);assert.deepEqual([...f.uses],[]);
   const failed=f.output.join('');assert.match(failed,/failed/i);
   assert.equal(f.mode(),'candidate');assert.equal(f.calls.includes('local.dev.container:stop'),false);
   assert.equal(await f.invoke('restart'),0,f.output.join(''));

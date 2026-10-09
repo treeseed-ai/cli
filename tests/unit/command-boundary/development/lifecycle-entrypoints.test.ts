@@ -132,8 +132,8 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
             operations: { start: { command: 'manager-runtime' } }, dependencies: [], endpoints: [{ id: 'http', protocol: 'http', port: 4000 }], ready: { kind: 'process', graceSeconds: 0 } }] }],
     };
     let started = false, starts = 0;
-    const context = {
-        cwd: root, env,
+    const context: CommandContext = {
+        cwd: root, env, interactiveUi: false, outputFormat: 'json', write() {},
         hostInvoke: async (request: { handlerId: string; options: { payload?: unknown } }) => {
             const payload = request.options.payload ? JSON.parse(String(request.options.payload)) : {};
             if (request.handlerId === 'local.dev.status') return payload.all ? { sessions: [record] } : record;
@@ -157,8 +157,10 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
             if (request.handlerId === 'local.host.start') return { state: 'running', changed: true };
             throw new Error(`Unexpected operation ${request.handlerId}`);
         },
-    } as CommandContext;
-    const invocation = { command: { name: 'dev use' }, arguments: ['api.operations-runner=candidate'], options: { session: sessionId } } as ParsedInvocation;
+    };
+    const selectedCommand = resolveCommand(['dev', 'use', 'api.operations-runner=candidate', '--session', sessionId]);
+    assert.ok(selectedCommand);
+    const invocation = parseInvocation(selectedCommand.command, selectedCommand.rest);
     try {
         await Promise.all([resumeDevelopmentSession(sessionId, context), runDevelopment(invocation, context)]);
         assert.equal(starts, 1);
