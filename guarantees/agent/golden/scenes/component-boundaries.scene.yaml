@@ -3,6 +3,15 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: restart-current-custody-unit
+    action: { verifier: cli.golden.restart-current-custody-unit }
+    expect: { status: passed }
+  - id: restart-refresh-denial-unit
+    action: { verifier: cli.golden.restart-refresh-denial-unit }
+    expect: { status: passed }
+  - id: restart-current-custody-native
+    action: { verifier: cli.golden.restart-current-custody-native }
+    expect: { status: passed }
   - id: execution-diagnostics-read-unit
     action: { verifier: cli.golden.execution-diagnostics-read-unit }
     expect: { status: passed }

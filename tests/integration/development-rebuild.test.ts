@@ -5,6 +5,30 @@ import {resolve} from 'node:path';
 import type {DevelopmentRuntime} from '@treeseed/sdk/development';
 import {rebuildFixture} from '../support/development-rebuild.ts';
 
+test('native restart refreshes changed caller recipe and retains one exact build and endpoint through retry', async()=>{
+ const f=await rebuildFixture();try{
+  const file=resolve(f.root,'treeseed.package.yaml');
+  const document=JSON.parse(readFileSync(file,'utf8')) as {development:DevelopmentRuntime};
+  const target=document.development.targets[0]!;
+  target.endpoints=[{id:'http',protocol:'http',port:4321,visibility:'host',canonicalAlias:'specimen.treeseed.localhost',authentication:'application'}];
+  target.operations.build!.environment={FAIL_AT:'1'};
+  writeFileSync(file,JSON.stringify(document));const source=readFileSync(file);
+  const build=readFileSync(resolve(f.root,'scripts/build.ts'));
+  assert.equal(await f.invoke('restart'),1,f.output.join(''));
+  assert.deepEqual(f.managerRuntimes(),[document.development]);
+  assert.deepEqual(f.calls.slice(0,2),['local.dev.session.refresh','local.dev.status']);
+  assert.deepEqual(f.builds(),['1']);assert.deepEqual(f.selectedBytes,[]);assert.deepEqual(f.uses,[]);
+  const failed=f.output.join('');assert.match(failed,/failed/i);
+  assert.equal(f.mode(),'candidate');assert.equal(f.calls.includes('local.dev.container:stop'),false);
+  assert.equal(await f.invoke('restart'),0,f.output.join(''));
+  assert.deepEqual(f.builds(),['1','2']);assert.deepEqual(f.selectedBytes,['built-2']);
+  assert.equal(f.uses.length,1);assert.equal(f.uses[0]!.port,4321);
+  assert.equal(readFileSync(resolve(f.root,'candidate.bin'),'utf8'),'built-2');
+  assert.equal(f.output.join('').startsWith(failed),true);
+  assert.deepEqual(readFileSync(file),source);assert.deepEqual(readFileSync(resolve(f.root,'scripts/build.ts')),build);
+ }finally{f.close();}
+});
+
 // Real public CLI, source/Git custody, native caller builds and selected file
 // readback. Manager replies remain controlled inputs: not physical Docker or
 // live provider claim-retention proof.
