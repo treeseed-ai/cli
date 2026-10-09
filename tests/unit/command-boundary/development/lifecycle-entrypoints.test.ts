@@ -10,7 +10,38 @@ import { parseInvocation } from '../../../../src/cli/parser.ts';
 import { resolveCommand } from '../../../../src/cli/registry.ts';
 import type { DevelopmentRuntime, DevelopmentTarget } from '@treeseed/sdk/development';
 import { startPackageSynchronizer, stopProcess, waitForPackageOverlay } from '../../../../src/cli/commands/development-support/overlays.ts';
-import { rebuildTarget } from '../../../support/development-rebuild.ts';
+import { rebuildFixture, rebuildTarget } from '../../../support/development-rebuild.ts';
+
+test('managed rebuild and restart delegate one owning handoff without selecting or starting released code', async () => {
+    for (const command of ['rebuild', 'restart']) {
+        const f = await rebuildFixture({ managerOwned: true });
+        try {
+            assert.equal(await f.invoke(command), 0, f.output.join(''));
+            assert.equal(f.mode(), 'candidate');
+            assert.deepEqual(f.selections, ['candidate']);
+            assert.deepEqual(f.selectedBytes, ['manager-owned']);
+            assert.deepEqual(f.builds(), []);
+            assert.equal(f.calls.filter(call => call === 'local.dev.container:start').length, 1);
+            assert.equal(f.calls.includes('local.dev.container:stop'), false);
+        } finally { f.close(); }
+    }
+});
+
+test('managed handoff denial preserves the original selection without release fallback or a passing retry', async () => {
+    for (const command of ['rebuild', 'restart']) {
+        const f = await rebuildFixture({ managerOwned: true, rejectStart: true });
+        try {
+            assert.equal(await f.invoke(command), 1);
+            assert.equal(f.mode(), 'candidate');
+            assert.deepEqual(f.selections, []);
+            assert.deepEqual(f.selectedBytes, []);
+            assert.deepEqual(f.builds(), []);
+            assert.equal(f.calls.filter(call => call === 'local.dev.container:start').length, 1);
+            assert.equal(f.calls.includes('local.dev.container:stop'), false);
+            assert.match(f.output.join(''), /owning handoff refuses active custody/);
+        } finally { f.close(); }
+    }
+});
 
 test('development freeze and verify planning returns exact nonmutating actions without manager dispatch', async () => {
     const root = mkdtempSync(resolve(tmpdir(), 'provider-plan-unit-'));
