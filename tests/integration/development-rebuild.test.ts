@@ -36,7 +36,7 @@ test('native development rebuild preserves selection and avoids stop after a fai
  const f=await rebuildFixture({failAt:1});try{assert.equal(await f.invoke(),1);assert.deepEqual(f.builds(),['1']);assert.equal(f.mode(),'candidate');assert.equal(f.calls.includes('local.dev.container:stop'),false);assert.deepEqual(f.selectedBytes,[]);}finally{f.close();}
 });
 test('native development rebuild runs once and preserves selection when stop is refused',async()=>{
- const f=await rebuildFixture({rejectStop:true});try{assert.equal(await f.invoke(),1);assert.deepEqual(f.builds(),['1']);assert.equal(f.mode(),'candidate');assert.deepEqual(f.selectedBytes,[]);assert.equal(f.calls.filter(x=>x==='local.dev.container:stop').length,1);}finally{f.close();}
+ const f=await rebuildFixture({rejectStop:true});try{assert.equal(await f.invoke(),1);assert.deepEqual(f.builds(),['1']);assert.equal(f.mode(),'candidate');assert.deepEqual(f.selectedBytes,[]);assert.equal(f.calls.filter(x=>x==='local.dev.container:start').length,1);assert.equal(f.calls.includes('local.dev.container:stop'),false);assert.deepEqual(f.selections,[]);}finally{f.close();}
 });
 test('native development rebuild plan neither builds nor refreshes manager state',async()=>{
  const f=await rebuildFixture();try{assert.equal(await f.invoke('rebuild',true),0,f.output.join(''));assert.deepEqual(f.builds(),[]);assert.deepEqual(f.calls,['local.dev.status']);assert.equal(f.mode(),'candidate');assert.deepEqual(f.selectedBytes,[]);}finally{f.close();}

@@ -33,6 +33,9 @@ export async function rebuildFixture(options:{managerOwned?:boolean;failAt?:numb
   if(input.handlerId==='local.dev.container'){
    if(payload.action==='stop'&&options.rejectStop)throw new Error('Fixture active claim refuses stop.');
    if(payload.action==='start'){
+    // The owning start boundary performs its drain/active-claim check before
+    // replacing a selection; refusal must not require an explicit release.
+    if(options.rejectStop)throw new Error('Fixture active claim refuses stop.');
     if(options.rejectStart)throw new Error('Fixture owning handoff refuses active custody.');
     selectedBytes.push(existsSync(resolve(root,'candidate.bin'))?readFileSync(resolve(root,'candidate.bin'),'utf8'):'manager-owned');
    }
