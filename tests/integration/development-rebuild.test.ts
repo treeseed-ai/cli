@@ -5,6 +5,27 @@ import {resolve} from 'node:path';
 import type {DevelopmentRuntime} from '@treeseed/sdk/development';
 import {rebuildFixture} from '../support/development-rebuild.ts';
 
+// Real public CLI, source/Git custody, native caller builds and selected file
+// readback. Manager replies remain controlled inputs: not physical Docker or
+// live provider claim-retention proof.
+test('native public rebuild and restart retain exact candidate output without transient released execution',async()=>{
+ const f=await rebuildFixture();try{
+  const source=readFileSync(resolve(f.root,'treeseed.package.yaml'));
+  const build=readFileSync(resolve(f.root,'scripts/build.ts'));
+  for(const [index,command] of ['rebuild','restart','rebuild'].entries()){
+   assert.equal(await f.invoke(command),0,f.output.join(''));
+   assert.deepEqual(f.builds(),Array.from({length:index+1},(_,n)=>String(n+1)));
+   assert.deepEqual(f.selectedBytes,Array.from({length:index+1},(_,n)=>`built-${n+1}`));
+   assert.equal(readFileSync(resolve(f.root,'candidate.bin'),'utf8'),`built-${index+1}`);
+   assert.equal(f.mode(),'candidate');assert.deepEqual(f.selections,Array(index+1).fill('candidate'));
+   assert.equal(f.calls.includes('local.dev.container:stop'),false);
+   assert.equal(f.calls.filter(call=>call==='local.dev.container:start').length,index+1);
+   assert.deepEqual(readFileSync(resolve(f.root,'treeseed.package.yaml')),source);
+   assert.deepEqual(readFileSync(resolve(f.root,'scripts/build.ts')),build);
+  }
+ }finally{f.close();}
+});
+
 test('native development rebuild executes its caller build once before selecting exact output',async()=>{
  const f=await rebuildFixture();try{assert.equal(await f.invoke(),0,f.output.join(''));assert.deepEqual(f.builds(),['1']);assert.deepEqual(f.selectedBytes,['built-1']);assert.equal(f.mode(),'candidate');}finally{f.close();}
 });
