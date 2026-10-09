@@ -12,6 +12,43 @@ import type { DevelopmentRuntime, DevelopmentTarget } from '@treeseed/sdk/develo
 import { startPackageSynchronizer, stopProcess, waitForPackageOverlay } from '../../../../src/cli/commands/development-support/overlays.ts';
 import { rebuildFixture, rebuildTarget } from '../../../support/development-rebuild.ts';
 
+test('restart refreshes current manager custody before handoff and omits direct host readiness for a managed endpoint', async () => {
+    const f = await rebuildFixture({ managerOwned: true });
+    try {
+        const file = resolve(f.root, 'treeseed.package.yaml');
+        const document = JSON.parse(readFileSync(file, 'utf8')) as { development: DevelopmentRuntime };
+        document.development.targets[0]!.endpoints = [{ id: 'http', protocol: 'http', port: 4000,
+            visibility: 'host', canonicalAlias: 'specimen.treeseed.localhost', authentication: 'application' }];
+        writeFileSync(file, JSON.stringify(document));
+        const before = readFileSync(file), stored = f.managerRuntimes();
+        assert.equal(await f.invoke('restart', true), 0, f.output.join(''));
+        assert.deepEqual(f.calls, ['local.dev.status']);
+        assert.deepEqual(f.managerRuntimes(), stored);
+        f.calls.length = 0;
+        assert.equal(await f.invoke('restart'), 0, f.output.join(''));
+        assert.deepEqual(f.calls.slice(0, 2), ['local.dev.session.refresh', 'local.dev.status']);
+        assert.deepEqual(f.managerRuntimes(), [document.development]);
+        assert.equal(Object.hasOwn(f.uses[0]!, 'port'), false);
+        assert.equal(f.mode(), 'candidate');
+        assert.deepEqual(f.selectedBytes, ['manager-owned']);
+        assert.deepEqual(f.builds(), []);
+        assert.deepEqual(readFileSync(file), before);
+    } finally { f.close(); }
+});
+
+test('refused restart refresh performs no build start release or route mutation', async () => {
+    const f = await rebuildFixture({ managerOwned: true, rejectRefresh: true });
+    try {
+        const before = f.managerRuntimes();
+        assert.equal(await f.invoke('restart'), 1, f.output.join(''));
+        assert.match(f.output.join(''), /refuses runtime refresh/);
+        assert.deepEqual(f.calls, ['local.dev.session.refresh']);
+        assert.deepEqual(f.managerRuntimes(), before);
+        assert.deepEqual(f.builds(), []); assert.deepEqual(f.selectedBytes, []);
+        assert.deepEqual(f.uses, []); assert.equal(f.mode(), 'candidate');
+    } finally { f.close(); }
+});
+
 test('managed rebuild and restart delegate one owning handoff without selecting or starting released code', async () => {
     for (const command of ['rebuild', 'restart']) {
         const f = await rebuildFixture({ managerOwned: true });
@@ -95,8 +132,8 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
             operations: { start: { command: 'manager-runtime' } }, dependencies: [], endpoints: [{ id: 'http', protocol: 'http', port: 4000 }], ready: { kind: 'process', graceSeconds: 0 } }] }],
     };
     let started = false, starts = 0;
-    const context = {
-        cwd: root, env,
+    const context: CommandContext = {
+        cwd: root, env, interactiveUi: false, outputFormat: 'json', write() {},
         hostInvoke: async (request: { handlerId: string; options: { payload?: unknown } }) => {
             const payload = request.options.payload ? JSON.parse(String(request.options.payload)) : {};
             if (request.handlerId === 'local.dev.status') return payload.all ? { sessions: [record] } : record;
@@ -120,8 +157,10 @@ test('boot resume and manual use re-read state under the same lifecycle lock', {
             if (request.handlerId === 'local.host.start') return { state: 'running', changed: true };
             throw new Error(`Unexpected operation ${request.handlerId}`);
         },
-    } as CommandContext;
-    const invocation = { command: { name: 'dev use' }, arguments: ['api.operations-runner=candidate'], options: { session: sessionId } } as ParsedInvocation;
+    };
+    const selectedCommand = resolveCommand(['dev', 'use', 'api.operations-runner=candidate', '--session', sessionId]);
+    assert.ok(selectedCommand);
+    const invocation = parseInvocation(selectedCommand.command, selectedCommand.rest);
     try {
         await Promise.all([resumeDevelopmentSession(sessionId, context), runDevelopment(invocation, context)]);
         assert.equal(starts, 1);

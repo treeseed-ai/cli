@@ -309,8 +309,10 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 }
 async function restart(invocation: ParsedInvocation, context: CommandContext, state: LocalSessionState, sessionId: string) {
 	const selection = parseSelection(`${invocation.arguments[0]}=candidate`);
+	const runtimes = (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime);
+	if (invocation.options.plan !== true) await invoke(context, 'local.dev.session.refresh', { sessionId, runtimes });
 	const status = await invoke(context, 'local.dev.status', { sessionId, all: false }) as DevelopmentStatusRecord;
-	const record = { ...status, runtimes: (await loadDevelopmentRuntimes(state.manifest)).map(({ runtime }) => runtime) };
+	const record = { ...status, runtimes };
 	const selected = record.session.targets.find((entry) => entry.projectId === selection.projectId && entry.targetId === selection.targetId);
 	if (!selected || selected.mode === 'released') throw new Error(`${selection.projectId}.${selection.targetId} is not selected for local development.`);
 	const { runtime, target } = selectedTarget(record, selection.projectId, selection.targetId);
@@ -325,7 +327,7 @@ async function restart(invocation: ParsedInvocation, context: CommandContext, st
 	}
 	if (target.kind === 'package-watch') throw new Error('Package-watch targets rebuild atomically and do not support restart.');
 	await restartConsumer({ state, runtime, target, worktree: repository.worktree, mode: selected.mode as 'candidate' | 'live', context, recordGeneration: false });
-	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode, ...(target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
+	await invoke(context, 'local.dev.use', { sessionId, projectId: selection.projectId, targetId: selection.targetId, mode: selected.mode, ...(!usesManagerBuild(target) && target.endpoints[0] ? { port: target.endpoints[0].port } : {}) });
 	saveState(state, context.env);
 	return { sessionId, target: `${selection.projectId}.${selection.targetId}`, restarted: true, record: await invoke(context, 'local.dev.status', { sessionId, all: false }) };
 }
