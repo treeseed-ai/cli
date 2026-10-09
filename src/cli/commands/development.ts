@@ -290,12 +290,10 @@ async function restartConsumer(input: { state: LocalSessionState; runtime: Devel
 	const resolved = await invoke(context, 'local.dev.environment', { sessionId: state.sessionId, projectId: runtime.project.id, targetId: target.id }) as { environment?: NodeJS.ProcessEnv };
 	if (usesManagedContainer(target) && !usesManagerBuild(target) && target.kind === 'rebuild-restart' && target.operations.build) runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {},{runtime,target});
 	await stopProcess(state, key);
-	if (usesManagedContainer(target)) {
-		// Preserve the live selection if manager custody refuses an active claim.
-		await containerOperation(context, state.sessionId, runtime, target, 'stop');
-		await invoke(context, 'local.dev.use', {sessionId:state.sessionId,projectId:runtime.project.id,targetId:target.id,mode:'released'});
-	}
-	else if (target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
+	// Managed start owns preparation, active-work refusal and replacement.
+	// Explicit stop restores released code and is only for a deliberate release,
+	// never an intermediate step of rebuilding the selected candidate.
+	if (!usesManagedContainer(target) && target.operations.cleanup) runOneShotOperation(state, target.operations.cleanup, worktree, mode, context.env, { TREESEED_DEVELOPMENT_CLEANUP_SCOPE: 'runtime' });
 	if (target.operations.setup) runOneShotOperation(state, target.operations.setup, worktree, mode, context.env, resolved.environment ?? {});
 	if (!target.operations.start && target.kind === 'rebuild-restart' && target.operations.build) {
 		runOneShotOperation(state, target.operations.build, worktree, mode, context.env, resolved.environment ?? {},{runtime,target});

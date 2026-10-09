@@ -24,7 +24,7 @@ test('container startup and cleanup only invoke the protected manager, including
       if(request.handlerId==='local.dev.environment')return {environment:{}};
       if(request.handlerId==='local.dev.container'){
         assert.equal(payload.sessionId,selected);actions.push(payload.action);
-        if(payload.action==='stop' && rejectStop)throw new Error('Active assignment prevents guest trust replacement.');
+        if((payload.action==='start' || payload.action==='stop') && rejectStop)throw new Error('Active assignment prevents guest trust replacement.');
         return payload.action==='status'?{registered:false,state:null}:{};
       }
       if(request.handlerId==='local.dev.use'){
@@ -57,12 +57,12 @@ test('container startup and cleanup only invoke the protected manager, including
     for(const command of ['restart','rebuild']) {
       assert.equal(await runCommandLine(['dev',command,'api.service','--session',selected,'--json'],context),1);
       assert.equal(record.session.targets[0].mode,'live','A refused stop must not switch the selected runtime to released');
-      assert.equal(actions.at(-1),'stop');
+      assert.equal(actions.at(-1),'start','Replacement must drain through the owning start boundary without a released-code stop');
     }
     rejectStop=false;
     assert.equal(await runCommandLine(['dev','restart','api.service','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','use','api.service=released','--session',selected,'--json'],context),0);
     assert.equal(await runCommandLine(['dev','session','stop','--session',selected,'--json'],context),0);
-    assert.deepEqual(actions,['status','start','stop','stop','stop','start','stop','status']);
+    assert.deepEqual(actions,['status','start','start','start','start','stop','status']);
   } finally {rmSync(root,{recursive:true,force:true});}
 });

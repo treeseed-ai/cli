@@ -480,3 +480,12 @@ workflow:
   - id: operator-unresolved-recovery-native
     action: { verifier: cli.golden.operator-unresolved-recovery-native }
     expect: { status: passed }
+  - id: provider-handoff-selection-unit
+    action: { verifier: cli.golden.provider-handoff-selection-unit }
+    expect: { status: passed }
+  - id: provider-handoff-denial-unit
+    action: { verifier: cli.golden.provider-handoff-denial-unit }
+    expect: { status: passed }
+  - id: provider-handoff-selection-native
+    action: { verifier: cli.golden.provider-handoff-selection-native }
+    expect: { status: passed }
