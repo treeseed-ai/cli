@@ -122,6 +122,7 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 		'cli.golden.build-docker-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"development build custody recognizes a caller-built Docker runtime"},
 		'cli.golden.build-direct-unit': {testFile:"tests/unit/command-boundary/development/build-custody.test.ts",testName:"development build custody leaves a direct native runtime in caller custody"},
 		'cli.golden.build-once-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild executes its caller build once before selecting exact output"},
+		'cli.golden.provider-handoff-selection-native': {testFile:'tests/integration/development-rebuild.test.ts',testName:'native public rebuild and restart retain exact candidate output without transient released execution'},
 		'cli.golden.build-non-idempotent-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild does not repeat a non-idempotent successful build"},
 		'cli.golden.build-failure-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild preserves selection and avoids stop after a failed build"},
 		'cli.golden.build-refused-native': {testFile:"tests/integration/development-rebuild.test.ts",testName:"native development rebuild runs once and preserves selection when stop is refused"},
