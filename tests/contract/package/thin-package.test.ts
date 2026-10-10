@@ -50,6 +50,8 @@ test('the executable drains complete output before exiting', () => {
 });
 
 test('candidate promotion uses staging while stable publication uses production', () => {
+	const verification = readFileSync('.github/workflows/verify.yml', 'utf8');
+	assert.match(verification, /uses: treeseed-ai\/reviewer\/\.github\/actions\/run-scenes@77f8f0003ccdc477cf90801fd7b0a23b1a1bb82f/u);
 	const workflow = readFileSync('.github/workflows/publish.yml', 'utf8');
 	const install = workflow.indexOf('npm ci --ignore-scripts --no-audit --no-fund');
 	const verify = workflow.indexOf('npm run release:custody -- verify');

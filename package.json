@@ -21,6 +21,8 @@
     "README.md",
     "completions",
     "dist",
+    "!dist/.treeseed-build-complete.json",
+    "!dist/.treeseed-build-complete.json.new",
     "docs/command-reference.md",
     "schemas",
     "treeseed.package.yaml",
