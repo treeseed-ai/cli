@@ -18,6 +18,11 @@ test('ships the selected CLI native observation assets without checkout source e
  const [packed] = JSON.parse(await execute('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'])) as Packed[];
  assert.ok(packed); const paths = new Set(packed.files.map(file => file.path));
  assert.deepEqual(assets.filter(path => !paths.has(path)), []);
+ const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+ for (const path of ['dist/.treeseed-build-complete.json', 'dist/.treeseed-build-complete.json.new']) {
+  assert.ok(manifest.files.includes(`!${path}`), 'Development readiness bytes must be excluded from package selection');
+  assert.equal(paths.has(path), false);
+ }
  const source = ts.createSourceFile(assets[2]!, readFileSync(assets[2]!, 'utf8'), ts.ScriptTarget.Latest, true);
  const privatePaths: string[] = [];
  const visit = (node: ts.Node) => {
@@ -46,6 +51,8 @@ test('native production CLI archive retains exact observation assets and execute
   await execute('npm', ['ls', '--all', '--omit=dev', '--json'], root);
   const installed = resolve(root, 'node_modules/@treeseed/cli');
   assert.equal(realpathSync(installed), installed); assert.equal(lstatSync(installed).isSymbolicLink(), false);
+  for (const path of ['dist/.treeseed-build-complete.json', 'dist/.treeseed-build-complete.json.new'])
+   assert.equal(existsSync(resolve(installed, path)), false, 'Installed archives must omit development readiness state');
   for (const path of ['src', 'node_modules/@treeseed/sdk', 'node_modules/@treeseed/identity']) assert.equal(existsSync(resolve(installed, path)), false, path);
   for (const dependency of ['tsx', 'vitest', '@treeseed/deployment', '@treeseed/ui']) assert.equal(existsSync(resolve(root, 'node_modules', dependency)), false, dependency);
   for (const path of assets) assert.deepEqual(readFileSync(resolve(installed, path)), readFileSync(path), path);
@@ -54,6 +61,13 @@ test('native production CLI archive retains exact observation assets and execute
   const env: NodeJS.ProcessEnv = { ...process.env, TREESEED_CONFIG_HOME: resolve(root, 'config') }; delete env.NODE_OPTIONS; delete env.NODE_TEST_CONTEXT;
   const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, encoding: 'utf8' });
   assert.equal(result.stderr, ''); assert.match(result.stdout, /trsd/u); assert.deepEqual(readFileSync(binary), bytes);
+  const inventory = async () => (JSON.parse(await execute('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], installed)) as Packed[])[0]!;
+  const before = await inventory();
+  for (const path of ['dist/.treeseed-build-complete.json', 'dist/.treeseed-build-complete.json.new'])
+   writeFileSync(resolve(installed, path), JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' }));
+  const after = await inventory();
+  assert.equal(after.integrity, before.integrity, 'Development readiness changes must not change executable archive custody');
+  assert.deepEqual(after.files, before.files); assert.deepEqual(readFileSync(binary), bytes);
   for (const archive of packed) assert.equal(`sha512-${createHash('sha512').update(readFileSync(resolve(root, archive.filename))).digest('base64')}`, archive.integrity);
   console.log(JSON.stringify({ archives: packed.map(archive => ({ filename: archive.filename,
    sha256: createHash('sha256').update(readFileSync(resolve(root, archive.filename))).digest('hex') })), installedPublicBinary: 'passed' }));
