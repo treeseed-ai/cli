@@ -189,6 +189,11 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 		'cli.golden.reporting-unit': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting accepts only a complete nonempty reporting pair without test selection'},
 		'cli.golden.component-scene-os-boundary': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'component scene case execution inherits the same declared test-only OS boundary as complete suites without changing runtime or host acceptance'},
 	};
+		reporting['cli.golden.installed-assets-unit'] = {testFile:'tests/contract/package/installed-assets.test.ts',testName:'ships the selected CLI native observation assets without checkout source execution or private imports'};
+		reporting['cli.golden.installed-assets-native'] = {testFile:'tests/contract/package/installed-assets.test.ts',testName:'native production CLI archive retains exact observation assets and executes its public binary without source or development dependencies'};
+		reporting['cli.golden.installed-event-command'] = {testFile:'tests/contract/package/installed-assets.test.ts',testName:'native workday event cases never execute checkout source or substitute an unbound command'};
+		reporting['cli.golden.execution-diagnostics-read-native'] = {testFile:'tests/acceptance/workday-events.test.ts',testName:'packaged native workday diagnostic readback preserves exact clock bytes and denied history through unchanged retry without execution requests'};
+		reporting['cli.golden.architecture-workday-event-native'] = {testFile:'tests/acceptance/workday-events.test.ts',testName:'retrieves a later exact event page through independent native CLI and real HTTP transport'};
 	const observedReporting = new Set<string>();
 	const files = readdirSync('guarantees', { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
 	assert.equal(files.length, 3);

@@ -39,7 +39,7 @@ function main(): void {
 		...tests,
 	], {
 		cwd: process.cwd(),
-		env: {...process.env,NODE_OPTIONS:`${process.env.NODE_OPTIONS ?? ''} --import=${resolve(process.cwd(),'tests/support/os-custody.mjs')}`.trim()},
+		env: {...process.env,NODE_OPTIONS:`${process.env.NODE_OPTIONS ?? ''} --import=${resolve(process.cwd(),'tests/support/os-custody.ts')}`.trim()},
 		stdio: 'inherit',
 	});
 
