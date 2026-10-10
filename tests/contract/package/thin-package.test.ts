@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { parse } from 'yaml';
@@ -47,6 +48,14 @@ test('the executable drains complete output before exiting', () => {
 	const main = readFileSync('src/cli/main.ts', 'utf8');
 	assert.equal(main.includes('process.exit('), false);
 	assert.equal(main.includes('process.exitCode = await runCommandLine'), true);
+	const invoke = (args: string[]) => spawnSync(process.execPath, ['dist/cli/main.js', ...args],
+		{ encoding: 'utf8', timeout: 5_000, maxBuffer: 1024 * 1024 });
+	const help = invoke(['--help']);
+	assert.equal(help.error, undefined); assert.equal(help.signal, null); assert.equal(help.status, 0);
+	assert.equal(help.stderr, ''); assert.match(help.stdout, /trsd/u);
+	const denied = invoke(['definitely-invalid-command', '--json']);
+	assert.equal(denied.error, undefined); assert.equal(denied.signal, null); assert.equal(denied.status, 1);
+	assert.equal(denied.stdout, ''); assert.equal(JSON.parse(denied.stderr).error.code, 'unknown_command');
 });
 
 test('candidate promotion uses staging while stable publication uses production', () => {
