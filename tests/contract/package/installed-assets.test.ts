@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -61,6 +61,15 @@ test('native production CLI archive retains exact observation assets and execute
   const env: NodeJS.ProcessEnv = { ...process.env, TREESEED_CONFIG_HOME: resolve(root, 'config') }; delete env.NODE_OPTIONS; delete env.NODE_TEST_CONTEXT;
   const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, encoding: 'utf8' });
   assert.equal(result.stderr, ''); assert.match(result.stdout, /trsd/u); assert.deepEqual(readFileSync(binary), bytes);
+  const alias = resolve(root, 'trsd'), replacement = resolve(root, 'replacement.ts'), preload = resolve(root, 'switch-entrypoint.mts');
+  symlinkSync(binary, alias); writeFileSync(replacement, bytes);
+  writeFileSync(preload, `import{registerHooks}from'node:module';import{unlinkSync,symlinkSync,writeFileSync}from'node:fs';import{pathToFileURL}from'node:url';
+registerHooks({resolve(specifier,context,next){if(context.parentURL===pathToFileURL(${JSON.stringify(binary)}).href&&specifier==='./runtime.js'){
+unlinkSync(${JSON.stringify(alias)});symlinkSync(${JSON.stringify(replacement)},${JSON.stringify(alias)});writeFileSync(${JSON.stringify(resolve(root,'switched'))},'observed');}return next(specifier,context);}});`);
+  const switched = await promisify(execFile)(process.execPath, ['--import', preload, alias, '--help'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(readFileSync(resolve(root, 'switched'), 'utf8'), 'observed');
+  assert.equal(switched.stderr, ''); assert.match(switched.stdout, /trsd/u, 'The loaded public binary must finish even when its invocation symlink moves');
+  assert.deepEqual(readFileSync(binary), bytes);
   const inventory = async () => (JSON.parse(await execute('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], installed)) as Packed[])[0]!;
   const before = await inventory();
   for (const path of ['dist/.treeseed-build-complete.json', 'dist/.treeseed-build-complete.json.new'])
