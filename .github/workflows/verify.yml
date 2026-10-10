@@ -49,7 +49,7 @@ jobs:
       - name: Verify package with exact SDK
         run: npm run verify:direct
       - name: Execute coded golden component scenes
-        uses: treeseed-ai/reviewer/.github/actions/run-scenes@013d38165f0430278ac944592d3b20618736c2d5
+        uses: treeseed-ai/reviewer/.github/actions/run-scenes@9dc625e2186e6d618cea30a17afd79fe64a95998
         env:
           NODE_OPTIONS: --import=${{ github.workspace }}/tests/support/os-custody.ts
         with:
