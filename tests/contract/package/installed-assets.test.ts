@@ -51,7 +51,7 @@ test('native production CLI archive retains exact observation assets and execute
   for (const path of assets) assert.deepEqual(readFileSync(resolve(installed, path)), readFileSync(path), path);
   const manifest = JSON.parse(readFileSync(resolve(installed, 'package.json'), 'utf8'));
   assert.equal(manifest.bin.trsd, './dist/cli/main.js'); const binary = resolve(installed, manifest.bin.trsd), bytes = readFileSync(binary);
-  const env = { ...process.env, TREESEED_CONFIG_HOME: resolve(root, 'config') }; delete env.NODE_OPTIONS; delete env.NODE_TEST_CONTEXT;
+  const env: NodeJS.ProcessEnv = { ...process.env, TREESEED_CONFIG_HOME: resolve(root, 'config') }; delete env.NODE_OPTIONS; delete env.NODE_TEST_CONTEXT;
   const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, encoding: 'utf8' });
   assert.equal(result.stderr, ''); assert.match(result.stdout, /trsd/u); assert.deepEqual(readFileSync(binary), bytes);
   for (const archive of packed) assert.equal(`sha512-${createHash('sha512').update(readFileSync(resolve(root, archive.filename))).digest('base64')}`, archive.integrity);

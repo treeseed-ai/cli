@@ -498,3 +498,12 @@ workflow:
   - id: provider-handoff-selection-native
     action: { verifier: cli.golden.provider-handoff-selection-native }
     expect: { status: passed }
+  - id: installed-assets-unit
+    action: { verifier: cli.golden.installed-assets-unit }
+    expect: { status: passed }
+  - id: installed-assets-native
+    action: { verifier: cli.golden.installed-assets-native }
+    expect: { status: passed }
+  - id: installed-event-command
+    action: { verifier: cli.golden.installed-event-command }
+    expect: { status: passed }

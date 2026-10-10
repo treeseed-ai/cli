@@ -22,7 +22,11 @@
     "completions",
     "dist",
     "docs/command-reference.md",
-    "schemas"
+    "schemas",
+    "treeseed.package.yaml",
+    "guarantees",
+    "tests/acceptance/workday-events.test.ts",
+    "tests/support/os-custody.ts"
   ],
   "publishConfig": {
     "access": "public"

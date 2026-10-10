@@ -15,7 +15,7 @@ function fixture() {
 	symlinkSync(resolve(import.meta.dirname,'../../node_modules'),resolve(root,'node_modules'));
 	writeFileSync(resolve(root,'package.json'),JSON.stringify({type:'module',scripts:{test:`node --import tsx build.ts && node --import tsx ${runner}`}}));
 	writeFileSync(resolve(root,'build.ts'),"import {writeFileSync} from 'node:fs'; writeFileSync('built','yes');");
-	writeFileSync(resolve(root,'tests/support/os-custody.mjs'),"globalThis.custodyLoaded=true;");
+	writeFileSync(resolve(root,'tests/support/os-custody.ts'),"globalThis.custodyLoaded=true;");
 	writeFileSync(resolve(root,'tests/unit.test.ts'),"import test from 'node:test'; import assert from 'node:assert/strict'; import {appendFileSync,existsSync} from 'node:fs'; test('unit boundary',()=>{assert.equal(existsSync('built'),true); assert.equal(globalThis.custodyLoaded,true); appendFileSync('order','unit\\n');});");
 	writeFileSync(resolve(root,'outside/child.ts'),"import test from 'node:test'; test('child boundary',()=>{});");
 	writeFileSync(resolve(root,'tests/nested/integration.test.ts'),"import {suite,test} from 'node:test'; import assert from 'node:assert/strict'; import {appendFileSync} from 'node:fs'; import {spawnSync} from 'node:child_process'; suite('integration suite',()=>{test('integration boundary',()=>{const env={...process.env}; delete env.NODE_TEST_CONTEXT; const child=spawnSync(process.execPath,['--import','tsx','--test','outside/child.ts'],{encoding:'utf8',env}); assert.equal(child.status,0); assert.match(child.stdout,/child boundary/); appendFileSync('order','integration\\n');});});");

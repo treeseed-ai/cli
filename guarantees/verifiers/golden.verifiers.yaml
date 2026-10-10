@@ -9,7 +9,7 @@ verifiers:
   cli.golden.execution-diagnostics-read-native:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
-    testFile: tests/unit/command-boundary/observation/workday-events.test.ts
+    testFile: tests/acceptance/workday-events.test.ts
     testName: "packaged native workday diagnostic readback preserves exact clock bytes and denied history through unchanged retry without execution requests"
   cli.golden.execution-library-lookup-unit-1:
     kind: nodeTestCase
@@ -104,7 +104,7 @@ verifiers:
   cli.golden.architecture-workday-event-native:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
-    testFile: tests/unit/command-boundary/observation/workday-events.test.ts
+    testFile: tests/acceptance/workday-events.test.ts
     testName: "retrieves a later exact event page through independent native CLI and real HTTP transport"
   cli.golden.schema-canonical:
     kind: nodeTestCase
@@ -826,3 +826,18 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/integration/development-rebuild.test.ts
     testName: native restart refreshes changed caller recipe and retains one exact build and endpoint through retry
+  cli.golden.installed-assets-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/contract/package/installed-assets.test.ts
+    testName: "ships the selected CLI native observation assets without checkout source execution or private imports"
+  cli.golden.installed-assets-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/contract/package/installed-assets.test.ts
+    testName: "native production CLI archive retains exact observation assets and executes its public binary without source or development dependencies"
+  cli.golden.installed-event-command:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/contract/package/installed-assets.test.ts
+    testName: "native workday event cases never execute checkout source or substitute an unbound command"
