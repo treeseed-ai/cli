@@ -144,7 +144,7 @@ test('packaged native library lookup preserves paginated active team identity an
 			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
 			return { code, stdout, stderr };
 		};
-		const success = await execute(); assert.equal(success.code, 0); assert.equal(success.stderr, '');
+		const success = await execute(); assert.equal(success.code, 0, success.stderr); assert.equal(success.stderr, '');
 		assert.deepEqual(JSON.parse(success.stdout).result, { project, library });
 		assert.deepEqual(requests.map(value => value.path), ['/v1/projects?limit=200', '/v1/projects?limit=200&cursor=original-next', `/v1/projects/${project.id}/treedx-library`]);
 		for (const fault of ['missing', 'ambiguous', 'unbound', 'denied', 'unavailable', 'reset', 'json'] as const) {
