@@ -42,14 +42,26 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install exact integrated SDK
-        uses: treeseed-ai/sdk/.github/actions/install-exact-sdk@952195376b53bf39742e64f320f2a3b109cc77c0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           github-token: ${{ github.token }}
+          repository: treeseed-ai/sdk
+          run-id: 38164849288
+          name: sdk-ac5b9abd8a7e615d9ef5886e342859dd2b183d5e
+          path: .treeseed/verified-sdk
+
+      - name: Verify and install held SDK archive
+        run: |
+          set -euo pipefail
+          mapfile -t archives < <(find .treeseed/verified-sdk -maxdepth 1 -type f -name '*.tgz')
+          test "${#archives[@]}" -eq 1
+          echo "ff7a7af40bfce7398f137eabcbf9212f2e8d8f3ddb18c9f152df8b76fdb8c9e3  ${archives[0]}" | sha256sum --check --strict
+          npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund "${archives[0]}"
 
       - name: Verify package with exact SDK
         run: npm run verify:direct
       - name: Execute coded golden component scenes
-        uses: treeseed-ai/reviewer/.github/actions/run-scenes@77f8f0003ccdc477cf90801fd7b0a23b1a1bb82f
+        uses: treeseed-ai/reviewer/.github/actions/run-scenes@e60ad2581e7ff041f058af04bd810796fea748f9
         env:
           NODE_OPTIONS: --import=${{ github.workspace }}/tests/support/os-custody.ts
         with:
