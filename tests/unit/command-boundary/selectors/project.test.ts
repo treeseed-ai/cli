@@ -98,7 +98,7 @@ test('packaged native library lookup preserves paginated active team identity an
 	const before = structuredClone({ project, library, team }), requests: Array<{ method: string | undefined; path: string | undefined; body: string; writeKey: boolean; confirmation: boolean }> = [];
 	const failed: Array<{ code: number | null; stdout: string; stderr: string }> = [];
 	let mode: 'accept' | 'missing' | 'ambiguous' | 'unbound' | 'denied' | 'unavailable' | 'reset' | 'json' = 'accept';
-	let child: ReturnType<typeof spawn> | undefined;
+	const children = new Set<ReturnType<typeof spawn>>();
 	const server = createServer((incoming, outgoing) => {
 		let body = ''; incoming.setEncoding('utf8'); incoming.on('data', bytes => { body += String(bytes); });
 		incoming.on('end', () => {
@@ -139,9 +139,10 @@ test('packaged native library lookup preserves paginated active team identity an
 		await saveServerSession({ identity: { issuer: 'https://isolated.example.test', subject: 'reader' }, clientId: 'trsd', scopes: ['treeseed:read'],
 			serverId: 'local', audience: url, accessToken: 'isolated-fixture-token', activeTeam: team }, env);
 		const execute = async (args: string[] = ['library', 'show', project.slug]) => {
-			child = spawn(process.execPath, [entrypoint, ...helper.sdkGoldenReadArguments!(args, team.id)], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+			const child = spawn(process.execPath, [entrypoint, ...helper.sdkGoldenReadArguments!(args, team.id)], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+			children.add(child); child.once('close', () => children.delete(child));
 			let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
-			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
+			const code = await new Promise<number | null>((accept, reject) => { child.once('error', reject); child.once('close', accept); });
 			return { code, stdout, stderr };
 		};
 		const success = await execute(); assert.equal(success.code, 0, success.stderr); assert.equal(success.stderr, '');
@@ -157,25 +158,34 @@ test('packaged native library lookup preserves paginated active team identity an
 		const retained = structuredClone(failed), history = structuredClone(requests); mode = 'accept';
 		const retry = await execute(); assert.equal(retry.code, 0); assert.equal(retry.stderr, ''); assert.deepEqual(JSON.parse(retry.stdout).result, { project, library });
 		assert.deepEqual(failed, retained); assert.deepEqual(requests.slice(0, history.length), history);
-		for (const read of reads) {
+		await Promise.all(reads.map(async read => {
 			const original = await execute(read.args); assert.equal(original.code, 0, original.stderr);
 			assert.deepEqual(JSON.parse(original.stdout).result, read.result);
-			for (const fault of ['denied', 'unavailable', 'reset', 'json'] as const) {
-				mode = fault; const denied = await execute(read.args); failed.push(denied);
+		}));
+		for (const fault of ['denied', 'unavailable', 'reset', 'json'] as const) {
+			mode = fault;
+			await Promise.all(reads.map(async read => {
+				const denied = await execute(read.args); failed.push(denied);
 				assert.equal(denied.code, 1); assert.equal(denied.stdout, '');
 				const envelope = JSON.parse(denied.stderr); assert.equal(envelope.ok, false); assert.equal(envelope.result, null);
-			}
-			const failedBeforeRetry = structuredClone(failed); mode = 'accept';
-			const exact = await execute(read.args); assert.equal(exact.code, 0, exact.stderr);
-			assert.deepEqual(JSON.parse(exact.stdout).result, read.result); assert.deepEqual(failed, failedBeforeRetry);
+			}));
 		}
+		const failedBeforeRetry = structuredClone(failed); mode = 'accept';
+		await Promise.all(reads.map(async read => {
+			const exact = await execute(read.args); assert.equal(exact.code, 0, exact.stderr);
+			assert.deepEqual(JSON.parse(exact.stdout).result, read.result);
+		}));
+		assert.deepEqual(failed, failedBeforeRetry); assert.equal(failed.length, 27); assert.equal(children.size, 0);
 		assert.ok(requests.every(value => (value.method === 'GET' && !value.body
 			|| value.method === 'POST' && value.path === `/v1/dx/projects/${project.id}/repos/${library.repositoryId}/files/read`)
 			&& !value.writeKey && !value.confirmation));
 		assert.deepEqual({ reads, files, proposal, run, assignments, graph }, heldReads); assert.deepEqual(readFileSync(sdkAsset), sdkBytes);
 		assert.deepEqual({ project, library, team }, before); assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve('package.json')), packageBytes);
 	} finally {
-		try { if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await new Promise<void>(accept => child!.once('close', () => accept())); } }
+		try { await Promise.all([...children].map(child => new Promise<void>(accept => {
+			if (child.exitCode !== null || child.signalCode !== null) { accept(); return; }
+			child.once('close', () => accept()); child.kill();
+		}))); }
 		finally { try { server.closeAllConnections(); if (server.listening) await new Promise<void>((accept, reject) => server.close(error => error ? reject(error) : accept()));
 			assert.equal(server.listening, false); } finally { rmSync(root, { recursive: true, force: true }); } }
 	}
