@@ -5,6 +5,9 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { dirname } from 'node:path';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import { saveServerSession } from '../../../../src/cli/support/server-custody.ts';
 import { resolveProjectSelector } from '../../../../src/cli/support/selectors/project.ts';
@@ -67,12 +70,31 @@ test('library lookup retains missing ambiguous unbound and denied observations w
 });
 
 test('packaged native library lookup preserves paginated active team identity and failed read history through exact retry without execution writes', { timeout: 30_000 }, async context => {
+	const sdk = resolve(dirname(createRequire(import.meta.url).resolve('@treeseed/sdk/operator-contracts')), '../..');
+	const sdkAsset = resolve(sdk, 'tests/acceptance/golden-product.ts'), sdkBytes = readFileSync(sdkAsset);
+	const helper = await import(pathToFileURL(sdkAsset).href) as { sdkGoldenReadArguments?: (args: readonly string[], team: string) => string[] };
+	assert.equal(typeof helper.sdkGoldenReadArguments, 'function', 'Original installed SDK acceptance reader is required');
 	const packageBytes = readFileSync(resolve('package.json')), manifest = JSON.parse(packageBytes.toString('utf8'));
 	assert.equal(manifest.bin.trsd, './dist/cli/main.js'); const entrypoint = resolve(manifest.bin.trsd), entryBytes = readFileSync(entrypoint);
 	const root = mkdtempSync(resolve(tmpdir(), 'cli-library-lookup-'));
 	const team = { id: '11111111-1111-4111-8111-111111111111', slug: 'original-team', name: 'Original team' };
 	const project = { id: '22222222-2222-4222-8222-222222222222', slug: 'configured-project', teamId: team.id };
 	const library = { projectId: project.id, teamId: team.id, repositoryId: 'original-library', contentRepositoryRef: 'refs/heads/staging' };
+	const ref = 'a'.repeat(40), path = 'proposals/current.mdx';
+	const files = { result: { ok: true, repoId: library.repositoryId, resolvedRef: ref,
+		files: [{ path, content: 'Controlled original source bytes.' }] }, receipt: { projectId: project.id } };
+	const proposal = { id: 'original-proposal', projectId: project.id, title: 'Controlled proposal index' };
+	const run = { run: { id: 'original-workday', teamId: team.id, executionMode: 'simulation' } };
+	const assignments = { items: [], page: { limit: 50, hasMore: false, nextCursor: null } };
+	const graph = { teamId: team.id, revision: 1, nodes: [], edges: [] };
+	const reads: Array<{ args: string[]; result: unknown }> = [
+		{ args: ['library', 'read', project.slug, path, '--ref', ref], result: files },
+		{ args: ['proposals', 'show', proposal.id, '--project', project.id], result: proposal },
+		{ args: ['workdays', 'show', run.run.id], result: run },
+		{ args: ['assignments', 'list', '--limit', '50'], result: assignments },
+		{ args: ['execution', 'graph', 'show'], result: graph },
+	];
+	const heldReads = structuredClone({ reads, files, proposal, run, assignments, graph });
 	const before = structuredClone({ project, library, team }), requests: Array<{ method: string | undefined; path: string | undefined; body: string; writeKey: boolean; confirmation: boolean }> = [];
 	const failed: Array<{ code: number | null; stdout: string; stderr: string }> = [];
 	let mode: 'accept' | 'missing' | 'ambiguous' | 'unbound' | 'denied' | 'unavailable' | 'reset' | 'json' = 'accept';
@@ -83,7 +105,8 @@ test('packaged native library lookup preserves paginated active team identity an
 			requests.push({ method: incoming.method, path: incoming.url, body, writeKey: incoming.headers['idempotency-key'] !== undefined,
 				confirmation: incoming.headers['x-treeseed-confirmation'] !== undefined });
 			const url = new URL(incoming.url ?? '', 'http://127.0.0.1'); outgoing.setHeader('content-type', 'application/json');
-			if (incoming.method !== 'GET' || body) { outgoing.writeHead(500).end('{}'); return; }
+			const fileRead = incoming.method === 'POST' && url.pathname === `/v1/dx/projects/${project.id}/repos/${library.repositoryId}/files/read`;
+			if (!fileRead && (incoming.method !== 'GET' || body)) { outgoing.writeHead(500).end('{}'); return; }
 			if (mode === 'reset') { incoming.socket.destroy(); return; }
 			if (mode === 'json') { outgoing.end('{'); return; }
 			if (mode === 'denied' || mode === 'unavailable') { const status = mode === 'denied' ? 403 : 503;
@@ -96,6 +119,15 @@ test('packaged native library lookup preserves paginated active team identity an
 			if (url.pathname === `/v1/projects/${project.id}/treedx-library`) {
 				outgoing.end(JSON.stringify({ data: mode === 'unbound' ? { projectId: project.id } : library })); return;
 			}
+			if (fileRead) {
+				assert.deepEqual(JSON.parse(body), { ref, paths: [path], encoding: 'utf8', parseFrontmatter: true });
+				outgoing.end(JSON.stringify({ data: files })); return;
+			}
+			const result = url.pathname === `/v1/projects/${project.id}/proposals/${proposal.id}` ? proposal
+				: url.pathname === `/v1/teams/${team.id}/workday-runs/${run.run.id}` ? run
+				: url.pathname === `/v1/teams/${team.id}/capacity/assignments` ? assignments
+				: url.pathname === `/v1/teams/${team.id}/execution-graph` ? graph : undefined;
+			if (result) { outgoing.end(JSON.stringify({ data: result })); return; }
 			outgoing.writeHead(500).end('{}');
 		});
 	});
@@ -106,8 +138,8 @@ test('packaged native library lookup preserves paginated active team identity an
 		// Native custody and actual generated CLI/SDK transport; supplied token and responses are not native API governance.
 		await saveServerSession({ identity: { issuer: 'https://isolated.example.test', subject: 'reader' }, clientId: 'trsd', scopes: ['treeseed:read'],
 			serverId: 'local', audience: url, accessToken: 'isolated-fixture-token', activeTeam: team }, env);
-		const execute = async () => {
-			child = spawn(process.execPath, [entrypoint, 'library', 'show', project.slug, '--json'], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+		const execute = async (args: string[] = ['library', 'show', project.slug]) => {
+			child = spawn(process.execPath, [entrypoint, ...helper.sdkGoldenReadArguments!(args, team.id)], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
 			let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
 			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
 			return { code, stdout, stderr };
@@ -125,7 +157,22 @@ test('packaged native library lookup preserves paginated active team identity an
 		const retained = structuredClone(failed), history = structuredClone(requests); mode = 'accept';
 		const retry = await execute(); assert.equal(retry.code, 0); assert.equal(retry.stderr, ''); assert.deepEqual(JSON.parse(retry.stdout).result, { project, library });
 		assert.deepEqual(failed, retained); assert.deepEqual(requests.slice(0, history.length), history);
-		assert.ok(requests.every(value => value.method === 'GET' && !value.body && !value.writeKey && !value.confirmation));
+		for (const read of reads) {
+			const original = await execute(read.args); assert.equal(original.code, 0, original.stderr);
+			assert.deepEqual(JSON.parse(original.stdout).result, read.result);
+			for (const fault of ['denied', 'unavailable', 'reset', 'json'] as const) {
+				mode = fault; const denied = await execute(read.args); failed.push(denied);
+				assert.equal(denied.code, 1); assert.equal(denied.stdout, '');
+				const envelope = JSON.parse(denied.stderr); assert.equal(envelope.ok, false); assert.equal(envelope.result, null);
+			}
+			const failedBeforeRetry = structuredClone(failed); mode = 'accept';
+			const exact = await execute(read.args); assert.equal(exact.code, 0, exact.stderr);
+			assert.deepEqual(JSON.parse(exact.stdout).result, read.result); assert.deepEqual(failed, failedBeforeRetry);
+		}
+		assert.ok(requests.every(value => (value.method === 'GET' && !value.body
+			|| value.method === 'POST' && value.path === `/v1/dx/projects/${project.id}/repos/${library.repositoryId}/files/read`)
+			&& !value.writeKey && !value.confirmation));
+		assert.deepEqual({ reads, files, proposal, run, assignments, graph }, heldReads); assert.deepEqual(readFileSync(sdkAsset), sdkBytes);
 		assert.deepEqual({ project, library, team }, before); assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve('package.json')), packageBytes);
 	} finally {
 		try { if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await new Promise<void>(accept => child!.once('close', () => accept())); } }
