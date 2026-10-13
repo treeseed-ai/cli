@@ -37,18 +37,29 @@ test('native production CLI archive retains exact observation assets and execute
  const root = mkdtempSync(resolve(tmpdir(), 'cli-installed-assets-'));
  try {
   const names = ['@treeseed/sdk', '@treeseed/identity', '@treeseed/cli'];
-  const records=JSON.parse(await execute('npm',['pack','./node_modules/@treeseed/sdk','./node_modules/@treeseed/identity','.',
-   '--ignore-scripts','--json','--pack-destination',root])) as Packed[];
+  const sdkInput=process.env.TREESEED_TEST_SDK_ARCHIVE,sdkDigest=process.env.TREESEED_TEST_SDK_ARCHIVE_SHA256;
+  assert.ok(sdkInput&&sdkDigest,'Reuse the exact held SDK archive instead of repacking its installed files');assert.equal(isAbsolute(sdkInput),true);
+  assert.equal(lstatSync(sdkInput).isSymbolicLink(),false);assert.equal(createHash('sha256').update(readFileSync(sdkInput)).digest('hex'),sdkDigest);
+  const [sdk]=JSON.parse(await execute('npm',['pack','--dry-run','--ignore-scripts','--json',sdkInput])) as Packed[];
+  assert.ok(sdk);assert.equal(sdk.name,'@treeseed/sdk');copyFileSync(sdkInput,resolve(root,sdk.filename));
+  const records=[sdk,...JSON.parse(await execute('npm',['pack','./node_modules/@treeseed/identity','.',
+   '--ignore-scripts','--json','--pack-destination',root])) as Packed[]];
   assert.equal(records.length,names.length);
   const packed=names.map(name=>{const matches=records.filter(record=>record.name===name);assert.equal(matches.length,1);return matches[0]!;});
   for (const archive of packed) {
    assert.equal(`sha512-${createHash('sha512').update(readFileSync(resolve(root, archive.filename))).digest('base64')}`, archive.integrity);
   }
   const dependencies = Object.fromEntries(packed.map((archive, index) => [names[index]!, `file:${resolve(root, archive.filename)}`]));
-  writeFileSync(resolve(root, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies,
-   overrides: { '@treeseed/sdk': '$@treeseed/sdk', '@treeseed/identity': '$@treeseed/identity' } }));
-  await execute('npm', ['install', '--prefix', root, '--omit=dev', '--ignore-scripts', '--package-lock=false', '--no-save', '--no-audit', '--no-fund','--prefer-offline',
-   ...packed.map(archive => resolve(root, archive.filename))], root);
+  const verifierArchive=process.env.TREESEED_TEST_REVIEWER_ARCHIVE,verifierDigest=process.env.TREESEED_TEST_REVIEWER_ARCHIVE_SHA256;
+  assert.ok(verifierArchive&&verifierDigest,'The exact production Reviewer archive must be supplied for native verifier closure');
+  assert.equal(isAbsolute(verifierArchive),true);
+  assert.equal(lstatSync(verifierArchive).isSymbolicLink(),false);
+  assert.equal(createHash('sha256').update(readFileSync(verifierArchive)).digest('hex'),verifierDigest);
+  const verifierInput=resolve(root,basename(verifierArchive));assert.equal(existsSync(verifierInput),false);copyFileSync(verifierArchive,verifierInput);
+  writeFileSync(resolve(root,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{...dependencies,'@treeseed/reviewer':`file:${verifierInput}`},
+   overrides:{'@treeseed/sdk':'$@treeseed/sdk','@treeseed/identity':'$@treeseed/identity'}}));
+  await execute('npm',['install','--prefix',root,'--omit=dev','--ignore-scripts','--package-lock=false','--no-save','--no-audit','--no-fund','--prefer-offline','--install-strategy=nested',
+   ...packed.map(archive=>resolve(root,archive.filename)),verifierInput],root);
   await execute('npm', ['ls', '--all', '--omit=dev', '--json'], root);
   const installed = resolve(root, 'node_modules/@treeseed/cli');
   assert.equal(realpathSync(installed), installed); assert.equal(lstatSync(installed).isSymbolicLink(), false);
@@ -62,16 +73,6 @@ test('native production CLI archive retains exact observation assets and execute
   const env: NodeJS.ProcessEnv = { ...process.env, TREESEED_CONFIG_HOME: resolve(root, 'config') }; delete env.NODE_OPTIONS; delete env.NODE_TEST_CONTEXT;
   const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, encoding: 'utf8' });
   assert.equal(result.stderr, ''); assert.match(result.stdout, /trsd/u); assert.deepEqual(readFileSync(binary), bytes);
-  const verifierArchive=process.env.TREESEED_TEST_REVIEWER_ARCHIVE,verifierDigest=process.env.TREESEED_TEST_REVIEWER_ARCHIVE_SHA256;
-  assert.ok(verifierArchive&&verifierDigest,'The exact production Reviewer archive must be supplied for native verifier closure');
-  assert.equal(isAbsolute(verifierArchive),true);
-  assert.equal(lstatSync(verifierArchive).isSymbolicLink(),false);
-  assert.equal(createHash('sha256').update(readFileSync(verifierArchive)).digest('hex'),verifierDigest);
-  const verifierInput=resolve(root,basename(verifierArchive));assert.equal(existsSync(verifierInput),false);copyFileSync(verifierArchive,verifierInput);
-  writeFileSync(resolve(root,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{...dependencies,'@treeseed/reviewer':`file:${verifierInput}`},
-   overrides:{'@treeseed/sdk':'$@treeseed/sdk','@treeseed/identity':'$@treeseed/identity'}}));
-  await execute('npm',['install','--prefix',root,'--omit=dev','--ignore-scripts','--package-lock=false','--no-save','--no-audit','--no-fund','--prefer-offline','--install-strategy=nested',
-   ...packed.map(archive=>resolve(root,archive.filename)),verifierInput],root);
   const verifierRoot=resolve(root,'node_modules/@treeseed/reviewer');
   const verifierManifest=JSON.parse(readFileSync(resolve(verifierRoot,'package.json'),'utf8'));
   assert.equal(verifierManifest.name,'@treeseed/reviewer');assert.ok(verifierManifest.dependencies.tsx);
@@ -103,6 +104,7 @@ unlinkSync(${JSON.stringify(alias)});symlinkSync(${JSON.stringify(replacement)},
   assert.equal(after.integrity, before.integrity, 'Development readiness changes must not change executable archive custody');
   assert.deepEqual(after.files, before.files); assert.deepEqual(readFileSync(binary), bytes);
   for (const archive of packed) assert.equal(`sha512-${createHash('sha512').update(readFileSync(resolve(root, archive.filename))).digest('base64')}`, archive.integrity);
+  assert.equal(createHash('sha256').update(readFileSync(sdkInput)).digest('hex'),sdkDigest);
   console.log(JSON.stringify({ archives: packed.map(archive => ({ filename: archive.filename,
    sha256: createHash('sha256').update(readFileSync(resolve(root, archive.filename))).digest('hex') })), installedPublicBinary: 'passed' }));
  } finally { rmSync(root, { recursive: true, force: true }); assert.equal(existsSync(root), false); }
