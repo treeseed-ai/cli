@@ -1,4 +1,5 @@
 import '../support/os-custody.ts';
+import { nativePreloadArguments } from '../support/native-loader.ts';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -13,7 +14,7 @@ const packageRoot = resolve(import.meta.dirname, '../..');
 const { commandSpecs }: { commandSpecs: Array<{ path: string[]; execution: CommandExecutionBinding }> } =
  await import(new URL('../../dist/cli/registry.js', import.meta.url).href);
 const { saveServerSession } = await import(new URL('../../dist/cli/support/server-custody.js', import.meta.url).href);
-const loader = import.meta.resolve('tsx');
+const preloads = nativePreloadArguments(process.execArgv);
 const custody = new URL('../support/os-custody.ts', import.meta.url).href;
 test('packaged native workday diagnostic readback preserves exact clock bytes and denied history through unchanged retry without execution requests', { timeout: 30_000 }, async context => {
 	const packageBytes = readFileSync(resolve(packageRoot, 'package.json')), manifest = JSON.parse(packageBytes.toString('utf8'));
@@ -58,7 +59,7 @@ test('packaged native workday diagnostic readback preserves exact clock bytes an
 			assert.equal(command.length, 1);
 			const argv = [...command[0]!.path, runId, '--team', teamId, '--cursor', cursor, '--limit', '50', ...options, '--server', 'local', '--json'];
 			const before = structuredClone(argv);
-			child = spawn(process.execPath, ['--import', loader, '--import', custody, entrypoint, ...argv], { cwd: packageRoot, env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+			child = spawn(process.execPath, [...preloads, '--import', custody, entrypoint, ...argv], { cwd: packageRoot, env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
 			let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
 			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
 			assert.deepEqual(argv, before); assert.equal(child.signalCode, null);
@@ -121,7 +122,7 @@ test('retrieves a later exact event page through independent native CLI and real
 		assert.ok(bound, 'The existing public event command must be bound.');
 		const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
 		assert.equal(manifest.bin.trsd, './dist/cli/main.js'); const entrypoint = resolve(packageRoot, manifest.bin.trsd), bytes = readFileSync(entrypoint);
-		child = spawn(process.execPath, ['--import', loader, '--import', custody, entrypoint, ...bound.path, runId,
+		child = spawn(process.execPath, [...preloads, '--import', custody, entrypoint, ...bound.path, runId,
 			'--team', teamId, '--cursor', cursor, '--limit', '50', '--json'], { cwd: packageRoot, env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
 		let stdout = '', stderr = '';
 		child.stdout!.on('data', chunk => { stdout += String(chunk); }); child.stderr!.on('data', chunk => { stderr += String(chunk); });
