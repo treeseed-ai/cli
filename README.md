@@ -111,6 +111,13 @@ The package exposes only the `trsd` executable. It has no JavaScript library exp
 
 ## Development
 
+The complete package suite also verifies native acceptance assets with an actual
+production Reviewer archive. Set `TREESEED_TEST_REVIEWER_ARCHIVE` to its absolute
+tarball path and `TREESEED_TEST_REVIEWER_ARCHIVE_SHA256` to its verified digest.
+The Verify workflow obtains its pinned archive from Reviewer Actions. The fixture
+installs it with production dependencies and scripts disabled; CLI adds no loader
+runtime dependency and retains the owning verifier's loader and import fence.
+
 ```sh
 npm ci
 npm run lint
