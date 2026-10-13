@@ -40,10 +40,13 @@ test('native production CLI archive retains exact observation assets and execute
   const sdkInput=process.env.TREESEED_TEST_SDK_ARCHIVE,sdkDigest=process.env.TREESEED_TEST_SDK_ARCHIVE_SHA256;
   assert.ok(sdkInput&&sdkDigest,'Reuse the exact held SDK archive instead of repacking its installed files');assert.equal(isAbsolute(sdkInput),true);
   assert.equal(lstatSync(sdkInput).isSymbolicLink(),false);assert.equal(createHash('sha256').update(readFileSync(sdkInput)).digest('hex'),sdkDigest);
-  const [sdk]=JSON.parse(await execute('npm',['pack','--dry-run','--ignore-scripts','--json',sdkInput])) as Packed[];
+  const [sdkInventory,ownerInventory]=await Promise.all([
+   execute('npm',['pack','--dry-run','--ignore-scripts','--json',sdkInput]),
+   execute('npm',['pack','./node_modules/@treeseed/identity','.', '--ignore-scripts','--json','--pack-destination',root]),
+  ]);
+  const [sdk]=JSON.parse(sdkInventory) as Packed[];
   assert.ok(sdk);assert.equal(sdk.name,'@treeseed/sdk');copyFileSync(sdkInput,resolve(root,sdk.filename));
-  const records=[sdk,...JSON.parse(await execute('npm',['pack','./node_modules/@treeseed/identity','.',
-   '--ignore-scripts','--json','--pack-destination',root])) as Packed[]];
+  const records=[sdk,...JSON.parse(ownerInventory) as Packed[]];
   assert.equal(records.length,names.length);
   const packed=names.map(name=>{const matches=records.filter(record=>record.name===name);assert.equal(matches.length,1);return matches[0]!;});
   for (const archive of packed) {
@@ -71,8 +74,6 @@ test('native production CLI archive retains exact observation assets and execute
   const manifest = JSON.parse(readFileSync(resolve(installed, 'package.json'), 'utf8'));
   assert.equal(manifest.bin.trsd, './dist/cli/main.js'); const binary = resolve(installed, manifest.bin.trsd), bytes = readFileSync(binary);
   const env: NodeJS.ProcessEnv = { ...process.env, TREESEED_CONFIG_HOME: resolve(root, 'config') }; delete env.NODE_OPTIONS; delete env.NODE_TEST_CONTEXT;
-  const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, encoding: 'utf8' });
-  assert.equal(result.stderr, ''); assert.match(result.stdout, /trsd/u); assert.deepEqual(readFileSync(binary), bytes);
   const verifierRoot=resolve(root,'node_modules/@treeseed/reviewer');
   const verifierManifest=JSON.parse(readFileSync(resolve(verifierRoot,'package.json'),'utf8'));
   assert.equal(verifierManifest.name,'@treeseed/reviewer');assert.ok(verifierManifest.dependencies.tsx);
@@ -83,10 +84,14 @@ test('native production CLI archive retains exact observation assets and execute
   let denied='';try{await promisify(execFile)(process.execPath,invocation,{cwd:installed,env,encoding:'utf8'});assert.fail('Missing archived loader helper must deny');}
   catch(error){denied=String((error as {stdout?:string}).stdout??'');assert.equal(JSON.parse(denied).success,false);}
   writeFileSync(helper,helperBytes);
-  const native=JSON.parse((await promisify(execFile)(process.execPath,invocation,{cwd:installed,env,encoding:'utf8'})).stdout);
-  assert.equal(native.success,true);assert.equal(native.numPassedTests,1);assert.equal(native.numFailedTests,0);
-  assert.equal(createHash('sha256').update(readFileSync(verifierInput)).digest('hex'),verifierDigest);
-  assert.deepEqual(readFileSync(helper),helperBytes);assert.equal(JSON.parse(denied).success,false);
+  // The public-binary/readiness checks and original installed diagnostic case
+  // read the same immutable executable bytes and use separate temporary config.
+  // Wait for both outcomes before cleanup, including when either fails.
+  const outcomes=await Promise.allSettled([
+   promisify(execFile)(process.execPath,invocation,{cwd:installed,env,encoding:'utf8'}),
+   (async()=>{
+  const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(result.stderr, ''); assert.match(result.stdout, /trsd/u); assert.deepEqual(readFileSync(binary), bytes);
   const alias = resolve(root, 'trsd'), replacement = resolve(root, 'replacement.ts'), preload = resolve(root, 'switch-entrypoint.mts');
   symlinkSync(binary, alias); writeFileSync(replacement, bytes);
   writeFileSync(preload, `import{registerHooks}from'node:module';import{unlinkSync,symlinkSync,writeFileSync}from'node:fs';import{pathToFileURL}from'node:url';
@@ -103,6 +108,14 @@ unlinkSync(${JSON.stringify(alias)});symlinkSync(${JSON.stringify(replacement)},
   const after = await inventory();
   assert.equal(after.integrity, before.integrity, 'Development readiness changes must not change executable archive custody');
   assert.deepEqual(after.files, before.files); assert.deepEqual(readFileSync(binary), bytes);
+   })(),
+  ]);
+  for(const outcome of outcomes)if(outcome.status==='rejected')throw outcome.reason;
+  const observed=outcomes[0]!;assert.equal(observed.status,'fulfilled');
+  const native=JSON.parse(observed.value.stdout);
+  assert.equal(native.success,true);assert.equal(native.numPassedTests,1);assert.equal(native.numFailedTests,0);
+  assert.equal(createHash('sha256').update(readFileSync(verifierInput)).digest('hex'),verifierDigest);
+  assert.deepEqual(readFileSync(helper),helperBytes);assert.equal(JSON.parse(denied).success,false);
   for (const archive of packed) assert.equal(`sha512-${createHash('sha512').update(readFileSync(resolve(root, archive.filename))).digest('base64')}`, archive.integrity);
   assert.equal(createHash('sha256').update(readFileSync(sdkInput)).digest('hex'),sdkDigest);
   console.log(JSON.stringify({ archives: packed.map(archive => ({ filename: archive.filename,
