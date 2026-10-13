@@ -18,6 +18,10 @@ jobs:
       TREESEED_AGENT_DISABLE_GIT: "true"
       TREESEED_TOOL_CLOSURE_OUTPUT: artifacts
       TREESEED_DEVELOPMENT_WORKSPACE_ROOT: ${{ github.workspace }}/.treeseed/platform-authority
+      TREESEED_TEST_SDK_ARCHIVE: ${{ github.workspace }}/.treeseed/verified-sdk/treeseed-sdk-0.13.0-rc.122.tgz
+      TREESEED_TEST_SDK_ARCHIVE_SHA256: ff7a7af40bfce7398f137eabcbf9212f2e8d8f3ddb18c9f152df8b76fdb8c9e3
+      TREESEED_TEST_REVIEWER_ARCHIVE: ${{ github.workspace }}/.treeseed/verified-reviewer/treeseed-reviewer-0.1.0-rc.13.tgz
+      TREESEED_TEST_REVIEWER_ARCHIVE_SHA256: 063ef40142eaf603a37c14082aad7a34d326aefeae40026cf684af8bdc4bc274
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,8 +59,18 @@ jobs:
           set -euo pipefail
           mapfile -t archives < <(find .treeseed/verified-sdk -maxdepth 1 -type f -name '*.tgz')
           test "${#archives[@]}" -eq 1
-          echo "ff7a7af40bfce7398f137eabcbf9212f2e8d8f3ddb18c9f152df8b76fdb8c9e3  ${archives[0]}" | sha256sum --check --strict
+          test "${archives[0]}" -ef "$TREESEED_TEST_SDK_ARCHIVE"
+          echo "$TREESEED_TEST_SDK_ARCHIVE_SHA256  ${archives[0]}" | sha256sum --check --strict
           npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund "${archives[0]}"
+
+      - name: Obtain exact production verifier archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          repository: treeseed-ai/reviewer
+          run-id: 38348410425
+          name: reviewer-c04f1b295780d4758cbeee16a456d25272ec4b50
+          path: .treeseed/verified-reviewer
 
       - name: Verify package with exact SDK
         run: npm run verify:direct

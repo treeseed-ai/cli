@@ -1,6 +1,21 @@
 schemaVersion: treeseed.guarantee-verifiers/v1
 ownerPackage: "@treeseed/cli"
 verifiers:
+  cli.golden.native-preloads-unit:
+    kind: nodeTestCase
+    ownerPackage: '@treeseed/cli'
+    testFile: tests/unit/command-boundary/observation/native-loader.test.ts
+    testName: retains the original owning loader and import fence without importing CLI development dependencies or child test flags
+  cli.golden.native-preloads-syntax-unit:
+    kind: nodeTestCase
+    ownerPackage: '@treeseed/cli'
+    testFile: tests/unit/command-boundary/observation/native-loader.test.ts
+    testName: retains combined import syntax and order through the same original loader without mutating native arguments
+  cli.golden.native-preloads-denial-unit:
+    kind: nodeTestCase
+    ownerPackage: '@treeseed/cli'
+    testFile: tests/unit/command-boundary/observation/native-loader.test.ts
+    testName: denies missing malformed or unrelated owning loaders instead of falling back to checkout dependencies
   cli.golden.execution-diagnostics-read-unit:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"

@@ -28,7 +28,8 @@
     "treeseed.package.yaml",
     "guarantees",
     "tests/acceptance/workday-events.test.ts",
-    "tests/support/os-custody.ts"
+    "tests/support/os-custody.ts",
+    "tests/support/native-loader.ts"
   ],
   "publishConfig": {
     "access": "public"
