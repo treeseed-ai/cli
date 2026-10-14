@@ -33,7 +33,13 @@ test('ships the selected CLI native observation assets without checkout source e
  assert.equal(existsSync('tests/support/os-custody.mjs'), false);
 });
 
-test('native production CLI archive retains exact observation assets and executes its public binary without source or development dependencies', { timeout: 30_000 }, async () => {
+test('native production CLI archive retains exact observation assets and executes its public binary without source or development dependencies', { timeout: 30_000 }, async (context) => {
+ const execute = async (command:string,args:string[],cwd=process.cwd()) => {
+  const started=performance.now();console.log(JSON.stringify({nativeArchiveCommand:command,args,phase:'started'}));
+  try { const result=await promisify(execFile)(command,args,{cwd,signal:context.signal,encoding:'utf8',maxBuffer:8*1024*1024});console.log(JSON.stringify({nativeArchiveCommand:command,phase:'completed',elapsedMillis:performance.now()-started}));return result.stdout; }
+  catch(error){console.log(JSON.stringify({nativeArchiveCommand:command,phase:'failed',elapsedMillis:performance.now()-started}));throw error;}
+ };
+
  const root = mkdtempSync(resolve(tmpdir(), 'cli-installed-assets-'));
  try {
   const names = ['@treeseed/sdk', '@treeseed/identity', '@treeseed/cli'];
@@ -81,28 +87,30 @@ test('native production CLI archive retains exact observation assets and execute
   const runner=resolve(verifierRoot,'dist/verifiers/guarantees/node-case.js'),asset=resolve(installed,assets[2]!),helper=resolve(installed,assets[4]!);
   const helperBytes=readFileSync(helper);rmSync(helper);
   const invocation=[runner,asset,'packaged native workday diagnostic readback preserves exact clock bytes and denied history through unchanged retry without execution requests',resolve(root,'node_modules')];
-  let denied='';try{await promisify(execFile)(process.execPath,invocation,{cwd:installed,env,encoding:'utf8'});assert.fail('Missing archived loader helper must deny');}
+  let denied='';try{await promisify(execFile)(process.execPath,invocation,{cwd:installed,env,signal:context.signal,encoding:'utf8'});assert.fail('Missing archived loader helper must deny');}
   catch(error){denied=String((error as {stdout?:string}).stdout??'');assert.equal(JSON.parse(denied).success,false);}
   writeFileSync(helper,helperBytes);
   // The public-binary/readiness checks and original installed diagnostic case
   // read the same immutable executable bytes and use separate temporary config.
   // Wait for both outcomes before cleanup, including when either fails.
   const outcomes=await Promise.allSettled([
-   promisify(execFile)(process.execPath,invocation,{cwd:installed,env,encoding:'utf8'}),
+   promisify(execFile)(process.execPath,invocation,{cwd:installed,env,signal:context.signal,encoding:'utf8'}),
    (async()=>{
-  const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, encoding: 'utf8' });
+  const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, signal:context.signal, encoding: 'utf8' });
   assert.equal(result.stderr, ''); assert.match(result.stdout, /trsd/u); assert.deepEqual(readFileSync(binary), bytes);
   const alias = resolve(root, 'trsd'), replacement = resolve(root, 'replacement.ts'), preload = resolve(root, 'switch-entrypoint.mts');
   symlinkSync(binary, alias); writeFileSync(replacement, bytes);
   writeFileSync(preload, `import{registerHooks}from'node:module';import{unlinkSync,symlinkSync,writeFileSync}from'node:fs';import{pathToFileURL}from'node:url';
 registerHooks({resolve(specifier,context,next){if(context.parentURL===pathToFileURL(${JSON.stringify(binary)}).href&&specifier==='./runtime.js'){
 unlinkSync(${JSON.stringify(alias)});symlinkSync(${JSON.stringify(replacement)},${JSON.stringify(alias)});writeFileSync(${JSON.stringify(resolve(root,'switched'))},'observed');}return next(specifier,context);}});`);
-  const switched = await promisify(execFile)(process.execPath, ['--import', preload, alias, '--help'], { cwd: root, env, encoding: 'utf8' });
+  const switched = await promisify(execFile)(process.execPath, ['--import', preload, alias, '--help'], { cwd: root, env, signal:context.signal, encoding: 'utf8' });
   assert.equal(readFileSync(resolve(root, 'switched'), 'utf8'), 'observed');
   assert.equal(switched.stderr, ''); assert.match(switched.stdout, /trsd/u, 'The loaded public binary must finish even when its invocation symlink moves');
   assert.deepEqual(readFileSync(binary), bytes);
   const inventory = async () => (JSON.parse(await execute('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], installed)) as Packed[])[0]!;
-  const before = await inventory();
+  // Original held archive already owns the before inventory and exact bytes.
+  // Compare the installed post-readiness archive directly to that authority.
+  const before = packed.find(value => value.name === '@treeseed/cli'); assert.ok(before);
   for (const path of ['dist/.treeseed-build-complete.json', 'dist/.treeseed-build-complete.json.new'])
    writeFileSync(resolve(installed, path), JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' }));
   const after = await inventory();

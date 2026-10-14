@@ -856,3 +856,14 @@ verifiers:
     ownerPackage: "@treeseed/cli"
     testFile: tests/contract/package/installed-assets.test.ts
     testName: "native workday event cases never execute checkout source or substitute an unbound command"
+  cli.golden.sdk-hydration-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/integration/dependency-sbom.test.ts
+    testName: "native held SDK hydration preserves locked peers through exact replay and denied archive without changing original source bytes"
+  cli.golden.sdk-hydration-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/dependency-sbom.test.ts
+    testName: "held SDK hydration preserves locked bundled dependencies instead of resolving root ranges again"
+
