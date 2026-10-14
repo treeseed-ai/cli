@@ -24,3 +24,11 @@ test('strict SBOM is generated once by release verification before tests and can
 	assert.doesNotMatch(seal.run,/npm sbom/u);
 	assert.match(seal.run,/release:custody -- seal/u);
 });
+test('held SDK hydration preserves locked bundled dependencies instead of resolving root ranges again',()=>{
+ const workflow=parse(readFileSync('.github/workflows/verify.yml','utf8'));
+ const step=workflow.jobs.verify.steps.find((step:{name?:string})=>step.name==='Verify and install held SDK archive');
+ assert.ok(step);assert.doesNotMatch(step.run,/npm install/u,'a held SDK swap must not re-resolve React or another bundled dependency');
+ assert.match(step.run,/scripts\/build\/hydrate-exact-sdk\.ts/u);
+ assert.match(step.run,/TREESEED_TEST_SDK_ARCHIVE_SHA256/u);
+});
+
