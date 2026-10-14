@@ -516,3 +516,6 @@ workflow:
   - id: installed-event-command
     action: { verifier: cli.golden.installed-event-command }
     expect: { status: passed }
+  - id: sdk-hydration-native
+    action: { verifier: cli.golden.sdk-hydration-native }
+    expect: { status: passed }

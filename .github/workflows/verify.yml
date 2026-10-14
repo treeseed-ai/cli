@@ -61,7 +61,7 @@ jobs:
           test "${#archives[@]}" -eq 1
           test "${archives[0]}" -ef "$TREESEED_TEST_SDK_ARCHIVE"
           echo "$TREESEED_TEST_SDK_ARCHIVE_SHA256  ${archives[0]}" | sha256sum --check --strict
-          node --import tsx ./scripts/build/hydrate-exact-sdk.ts "${archives[0]}" "$TREESEED_TEST_SDK_ARCHIVE_SHA256"
+          node --import tsx ./scripts/build/hydrate-exact-sdk.ts "$TREESEED_TEST_SDK_ARCHIVE" "$TREESEED_TEST_SDK_ARCHIVE_SHA256"
 
       - name: Obtain exact production verifier archive
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
