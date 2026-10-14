@@ -15,7 +15,7 @@ function bytes(path: string): Buffer {
 }
 function native(command: string, args: string[], cwd: string): string {
  const result = spawnSync(command, args, { cwd, encoding: 'utf8', timeout: 20_000, maxBuffer: 8 * 1024 * 1024 });
- assert.ok(!result.error && result.signal === null && result.status === 0, 'Exact SDK archive command failed');
+ assert.ok(!result.error && result.signal === null && result.status === 0, `Exact SDK archive command failed (${command}, status ${result.status}, signal ${result.signal}): ${result.stderr}\n${result.stdout}`);
  return result.stdout;
 }
 const safe = (path: unknown): path is string => typeof path === 'string' && path.length > 0 && !isAbsolute(path)
