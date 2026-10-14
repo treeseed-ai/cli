@@ -458,13 +458,13 @@ async function runDevelopmentUnlocked(invocation: ParsedInvocation, context: Com
 	if (invocation.command.name.startsWith('dev host ')) return runHostDevelopment(invocation, context);
 	if (invocation.command.name === 'dev session start') return startSession(invocation, context);
 	if (invocation.command.name === 'dev use') return useTargets(invocation, context);
+	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId: String(invocation.options.session) } : {}), all: invocation.options.all === true });
 	const state = loadState(context.env,invocation.options.session), sessionId = String(invocation.options.session ?? state.sessionId);
 	if (invocation.options.plan === true && ['dev freeze', 'dev verify'].includes(invocation.command.name)) return { sessionId, action: invocation.command.name.slice(4), mutation: false };
 	if (invocation.command.name === 'dev session stop') {
 		if (invocation.options.plan === true) return { sessionId, restore: true, mutation: false };
 		return closeDevelopmentSession(state, sessionId, context, true);
 	}
-	if (invocation.command.name === 'dev status') return invoke(context, 'local.dev.status', { ...(invocation.options.session ? { sessionId } : {}), all: invocation.options.all === true });
 	if (invocation.command.name === 'dev plan') return invoke(context, 'local.dev.plan', { sessionId, selected: [] });
 	if (invocation.command.name === 'dev logs') {
 		const selected = typeof invocation.options.target === 'string' ? invocation.options.target : null;
