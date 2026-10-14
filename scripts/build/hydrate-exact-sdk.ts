@@ -61,13 +61,15 @@ export function hydrateExactSdk(archive: string, expectedSha256: string, root = 
   native('tar', ['--extract', '--gzip', '--file', held, '--directory', temporary, '--no-same-owner', '--no-same-permissions'], root);
   const prepared = join(temporary, 'package'), packaged = row(JSON.parse(bytes(join(prepared, 'package.json')).toString()));
   assert.equal(packaged.name, '@treeseed/sdk'); assert.equal(packaged.version, pin);
-  for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) assert.deepEqual(packaged[field] ?? {}, original[field] ?? {}, 'SDK dependency closure must remain the locked closure');
+  // The held archive owns its dependency declarations, including new SDK helpers.
+  // Resolve them inside SDK staging; CLI's locked peers remain outside this scope.
   for (const file of files) assert.equal(bytes(join(prepared, String(file.path))).length, file.size, 'SDK asset inventory differs from archive');
   if (existsSync(join(target, 'node_modules'))) {
    assert.equal(realpathSync(join(target, 'node_modules')), join(target, 'node_modules'));
    assert.equal(existsSync(join(prepared, 'node_modules')), false, 'A separate SDK dependency closure cannot replace locked inputs');
    cpSync(join(target, 'node_modules'), join(prepared, 'node_modules'), { recursive: true, dereference: false, verbatimSymlinks: true });
   }
+  native('npm', ['install', '--prefix', prepared, '--omit=dev', '--ignore-scripts', '--no-save', '--package-lock=false', '--no-audit', '--no-fund'], prepared);
   renameSync(target, previous); moved = true;
   renameSync(prepared, target); published = true;
   native('npm', ['ls', '--all', '--omit=dev', '--json'], root);
@@ -90,4 +92,3 @@ if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
  assert.equal(process.argv.length, 4, 'Usage: hydrate-exact-sdk.ts <absolute-archive> <sha256>');
  hydrateExactSdk(process.argv[2]!, process.argv[3]!);
 }
-

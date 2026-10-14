@@ -60,12 +60,19 @@ test('native held SDK hydration preserves locked peers through exact replay and 
    assert.deepEqual(readFileSync(join(root,'package-lock.json')),lock);assert.deepEqual(readFileSync(join(root,'node_modules/react/index.js')),peer);
   }
 
-  for(const invalid of [{...sdk,name:'another-owner'}, {...sdk,version:'1.0.1'}, {...sdk,dependencies:{'unexpected-owner':'1.0.0'}}]){
+  for(const invalid of [{...sdk,name:'another-owner'}, {...sdk,version:'1.0.1'}, {...sdk,dependencies:{'unexpected-owner':'file:/missing-native-SDK-dependency'}}]){
    writeFileSync(join(input,'package.json'),JSON.stringify(invalid));
    const result=JSON.parse((await run('npm',['pack','--ignore-scripts','--json','--pack-destination',archiveRoot],input)).stdout);
    const wrong=join(archiveRoot,result[0].filename),digest=createHash('sha256').update(readFileSync(wrong)).digest('hex');
    await assert.rejects(invoke(wrong,digest));assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);
   }
+
+  const dependency=join(root,'sdk-helper-input');mkdirSync(dependency);writeFileSync(join(dependency,'package.json'),JSON.stringify({name:'sdk-helper-fixture',version:'1.0.0',main:'index.js'}));writeFileSync(join(dependency,'index.js'),'module.exports = "held SDK helper";');
+  const dependencyPack=JSON.parse((await run('npm',['pack','--ignore-scripts','--json','--pack-destination',archiveRoot],dependency)).stdout);
+  writeFileSync(join(input,'package.json'),JSON.stringify({...sdk,dependencies:{'sdk-helper-fixture':'file:'+join(archiveRoot,dependencyPack[0].filename)}}));
+  const expanded=JSON.parse((await run('npm',['pack','--ignore-scripts','--json','--pack-destination',archiveRoot],input)).stdout),expandedArchive=join(archiveRoot,expanded[0].filename),expandedSha=createHash('sha256').update(readFileSync(expandedArchive)).digest('hex');
+  await invoke(expandedArchive,expandedSha);assert.equal(JSON.parse(readFileSync(join(root,'node_modules/@treeseed/sdk/node_modules/sdk-helper-fixture/package.json'),'utf8')).version,'1.0.0');
+  assert.deepEqual(readFileSync(join(root,'node_modules/react/index.js')),peer);assert.deepEqual(readFileSync(join(root,'package-lock.json')),lock);assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);
   const malformed=join(archiveRoot,'malformed.tgz');writeFileSync(malformed,'incomplete gzip archive');
   await assert.rejects(invoke(malformed,createHash('sha256').update(readFileSync(malformed)).digest('hex')));
   const linked=join(archiveRoot,'linked.tgz');symlinkSync(archive,linked);await assert.rejects(invoke(linked,sha));
