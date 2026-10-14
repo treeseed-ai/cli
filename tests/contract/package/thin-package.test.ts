@@ -207,6 +207,8 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 		reporting['cli.golden.installed-event-command'] = {testFile:'tests/contract/package/installed-assets.test.ts',testName:'native workday event cases never execute checkout source or substitute an unbound command'};
 		reporting['cli.golden.execution-diagnostics-read-native'] = {testFile:'tests/acceptance/workday-events.test.ts',testName:'packaged native workday diagnostic readback preserves exact clock bytes and denied history through unchanged retry without execution requests'};
 		reporting['cli.golden.architecture-workday-event-native'] = {testFile:'tests/acceptance/workday-events.test.ts',testName:'retrieves a later exact event page through independent native CLI and real HTTP transport'};
+	reporting['cli.golden.development-status-unit']={testFile:'tests/unit/command-boundary/development-session.test.ts',testName:'read-only development status needs no local selection and preserves exact manager scope and denial'};
+	reporting['cli.golden.development-status-native']={testFile:'tests/integration/development/status.test.ts',testName:'packaged native development status reads the complete manager inventory over the protected local socket without local state and preserves denial interruption and exact retry'};
 	const observedReporting = new Set<string>();
 	const files = readdirSync('guarantees', { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
 	assert.equal(files.length, 3);
