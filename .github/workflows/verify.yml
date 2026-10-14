@@ -72,6 +72,12 @@ jobs:
           name: reviewer-c04f1b295780d4758cbeee16a456d25272ec4b50
           path: .treeseed/verified-reviewer
 
+      - name: Prepare exclusive disposable native manager socket directory
+        run: |
+          set -euo pipefail
+          test ! -e /run/treeseed/manager/api.sock
+          sudo install -d -m 0755 -o "$(id -u)" -g "$(id -g)" /run/treeseed/manager
+
       - name: Verify package with exact SDK
         run: npm run verify:direct
       - name: Execute coded golden component scenes

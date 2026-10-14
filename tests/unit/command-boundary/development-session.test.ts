@@ -312,3 +312,23 @@ test('freeze binds completed generations and attestations while verify rejects a
 		assert.match(output.at(-1)!, /artifact custody failed/u);
 	} finally { rmSync(root, { recursive: true, force: true }); rmSync(stateRoot, { recursive: true, force: true }); }
 });
+
+test('read-only development status needs no local selection and preserves exact manager scope and denial', async () => {
+ const root=mkdtempSync(resolve(tmpdir(),'treeseed-cli-status-inventory-')),state=resolve(root,'state');
+ const env={...process.env,XDG_STATE_HOME:state},calls:unknown[]=[];
+ try{
+  for(const args of [[],['--all'],['--session','dev-exact']] as string[][]){
+   const output:string[]=[];const inventory={sessions:[]};
+   const exit=await runCommandLine(['dev','status',...args,'--json'],{env,interactiveUi:false,write:value=>output.push(value),hostInvoke:async input=>{calls.push(input);return inventory;}});
+   assert.equal(exit,0,output.join(''));assert.deepEqual(JSON.parse(output[0]!).result,inventory);
+   const call=calls.at(-1) as {handlerId:string;options:{payload:string}};assert.equal(call.handlerId,'local.dev.status');
+   assert.deepEqual(JSON.parse(call.options.payload),args.includes('--session')?{sessionId:'dev-exact',all:false}:{all:args.includes('--all')});
+   assert.equal(existsSync(state),false);
+  }
+  for(const failure of [new Error('original manager denial'),Object.assign(new Error('original interruption'),{code:'ECONNRESET'})]){
+   const output:string[]=[];assert.equal(await runCommandLine(['dev','status','--all','--json'],{env,interactiveUi:false,write:value=>output.push(value),hostInvoke:async()=>{throw failure;}}),1);
+   assert.match(output.join(''),/original manager denial|original interruption/u);assert.equal(existsSync(state),false);
+  }
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+

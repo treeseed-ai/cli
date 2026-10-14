@@ -3,6 +3,12 @@ id: cli.golden.component-boundaries
 title: Golden operator component boundaries
 scope: local-component-tests
 workflow:
+  - id: development-status-unit
+    action: { verifier: cli.golden.development-status-unit }
+    expect: { status: passed }
+  - id: development-status-native
+    action: { verifier: cli.golden.development-status-native }
+    expect: { status: passed }
   - id: native-preloads-unit
     action: { verifier: cli.golden.native-preloads-unit }
     expect: { status: passed }
