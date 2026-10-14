@@ -4,7 +4,7 @@ import {mkdirSync,mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync,execFile} from 'node:child_process';
-import {readFileSync,existsSync,readdirSync} from 'node:fs';
+import {readFileSync,existsSync,readdirSync,symlinkSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -40,7 +40,7 @@ test('native held SDK hydration preserves locked peers through exact replay and 
   const sdk={name:'@treeseed/sdk',version:'1.0.0',type:'module',files:['dist'],exports:{'.':'./dist/index.js'},dependencies:{}};
   writeFileSync(join(input,'package.json'),JSON.stringify(sdk));mkdirSync(join(input,'dist'));writeFileSync(join(input,'dist/index.js'),'export const original = "held-input";\n');
   const packed=JSON.parse((await run('npm',['pack','--ignore-scripts','--json','--pack-destination',archiveRoot],input)).stdout);assert.equal(packed.length,1);
-  const archive=join(archiveRoot,packed[0].filename),sha=createHash('sha256').update(readFileSync(archive)).digest('hex');
+  const archive=join(archiveRoot,'held.tgz');writeFileSync(archive,readFileSync(join(archiveRoot,packed[0].filename)));const sha=createHash('sha256').update(readFileSync(archive)).digest('hex');
   writeFileSync(join(root,'package.json'),JSON.stringify({name:'@treeseed/cli',version:'1.0.0',dependencies:{'@treeseed/sdk':'1.0.0',react:'^19.2.8'}}));
   writeFileSync(join(root,'package-lock.json'),JSON.stringify({name:'@treeseed/cli',version:'1.0.0',lockfileVersion:3,packages:{'':{dependencies:{'@treeseed/sdk':'1.0.0',react:'^19.2.8'}},'node_modules/@treeseed/sdk':{version:'1.0.0',dependencies:{}},'node_modules/react':{version:'19.2.8'}}}));
   writeFileSync(join(root,'node_modules/@treeseed/sdk/package.json'),JSON.stringify(sdk));writeFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js'),'original locked SDK bytes');
@@ -59,6 +59,18 @@ test('native held SDK hydration preserves locked peers through exact replay and 
    await assert.rejects(invoke(path,digest));assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);
    assert.deepEqual(readFileSync(join(root,'package-lock.json')),lock);assert.deepEqual(readFileSync(join(root,'node_modules/react/index.js')),peer);
   }
+
+  for(const invalid of [{...sdk,name:'another-owner'}, {...sdk,version:'1.0.1'}, {...sdk,dependencies:{'unexpected-owner':'1.0.0'}}]){
+   writeFileSync(join(input,'package.json'),JSON.stringify(invalid));
+   const result=JSON.parse((await run('npm',['pack','--ignore-scripts','--json','--pack-destination',archiveRoot],input)).stdout);
+   const wrong=join(archiveRoot,result[0].filename),digest=createHash('sha256').update(readFileSync(wrong)).digest('hex');
+   await assert.rejects(invoke(wrong,digest));assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);
+  }
+  const malformed=join(archiveRoot,'malformed.tgz');writeFileSync(malformed,'incomplete gzip archive');
+  await assert.rejects(invoke(malformed,createHash('sha256').update(readFileSync(malformed)).digest('hex')));
+  const linked=join(archiveRoot,'linked.tgz');symlinkSync(archive,linked);await assert.rejects(invoke(linked,sha));
+  const interrupted=join(root,'node_modules/@treeseed/.sdk-input');mkdirSync(interrupted);writeFileSync(join(interrupted,'retained'),'other writer or interrupted original bytes');
+  await assert.rejects(invoke());assert.equal(readFileSync(join(interrupted,'retained'),'utf8'),'other writer or interrupted original bytes');rmSync(interrupted,{recursive:true});
   assert.deepEqual(readFileSync(join(root,'package.json')),manifest);assert.deepEqual(readFileSync(join(root,'package-lock.json')),lock);
   assert.deepEqual(readFileSync(join(root,'node_modules/react/index.js')),peer);assert.deepEqual(readdirSync(join(root,'node_modules/@treeseed')),['sdk']);
  }finally{rmSync(root,{recursive:true,force:true});}
