@@ -192,6 +192,7 @@ test('guarantee metadata binds owner tests without adding a second CLI implement
 		'cli.golden.sdk-agreement': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'exact SDK artifact agrees with both dependency declarations before acceptance'},
 		'cli.golden.sbom-authority': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'strict SBOM is generated once by release verification before tests and candidate sealing'},
 		'cli.golden.sbom-native': {testFile:'tests/integration/dependency-sbom.test.ts',testName:'strict native SBOM accepts exact installed artifacts and refuses mismatched missing malformed dependencies'},
+		'cli.golden.sdk-hydration-unit': {testFile:'tests/unit/dependency-sbom.test.ts',testName:'held SDK hydration preserves locked bundled dependencies instead of resolving root ranges again'},
 		'cli.golden.sdk-hydration-native': {testFile:'tests/integration/dependency-sbom.test.ts',testName:'native held SDK hydration preserves locked peers through exact replay and denied archive without changing original source bytes'},
 		'cli.golden.workflow-triggers': {testFile:'tests/contract/package/thin-package.test.ts',testName:'verification retains every PR protected branch and tag without duplicate topic pushes'},
 		'cli.golden.reporting-deadlines': {testFile:'tests/unit/native-suite-reporting.test.ts',testName:'native reporting cannot replace original suite deadlines or interrupt policy through reporting flags'},
