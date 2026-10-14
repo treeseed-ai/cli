@@ -30,5 +30,5 @@ test('held SDK hydration preserves locked bundled dependencies instead of resolv
  assert.ok(step);assert.doesNotMatch(step.run,/npm install/u,'a held SDK swap must not re-resolve React or another bundled dependency');
  assert.match(step.run,/scripts\/build\/hydrate-exact-sdk\.ts/u);
  assert.match(step.run,/TREESEED_TEST_SDK_ARCHIVE_SHA256/u);
+ assert.match(step.run,/hydrate-exact-sdk\.ts "\$TREESEED_TEST_SDK_ARCHIVE"/u,'hydration requires the existing absolute held archive input');
 });
-
