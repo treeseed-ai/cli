@@ -50,6 +50,11 @@ test('native held SDK hydration preserves locked peers through exact replay and 
   const invoke=(path=archive,digest=sha)=>existsSync(helper)?run(process.execPath,['--import',resolve(source,'node_modules/tsx/dist/loader.mjs'),helper,path,digest]):run('bash',[resolve(source,'scripts/build/hydrate-exact-sdk.sh'),archiveRoot,'install']);
   await invoke();const held=readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js'));assert.equal(held.toString(),'export const original = "held-input";\n');
   await invoke();assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);
+  const concurrent=await Promise.allSettled([invoke(),invoke()]);assert.equal(concurrent.filter(value=>value.status==='fulfilled').length,1);assert.equal(concurrent.filter(value=>value.status==='rejected').length,1);
+  assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);
+  writeFileSync(join(root,'package.json'),JSON.stringify({...JSON.parse(manifest.toString()),dependencies:{'@treeseed/sdk':'1.0.0',react:'^19.2.8','missing-locked-dependency':'1.0.0'}}));
+  await assert.rejects(invoke());assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);writeFileSync(join(root,'package.json'),manifest);
+
   for(const[path,digest]of[[archive,'0'.repeat(64)],[join(root,'missing.tgz'),sha]]){
    await assert.rejects(invoke(path,digest));assert.deepEqual(readFileSync(join(root,'node_modules/@treeseed/sdk/dist/index.js')),held);
    assert.deepEqual(readFileSync(join(root,'package-lock.json')),lock);assert.deepEqual(readFileSync(join(root,'node_modules/react/index.js')),peer);
@@ -58,4 +63,3 @@ test('native held SDK hydration preserves locked peers through exact replay and 
   assert.deepEqual(readFileSync(join(root,'node_modules/react/index.js')),peer);assert.deepEqual(readdirSync(join(root,'node_modules/@treeseed')),['sdk']);
  }finally{rmSync(root,{recursive:true,force:true});}
 });
-
