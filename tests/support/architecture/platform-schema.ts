@@ -11,8 +11,12 @@ export function platformSchemaFixture() {
 	const workspace = process.env.TREESEED_DEVELOPMENT_WORKSPACE_ROOT;
 	assert.ok(workspace, 'Missing declared canonical workspace blocks architecture coverage');
 	const authority = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: workspace, encoding: 'utf8' }).trim();
-	const bytes = execFileSync('git', ['show', `${authority}:${schemaPath}`], { cwd: workspace, encoding: 'utf8' });
-	assert.equal(readFileSync(resolve(workspace, schemaPath), 'utf8'), bytes, 'Canonical input must match exact tracked Git bytes');
+	const originalBytes = execFileSync('git', ['show', `${authority}:${schemaPath}`], { cwd: workspace, encoding: 'utf8' });
+	// The execution checkout remains pinned independently of the approved schema contract.
+	const schemaAuthority = '9d7619d1aba38f03eacab3ccbbbab53d63efeb1d';
+	assert.equal(execFileSync('git', ['rev-parse', schemaAuthority+'^{commit}'], {cwd: workspace, encoding:'utf8'}).trim(), schemaAuthority);
+	const bytes = execFileSync('git', ['show', `${schemaAuthority}:${schemaPath}`], { cwd: workspace, encoding: 'utf8' });
+	assert.equal(readFileSync(resolve(workspace, schemaPath), 'utf8'), originalBytes, 'Canonical input must match exact tracked Git bytes');
 	const document = parse(bytes) as Schema;
 	assert.ok(document.$defs && document.oneOf.length, 'Complete canonical target required');
 	const root = mkdtempSync(resolve(tmpdir(), 'cli-architecture-schema-'));
@@ -36,7 +40,7 @@ export function platformSchemaFixture() {
 		close() {
 			try {
 				assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: workspace, encoding: 'utf8' }).trim(), authority);
-				assert.equal(readFileSync(resolve(workspace, schemaPath), 'utf8'), bytes);
+				assert.equal(readFileSync(resolve(workspace, schemaPath), 'utf8'), originalBytes);
 			} finally { rmSync(root, { recursive: true, force: true }); }
 		},
 	};

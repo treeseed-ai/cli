@@ -32,7 +32,8 @@ test('packaged native workday diagnostic readback preserves exact clock bytes an
 		] } };
 	const page = { items: [event], page: { limit: 50, hasMore: false, nextCursor: null } }, held = structuredClone(page);
 	const requests: Array<{ method: string | undefined; url: string; body: string }> = [];
-	let mode: 'accept' | 'denied' | 'unavailable' = 'accept', child: ReturnType<typeof spawn> | undefined;
+	let mode: 'accept' | 'denied' | 'unavailable' = 'accept';
+	const children=new Set<ReturnType<typeof spawn>>();
 	const server = createServer((request, response) => {
 		let body = ''; request.setEncoding('utf8'); request.on('data', value => { body += String(value); });
 		request.on('end', () => {
@@ -59,7 +60,8 @@ test('packaged native workday diagnostic readback preserves exact clock bytes an
 			assert.equal(command.length, 1);
 			const argv = [...command[0]!.path, runId, '--team', teamId, '--cursor', cursor, '--limit', '50', ...options, '--server', 'local', '--json'];
 			const before = structuredClone(argv);
-			child = spawn(process.execPath, [...preloads, '--import', custody, entrypoint, ...argv], { cwd: packageRoot, env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+			const child = spawn(process.execPath, [...preloads, '--import', custody, entrypoint, ...argv], { cwd: packageRoot, env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+			children.add(child);child.once('close',()=>children.delete(child));
 			let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
 			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
 			assert.deepEqual(argv, before); assert.equal(child.signalCode, null);
@@ -67,15 +69,21 @@ test('packaged native workday diagnostic readback preserves exact clock bytes an
 			assert.equal((code === 0 ? stderr : stdout).trim(), '');
 			return { code, envelope: JSON.parse(text) };
 		};
-		for (const detail of [undefined, 'metadata', 'full']) {
-			const start = requests.length, result = await execute(detail === undefined ? [] : ['--diagnostics', detail]);
+		const details=[undefined,'metadata','full'] as const, offset=requests.length;
+		const observe=async(detail:typeof details[number])=>{
+			const result = await execute(detail === undefined ? [] : ['--diagnostics', detail]);
 			assert.equal(result.code, 0); assert.equal(result.envelope.ok, true); assert.deepEqual(result.envelope.warnings, []);
 			const { protectedPayload: _protected, ...metadata } = event;
 			assert.deepEqual(result.envelope.result, detail === 'full' ? page : { ...page, items: [metadata] });
-			assert.equal(requests.length, start + 1); const requested = new URL(requests.at(-1)!.url, url);
+		};
+		// Independent read-only requests share one frozen page; at most two owned children.
+		for(let index=0;index<details.length;index+=2){const outcomes=await Promise.allSettled(details.slice(index,index+2).map(observe));for(const outcome of outcomes)if(outcome.status==='rejected')throw outcome.reason;}
+		assert.equal(requests.length,offset+details.length);
+		for(const detail of details){
+			const matches=requests.slice(offset).filter(value=>new URL(value.url,url).searchParams.get('diagnostics')===(detail??null));assert.equal(matches.length,1);const requested = new URL(matches[0]!.url,url);
 			assert.equal(requested.pathname, `/v1/teams/${teamId}/workday-runs/${runId}/events`);
 			assert.equal(requested.searchParams.get('diagnostics'), detail ?? null); assert.equal(requested.searchParams.get('cursor'), cursor);
-			assert.equal(requested.searchParams.get('limit'), '50'); assert.equal(requests.at(-1)!.method, 'GET'); assert.equal(requests.at(-1)!.body, '');
+			assert.equal(requested.searchParams.get('limit'), '50'); assert.equal(matches[0]!.method, 'GET'); assert.equal(matches[0]!.body, '');
 		}
 		for (const failure of ['denied', 'unavailable'] as const) {
 			mode = failure; const start = requests.length, failed = await execute(['--diagnostics', 'full']);
@@ -91,7 +99,7 @@ test('packaged native workday diagnostic readback preserves exact clock bytes an
 		assert.equal(malformed.envelope.error.category, 'invalid_input'); assert.equal(requests.length, start);
 		assert.deepEqual(page, held); assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve(packageRoot, 'package.json')), packageBytes);
 	} finally {
-		if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await new Promise<void>(accept => child!.once('close', () => accept())); }
+		await Promise.all([...children].map(child=>new Promise<void>(accept=>{if(child.exitCode!==null||child.signalCode!==null){accept();return;}child.once('close',()=>accept());child.kill();})));assert.equal(children.size,0);
 		server.closeAllConnections(); await new Promise<void>((accept, reject) => server.close(error => error ? reject(error) : accept()));
 		rmSync(root, { recursive: true, force: true }); assert.equal(server.listening, false); assert.equal(existsSync(root), false);
 	}

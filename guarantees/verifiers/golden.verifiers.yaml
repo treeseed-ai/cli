@@ -877,3 +877,8 @@ verifiers:
     testFile: tests/unit/dependency-sbom.test.ts
     testName: "held SDK hydration preserves locked bundled dependencies instead of resolving root ranges again"
 
+  cli.golden.workday-reporting-selection-unit:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "retains the exact independent closeout Reporter identity in both public Workday forms and rejects every malformed selector before plan or invocation"
