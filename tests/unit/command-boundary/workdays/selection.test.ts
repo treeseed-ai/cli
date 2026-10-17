@@ -234,7 +234,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 	const scheduleConfirmation = { ...confirmation, operationId: 'workdays.schedules.create', nonce: 'schedule-nonce' };
 	const frozen = structuredClone({ selected, preflight, confirmation, scheduleConfirmation }), decodedConfirmations: unknown[] = [];
 	const requests: Array<{ method: string | undefined; path: string | undefined; body: string; idempotency: string | undefined; confirmed: boolean }> = [];
-	let mode: 'accept' | 'stale' | 'denied' | 'unavailable' = 'accept'; const children=new Set<ReturnType<typeof spawn>>();
+	let mode: 'accept' | 'stale' | 'denied' | 'unavailable' = 'accept', child: ReturnType<typeof spawn> | undefined;
 	// HTTP replies/confirmation/credential are controlled INPUTS, not API governance, signed admission, or a real workday.
 	const server = createServer((request, response) => {
 		let body = ''; request.setEncoding('utf8'); request.on('data', chunk => { body += String(chunk); });
@@ -265,13 +265,11 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			serverId: 'local', audience: url, accessToken: 'isolated-fixture-token' }, env);
 		const execute = async (argv: string[]) => {
 			const before = structuredClone(argv);
-			const child = spawn(process.execPath, [entrypoint, ...argv, '--server', 'local', '--json'], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
-			children.add(child);let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
-			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close',code=>{children.delete(child);accept(code);}); });
+			child = spawn(process.execPath, [entrypoint, ...argv, '--server', 'local', '--json'], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+			let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
+			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
 			assert.deepEqual(argv, before); return { code, stdout, stderr };
 		};
-		// Only independent denial probes share these two bounded subprocess slots.
-		const inPairs=async<T>(values:readonly T[],apply:(value:T)=>Promise<void>)=>{for(let index=0;index<values.length;index+=2)await Promise.all(values.slice(index,index+2).map(apply));};
 		const plan = await execute([...base.slice(0, -1), '--decision', ' a:1,a.1,a ', '--decision', 'a/1,Z,a-1,A', '--decision', 'A']);
 		assert.equal(plan.code, 0); assert.equal(plan.stderr, ''); const planEnvelope = JSON.parse(plan.stdout);
 		assert.equal(planEnvelope.ok, true); assert.deepEqual(planEnvelope.result, preflight); assert.deepEqual(planEnvelope.warnings, []);
@@ -307,23 +305,25 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			assert.deepEqual(writes, Array.from({ length: successful ? 2 : 1 }, (_, index) => ({ method: 'POST', path: `/v1/teams/${teamId}/workday-runs`,
 				body: JSON.stringify({ preflightId: preflight.id, preflightDigest: selectedMode === 'stale' ? wrongDigest : digest }), idempotency: 'original-start-key', confirmed: successful && index === 1 })));
 		}
-		await inPairs([[...base.slice(0, -1), '--decision', 'decision,'], ['workdays', 'start', '--team', teamId, '--preflight', preflight.id],
+		for (const argv of [[...base.slice(0, -1), '--decision', 'decision,'], ['workdays', 'start', '--team', teamId, '--preflight', preflight.id],
 			[...base.slice(0, -1), '--decision', 'é'], [...base.slice(0, -1), '--decision', 'x'.repeat(201)],
 			['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--decision', 'é'],
 			['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--decision', 'x'.repeat(201)],
-			[...start, '--execution-plan', 'caller-derived'], [...base.slice(0, -1), '--activity', 'acting']],async argv=>{
+			[...start, '--execution-plan', 'caller-derived'], [...base.slice(0, -1), '--activity', 'acting']]) {
 			const offset:number = requests.length, result = await execute(argv);
 			assert.equal(result.code, 1); assert.equal(result.stdout, ''); const envelope = JSON.parse(result.stderr);
 			assert.equal(envelope.ok, false); assert.equal(envelope.result, null); assert.deepEqual(envelope.warnings, []); assert.equal(requests.length, offset);
-});
+		}
 		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation]);
-		await inPairs(['agent-author', 'capacity-plan-create', 'checkpoint-integrate', 'content-integrate', 'content-abandon'].flatMap(name=>[false,true].map(planned=>({name,planned}))),async({name,planned})=>{
+		for (const name of ['agent-author', 'capacity-plan-create', 'checkpoint-integrate', 'content-integrate', 'content-abandon']) {
+			for (const planned of [false, true]) {
 				const offset:number = requests.length, result = await execute([name, '--team', teamId, ...(planned ? ['--plan'] : [])]);
 				assert.equal(result.code, 1); assert.equal(result.stdout, '');
 				const envelope = JSON.parse(result.stderr); assert.equal(envelope.ok, false); assert.equal(envelope.result, null);
 				assert.equal(envelope.error.code, 'unknown_command'); assert.equal(envelope.error.category, 'unknown_command');
 				assert.deepEqual(envelope.warnings, []); assert.equal(requests.length, offset);
-		});
+			}
+		}
 		const retryOffset = requests.length, retry = await execute(base.slice(0, -1));
 		assert.equal(retry.code, 0); assert.equal(retry.stderr, ''); const retryEnvelope = JSON.parse(retry.stdout);
 		assert.equal(retryEnvelope.ok, true); assert.deepEqual(retryEnvelope.result, preflight); assert.deepEqual(retryEnvelope.warnings, []);
@@ -341,7 +341,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 				body: JSON.stringify(scheduled ? { intent, cadenceSeconds: 3600 } : intent), idempotency: 'selector-key', confirmed: scheduled && index === 1 })));
 		}
 		for (const scheduled of [false,true]) {
-			const command=scheduled?['workdays','schedules','start',...base.slice(2,-1),'--cadence-seconds','3600','--yes']:base.slice(0,-1),offset=requests.length;
+			const command=scheduled?['workdays','schedules','start',...base.slice(2,-1),'--cadence-seconds','3600','--yes']:base.slice(0,-1),offset:number=requests.length;
 			const reporter='Configured/Reporter-A',result=await execute([...command,'--reporting-agent',reporter,'--decision','decision-a','--agent','architect','--idempotency-key','reporter-key']);
 			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes:typeof requests=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
 			for(const write of writes){const body=JSON.parse(write.body),intent=scheduled?body.intent:body;assert.equal(intent.reportingAgentId,reporter);assert.deepEqual(intent.decisionIds,['decision-a']);assert.deepEqual(intent.agentSelection,{agentSlugs:['architect'],mode:'intersection'});assert.equal(write.idempotency,'reporter-key');}if(scheduled)assert.equal(writes[1]!.confirmed,true);
@@ -352,7 +352,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve('package.json')), packageBytes);
 	} finally {
 		try {
-			await Promise.all([...children].map(child=>new Promise<void>(accept=>{if(child.exitCode!==null||child.signalCode!==null){accept();return;}child.once('close',()=>accept());child.kill();})));assert.equal(children.size,0);
+			if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await new Promise<void>(accept => child!.once('close', () => accept())); }
 		} finally {
 			try { server.closeAllConnections(); await new Promise<void>((accept, reject) => server.close(error => error ? reject(error) : accept())); assert.equal(server.listening, false); }
 			finally { rmSync(root, { recursive: true, force: true }); }
