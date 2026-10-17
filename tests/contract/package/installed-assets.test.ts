@@ -94,6 +94,17 @@ test('native production CLI archive retains exact observation assets and execute
   // read the same immutable executable bytes and use separate temporary config.
   // Wait for both outcomes before cleanup, including when either fails.
   const outcomes=await Promise.allSettled([
+   (async()=>{
+  const inventory = async () => (JSON.parse(await execute('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], installed)) as Packed[])[0]!;
+  // Original held archive already owns the before inventory and exact bytes.
+  // Compare the installed post-readiness archive directly to that authority.
+  const before = packed.find(value => value.name === '@treeseed/cli'); assert.ok(before);
+  for (const path of ['dist/.treeseed-build-complete.json', 'dist/.treeseed-build-complete.json.new'])
+   writeFileSync(resolve(installed, path), JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' }));
+  const after = await inventory();
+  assert.equal(after.integrity, before.integrity, 'Development readiness changes must not change executable archive custody');
+  assert.deepEqual(after.files, before.files); assert.deepEqual(readFileSync(binary), bytes);
+   })(),
    promisify(execFile)(process.execPath,invocation,{cwd:installed,env,signal:context.signal,encoding:'utf8'}),
    (async()=>{
   const result = await promisify(execFile)(process.execPath, [binary, '--help'], { cwd: root, env, signal:context.signal, encoding: 'utf8' });
@@ -107,19 +118,11 @@ unlinkSync(${JSON.stringify(alias)});symlinkSync(${JSON.stringify(replacement)},
   assert.equal(readFileSync(resolve(root, 'switched'), 'utf8'), 'observed');
   assert.equal(switched.stderr, ''); assert.match(switched.stdout, /trsd/u, 'The loaded public binary must finish even when its invocation symlink moves');
   assert.deepEqual(readFileSync(binary), bytes);
-  const inventory = async () => (JSON.parse(await execute('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], installed)) as Packed[])[0]!;
-  // Original held archive already owns the before inventory and exact bytes.
-  // Compare the installed post-readiness archive directly to that authority.
-  const before = packed.find(value => value.name === '@treeseed/cli'); assert.ok(before);
-  for (const path of ['dist/.treeseed-build-complete.json', 'dist/.treeseed-build-complete.json.new'])
-   writeFileSync(resolve(installed, path), JSON.stringify({ completedAt: new Date().toISOString(), executable: 'cli/main.js' }));
-  const after = await inventory();
-  assert.equal(after.integrity, before.integrity, 'Development readiness changes must not change executable archive custody');
-  assert.deepEqual(after.files, before.files); assert.deepEqual(readFileSync(binary), bytes);
+
    })(),
   ]);
   for(const outcome of outcomes)if(outcome.status==='rejected')throw outcome.reason;
-  const observed=outcomes[0]!;assert.equal(observed.status,'fulfilled');
+  const observed=outcomes[1]!;assert.equal(observed.status,'fulfilled');
   const native=JSON.parse(observed.value.stdout);
   assert.equal(native.success,true);assert.equal(native.numPassedTests,1);assert.equal(native.numFailedTests,0);
   assert.equal(createHash('sha256').update(readFileSync(verifierInput)).digest('hex'),verifierDigest);

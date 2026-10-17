@@ -34,6 +34,14 @@ jobs:
           path: .treeseed/platform-authority
           persist-credentials: false
 
+      - name: Fetch exact approved canonical Reporter schema without switching execution authority
+        run: |
+          set -euo pipefail
+          test "$(git -C .treeseed/platform-authority rev-parse HEAD)" = e4c4cad1e526f53d3549c8fc27c3e60122b20ee4
+          git -C .treeseed/platform-authority fetch --no-tags origin 9d7619d1aba38f03eacab3ccbbbab53d63efeb1d
+          test "$(git -C .treeseed/platform-authority rev-parse FETCH_HEAD)" = 9d7619d1aba38f03eacab3ccbbbab53d63efeb1d
+          test "$(git -C .treeseed/platform-authority rev-parse HEAD)" = e4c4cad1e526f53d3549c8fc27c3e60122b20ee4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
