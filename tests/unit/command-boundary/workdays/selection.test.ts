@@ -233,7 +233,8 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		operationId: 'workdays.start', argumentsDigest: `sha256:${'c'.repeat(64)}`, expiresAt: '2030-01-01T00:00:00.000Z', nonce: 'original-nonce', signature: 'controlled-signature' };
 	const scheduleConfirmation = { ...confirmation, operationId: 'workdays.schedules.create', nonce: 'schedule-nonce' };
 	const frozen = structuredClone({ selected, preflight, confirmation, scheduleConfirmation }), decodedConfirmations: unknown[] = [];
-	const requests: Array<{ method: string | undefined; path: string | undefined; body: string; idempotency: string | undefined; confirmed: boolean }> = [];
+	type NativeRequest={ method: string | undefined; path: string | undefined; body: string; idempotency: string | undefined; confirmed: boolean };
+	const requests:NativeRequest[]=[];
 	let mode: 'accept' | 'stale' | 'denied' | 'unavailable' = 'accept', child: ReturnType<typeof spawn> | undefined;
 	// HTTP replies/confirmation/credential are controlled INPUTS, not API governance, signed admission, or a real workday.
 	const server = createServer((request, response) => {
@@ -301,7 +302,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			assert.equal(envelope.ok, successful); assert.deepEqual(envelope.warnings, []);
 			if (successful) assert.deepEqual(envelope.result, { started: true, preflightId: preflight.id, preflightDigest: digest });
 			else { assert.equal(envelope.result, null); assert.equal(envelope.error.code, selectedMode === 'stale' ? 'stale_preflight' : selectedMode === 'denied' ? 'team_access_denied' : 'isolated_unavailable'); }
-			const writes:typeof requests = requests.slice(offset); assert.equal(writes.length, successful ? 2 : 1);
+			const writes:NativeRequest[] = requests.slice(offset); assert.equal(writes.length, successful ? 2 : 1);
 			assert.deepEqual(writes, Array.from({ length: successful ? 2 : 1 }, (_, index) => ({ method: 'POST', path: `/v1/teams/${teamId}/workday-runs`,
 				body: JSON.stringify({ preflightId: preflight.id, preflightDigest: selectedMode === 'stale' ? wrongDigest : digest }), idempotency: 'original-start-key', confirmed: successful && index === 1 })));
 		}
@@ -343,7 +344,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		for (const scheduled of [false,true]) {
 			const command=scheduled?['workdays','schedules','start',...base.slice(2,-1),'--cadence-seconds','3600','--yes']:base.slice(0,-1),offset:number=requests.length;
 			const reporter='Configured/Reporter-A',result=await execute([...command,'--reporting-agent',reporter,'--decision','decision-a','--agent','architect','--idempotency-key','reporter-key']);
-			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes:typeof requests=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
+			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes:NativeRequest[]=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
 			for(const write of writes){const body=JSON.parse(write.body),intent=scheduled?body.intent:body;assert.equal(intent.reportingAgentId,reporter);assert.deepEqual(intent.decisionIds,['decision-a']);assert.deepEqual(intent.agentSelection,{agentSlugs:['architect'],mode:'intersection'});assert.equal(write.idempotency,'reporter-key');}if(scheduled)assert.equal(writes[1]!.confirmed,true);
 			for(const value of [' ','a,b','é','x'.repeat(201)]){const count:number=requests.length,denied=await execute([...command,'--reporting-agent',value]);assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.equal(JSON.parse(denied.stderr).error.code,'workday_reporting_selection_invalid');assert.equal(requests.length,count);}
 		}
