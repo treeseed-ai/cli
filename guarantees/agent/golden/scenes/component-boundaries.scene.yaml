@@ -529,3 +529,6 @@ workflow:
     action: { verifier: cli.golden.sdk-hydration-unit }
     expect: { status: passed }
 
+  - id: workday-reporting-selection-unit
+    action: { verifier: cli.golden.workday-reporting-selection-unit }
+    expect: { status: passed }
