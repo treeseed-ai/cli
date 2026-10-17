@@ -5985,6 +5985,11 @@
           "kind": "mutation",
           "options": [
             {
+              "name": "--reporting-agent",
+              "description": "Closeout Reporter identity; required when several are eligible.",
+              "type": "string"
+            },
+            {
               "name": "--planning-percent",
               "description": "Planning share of workday time and capacity (default 20%).",
               "type": "number"
@@ -6157,6 +6162,14 @@
                 "field": "continueFromWorkdayId",
                 "source": "option",
                 "name": "continueFrom",
+                "required": false,
+                "transform": "identity"
+              },
+              {
+                "target": "body",
+                "field": "reportingAgentId",
+                "source": "option",
+                "name": "reportingAgent",
                 "required": false,
                 "transform": "identity"
               },
@@ -6573,6 +6586,11 @@
                   "type": "boolean"
                 },
                 {
+                  "name": "--reporting-agent",
+                  "description": "Closeout Reporter identity; required when several are eligible.",
+                  "type": "string"
+                },
+                {
                   "name": "--planning-percent",
                   "description": "Planning share of workday time and capacity (default 20%).",
                   "type": "number"
@@ -6745,6 +6763,14 @@
                     "field": "intent.continueFromWorkdayId",
                     "source": "option",
                     "name": "continueFrom",
+                    "required": false,
+                    "transform": "identity"
+                  },
+                  {
+                    "target": "body",
+                    "field": "intent.reportingAgentId",
+                    "source": "option",
+                    "name": "reportingAgent",
                     "required": false,
                     "transform": "identity"
                   },
