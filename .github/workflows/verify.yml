@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: "true"
+      TREESEED_CLI_TEST_CONCURRENCY: "1"
       TREESEED_STAGE_WAIT_MODE: skip
       TREESEED_AGENT_DISABLE_GIT: "true"
       TREESEED_TOOL_CLOSURE_OUTPUT: artifacts
