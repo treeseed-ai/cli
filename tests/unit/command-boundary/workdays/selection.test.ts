@@ -36,6 +36,23 @@ test('rejects every retired execution authority command before any invocation in
 	assert.deepEqual(base, before);
 });
 
+
+test("retains the exact independent closeout Reporter identity in both public Workday forms and rejects every malformed selector before plan or invocation", async () => {
+	for (const scheduled of [false, true]) {
+		const command=scheduled?['workdays','schedules','start',...base.slice(2),'--cadence-seconds','3600']:[...base];
+		for(const value of ['Configured/Reporter-A','x'.repeat(200)])for(const planned of [false,true]) {
+			const argv=[...command,'--reporting-agent',value,'--agent','architect','--decision','decision-a',...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[],calls:Array<{id:string;input:unknown}>=[];
+			assert.equal(await runCommandLine(argv,{interactiveUi:false,write:part=>output.push(part),operationInvoke:async(id,input)=>{calls.push({id,input});return{data:{accepted:true}};}}),0);
+			const envelope=JSON.parse(output[0]!);assert.equal(envelope.ok,true);const input=planned?envelope.result.input:(calls[0]!.input as {body:unknown});
+			const intent=scheduled?getOperationInputField(input.body,'intent'):input.body;assert.equal(intent.reportingAgentId,value);assert.deepEqual(intent.agentSelection,{agentSlugs:['architect'],mode:'intersection'});assert.deepEqual(intent.decisionIds,['decision-a']);assert.equal(calls.length,planned?0:1);assert.deepEqual(argv,before);
+		}
+		for(const value of ['',' ',' Configured/Reporter-A','Configured/Reporter-A ','a,b','x'.repeat(201),'é','e\u0301','a?'])for(const planned of [false,true]) {
+			const argv=[...command,'--reporting-agent',value,...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[];let calls=0;
+			assert.equal(await runCommandLine(argv,{interactiveUi:false,write:part=>output.push(part),operationInvoke:async()=>{calls++;}}),1);assert.equal(calls,0);const envelope=JSON.parse(output[0]!);assert.equal(envelope.ok,false);assert.equal(envelope.error.category,'invalid_input');assert.equal(envelope.error.code,value===''?'invalid_input':'workday_reporting_selection_invalid');assert.deepEqual(argv,before);
+		}
+	}
+});
+
 test('high-level allocation options use one nested policy input', async () => {
 	let body: any;
 	assert.equal(await runCommandLine([...base, '--planning-percent', '20', '--allocation-weight', '2',
@@ -321,7 +338,14 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 				path: `/v1/teams/${teamId}/${scheduled ? 'workday-schedules' : 'workday-runs/preflight'}`,
 				body: JSON.stringify(scheduled ? { intent, cadenceSeconds: 3600 } : intent), idempotency: 'selector-key', confirmed: scheduled && index === 1 })));
 		}
-		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation, scheduleConfirmation]);
+		for (const scheduled of [false,true]) {
+			const command=scheduled?['workdays','schedules','start',...base.slice(2,-1),'--cadence-seconds','3600','--yes']:base.slice(0,-1),offset=requests.length;
+			const reporter='Configured/Reporter-A',result=await execute([...command,'--reporting-agent',reporter,'--decision','decision-a','--agent','architect','--idempotency-key','reporter-key']);
+			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
+			for(const write of writes){const body=JSON.parse(write.body),intent=scheduled?body.intent:body;assert.equal(intent.reportingAgentId,reporter);assert.deepEqual(intent.decisionIds,['decision-a']);assert.deepEqual(intent.agentSelection,{agentSlugs:['architect'],mode:'intersection'});assert.equal(write.idempotency,'reporter-key');}if(scheduled)assert.equal(writes[1]!.confirmed,true);
+			for(const value of [' ','a,b','é','x'.repeat(201)]){const count=requests.length,denied=await execute([...command,'--reporting-agent',value]);assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.equal(JSON.parse(denied.stderr).error.code,'workday_reporting_selection_invalid');assert.equal(requests.length,count);}
+		}
+		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation, scheduleConfirmation, scheduleConfirmation]);
 		assert.deepEqual({ selected, preflight, confirmation, scheduleConfirmation }, frozen);
 		assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve('package.json')), packageBytes);
 	} finally {
