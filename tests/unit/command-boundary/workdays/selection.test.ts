@@ -10,6 +10,8 @@ import { runCommandLine } from '../../../../src/cli/runtime.ts';
 import { getOperationInputField, setOperationInputField } from '../../../../src/cli/support/operations/input-fields.ts';
 import { saveServerSession } from '../../../../src/cli/support/server-custody.ts';
 
+function operationBody(input:unknown):Record<string,unknown>{assert.ok(input&&typeof input==='object'&&!Array.isArray(input)&&'body' in input);const body=input.body;assert.ok(body&&typeof body==='object'&&!Array.isArray(body));return body as Record<string,unknown>;}
+
 const base = ['workdays', 'plan', '--team', '11111111-1111-4111-8111-111111111111', '--profile', 'documentation', '--projects', 'sdk', '--start', '2030-01-01T00:00:00Z', '--duration', '600', '--json'];
 
 test('rejects every retired execution authority command before any invocation in both plan and execute mode and retains a valid original planning retry', async () => {
@@ -58,7 +60,7 @@ test('high-level allocation options use one nested policy input', async () => {
 	assert.equal(await runCommandLine([...base, '--planning-percent', '20', '--allocation-weight', '2',
 		'--planning-turn-maximum-seconds', '180', '--project-percentages', '{"sdk":60,"api":40}',
 		'--agent-class-percentages', '{"sdk":{"engineer":100}}'], {
-		interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = input.body; return { data: {} }; },
+		interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = operationBody(input); return { data: {} }; },
 	}), 0);
 	assert.deepEqual(body.allocation, { planningPercent: 20, allocationWeight: 2, planningTurnMaximumSeconds: 180,
 		projectPercentages: { sdk: 60, api: 40 }, agentClassPercentages: { sdk: { engineer: 100 } } });
@@ -89,7 +91,7 @@ test('manual and scheduled agent selectors omit empty internal arrays and satisf
 		argv.push('--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering');
 		const held = structuredClone(argv), calls: unknown[] = [];
 		assert.equal(await runCommandLine(argv, { interactiveUi: false, write() {}, operationInvoke: async (id, input) => {
-			assert.equal(controlPlaneOperation(id).schema.body.safeParse(input.body).success, true, 'Actual SDK public request must accept CLI selectors');
+			assert.equal(controlPlaneOperation(id).schema.body.safeParse(operationBody(input)).success, true, 'Actual SDK public request must accept CLI selectors');
 			calls.push(input); return { data: {} };
 		} }), 0);
 		const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600,
@@ -102,7 +104,7 @@ test('manual and scheduled agent selectors omit empty internal arrays and satisf
 test('repeated and CSV accepted decisions become one normalized selection', async () => {
 	let body: any;
 	const exit = await runCommandLine([...base, '--decision', 'decision-b,decision-a', '--decision', 'decision-b'], {
-		interactiveUi: false, write() {}, operationInvoke: async (_operationId, input) => { body = input.body; return { data: {} }; },
+		interactiveUi: false, write() {}, operationInvoke: async (_operationId, input) => { body = operationBody(input); return { data: {} }; },
 	});
 	assert.equal(exit, 0);
 	assert.deepEqual(body.decisionIds, ['decision-a', 'decision-b']);
@@ -110,7 +112,7 @@ test('repeated and CSV accepted decisions become one normalized selection', asyn
 
 test('omitted selection leaves the full intent unchanged', async () => {
 	let body: any;
-	assert.equal(await runCommandLine(base, { interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = input.body; return { data: {} }; } }), 0);
+	assert.equal(await runCommandLine(base, { interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = operationBody(input); return { data: {} }; } }), 0);
 	assert.equal(Object.hasOwn(body, 'agentSelection'), false);
 });
 
@@ -232,7 +234,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 	const scheduleConfirmation = { ...confirmation, operationId: 'workdays.schedules.create', nonce: 'schedule-nonce' };
 	const frozen = structuredClone({ selected, preflight, confirmation, scheduleConfirmation }), decodedConfirmations: unknown[] = [];
 	const requests: Array<{ method: string | undefined; path: string | undefined; body: string; idempotency: string | undefined; confirmed: boolean }> = [];
-	let mode: 'accept' | 'stale' | 'denied' | 'unavailable' = 'accept', child: ReturnType<typeof spawn> | undefined;
+	let mode: 'accept' | 'stale' | 'denied' | 'unavailable' = 'accept'; const children=new Set<ReturnType<typeof spawn>>();
 	// HTTP replies/confirmation/credential are controlled INPUTS, not API governance, signed admission, or a real workday.
 	const server = createServer((request, response) => {
 		let body = ''; request.setEncoding('utf8'); request.on('data', chunk => { body += String(chunk); });
@@ -263,11 +265,13 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			serverId: 'local', audience: url, accessToken: 'isolated-fixture-token' }, env);
 		const execute = async (argv: string[]) => {
 			const before = structuredClone(argv);
-			child = spawn(process.execPath, [entrypoint, ...argv, '--server', 'local', '--json'], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
-			let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
-			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close', accept); });
+			const child = spawn(process.execPath, [entrypoint, ...argv, '--server', 'local', '--json'], { cwd: process.cwd(), env, signal: context.signal, stdio: ['ignore', 'pipe', 'pipe'] });
+			children.add(child);let stdout = '', stderr = ''; child.stdout!.on('data', bytes => { stdout += String(bytes); }); child.stderr!.on('data', bytes => { stderr += String(bytes); });
+			const code = await new Promise<number | null>((accept, reject) => { child!.once('error', reject); child!.once('close',code=>{children.delete(child);accept(code);}); });
 			assert.deepEqual(argv, before); return { code, stdout, stderr };
 		};
+		// Only independent denial probes share these two bounded subprocess slots.
+		const inPairs=async<T>(values:readonly T[],apply:(value:T)=>Promise<void>)=>{for(let index=0;index<values.length;index+=2)await Promise.all(values.slice(index,index+2).map(apply));};
 		const plan = await execute([...base.slice(0, -1), '--decision', ' a:1,a.1,a ', '--decision', 'a/1,Z,a-1,A', '--decision', 'A']);
 		assert.equal(plan.code, 0); assert.equal(plan.stderr, ''); const planEnvelope = JSON.parse(plan.stdout);
 		assert.equal(planEnvelope.ok, true); assert.deepEqual(planEnvelope.result, preflight); assert.deepEqual(planEnvelope.warnings, []);
@@ -291,7 +295,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			idempotency: 'original-schedule-key', confirmed })));
 		const start = ['workdays', 'start', '--team', teamId, '--preflight', preflight.id, '--digest', preflight.preflightDigest, '--yes', '--idempotency-key', 'original-start-key'];
 		for (const selectedMode of ['accept', 'stale', 'denied', 'unavailable', 'accept'] as const) {
-			mode = selectedMode; const offset = requests.length;
+			mode = selectedMode; const offset:number = requests.length;
 			const argv = selectedMode === 'stale' ? start.map(value => value === digest ? wrongDigest : value) : [...start];
 			const result = await execute(argv), successful = selectedMode === 'accept';
 			assert.equal(result.code, successful ? 0 : 1); assert.equal(successful ? result.stderr : result.stdout, '');
@@ -299,29 +303,27 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			assert.equal(envelope.ok, successful); assert.deepEqual(envelope.warnings, []);
 			if (successful) assert.deepEqual(envelope.result, { started: true, preflightId: preflight.id, preflightDigest: digest });
 			else { assert.equal(envelope.result, null); assert.equal(envelope.error.code, selectedMode === 'stale' ? 'stale_preflight' : selectedMode === 'denied' ? 'team_access_denied' : 'isolated_unavailable'); }
-			const writes = requests.slice(offset); assert.equal(writes.length, successful ? 2 : 1);
+			const writes:typeof requests = requests.slice(offset); assert.equal(writes.length, successful ? 2 : 1);
 			assert.deepEqual(writes, Array.from({ length: successful ? 2 : 1 }, (_, index) => ({ method: 'POST', path: `/v1/teams/${teamId}/workday-runs`,
 				body: JSON.stringify({ preflightId: preflight.id, preflightDigest: selectedMode === 'stale' ? wrongDigest : digest }), idempotency: 'original-start-key', confirmed: successful && index === 1 })));
 		}
-		for (const argv of [[...base.slice(0, -1), '--decision', 'decision,'], ['workdays', 'start', '--team', teamId, '--preflight', preflight.id],
+		await inPairs([[...base.slice(0, -1), '--decision', 'decision,'], ['workdays', 'start', '--team', teamId, '--preflight', preflight.id],
 			[...base.slice(0, -1), '--decision', 'é'], [...base.slice(0, -1), '--decision', 'x'.repeat(201)],
 			['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--decision', 'é'],
 			['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--decision', 'x'.repeat(201)],
-			[...start, '--execution-plan', 'caller-derived'], [...base.slice(0, -1), '--activity', 'acting']]) {
-			const offset = requests.length, result = await execute(argv);
+			[...start, '--execution-plan', 'caller-derived'], [...base.slice(0, -1), '--activity', 'acting']],async argv=>{
+			const offset:number = requests.length, result = await execute(argv);
 			assert.equal(result.code, 1); assert.equal(result.stdout, ''); const envelope = JSON.parse(result.stderr);
 			assert.equal(envelope.ok, false); assert.equal(envelope.result, null); assert.deepEqual(envelope.warnings, []); assert.equal(requests.length, offset);
-		}
+});
 		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation]);
-		for (const name of ['agent-author', 'capacity-plan-create', 'checkpoint-integrate', 'content-integrate', 'content-abandon']) {
-			for (const planned of [false, true]) {
-				const offset = requests.length, result = await execute([name, '--team', teamId, ...(planned ? ['--plan'] : [])]);
+		await inPairs(['agent-author', 'capacity-plan-create', 'checkpoint-integrate', 'content-integrate', 'content-abandon'].flatMap(name=>[false,true].map(planned=>({name,planned}))),async({name,planned})=>{
+				const offset:number = requests.length, result = await execute([name, '--team', teamId, ...(planned ? ['--plan'] : [])]);
 				assert.equal(result.code, 1); assert.equal(result.stdout, '');
 				const envelope = JSON.parse(result.stderr); assert.equal(envelope.ok, false); assert.equal(envelope.result, null);
 				assert.equal(envelope.error.code, 'unknown_command'); assert.equal(envelope.error.category, 'unknown_command');
 				assert.deepEqual(envelope.warnings, []); assert.equal(requests.length, offset);
-			}
-		}
+		});
 		const retryOffset = requests.length, retry = await execute(base.slice(0, -1));
 		assert.equal(retry.code, 0); assert.equal(retry.stderr, ''); const retryEnvelope = JSON.parse(retry.stdout);
 		assert.equal(retryEnvelope.ok, true); assert.deepEqual(retryEnvelope.result, preflight); assert.deepEqual(retryEnvelope.warnings, []);
@@ -329,7 +331,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		assert.equal(requests[retryOffset]!.path, `/v1/teams/${teamId}/workday-runs/preflight`);
 		assert.equal(requests[retryOffset]!.body, JSON.stringify({ profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600 }));
 		for (const scheduled of [false, true]) {
-			const offset = requests.length, args = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--yes'] : base.slice(0, -1);
+			const offset:number = requests.length, args = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--yes'] : base.slice(0, -1);
 			const result = await execute([...args, '--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering', '--idempotency-key', 'selector-key']);
 			assert.equal(result.code, 0); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, true);
 			const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600,
@@ -341,16 +343,16 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		for (const scheduled of [false,true]) {
 			const command=scheduled?['workdays','schedules','start',...base.slice(2,-1),'--cadence-seconds','3600','--yes']:base.slice(0,-1),offset=requests.length;
 			const reporter='Configured/Reporter-A',result=await execute([...command,'--reporting-agent',reporter,'--decision','decision-a','--agent','architect','--idempotency-key','reporter-key']);
-			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
+			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes:typeof requests=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
 			for(const write of writes){const body=JSON.parse(write.body),intent=scheduled?body.intent:body;assert.equal(intent.reportingAgentId,reporter);assert.deepEqual(intent.decisionIds,['decision-a']);assert.deepEqual(intent.agentSelection,{agentSlugs:['architect'],mode:'intersection'});assert.equal(write.idempotency,'reporter-key');}if(scheduled)assert.equal(writes[1]!.confirmed,true);
-			for(const value of [' ','a,b','é','x'.repeat(201)]){const count=requests.length,denied=await execute([...command,'--reporting-agent',value]);assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.equal(JSON.parse(denied.stderr).error.code,'workday_reporting_selection_invalid');assert.equal(requests.length,count);}
+			for(const value of [' ','a,b','é','x'.repeat(201)]){const count:number=requests.length,denied=await execute([...command,'--reporting-agent',value]);assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.equal(JSON.parse(denied.stderr).error.code,'workday_reporting_selection_invalid');assert.equal(requests.length,count);}
 		}
 		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation, scheduleConfirmation, scheduleConfirmation]);
 		assert.deepEqual({ selected, preflight, confirmation, scheduleConfirmation }, frozen);
 		assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve('package.json')), packageBytes);
 	} finally {
 		try {
-			if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await new Promise<void>(accept => child!.once('close', () => accept())); }
+			await Promise.all([...children].map(child=>new Promise<void>(accept=>{if(child.exitCode!==null||child.signalCode!==null){accept();return;}child.once('close',()=>accept());child.kill();})));assert.equal(children.size,0);
 		} finally {
 			try { server.closeAllConnections(); await new Promise<void>((accept, reject) => server.close(error => error ? reject(error) : accept())); assert.equal(server.listening, false); }
 			finally { rmSync(root, { recursive: true, force: true }); }
