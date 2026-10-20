@@ -20,7 +20,7 @@ jobs:
       TREESEED_TOOL_CLOSURE_OUTPUT: artifacts
       TREESEED_DEVELOPMENT_WORKSPACE_ROOT: ${{ github.workspace }}/.treeseed/platform-authority
       TREESEED_TEST_SDK_ARCHIVE: ${{ github.workspace }}/.treeseed/verified-sdk/treeseed-sdk-0.13.0-rc.123.tgz
-      TREESEED_TEST_SDK_ARCHIVE_SHA256: 5f1e87184c9f363043452aaf963b4c0dbc9660e21f1835e652345e8af68e4849
+      TREESEED_TEST_SDK_ARCHIVE_SHA256: 002a50d5ffe9836856be9e37264ac12ed77e95e21eedb51b0fdf67ab9a842da6
       TREESEED_TEST_REVIEWER_ARCHIVE: ${{ github.workspace }}/.treeseed/verified-reviewer/treeseed-reviewer-0.1.0-rc.13.tgz
       TREESEED_TEST_REVIEWER_ARCHIVE_SHA256: 063ef40142eaf603a37c14082aad7a34d326aefeae40026cf684af8bdc4bc274
     steps:
@@ -59,8 +59,8 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: treeseed-ai/sdk
-          run-id: 39389815909
-          name: sdk-08b0380958bd891da4c995bdc365fd347cd55adb
+          run-id: 39452632737
+          name: sdk-69c07896708deaaed228cc6e14f12c41e5289981
           path: .treeseed/verified-sdk
 
       - name: Verify and install held SDK archive

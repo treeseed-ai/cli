@@ -6045,18 +6045,13 @@
               "type": "string"
             },
             {
-              "name": "--agent",
-              "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
+              "name": "--group",
+              "description": "Shared proposal group; participants come from governed subscriptions. Repeat or comma-separate.",
               "type": "string[]"
             },
             {
               "name": "--activity",
               "description": "Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.",
-              "type": "string[]"
-            },
-            {
-              "name": "--class",
-              "description": "Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.",
               "type": "string[]"
             }
           ],
@@ -6210,9 +6205,9 @@
               },
               {
                 "target": "body",
-                "field": "agentSelection.agentSlugs",
+                "field": "groupIds",
                 "source": "option",
-                "name": "agent",
+                "name": "group",
                 "transform": "csv"
               },
               {
@@ -6220,13 +6215,6 @@
                 "field": "agentSelection.activityTypes",
                 "source": "option",
                 "name": "activity",
-                "transform": "csv"
-              },
-              {
-                "target": "body",
-                "field": "agentSelection.classSlugs",
-                "source": "option",
-                "name": "class",
                 "transform": "csv"
               }
             ]
@@ -6641,18 +6629,13 @@
                   "type": "string"
                 },
                 {
-                  "name": "--agent",
-                  "description": "Planning agent slug; repeat or comma-separate. Intersects with class/activity selectors.",
+                  "name": "--group",
+                  "description": "Shared proposal group; participants come from governed subscriptions. Repeat or comma-separate.",
                   "type": "string[]"
                 },
                 {
                   "name": "--activity",
                   "description": "Planning activity: planning, estimating, reviewing, reporting, or chat; repeat or comma-separate.",
-                  "type": "string[]"
-                },
-                {
-                  "name": "--class",
-                  "description": "Planning class slug; repeat or comma-separate. Acting remains governed by accepted decisions.",
                   "type": "string[]"
                 },
                 {
@@ -6811,9 +6794,9 @@
                   },
                   {
                     "target": "body",
-                    "field": "intent.agentSelection.agentSlugs",
+                    "field": "intent.groupIds",
                     "source": "option",
-                    "name": "agent",
+                    "name": "group",
                     "transform": "csv"
                   },
                   {
@@ -6821,13 +6804,6 @@
                     "field": "intent.agentSelection.activityTypes",
                     "source": "option",
                     "name": "activity",
-                    "transform": "csv"
-                  },
-                  {
-                    "target": "body",
-                    "field": "intent.agentSelection.classSlugs",
-                    "source": "option",
-                    "name": "class",
                     "transform": "csv"
                   },
                   {
