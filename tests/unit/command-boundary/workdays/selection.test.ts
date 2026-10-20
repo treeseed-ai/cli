@@ -14,6 +14,23 @@ function operationBody(input:unknown):Record<string,unknown>{assert.ok(input&&ty
 
 const base = ['workdays', 'plan', '--team', '11111111-1111-4111-8111-111111111111', '--profile', 'documentation', '--projects', 'sdk', '--start', '2030-01-01T00:00:00Z', '--duration', '600', '--json'];
 
+test('shared groups replace individual and class proposal targeting in both public Workday forms', async () => {
+	for (const scheduled of [false, true]) {
+		const command = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600'] : base;
+		for (const selector of ['--agent', '--class']) {
+			let calls = 0;
+			assert.equal(await runCommandLine([...command, selector, 'engineer'], { interactiveUi: false, write() {},
+				operationInvoke: async () => { calls++; return { data: {} }; } }), 1);
+			assert.equal(calls, 0);
+		}
+		let intent: any;
+		assert.equal(await runCommandLine([...command, '--group', 'portfolio-atlas'], { interactiveUi: false, write() {},
+			operationInvoke: async (_id, input) => { const body = operationBody(input); intent = scheduled ? body.intent : body; return { data: {} }; } }), 0);
+		assert.deepEqual(intent.groupIds, ['portfolio-atlas']);
+		assert.equal(Object.hasOwn(intent, 'agentSelection'), false);
+	}
+});
+
 test('rejects every retired execution authority command before any invocation in both plan and execute mode and retains a valid original planning retry', async () => {
 	for (const name of ['agent-author', 'capacity-plan-create', 'checkpoint-integrate', 'content-integrate', 'content-abandon']) {
 		for (const planned of [false, true]) {
