@@ -14,6 +14,23 @@ function operationBody(input:unknown):Record<string,unknown>{assert.ok(input&&ty
 
 const base = ['workdays', 'plan', '--team', '11111111-1111-4111-8111-111111111111', '--profile', 'documentation', '--projects', 'sdk', '--start', '2030-01-01T00:00:00Z', '--duration', '600', '--json'];
 
+test('shared groups replace individual and class proposal targeting in both public Workday forms', async () => {
+	for (const scheduled of [false, true]) {
+		const command = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600'] : base;
+		for (const selector of ['--agent', '--class']) {
+			let calls = 0;
+			assert.equal(await runCommandLine([...command, selector, 'engineer'], { interactiveUi: false, write() {},
+				operationInvoke: async () => { calls++; return { data: {} }; } }), 1);
+			assert.equal(calls, 0);
+		}
+		let intent: any;
+		assert.equal(await runCommandLine([...command, '--group', 'portfolio-atlas'], { interactiveUi: false, write() {},
+			operationInvoke: async (_id, input) => { const body = operationBody(input); intent = scheduled ? body.intent : body; return { data: {} }; } }), 0);
+		assert.deepEqual(intent.groupIds, ['portfolio-atlas']);
+		assert.equal(Object.hasOwn(intent, 'agentSelection'), false);
+	}
+});
+
 test('rejects every retired execution authority command before any invocation in both plan and execute mode and retains a valid original planning retry', async () => {
 	for (const name of ['agent-author', 'capacity-plan-create', 'checkpoint-integrate', 'content-integrate', 'content-abandon']) {
 		for (const planned of [false, true]) {
@@ -43,10 +60,10 @@ test("retains the exact independent closeout Reporter identity in both public Wo
 	for (const scheduled of [false, true]) {
 		const command=scheduled?['workdays','schedules','start',...base.slice(2),'--cadence-seconds','3600']:[...base];
 		for(const value of ['Configured/Reporter-A','x'.repeat(200)])for(const planned of [false,true]) {
-			const argv=[...command,'--reporting-agent',value,'--agent','architect','--decision','decision-a',...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[],calls:Array<{id:string;input:unknown}>=[];
+			const argv=[...command,'--reporting-agent',value,'--group','portfolio-atlas','--decision','decision-a',...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[],calls:Array<{id:string;input:unknown}>=[];
 			assert.equal(await runCommandLine(argv,{interactiveUi:false,write:part=>output.push(part),operationInvoke:async(id,input)=>{calls.push({id,input});return{data:{accepted:true}};}}),0);
 			const envelope=JSON.parse(output[0]!);assert.equal(envelope.ok,true);const input=planned?envelope.result.input:(calls[0]!.input as {body:unknown});
-			const intent=scheduled?getOperationInputField(input.body,'intent'):input.body;assert.equal(intent.reportingAgentId,value);assert.deepEqual(intent.agentSelection,{agentSlugs:['architect'],mode:'intersection'});assert.deepEqual(intent.decisionIds,['decision-a']);assert.equal(calls.length,planned?0:1);assert.deepEqual(argv,before);
+			const intent=scheduled?getOperationInputField(input.body,'intent'):input.body;assert.equal(intent.reportingAgentId,value);assert.deepEqual(intent.groupIds,['portfolio-atlas']);assert.deepEqual(intent.decisionIds,['decision-a']);assert.equal(calls.length,planned?0:1);assert.deepEqual(argv,before);
 		}
 		for(const value of ['',' ',' Configured/Reporter-A','Configured/Reporter-A ','a,b','x'.repeat(201),'é','e\u0301','a?'])for(const planned of [false,true]) {
 			const argv=[...command,'--reporting-agent',value,...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[];let calls=0;
@@ -75,27 +92,28 @@ for (const options of [['--project-percentages', 'invalid'], ['--allocation-weig
 	});
 }
 
-test('repeated and CSV selectors become a normalized intersecting nested intent', async () => {
+test('repeated and CSV groups share one intent with activity selection', async () => {
 	const calls: Array<{ operationId: string; input: any }> = [];
-	const exit = await runCommandLine([...base, '--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering'], {
+	const exit = await runCommandLine([...base, '--group', 'portfolio-atlas,service-design', '--group', 'accessibility', '--activity', 'reviewing'], {
 		interactiveUi: false, write() {}, operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: {} }; },
 	});
 	assert.equal(exit, 0); assert.equal(calls.length, 1); assert.equal(calls[0]!.operationId, 'workdays.plan');
-	assert.deepEqual(calls[0]!.input.body.agentSelection, { classSlugs: ['engineering'], agentSlugs: ['architect', 'reviewer'], activityTypes: ['reviewing'], mode: 'intersection' });
+	assert.deepEqual(calls[0]!.input.body.groupIds, ['portfolio-atlas', 'service-design', 'accessibility']);
+	assert.deepEqual(calls[0]!.input.body.agentSelection, { activityTypes: ['reviewing'], mode: 'intersection' });
 	assert.equal(Object.keys(calls[0]!.input.body).some(key => key.includes('.')), false);
 });
 
-test('manual and scheduled agent selectors omit empty internal arrays and satisfy the same canonical public intent', async () => {
+test('manual and scheduled group selectors omit empty internal arrays and satisfy the same canonical public intent', async () => {
 	for (const scheduled of [false, true]) {
 		const argv = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600'] : [...base];
-		argv.push('--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering');
+		argv.push('--group', 'portfolio-atlas,service-design', '--group', 'accessibility', '--activity', 'reviewing');
 		const held = structuredClone(argv), calls: unknown[] = [];
 		assert.equal(await runCommandLine(argv, { interactiveUi: false, write() {}, operationInvoke: async (id, input) => {
 			assert.equal(controlPlaneOperation(id).schema.body.safeParse(operationBody(input)).success, true, 'Actual SDK public request must accept CLI selectors');
 			calls.push(input); return { data: {} };
 		} }), 0);
 		const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600,
-			agentSelection: { classSlugs: ['engineering'], agentSlugs: ['architect', 'reviewer'], activityTypes: ['reviewing'], mode: 'intersection' } };
+			groupIds: ['portfolio-atlas', 'service-design', 'accessibility'], agentSelection: { activityTypes: ['reviewing'], mode: 'intersection' } };
 		assert.deepEqual(calls, [{ path: { teamId: base[3] }, query: {}, body: scheduled ? { intent, cadenceSeconds: 3600 } : intent }]);
 		assert.deepEqual(argv, held);
 	}
@@ -123,7 +141,7 @@ for (const selector of [['--agent', ''], ['--agent', 'reviewer,'], ['--activity'
 		assert.equal(calls, 0);
 		const error = JSON.parse(output[0]!).error;
 		assert.equal(error.category, 'invalid_input');
-		assert.equal(error.code, selector[1] === '' ? 'invalid_input' : 'workday_agent_selection_invalid');
+		assert.equal(error.code, selector[0] === '--agent' || selector[1] === '' ? 'invalid_input' : 'workday_agent_selection_invalid');
 	});
 }
 
@@ -333,19 +351,19 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		assert.equal(requests[retryOffset]!.body, JSON.stringify({ profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600 }));
 		for (const scheduled of [false, true]) {
 			const offset:number = requests.length, args = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--yes'] : base.slice(0, -1);
-			const result = await execute([...args, '--agent', 'reviewer,architect', '--agent', 'reviewer', '--activity', 'reviewing', '--class', 'engineering', '--idempotency-key', 'selector-key']);
+			const result = await execute([...args, '--group', 'portfolio-atlas,service-design', '--group', 'accessibility', '--activity', 'reviewing', '--idempotency-key', 'selector-key']);
 			assert.equal(result.code, 0); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, true);
 			const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600,
-				agentSelection: { agentSlugs: ['architect', 'reviewer'], classSlugs: ['engineering'], activityTypes: ['reviewing'], mode: 'intersection' } };
+				groupIds: ['portfolio-atlas', 'service-design', 'accessibility'], agentSelection: { activityTypes: ['reviewing'], mode: 'intersection' } };
 			assert.deepEqual(requests.slice(offset), Array.from({ length: scheduled ? 2 : 1 }, (_, index) => ({ method: 'POST',
 				path: `/v1/teams/${teamId}/${scheduled ? 'workday-schedules' : 'workday-runs/preflight'}`,
 				body: JSON.stringify(scheduled ? { intent, cadenceSeconds: 3600 } : intent), idempotency: 'selector-key', confirmed: scheduled && index === 1 })));
 		}
 		for (const scheduled of [false,true]) {
 			const command=scheduled?['workdays','schedules','start',...base.slice(2,-1),'--cadence-seconds','3600','--yes']:base.slice(0,-1),offset:number=requests.length;
-			const reporter='Configured/Reporter-A',result=await execute([...command,'--reporting-agent',reporter,'--decision','decision-a','--agent','architect','--idempotency-key','reporter-key']);
+			const reporter='Configured/Reporter-A',result=await execute([...command,'--reporting-agent',reporter,'--decision','decision-a','--group','portfolio-atlas','--idempotency-key','reporter-key']);
 			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes:NativeRequest[]=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
-			for(const write of writes){const body=JSON.parse(write.body),intent=scheduled?body.intent:body;assert.equal(intent.reportingAgentId,reporter);assert.deepEqual(intent.decisionIds,['decision-a']);assert.deepEqual(intent.agentSelection,{agentSlugs:['architect'],mode:'intersection'});assert.equal(write.idempotency,'reporter-key');}if(scheduled)assert.equal(writes[1]!.confirmed,true);
+			for(const write of writes){const body=JSON.parse(write.body),intent=scheduled?body.intent:body;assert.equal(intent.reportingAgentId,reporter);assert.deepEqual(intent.decisionIds,['decision-a']);assert.deepEqual(intent.groupIds,['portfolio-atlas']);assert.equal(write.idempotency,'reporter-key');}if(scheduled)assert.equal(writes[1]!.confirmed,true);
 			for(const value of [' ','a,b','é','x'.repeat(201)]){const count:number=requests.length,denied=await execute([...command,'--reporting-agent',value]);assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.equal(JSON.parse(denied.stderr).error.code,'workday_reporting_selection_invalid');assert.equal(requests.length,count);}
 		}
 		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation, scheduleConfirmation, scheduleConfirmation]);
