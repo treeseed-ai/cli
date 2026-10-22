@@ -1360,6 +1360,21 @@ Execution: `local.host.sandbox.doctor`.
 - `--server <value>`: Control-plane server profile or URL.
 - `--json`: Emit the stable JSON envelope.
 
+## trsd host sandbox source
+
+Source operations.
+
+### trsd host sandbox source export
+
+Export the selected resource.
+
+Operation: read. Result schema: `treeseed.command.export/v1`.
+Execution: `local.host.sandbox.source.export`.
+
+- `--server <value>`: Control-plane server profile or URL.
+- `--json`: Emit the stable JSON envelope.
+- `--payload <value>`: Exact published source selection as JSON; validated by the owning local manager.
+
 ## trsd host fleet
 
 Fleet operations.

@@ -3536,6 +3536,32 @@
                 "kind": "local",
                 "handlerId": "local.host.sandbox.doctor"
               }
+            },
+            {
+              "nodeType": "branch",
+              "segment": "source",
+              "description": "Source operations.",
+              "children": [
+                {
+                  "nodeType": "leaf",
+                  "segment": "export",
+                  "description": "Export the selected resource.",
+                  "kind": "read",
+                  "options": [
+                    {
+                      "name": "--payload",
+                      "description": "Exact published source selection as JSON; validated by the owning local manager.",
+                      "type": "string",
+                      "required": true
+                    }
+                  ],
+                  "resultSchemaId": "treeseed.command.export/v1",
+                  "execution": {
+                    "kind": "local",
+                    "handlerId": "local.host.sandbox.source.export"
+                  }
+                }
+              ]
             }
           ]
         },
