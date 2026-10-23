@@ -1,5 +1,5 @@
 import { ComposeDeploymentHost, type DeploymentHost } from '@treeseed-cordis/deployment';
-import { PlatformSchemas, type CliEnvelope, type DiagnosticConfiguration, type DiagnosticReport } from '@treeseed-cordis/sdk';
+import { PlatformSchemas, type CliEnvelope, type DiagnosticConfiguration } from '@treeseed-cordis/sdk';
 
 export interface CliExecution {code:0|1|2|3;json:boolean;envelope:CliEnvelope;}
 class ArgumentProblem extends Error {}
