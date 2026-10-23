@@ -100,7 +100,17 @@ verifiers:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/workdays/selection.test.ts
-    testName: "packaged native CLI preserves decision and preflight bytes through confirmation denial and exact retry without derived writes"
+    testName: "packaged native CLI preserves decision custody and exact retry without derived writes"
+  cli.golden.architecture-retired-execution-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "packaged native CLI preserves retired execution denial without derived writes"
+  cli.golden.architecture-group-admission-native:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "packaged native CLI preserves group selector admission without derived writes"
   cli.golden.architecture-graph-watch-1:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
@@ -881,4 +891,9 @@ verifiers:
     kind: nodeTestCase
     ownerPackage: "@treeseed/cli"
     testFile: tests/unit/command-boundary/workdays/selection.test.ts
-    testName: "retains the exact independent closeout Reporter identity in both public Workday forms and rejects every malformed selector before plan or invocation"
+    testName: "rejects every named closeout selector in both public Workday forms before plan or invocation"
+  cli.golden.workday-group-scope-required:
+    kind: nodeTestCase
+    ownerPackage: "@treeseed/cli"
+    testFile: tests/unit/command-boundary/workdays/selection.test.ts
+    testName: "projects alone cannot admit or preview an unscoped Workday while explicit groups retain the full audience"

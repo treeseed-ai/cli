@@ -2287,7 +2287,6 @@ Control-plane operation: `workdays.plan`.
 - `--objective <value>`: Objective filter.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
-- `--reporting-agent <value>`: Closeout Reporter identity; required when several are eligible.
 - `--planning-percent <value>`: Planning share of workday time and capacity (default 20%).
 - `--allocation-weight <value>`: Relative share among eligible concurrent workdays (default 1).
 - `--planning-turn-maximum-seconds <value>`: Maximum active seconds per planning turn (default 180).
@@ -2438,7 +2437,6 @@ Control-plane operation: `workdays.schedules.create`.
 - `--json`: Emit the stable JSON envelope.
 - `--idempotency-key <value>`: Reuse the same request identity when retrying this mutation.
 - `--plan`: Return the exact proposed outcome without mutation.
-- `--reporting-agent <value>`: Closeout Reporter identity; required when several are eligible.
 - `--planning-percent <value>`: Planning share of workday time and capacity (default 20%).
 - `--allocation-weight <value>`: Relative share among eligible concurrent workdays (default 1).
 - `--planning-turn-maximum-seconds <value>`: Maximum active seconds per planning turn (default 180).

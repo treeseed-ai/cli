@@ -72,6 +72,12 @@ workflow:
   - id: architecture-decision-start-native-1
     action: { verifier: cli.golden.architecture-decision-start-native-1 }
     expect: { status: passed }
+  - id: architecture-retired-execution-native
+    action: { verifier: cli.golden.architecture-retired-execution-native }
+    expect: { status: passed }
+  - id: architecture-group-admission-native
+    action: { verifier: cli.golden.architecture-group-admission-native }
+    expect: { status: passed }
   - id: architecture-graph-watch-1
     action: { verifier: cli.golden.architecture-graph-watch-1 }
     expect: { status: passed }
@@ -531,4 +537,7 @@ workflow:
 
   - id: workday-reporting-selection-unit
     action: { verifier: cli.golden.workday-reporting-selection-unit }
+    expect: { status: passed }
+  - id: workday-group-scope-required
+    action: { verifier: cli.golden.workday-group-scope-required }
     expect: { status: passed }

@@ -45,10 +45,10 @@ test('rejects every retired execution authority command before any invocation in
 		}
 	}
 	const before = structuredClone(base), calls: Array<{ operationId: string; input: unknown }> = [], output: string[] = [];
-	assert.equal(await runCommandLine([...base], { interactiveUi: false, write: value => output.push(value),
+	assert.equal(await runCommandLine([...base, '--group', 'portfolio-atlas'], { interactiveUi: false, write: value => output.push(value),
 		operationInvoke: async (operationId, input) => { calls.push({ operationId, input }); return { data: { id: 'original-preflight' } }; } }), 0);
 	assert.deepEqual(calls, [{ operationId: 'workdays.plan', input: { path: { teamId: base[3] }, query: {}, body: {
-		profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600,
+		profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600, groupIds: ['portfolio-atlas'],
 	} } }]);
 	assert.equal(output.length, 1); const envelope = JSON.parse(output[0]!);
 	assert.equal(envelope.ok, true); assert.deepEqual(envelope.result, { id: 'original-preflight' }); assert.deepEqual(envelope.warnings, []);
@@ -56,25 +56,19 @@ test('rejects every retired execution authority command before any invocation in
 });
 
 
-test("retains the exact independent closeout Reporter identity in both public Workday forms and rejects every malformed selector before plan or invocation", async () => {
+test("rejects every named closeout selector in both public Workday forms before plan or invocation", async () => {
 	for (const scheduled of [false, true]) {
 		const command=scheduled?['workdays','schedules','start',...base.slice(2),'--cadence-seconds','3600']:[...base];
-		for(const value of ['Configured/Reporter-A','x'.repeat(200)])for(const planned of [false,true]) {
-			const argv=[...command,'--reporting-agent',value,'--group','portfolio-atlas','--decision','decision-a',...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[],calls:Array<{id:string;input:unknown}>=[];
-			assert.equal(await runCommandLine(argv,{interactiveUi:false,write:part=>output.push(part),operationInvoke:async(id,input)=>{calls.push({id,input});return{data:{accepted:true}};}}),0);
-			const envelope=JSON.parse(output[0]!);assert.equal(envelope.ok,true);const input=planned?envelope.result.input:(calls[0]!.input as {body:unknown});
-			const intent=scheduled?getOperationInputField(input.body,'intent'):input.body;assert.equal(intent.reportingAgentId,value);assert.deepEqual(intent.groupIds,['portfolio-atlas']);assert.deepEqual(intent.decisionIds,['decision-a']);assert.equal(calls.length,planned?0:1);assert.deepEqual(argv,before);
-		}
-		for(const value of ['',' ',' Configured/Reporter-A','Configured/Reporter-A ','a,b','x'.repeat(201),'é','e\u0301','a?'])for(const planned of [false,true]) {
-			const argv=[...command,'--reporting-agent',value,...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[];let calls=0;
-			assert.equal(await runCommandLine(argv,{interactiveUi:false,write:part=>output.push(part),operationInvoke:async()=>{calls++;}}),1);assert.equal(calls,0);const envelope=JSON.parse(output[0]!);assert.equal(envelope.ok,false);assert.equal(envelope.error.category,'invalid_input');assert.equal(envelope.error.code,value===''?'invalid_input':'workday_reporting_selection_invalid');assert.deepEqual(argv,before);
+		for(const value of ['Configured/Reporter-A','x'.repeat(200),'',' ',' Configured/Reporter-A','Configured/Reporter-A ','a,b','x'.repeat(201),'é','e\u0301','a?'])for(const planned of [false,true]) {
+			const argv=[...command,'--group','portfolio-atlas','--reporting-agent',value,...(planned?['--plan']:[])],before=structuredClone(argv),output:string[]=[];let calls=0;
+			assert.equal(await runCommandLine(argv,{interactiveUi:false,write:part=>output.push(part),operationInvoke:async()=>{calls++;}}),1);assert.equal(calls,0);const envelope=JSON.parse(output[0]!);assert.equal(envelope.ok,false);assert.equal(envelope.error.category,'invalid_input');assert.equal(envelope.error.code,'invalid_input');assert.deepEqual(argv,before);
 		}
 	}
 });
 
 test('high-level allocation options use one nested policy input', async () => {
 	let body: any;
-	assert.equal(await runCommandLine([...base, '--planning-percent', '20', '--allocation-weight', '2',
+	assert.equal(await runCommandLine([...base, '--group', 'portfolio-atlas', '--planning-percent', '20', '--allocation-weight', '2',
 		'--planning-turn-maximum-seconds', '180', '--project-percentages', '{"sdk":60,"api":40}',
 		'--agent-class-percentages', '{"sdk":{"engineer":100}}'], {
 		interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = operationBody(input); return { data: {} }; },
@@ -128,10 +122,18 @@ test('repeated and CSV accepted decisions become one normalized selection', asyn
 	assert.deepEqual(body.decisionIds, ['decision-a', 'decision-b']);
 });
 
-test('omitted selection leaves the full intent unchanged', async () => {
-	let body: any;
-	assert.equal(await runCommandLine(base, { interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { body = operationBody(input); return { data: {} }; } }), 0);
-	assert.equal(Object.hasOwn(body, 'agentSelection'), false);
+test('projects alone cannot admit or preview an unscoped Workday while explicit groups retain the full audience', async () => {
+	for (const scheduled of [false, true]) for (const planned of [false, true]) {
+		const command = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2), '--cadence-seconds', '3600'] : base;
+		const output: string[] = []; let calls = 0;
+		assert.equal(await runCommandLine([...command, ...(planned ? ['--plan'] : [])], { interactiveUi: false, write: part => output.push(part),
+			operationInvoke: async () => { calls++; } }), 1);
+		assert.equal(calls, 0); assert.equal(JSON.parse(output[0]!).error.code, 'command_body_invalid');
+	}
+	let body: Record<string, unknown> | undefined;
+	assert.equal(await runCommandLine([...base, '--group', 'portfolio-atlas'], { interactiveUi: false, write() {},
+		operationInvoke: async (_id, input) => { body = operationBody(input); return { data: {} }; } }), 0);
+	assert.ok(body); assert.deepEqual(body.groupIds, ['portfolio-atlas']); assert.equal(Object.hasOwn(body, 'agentSelection'), false);
 });
 
 for (const selector of [['--agent', ''], ['--agent', 'reviewer,'], ['--activity', 'acting'], ['--activity', 'reviewng']]) {
@@ -191,9 +193,8 @@ test('normalizes exact repeated CSV decision bytes for direct and scheduled inte
 		const intent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600, decisionIds: ids };
 		assert.deepEqual(calls, [{ path: { teamId: base[3] }, query: {}, body: scheduled ? { intent, cadenceSeconds: 3600 } : intent }]);
 		const omitted: unknown[] = [];
-		assert.equal(await runCommandLine(argv, { interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { omitted.push(input); return { data: {} }; } }), 0);
-		const fullIntent = { profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600 };
-		assert.deepEqual(omitted, [{ path: { teamId: base[3] }, query: {}, body: scheduled ? { intent: fullIntent, cadenceSeconds: 3600 } : fullIntent }]);
+		assert.equal(await runCommandLine(argv, { interactiveUi: false, write() {}, operationInvoke: async (_id, input) => { omitted.push(input); return { data: {} }; } }), 1);
+		assert.deepEqual(omitted, []);
 	}
 });
 
@@ -238,7 +239,7 @@ test('binds start only to the supplied exact preflight identity and digest and n
 	}
 });
 
-test('packaged native CLI preserves decision and preflight bytes through confirmation denial and exact retry without derived writes', { timeout: 30_000 }, async context => {
+for (const scene of ['decision custody and exact retry', 'retired execution denial', 'group selector admission'] as const) test(`packaged native CLI preserves ${scene} without derived writes`, { timeout: 30_000 }, async context => {
 	// The package's actual bin, never the source entrypoint or a replacement runner. Missing dist must fail; no build/install/skip.
 	const manifest = JSON.parse(readFileSync(resolve('package.json'), 'utf8'));
 	assert.equal(manifest.bin.trsd, './dist/cli/main.js'); const entrypoint = resolve(manifest.bin.trsd);
@@ -291,6 +292,7 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		};
 		// Only independent denial probes share these two bounded subprocess slots.
 		const inPairs=async<T>(values:readonly T[],apply:(value:T)=>Promise<void>)=>{for(let index=0;index<values.length;index+=2)await Promise.all(values.slice(index,index+2).map(apply));};
+		if (scene === 'decision custody and exact retry') {
 		const plan = await execute([...base.slice(0, -1), '--decision', ' a:1,a.1,a ', '--decision', 'a/1,Z,a-1,A', '--decision', 'A']);
 		assert.equal(plan.code, 0); assert.equal(plan.stderr, ''); const planEnvelope = JSON.parse(plan.stdout);
 		assert.equal(planEnvelope.ok, true); assert.deepEqual(planEnvelope.result, preflight); assert.deepEqual(planEnvelope.warnings, []);
@@ -326,6 +328,9 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			assert.deepEqual(writes, Array.from({ length: successful ? 2 : 1 }, (_, index) => ({ method: 'POST', path: `/v1/teams/${teamId}/workday-runs`,
 				body: JSON.stringify({ preflightId: preflight.id, preflightDigest: selectedMode === 'stale' ? wrongDigest : digest }), idempotency: 'original-start-key', confirmed: successful && index === 1 })));
 		}
+		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation]);
+		} else if (scene === 'retired execution denial') {
+		const start = ['workdays', 'start', '--team', teamId, '--preflight', preflight.id, '--digest', preflight.preflightDigest, '--yes', '--idempotency-key', 'original-start-key'];
 		await inPairs([[...base.slice(0, -1), '--decision', 'decision,'], ['workdays', 'start', '--team', teamId, '--preflight', preflight.id],
 			[...base.slice(0, -1), '--decision', 'é'], [...base.slice(0, -1), '--decision', 'x'.repeat(201)],
 			['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--decision', 'é'],
@@ -335,7 +340,6 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 			assert.equal(result.code, 1); assert.equal(result.stdout, ''); const envelope = JSON.parse(result.stderr);
 			assert.equal(envelope.ok, false); assert.equal(envelope.result, null); assert.deepEqual(envelope.warnings, []); assert.equal(requests.length, offset);
 });
-		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation]);
 		await inPairs(['agent-author', 'capacity-plan-create', 'checkpoint-integrate', 'content-integrate', 'content-abandon'].flatMap(name=>[false,true].map(planned=>({name,planned}))),async({name,planned})=>{
 				const offset:number = requests.length, result = await execute([name, '--team', teamId, ...(planned ? ['--plan'] : [])]);
 				assert.equal(result.code, 1); assert.equal(result.stdout, '');
@@ -343,12 +347,14 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 				assert.equal(envelope.error.code, 'unknown_command'); assert.equal(envelope.error.category, 'unknown_command');
 				assert.deepEqual(envelope.warnings, []); assert.equal(requests.length, offset);
 		});
-		const retryOffset = requests.length, retry = await execute(base.slice(0, -1));
+		assert.deepEqual(decodedConfirmations, []);
+		} else {
+		const retryOffset = requests.length, retry = await execute([...base.slice(0, -1), '--group', 'portfolio-atlas']);
 		assert.equal(retry.code, 0); assert.equal(retry.stderr, ''); const retryEnvelope = JSON.parse(retry.stdout);
 		assert.equal(retryEnvelope.ok, true); assert.deepEqual(retryEnvelope.result, preflight); assert.deepEqual(retryEnvelope.warnings, []);
 		assert.equal(requests.length, retryOffset + 1);
 		assert.equal(requests[retryOffset]!.path, `/v1/teams/${teamId}/workday-runs/preflight`);
-		assert.equal(requests[retryOffset]!.body, JSON.stringify({ profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600 }));
+		assert.equal(requests[retryOffset]!.body, JSON.stringify({ profileId: 'documentation', projects: ['sdk'], startsAt: '2030-01-01T00:00:00Z', durationSeconds: 600, groupIds: ['portfolio-atlas'] }));
 		for (const scheduled of [false, true]) {
 			const offset:number = requests.length, args = scheduled ? ['workdays', 'schedules', 'start', ...base.slice(2, -1), '--cadence-seconds', '3600', '--yes'] : base.slice(0, -1);
 			const result = await execute([...args, '--group', 'portfolio-atlas,service-design', '--group', 'accessibility', '--activity', 'reviewing', '--idempotency-key', 'selector-key']);
@@ -361,12 +367,13 @@ test('packaged native CLI preserves decision and preflight bytes through confirm
 		}
 		for (const scheduled of [false,true]) {
 			const command=scheduled?['workdays','schedules','start',...base.slice(2,-1),'--cadence-seconds','3600','--yes']:base.slice(0,-1),offset:number=requests.length;
-			const reporter='Configured/Reporter-A',result=await execute([...command,'--reporting-agent',reporter,'--decision','decision-a','--group','portfolio-atlas','--idempotency-key','reporter-key']);
-			assert.equal(result.code,0);assert.equal(result.stderr,'');assert.equal(JSON.parse(result.stdout).ok,true);const writes:NativeRequest[]=requests.slice(offset);assert.equal(writes.length,scheduled?2:1);
-			for(const write of writes){const body=JSON.parse(write.body),intent=scheduled?body.intent:body;assert.equal(intent.reportingAgentId,reporter);assert.deepEqual(intent.decisionIds,['decision-a']);assert.deepEqual(intent.groupIds,['portfolio-atlas']);assert.equal(write.idempotency,'reporter-key');}if(scheduled)assert.equal(writes[1]!.confirmed,true);
-			for(const value of [' ','a,b','é','x'.repeat(201)]){const count:number=requests.length,denied=await execute([...command,'--reporting-agent',value]);assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.equal(JSON.parse(denied.stderr).error.code,'workday_reporting_selection_invalid');assert.equal(requests.length,count);}
+			await inPairs(['Configured/Reporter-A','x'.repeat(200),' ','a,b','é','x'.repeat(201)],async value=>{const denied=await execute([...command,'--group','portfolio-atlas','--reporting-agent',value]);assert.equal(denied.code,1);assert.equal(denied.stdout,'');assert.equal(JSON.parse(denied.stderr).error.code,'invalid_input');});
+			assert.equal(requests.length,offset);
+			const unscoped = await execute(command); assert.equal(unscoped.code,1); assert.equal(unscoped.stdout,'');
+			assert.equal(JSON.parse(unscoped.stderr).error.code,'command_body_invalid'); assert.equal(requests.length,offset);
 		}
-		assert.deepEqual(decodedConfirmations, [scheduleConfirmation, confirmation, confirmation, scheduleConfirmation, scheduleConfirmation]);
+		assert.deepEqual(decodedConfirmations, [scheduleConfirmation]);
+		}
 		assert.deepEqual({ selected, preflight, confirmation, scheduleConfirmation }, frozen);
 		assert.deepEqual(readFileSync(entrypoint), entryBytes); assert.deepEqual(readFileSync(resolve('package.json')), packageBytes);
 	} finally {
