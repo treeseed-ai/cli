@@ -1,0 +1,37 @@
+{
+  "name": "@treeseed-cordis/cli",
+  "version": "0.0.0-cordis.1",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "packageManager": "bun@1.4.4",
+  "scripts": {
+    "check": "bun scripts/build-cli.ts check",
+    "build": "bun scripts/build-cli.ts build",
+    "test:unit": "bun test ./tests --test-name-pattern '^unit:'",
+    "test:integration": "bun test ./tests --test-name-pattern '^integration:'",
+    "test:smoke": "bun test ./tests --test-name-pattern '^smoke:'",
+    "verify": "bun run check && bun run build && bun run test:unit && bun run test:integration && bun run test:smoke"
+  },
+  "dependencies": {
+    "@treeseed-cordis/sdk": "file:vendor/sdk.tgz",
+    "@treeseed-cordis/deployment": "file:vendor/deployment.tgz"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/bun": "1.4.4",
+    "@types/node": "24.10.1"
+  },
+  "cordisCandidate": {
+    "sdk": {
+      "repository": "https://github.com/treeseed-ai/sdk.git",
+      "commit": "2893f754949edcebf0c299726a079205d9296b60",
+      "sha256": "0b946e59b800d6b323583c773744f7d5b3028a67c4da2808f3252834dbda6000"
+    },
+    "deployment": {
+      "repository": "https://github.com/treeseed-ai/deployment.git",
+      "commit": "eb09ba696cd9333081464c7927fb851a545318e2",
+      "sha256": "a5b255002f6e6a2fe091b6b672d9d88131dbc2f344194320052c80645e73208c"
+    }
+  }
+}
