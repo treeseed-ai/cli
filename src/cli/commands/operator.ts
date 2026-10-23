@@ -85,10 +85,6 @@ async function operationInput(invocation: ParsedInvocation, context: CommandCont
 	const selectedIntent = operation.descriptor.operationId === 'workdays.plan' ? input.body
 		: operation.descriptor.operationId === 'workdays.schedules.create' ? getOperationInputField(input.body, 'intent') : undefined;
 	const intent = selectedIntent && typeof selectedIntent === 'object' && !Array.isArray(selectedIntent) ? selectedIntent as Record<string, unknown> : undefined;
-	if (intent && invocation.options.reportingAgent !== undefined) {
-		const value=invocation.options.reportingAgent, exact=exactEntityReferenceSchema.innerType().shape.id.safeParse(value);
-		if(!exact.success||exact.data!==value)throw Object.assign(new Error('reportingAgentId must be one exact configured agent identity.'),{category:'invalid_input',code:'workday_reporting_selection_invalid'});
-	}
 	if (intent?.allocation !== undefined) {
 		const parsed = workdayAllocationOverridesSchema.safeParse(intent.allocation);
 		if (!parsed.success) throw Object.assign(new Error(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(' ')),

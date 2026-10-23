@@ -13,7 +13,7 @@ export function platformSchemaFixture() {
 	const authority = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: workspace, encoding: 'utf8' }).trim();
 	const originalBytes = execFileSync('git', ['show', `${authority}:${schemaPath}`], { cwd: workspace, encoding: 'utf8' });
 	// The execution checkout remains pinned independently of the approved schema contract.
-	const schemaAuthority = '0011a2459dce8290ddb604e0ee390363a4533646';
+	const schemaAuthority = '28df04061cbed62d5ef8f94ad3e40532f9a19c63';
 	assert.equal(execFileSync('git', ['rev-parse', schemaAuthority+'^{commit}'], {cwd: workspace, encoding:'utf8'}).trim(), schemaAuthority);
 	const bytes = execFileSync('git', ['show', `${schemaAuthority}:${schemaPath}`], { cwd: workspace, encoding: 'utf8' });
 	assert.equal(readFileSync(resolve(workspace, schemaPath), 'utf8'), originalBytes, 'Canonical input must match exact tracked Git bytes');

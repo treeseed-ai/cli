@@ -19,8 +19,8 @@ jobs:
       TREESEED_AGENT_DISABLE_GIT: "true"
       TREESEED_TOOL_CLOSURE_OUTPUT: artifacts
       TREESEED_DEVELOPMENT_WORKSPACE_ROOT: ${{ github.workspace }}/.treeseed/platform-authority
-      TREESEED_TEST_SDK_ARCHIVE: ${{ github.workspace }}/.treeseed/verified-sdk/treeseed-sdk-0.13.0-rc.125.tgz
-      TREESEED_TEST_SDK_ARCHIVE_SHA256: 6fd4230b9f23255cce81a4caaa8386a49280cda981bd4b480038369de4164e76
+      TREESEED_TEST_SDK_ARCHIVE: ${{ github.workspace }}/.treeseed/verified-sdk/treeseed-sdk-0.13.0-rc.130.tgz
+      TREESEED_TEST_SDK_ARCHIVE_SHA256: c6b49ba6413e85fccc2c80b53e977ede49386d78f1f0f42705d933495242c1cc
       TREESEED_TEST_REVIEWER_ARCHIVE: ${{ github.workspace }}/.treeseed/verified-reviewer/treeseed-reviewer-0.1.0-rc.13.tgz
       TREESEED_TEST_REVIEWER_ARCHIVE_SHA256: 063ef40142eaf603a37c14082aad7a34d326aefeae40026cf684af8bdc4bc274
     steps:
@@ -39,8 +39,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C .treeseed/platform-authority rev-parse HEAD)" = e4c4cad1e526f53d3549c8fc27c3e60122b20ee4
-          git -C .treeseed/platform-authority fetch --no-tags origin 0011a2459dce8290ddb604e0ee390363a4533646
-          test "$(git -C .treeseed/platform-authority rev-parse FETCH_HEAD)" = 0011a2459dce8290ddb604e0ee390363a4533646
+          git -C .treeseed/platform-authority fetch --no-tags origin 28df04061cbed62d5ef8f94ad3e40532f9a19c63
+          test "$(git -C .treeseed/platform-authority rev-parse FETCH_HEAD)" = 28df04061cbed62d5ef8f94ad3e40532f9a19c63
           test "$(git -C .treeseed/platform-authority rev-parse HEAD)" = e4c4cad1e526f53d3549c8fc27c3e60122b20ee4
 
       - name: Setup Node
@@ -59,8 +59,8 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: treeseed-ai/sdk
-          run-id: 39878559740
-          name: sdk-fe60e67de5c89e9f864a5d4805bcebc1eafba55e
+          run-id: 40025145979
+          name: sdk-b04000d0b1c97dc0e63b25fd2f03fd21f2d031b3
           path: .treeseed/verified-sdk
 
       - name: Verify and install held SDK archive
