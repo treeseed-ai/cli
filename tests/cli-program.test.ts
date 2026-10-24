@@ -209,7 +209,7 @@ class CompositionProgramTests {
     for(const label of ['constructor-fail','cleanup-fail']){const fixture=await new ProviderFixture(label).prepare();try{const result=fixture.run();expect(result.status).toBe(1);expect(JSON.parse(result.stdout).success).toBe(false);expect(JSON.parse(result.stdout).result).toBeNull();expect(result.stdout+result.stderr).not.toContain('canary');expect(existsSync(fixture.marker)).toBe(false);}finally{fixture.close();}}
   }
   async metadataFailures():Promise<void> {
-    for(const kind of ['hash','duplicate','schema','symlink','extra','configuration','address','closure']){
+    for(const kind of ['hash','duplicate','schema','symlink','extra','configuration','address','closure','scope','file-mode','directory-mode']){
       const fixture=await new ProviderFixture().prepare();
       try {
         fixture.permissions(fixture.tree,false);
@@ -220,8 +220,9 @@ class CompositionProgramTests {
         if(kind==='extra')writeFileSync(join(fixture.tree,'unapproved.js'),'secret-canary');
         if(kind==='configuration'){const manifest=JSON.parse(readFileSync(fixture.file,'utf8'));manifest.configuration={extra:'secret-canary'};writeFileSync(fixture.file,JSON.stringify(manifest));fixture.address();}
         if(kind==='address'){const destination=join(fixture.root,'mutable-package');renameSync(fixture.tree,destination);fixture.tree=destination;}
-        if(kind==='closure'){rmSync(join(fixture.tree,'node_modules/@fixture/helper'),{recursive:true});fixture.refresh();}
-        fixture.permissions(fixture.tree,true);const result=fixture.run();expect(result.status).toBe(3);expect(result.stdout+result.stderr).not.toContain('canary');expect(existsSync(fixture.marker)).toBe(false);
+        if(kind==='closure'){const packageFile=join(fixture.tree,'package.json'),metadata=JSON.parse(readFileSync(packageFile,'utf8'));metadata.dependencies['never-imported']='1.0.0';writeFileSync(packageFile,JSON.stringify(metadata));fixture.refresh();}
+        if(kind==='scope'){const manifest=JSON.parse(readFileSync(fixture.file,'utf8'));manifest.scopeId='foreign-scope';writeFileSync(fixture.file,JSON.stringify(manifest));fixture.address();}
+        fixture.permissions(fixture.tree,true);if(kind==='file-mode')chmodSync(join(fixture.tree,'index.js'),0o600);if(kind==='directory-mode')chmodSync(fixture.tree,0o700);const result=fixture.run();expect(result.status).toBe(3);expect(result.stdout+result.stderr).not.toContain('canary');expect(existsSync(fixture.marker)).toBe(false);
       }finally{fixture.close();}
     }
   }
