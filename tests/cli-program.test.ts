@@ -24,6 +24,10 @@ class CliTests {
   listen(resolvePort:(port:number)=>void):void {this.resolvePort=resolvePort;this.server=createServer();this.server.listen(0,'127.0.0.1',this.listening.bind(this));}
   listening():void {const address=this.server!.address();if(address&&typeof address==='object')this.resolvePort!(address.port);}
   async port(occupied=false):Promise<number> {const port=await new Promise<number>(this.listen.bind(this));if(!occupied)this.server!.close();return port;}
+  installedArguments():void {
+    const fixture=new CliProgramFixture();
+    try{for(const command of ["apply","status","application"]){const result=fixture.run(["platform",command,"--json"],{PATH:""});expect(result.status).toBe(2);expect(result.stderr).toBe("");expect(JSON.parse(result.stdout).problem.code).toBe("INVALID_ARGUMENTS");}}finally{fixture.close();}
+  }
   identity():void {
     const fixture=new CliProgramFixture();
     try {
@@ -245,3 +249,5 @@ test('smoke: installed provider byte and dependency failures block before import
 
 test('smoke: provider constructors and failed disposal cannot report successful CLI completion',compositionSuite.lifecycleFailures.bind(compositionSuite));
 test('smoke: prepared-provider metadata scope ownership and closure are checked before activation',compositionSuite.metadataFailures.bind(compositionSuite));
+
+test('smoke: installed commands validate arguments before contacting worker',suite.installedArguments.bind(suite));
