@@ -93,8 +93,8 @@ For Task 3A qualification only, doctor and platform plan additionally accept
 are explicit trusted local owner input, and select an already-prepared provider of the
 DeploymentHost capability. Neither flag installs, downloads, builds or creates provider state.
 The immutable owned/private manifest/package closure is verified through the SDK runtime's
-single reviewed loader before class imports. Unknown/duplicate flags or invalid JSON/schema
-are exit 2; identity/ownership/selection blockers are safe exit 3; lifecycle failures are 1.
+single reviewed loader before class imports. Unknown/duplicate flags or invalid command-configuration JSON/schema
+are exit 2; prepared-provider artifact/metadata failures are exit 3; identity/ownership/selection blockers are safe exit 3; lifecycle failures are 1.
 Never echo source bytes, raw exceptions or credentials. Existing envelope fields remain.
 
 The fixture provider must implement the same Deployment contract, native provide/inject fields
@@ -109,3 +109,9 @@ remain the compatibility gate. Package candidate becomes 0.0.0-cordis.3.
 
 This does not implement `trsd plugin install`, provider hot switching, apply, API transport or
 new installation state. Those retain their approved later-slice gates.
+
+The standalone build enables `compile.autoloadPackageJson` for native resolution of the
+verified external package closure, while disabling dotenv, bunfig and tsconfig autoload.
+This is required by Bun 1.4.4; [Bun documents the flag](https://bun.sh/docs/bundler/executables#automatic-config-loading)
+and its [maintainer identifies it for external modules](https://github.com/oven-sh/bun/issues/27058#issuecomment-3910111040).
+The built-program canary verifies cwd package metadata cannot redirect core behavior or run scripts.
