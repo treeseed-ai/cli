@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 ### Added
+- Compose standalone CLI with native Cordis provider selection (#313).
 - Expose non-activating platform plans (#311).
 
 
