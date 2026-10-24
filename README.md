@@ -1,12 +1,13 @@
-# Cordis diagnostic executable
+# Cordis diagnostic and planning executable
 
-`trsd-linux-x64` is a standalone Task1 diagnostic front door. Run it without Node/Bun or a
+`trsd-linux-x64` is a standalone diagnostic and non-activating planning front door. Run it without Node/Bun or a
 project checkout. Supported commands:
 
 ```text
 trsd --help
 trsd --version
 trsd doctor [--json] [--context NAME] [--installation ABSOLUTE_PATH] [--port INTEGER]
+trsd platform plan --file CONFIG [--json]
 ```
 
 `CliApplication` parses arguments and calls the public packaged `DeploymentHost` contract;
@@ -19,11 +20,8 @@ JSON stdout is exactly one envelope: command, success, result, problem, blockers
 Doctor result follows the SDK DiagnosticReport schema. Human output uses concise checks;
 human errors go to stderr. Errors never echo unknown argument values or raw Docker stderr.
 Exit0 means success;1 runtime failure;2 invalid command/flag/value (with actionable help);
-3 unmet prerequisites or explicitly unsupported platform/lifecycle commands. `platform`,
-`plan`, `apply`, `status`, `install`, `open`, `recover` and lifecycle verbs are unsupported,
-not simulated successful operations. SDK seven-operation bindings are contract-only.
-Duplicate/missing flags and positional arguments fail validation. JSON is supported only on
-doctor, including its validation failures. Version is `trsd 0.0.0-cordis.1`.
+3 unmet prerequisites or explicitly unsupported lifecycle commands. `platform plan` is the only implemented platform binding; `apply`, `status`, `install`, `open`, `recover` and other lifecycle verbs remain unsupported. Remote SDK bindings remain contract-only.
+Duplicate/missing flags and positional arguments fail validation. JSON is supported on doctor and platform plan, including validation failures. Version is `trsd 0.0.0-cordis.2`.
 
 `CliProgramFixture.run(args)` spawns the compiled artifact with closed stdin, captures output
 and exit status, and supports fixture cwd/environment. Acceptance covers another directory,
@@ -32,8 +30,7 @@ missing prerequisites and occupied ports. Default construction also exercises re
 The build disables dotenv and bunfig autoloading in the compiled executable; see
 [Bun executables](https://bun.com/docs/bundler/executables).
 
-Legacy ownership: CLI main/runtime/operator remains in CLI. This slice adds only argument,
-output and diagnostic execution. Remote transport and all lifecycle mutation are deferred.
+Legacy ownership: CLI main/runtime/operator remains in CLI. This slice owns argument, output and diagnostic/planning execution. Remote transport and activation are deferred.
 
 ## Development and candidate delivery
 
@@ -57,3 +54,27 @@ archives contain the exact generated package bytes, with source commit and SHA25
 `package.json` and installation integrity in `bun.lock`. Consumers use public package exports,
 never sibling source. These are review candidates, with no registry publication or production
 release. Migration PRs target `cordis`; issues remain open until authorized release.
+
+## Task 2: non-activating plans
+
+`trsd platform plan --file CONFIG [--json]` validates an explicitly prepared local release bundle. It never downloads, installs packages, imports plugin code, runs scripts, binds ports, loads images, creates credentials or starts containers. Apply remains unsupported. Successful plans describe future effects, not an active or healthy installation.
+
+Configuration retains installationId, engineContext, installationDirectory (absolute), origin (loopback), runtimeState, plugins (exact id/package/version/archive SHA-256) and credentialReferences (unique `secret://<slot>` values). Add `release: {directory: ABSOLUTE_PATH, manifestDigest: SHA256}`. The installation and bundle must be disjoint. JSON object keys and semantic sets normalize deterministically; artifact byte identities remain exact.
+
+The SDK release inventory version 1 binds `packageJson`, `lockfile`, and `recipe` descriptors `{path,sha256}`, requiredPluginIds/requiredServices, package entries `{name,version,path,sha256}` and image entries `{id,reference,layout,indexSha256,manifestDigest}`. All paths inside the inventory are relative and contained without symlinks. Image references are digest-only and match the selected OCI manifest. Package archives exactly cover the flat locked runtime closure; Bun v2 registry and local tarball records are accepted, without resolving versions or contacting a registry. Unsupported lock forms fail closed. Selected plugin package metadata is produced from the SDK PluginDefinition declaration also used for class static provide/inject fields.
+
+The recipe is a restricted Compose JSON object with services/volumes/secrets. Service fields: image, depends_on (names), ports (long-form target/published/host_ip/protocol tcp), volumes (type volume/source/target/read_only) and secrets (names). Exactly one published port matches origin; localhost maps to 127.0.0.1, IPv6 literals to ::1. Volume declarations are empty local objects; secret declarations are `{file: '.cordis/credentials/<slot>'}` and match configuration references bijectively. No command/entrypoint/environment/build/include/interpolation/host mount/custom network/privileged/external/hook fields. Named resources derive from `cordis-` plus the first 16 hex SHA-256 characters of canonical `{installationId,installationDirectory}`.
+
+Deployment validates native Ubuntu 26.04 x64, local Docker Linux amd64 context/endpoint/daemon identity, capacity, ownership and ports. Port checks read Linux TCP tables without binding. Existing project containers/networks/volumes block; planning adopts no runtime. Only fresh/empty owned installation directories or valid owner-private plan-only state are accepted.
+
+Plans bind normalized configuration, configuration/release/lock/recipe digests, expected engine, expectedComposition null, exact package/image artifacts and typed future effects. No timestamps or volatile capacity samples enter the digest. ID is `plan-<digest>`. Only unblocked plans are persisted under installation/.cordis (0700 directories, 0600 records), with no-overwrite atomic publication and verified read-back. Descriptor-anchored access rejects symlinks and unsafe ownership/permissions. Repetition revalidates inputs before byte-identical reuse. Interrupted/foreign/malformed state blocks; no automatic adoption or repair. Stored read-back does not require the source bundle, and grants no permission to apply.
+
+CLI exits: 0 verified saved plan; 1 sanitized runtime/I/O failure; 2 invalid arguments/JSON/schema; 3 prerequisites/artifact/authority/state blockers. Blocked responses have result null, structured blockers and no saved reference. Never echo invalid input, archive content, credentials or engine stderr. SDK PlanningBlockedError carries only validated safe blockers. Seven remote operation IDs remain unchanged; platform.plan stays a write operation because saving a plan needs local ownership.
+
+Verification: documentation first; outside-in built-program failure before implementation; exact read-back/modes/determinism; immutable/architecture/graph/recipe/secret/path/journal negative cases; no-runtime snapshots; actual default construction; all owner check/build/unit/integration/smoke gates plus assembled acceptance. Test fixtures are not a production application composition. CI must run a positive plan on ubuntu-26.04 and fail visibly if prerequisites are absent. No container starts, even in tests.
+
+Tracked in #311; parent integration treeseed-ai/platform#697. Issues remain open until authorized release.
+
+Docker-backed integration/program tests have 30/60-second harness budgets to cover multiple bounded queries on cold CI runners. Individual runtime Docker commands retain their five-second timeout; missing prerequisites still fail the positive planning gate.
+
+Planning accepts owned installation paths containing spaces and Unicode, including a directory that does not exist yet. A path accepted by the configuration contract must not be created and then rejected as an artifact filename.
