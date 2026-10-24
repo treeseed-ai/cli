@@ -93,7 +93,8 @@ For Task 3A qualification only, doctor and platform plan additionally accept
 are explicit trusted local owner input, and select an already-prepared provider of the
 DeploymentHost capability. Neither flag installs, downloads, builds or creates provider state.
 The immutable owned/private manifest/package closure is verified through the SDK runtime's
-single reviewed loader before class imports. Unknown/duplicate flags or invalid command-configuration JSON/schema
+single reviewed loader before class imports. Package capability/contract mismatches must be
+rejected before evaluating the entry module, including top-level code. Unknown/duplicate flags or invalid command-configuration JSON/schema
 are exit 2; prepared-provider artifact/metadata failures are exit 3; identity/ownership/selection blockers are safe exit 3; lifecycle failures are 1.
 Never echo source bytes, raw exceptions or credentials. Existing envelope fields remain.
 
