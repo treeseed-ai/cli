@@ -139,6 +139,7 @@ class ProviderFixture {
   readonly root=mkdtempSync(join(tmpdir(),'cordis installed provider Ω '));
   tree=join(this.root,'prepared package');
   readonly marker=join(this.root,'live-effect');
+  readonly importMarker=join(this.root,'module-imported');
   get file():string{return join(this.tree,'composition.json');}
   readonly declaration={id:'fixture-one',pluginId:'fixture',capability:'deployment',contractVersion:'0.3.0-cordis.1',target:'cli',provide:['deployment'],inject:[]};
   digest='';
@@ -161,6 +162,7 @@ class ProviderFixture {
     let build=spawnSync('bun',['build',helperSource,'--target=node','--outfile',join(helper,'index.js')],{encoding:'utf8'});expect(build.status).toBe(0);
     const source=join(this.root,'provider.ts');
     writeFileSync(source,`import {Context} from 'cordis';import {Helper} from '@fixture/helper';import {writeFileSync,unlinkSync} from 'node:fs';
+class ImportCanary {static run(){writeFileSync(${JSON.stringify(this.importMarker)},'imported');}}ImportCanary.run();
 class Configuration {static validate(value:unknown){return value&&typeof value==='object'&&Object.keys(value).length===0?{value}:{issues:[{message:'Invalid configuration'}]};}}
 export class Provider {
 static readonly declaration=${JSON.stringify(this.declaration)};
@@ -209,7 +211,7 @@ class CompositionProgramTests {
     for(const label of ['constructor-fail','cleanup-fail']){const fixture=await new ProviderFixture(label).prepare();try{const result=fixture.run();expect(result.status).toBe(1);expect(JSON.parse(result.stdout).success).toBe(false);expect(JSON.parse(result.stdout).result).toBeNull();expect(result.stdout+result.stderr).not.toContain('canary');expect(existsSync(fixture.marker)).toBe(false);}finally{fixture.close();}}
   }
   async metadataFailures():Promise<void> {
-    for(const kind of ['hash','duplicate','schema','symlink','extra','configuration','address','closure','scope','file-mode','directory-mode']){
+    for(const kind of ['hash','duplicate','schema','symlink','extra','configuration','address','closure','scope','file-mode','directory-mode','capability']){
       const fixture=await new ProviderFixture().prepare();
       try {
         fixture.permissions(fixture.tree,false);
@@ -221,8 +223,9 @@ class CompositionProgramTests {
         if(kind==='configuration'){const manifest=JSON.parse(readFileSync(fixture.file,'utf8'));manifest.configuration={extra:'secret-canary'};writeFileSync(fixture.file,JSON.stringify(manifest));fixture.address();}
         if(kind==='address'){const destination=join(fixture.root,'mutable-package');renameSync(fixture.tree,destination);fixture.tree=destination;}
         if(kind==='closure'){const packageFile=join(fixture.tree,'package.json'),metadata=JSON.parse(readFileSync(packageFile,'utf8'));metadata.dependencies['never-imported']='1.0.0';writeFileSync(packageFile,JSON.stringify(metadata));fixture.refresh();}
+        if(kind==='capability'){const packageFile=join(fixture.tree,'package.json'),metadata=JSON.parse(readFileSync(packageFile,'utf8'));metadata.cordis.capability='other-capability';metadata.cordis.provide=['other-capability'];writeFileSync(packageFile,JSON.stringify(metadata));fixture.refresh();}
         if(kind==='scope'){const manifest=JSON.parse(readFileSync(fixture.file,'utf8'));manifest.scopeId='foreign-scope';writeFileSync(fixture.file,JSON.stringify(manifest));fixture.address();}
-        fixture.permissions(fixture.tree,true);if(kind==='file-mode')chmodSync(join(fixture.tree,'index.js'),0o600);if(kind==='directory-mode')chmodSync(fixture.tree,0o700);const result=fixture.run();expect(result.status).toBe(3);expect(result.stdout+result.stderr).not.toContain('canary');expect(existsSync(fixture.marker)).toBe(false);
+        fixture.permissions(fixture.tree,true);if(kind==='file-mode')chmodSync(join(fixture.tree,'index.js'),0o600);if(kind==='directory-mode')chmodSync(fixture.tree,0o700);const result=fixture.run();expect(result.status).toBe(3);expect(result.stdout+result.stderr).not.toContain('canary');expect(existsSync(fixture.marker)).toBe(false);if(kind==='capability')expect(existsSync(fixture.importMarker)).toBe(false);
       }finally{fixture.close();}
     }
   }
