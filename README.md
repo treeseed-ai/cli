@@ -76,3 +76,5 @@ Verification: documentation first; outside-in built-program failure before imple
 Tracked in #311; parent integration treeseed-ai/platform#697. Issues remain open until authorized release.
 
 Docker-backed integration/program tests have 30/60-second harness budgets to cover multiple bounded queries on cold CI runners. Individual runtime Docker commands retain their five-second timeout; missing prerequisites still fail the positive planning gate.
+
+Planning accepts owned installation paths containing spaces and Unicode, including a directory that does not exist yet. A path accepted by the configuration contract must not be created and then rejected as an artifact filename.
