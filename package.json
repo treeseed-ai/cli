@@ -9,8 +9,8 @@
     "check": "bun scripts/build-cli.ts check",
     "build": "bun scripts/build-cli.ts build",
     "test:unit": "bun test ./tests --test-name-pattern '^unit:'",
-    "test:integration": "bun test ./tests --test-name-pattern '^integration:'",
-    "test:smoke": "bun test ./tests --test-name-pattern '^smoke:'",
+    "test:integration": "bun test ./tests --timeout 30000 --test-name-pattern '^integration:'",
+    "test:smoke": "bun test ./tests --timeout 60000 --test-name-pattern '^smoke:'",
     "verify": "bun run check && bun run build && bun run test:unit && bun run test:integration && bun run test:smoke"
   },
   "dependencies": {

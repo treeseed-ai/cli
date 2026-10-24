@@ -74,3 +74,5 @@ CLI exits: 0 verified saved plan; 1 sanitized runtime/I/O failure; 2 invalid arg
 Verification: documentation first; outside-in built-program failure before implementation; exact read-back/modes/determinism; immutable/architecture/graph/recipe/secret/path/journal negative cases; no-runtime snapshots; actual default construction; all owner check/build/unit/integration/smoke gates plus assembled acceptance. Test fixtures are not a production application composition. CI must run a positive plan on ubuntu-26.04 and fail visibly if prerequisites are absent. No container starts, even in tests.
 
 Tracked in #311; parent integration treeseed-ai/platform#697. Issues remain open until authorized release.
+
+Docker-backed integration/program tests have 30/60-second harness budgets to cover multiple bounded queries on cold CI runners. Individual runtime Docker commands retain their five-second timeout; missing prerequisites still fail the positive planning gate.
