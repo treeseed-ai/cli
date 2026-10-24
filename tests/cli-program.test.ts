@@ -32,7 +32,7 @@ class CliTests {
     const fixture=new CliProgramFixture();
     try {
       for(const binary of [fixture.binary,fixture.symlink]) {
-        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.3\n');expect(version.stderr).toBe('');
+        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.4\n');expect(version.stderr).toBe('');
         const help=fixture.run(['--help'],{PATH:''},binary);expect(help.status).toBe(0);expect(help.stdout).toContain('doctor');expect(help.stderr).toBe('');
       }
       expect(readdirSync(fixture.cwd)).toEqual([]);
@@ -72,7 +72,7 @@ class CliTests {
       for(const args of [['secret-canary'],['doctor','--secret-canary'],['doctor','--port'],['doctor','--port','0'],['doctor','--port','1.5'],['doctor','--context','a','--context','b']]) {
         const result=fixture.run(args);expect(result.status).toBe(2);expect(result.stderr).toContain('--help');expect(result.stdout+result.stderr).not.toContain('secret-canary');
       }
-      const unsupported=fixture.run(['platform','apply']);expect(unsupported.status).toBe(3);expect(unsupported.stderr).toContain('UNSUPPORTED_COMMAND');
+      const unsupported=fixture.run(['platform','install']);expect(unsupported.status).toBe(3);expect(unsupported.stderr).toContain('UNSUPPORTED_COMMAND');
     }finally{fixture.close();}
   }
   async defaultComposition():Promise<void> {
