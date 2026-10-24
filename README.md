@@ -78,3 +78,41 @@ Tracked in #311; parent integration treeseed-ai/platform#697. Issues remain open
 Docker-backed integration/program tests have 30/60-second harness budgets to cover multiple bounded queries on cold CI runners. Individual runtime Docker commands retain their five-second timeout; missing prerequisites still fail the positive planning gate.
 
 Planning accepts owned installation paths containing spaces and Unicode, including a directory that does not exist yet. A path accepted by the configuration contract must not be created and then rejected as an artifact filename.
+
+## Task 3A: native CLI composition
+
+Implementation is authorized in #313. CliApplication becomes a real native Cordis composition
+root with typed command, configuration and output services. The default Deployment service
+comes from the public Deployment package's native plugin registrations, not a direct
+ComposeDeploymentHost constructor in the CLI. Every invocation disposes its root and leases;
+help/version still need no engine access or writes. A minimal fixed emergency renderer may
+report failure when even root construction fails; it cannot replace normal output selection.
+
+For Task 3A qualification only, doctor and platform plan additionally accept
+`--composition ABSOLUTE_MANIFEST --composition-digest SHA256`. Both are required together,
+are explicit trusted local owner input, and select an already-prepared provider of the
+DeploymentHost capability. Neither flag installs, downloads, builds or creates provider state.
+The immutable owned/private manifest/package closure is verified through the SDK runtime's
+single reviewed loader before class imports. Package capability/contract mismatches must be
+rejected before evaluating the entry module, including top-level code. Unknown/duplicate flags or invalid command-configuration JSON/schema
+are exit 2; prepared-provider artifact/metadata failures are exit 3; identity/ownership/selection blockers are safe exit 3; lifecycle failures are 1.
+Never echo source bytes, raw exceptions or credentials. Existing envelope fields remain.
+
+The fixture provider must implement the same Deployment contract, native provide/inject fields
+and pinned contract 0.3.0-cordis.1, exporting its class and declaration from its verified entry.
+The resulting generation binds scope, provider declaration, exact external file inventory and
+configuration. It can identify its generation through ordinary diagnostic checks; no test-only
+remote operation is added. Default construction still uses real packaged providers. Tests
+exercise two implementations, true native service/root identity, ordinary ESM dependencies,
+foreign cwd/spaces/Unicode/symlink executable/no-Node-or-Bun PATH, tampering/missing dependency,
+constructor/disposer errors, and repeated invocation cleanup. Task 1–2 built-program results
+remain the compatibility gate. Package candidate becomes 0.0.0-cordis.3.
+
+This does not implement `trsd plugin install`, provider hot switching, apply, API transport or
+new installation state. Those retain their approved later-slice gates.
+
+The standalone build enables `compile.autoloadPackageJson` for native resolution of the
+verified external package closure, while disabling dotenv, bunfig and tsconfig autoload.
+This is required by Bun 1.4.4; [Bun documents the flag](https://bun.sh/docs/bundler/executables#automatic-config-loading)
+and its [maintainer identifies it for external modules](https://github.com/oven-sh/bun/issues/27058).
+The built-program canary verifies cwd package metadata cannot redirect core behavior or run scripts.
