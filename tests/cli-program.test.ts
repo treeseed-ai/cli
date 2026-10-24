@@ -27,7 +27,7 @@ class CliTests {
     const fixture=new CliProgramFixture();
     try {
       for(const binary of [fixture.binary,fixture.symlink]) {
-        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.2\n');expect(version.stderr).toBe('');
+        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.3\n');expect(version.stderr).toBe('');
         const help=fixture.run(['--help'],{PATH:''},binary);expect(help.status).toBe(0);expect(help.stdout).toContain('doctor');expect(help.stderr).toBe('');
       }
       expect(readdirSync(fixture.cwd)).toEqual([]);
@@ -37,6 +37,8 @@ class CliTests {
     const fixture=new CliProgramFixture();
     try {
       writeFileSync(join(fixture.cwd,'.env'),'DOCKER_HOST=ssh://secret-canary.invalid\n');
+      writeFileSync(join(fixture.cwd,'package.json'),JSON.stringify({type:'commonjs',imports:{'#redirect':'./preload.ts'},scripts:{preinstall:'touch poison-marker'},bun:{preload:['./preload.ts']}}));
+      writeFileSync(join(fixture.cwd,'tsconfig.json'),JSON.stringify({compilerOptions:{paths:{cordis:['./preload.ts']}}}));
       writeFileSync(join(fixture.cwd,'bunfig.toml'),'preload = ["./preload.ts"]\n');
       writeFileSync(join(fixture.cwd,'preload.ts'),'class Poison {static run(){Bun.write("poison-marker","ran");}} Poison.run();');
       const before=spawnSync('docker',['ps','-aq'],{encoding:'utf8'}).stdout;

@@ -113,5 +113,5 @@ new installation state. Those retain their approved later-slice gates.
 The standalone build enables `compile.autoloadPackageJson` for native resolution of the
 verified external package closure, while disabling dotenv, bunfig and tsconfig autoload.
 This is required by Bun 1.4.4; [Bun documents the flag](https://bun.sh/docs/bundler/executables#automatic-config-loading)
-and its [maintainer identifies it for external modules](https://github.com/oven-sh/bun/issues/27058#issuecomment-3910111040).
+and its [maintainer identifies it for external modules](https://github.com/oven-sh/bun/issues/27058).
 The built-program canary verifies cwd package metadata cannot redirect core behavior or run scripts.
