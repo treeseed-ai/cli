@@ -22,7 +22,7 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@treeseed-cordis/deployment": ["@treeseed-cordis/deployment@vendor/deployment.tgz", { "dependencies": { "cordis": "4.0.0-rc.12", "jsonc-parser": "3.3.1", "semver": "7.8.5", "tar": "7.5.22" }, "peerDependencies": { "@treeseed-cordis/sdk": "0.0.0-cordis.4" } }, "sha512-stKOhGRA16VCYJuO9FJV60u190OLtib/rv5Cczg1iVfEaGw5STlR0hwwjz6L/oZYvQAML0dxVinrlhLT/uijcg=="],
+    "@treeseed-cordis/deployment": ["@treeseed-cordis/deployment@vendor/deployment.tgz", { "dependencies": { "cordis": "4.0.0-rc.12", "jsonc-parser": "3.3.1", "semver": "7.8.5", "tar": "7.5.22" }, "peerDependencies": { "@treeseed-cordis/sdk": "0.0.0-cordis.4" } }, "sha512-J1tqCbM5T6yIeEDgIh7oJoQ98nsvSa5ke994U0nFc+STB5rbudQIFPD9P2FtpyRozaMf6ySKX5yNHqEkJEY4FA=="],
 
     "@treeseed-cordis/sdk": ["@treeseed-cordis/sdk@vendor/sdk.tgz", { "dependencies": { "cordis": "4.0.0-rc.12", "jsonc-parser": "3.3.1", "semver": "7.8.5", "zod": "4.6.7" } }, "sha512-2EoB8+NYfkLyjvEqRW/HhV8xCbokGCUJkqWfBid7kQp5/R2CowBj6EWnVv1wtKFZVoPI3qiLYMWWYAp1qxzPcA=="],
 
