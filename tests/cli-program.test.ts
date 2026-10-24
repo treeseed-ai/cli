@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { createServer, type Server } from 'node:net';
+import { createHash } from 'node:crypto';
 import { PreparedReleaseFixture } from '@treeseed-cordis/deployment/testing';
 import { CliApplication } from '../src/main.js';
 import { PlatformSchemas, type CliEnvelope } from '@treeseed-cordis/sdk';
