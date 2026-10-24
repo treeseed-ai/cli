@@ -27,7 +27,7 @@ class CliTests {
     const fixture=new CliProgramFixture();
     try {
       for(const binary of [fixture.binary,fixture.symlink]) {
-        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.1\n');expect(version.stderr).toBe('');
+        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.2\n');expect(version.stderr).toBe('');
         const help=fixture.run(['--help'],{PATH:''},binary);expect(help.status).toBe(0);expect(help.stdout).toContain('doctor');expect(help.stderr).toBe('');
       }
       expect(readdirSync(fixture.cwd)).toEqual([]);
@@ -94,6 +94,16 @@ class CliTests {
       writeFileSync(join(fixture.bundle,'archives/plugin.tgz'),'tampered');const blocked=program.run(['platform','plan','--file',configuration,'--json']);expect(blocked.status).toBe(3);const rejected=JSON.parse(blocked.stdout) as CliEnvelope;expect(rejected.result).toBeNull();expect(rejected.references).toEqual([]);expect(readdirSync(join(fixture.installation,'.cordis/plans'))).toEqual([plan.id+'.json']);
     }finally{fixture.close();program.close();}
   }
+  async invalidPlans():Promise<void> {
+    const fixture=new CliProgramFixture();
+    try {
+      const file=join(fixture.cwd,'invalid.json');
+      for(const text of ['{"password":"plaintext-secret-canary"}', '{"installationId":"a","installationId":"b"}', '{"__proto__":{"password":"plaintext-secret-canary"}}', 'not json plaintext-secret-canary']){
+        writeFileSync(file,text);const result=fixture.run(['platform','plan','--file',file,'--json']);expect(result.status).toBe(2);const envelope=JSON.parse(result.stdout) as CliEnvelope;expect(envelope.result).toBeNull();expect(envelope.references).toEqual([]);expect(result.stdout+result.stderr).not.toContain('plaintext-secret-canary');
+      }
+      for(const args of [['platform','plan','--json'],['platform','plan','--file',file,'--file',file,'--json'],['platform','plan','--file',file,'--apply','--json']]){const result=fixture.run(args);expect(result.status).toBe(2);expect(JSON.parse(result.stdout).command).toBe('platform.plan');}
+    }finally{fixture.close();}
+  }
   async parser():Promise<void> {
     const app=new CliApplication();
     expect((await app.execute(['--help'])).code).toBe(0);expect((await app.execute(['--version'])).code).toBe(0);
@@ -110,3 +120,5 @@ test('integration: default CLI construction uses real packaged diagnostics',suit
 test('unit: parser help, version and error classifications',suite.parser.bind(suite));
 
 test('smoke: plan_changes_no_runtime using real prepared artifacts',suite.plan_changes_no_runtime.bind(suite));
+
+test('smoke: invalid and duplicate planning inputs never echo secrets or claim saved state',suite.invalidPlans.bind(suite));

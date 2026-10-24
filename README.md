@@ -1,12 +1,13 @@
-# Cordis diagnostic executable
+# Cordis diagnostic and planning executable
 
-`trsd-linux-x64` is a standalone Task1 diagnostic front door. Run it without Node/Bun or a
+`trsd-linux-x64` is a standalone diagnostic and non-activating planning front door. Run it without Node/Bun or a
 project checkout. Supported commands:
 
 ```text
 trsd --help
 trsd --version
 trsd doctor [--json] [--context NAME] [--installation ABSOLUTE_PATH] [--port INTEGER]
+trsd platform plan --file CONFIG [--json]
 ```
 
 `CliApplication` parses arguments and calls the public packaged `DeploymentHost` contract;
@@ -19,11 +20,8 @@ JSON stdout is exactly one envelope: command, success, result, problem, blockers
 Doctor result follows the SDK DiagnosticReport schema. Human output uses concise checks;
 human errors go to stderr. Errors never echo unknown argument values or raw Docker stderr.
 Exit0 means success;1 runtime failure;2 invalid command/flag/value (with actionable help);
-3 unmet prerequisites or explicitly unsupported platform/lifecycle commands. `platform`,
-`plan`, `apply`, `status`, `install`, `open`, `recover` and lifecycle verbs are unsupported,
-not simulated successful operations. SDK seven-operation bindings are contract-only.
-Duplicate/missing flags and positional arguments fail validation. JSON is supported only on
-doctor, including its validation failures. Version is `trsd 0.0.0-cordis.1`.
+3 unmet prerequisites or explicitly unsupported lifecycle commands. `platform plan` is the only implemented platform binding; `apply`, `status`, `install`, `open`, `recover` and other lifecycle verbs remain unsupported. Remote SDK bindings remain contract-only.
+Duplicate/missing flags and positional arguments fail validation. JSON is supported on doctor and platform plan, including validation failures. Version is `trsd 0.0.0-cordis.2`.
 
 `CliProgramFixture.run(args)` spawns the compiled artifact with closed stdin, captures output
 and exit status, and supports fixture cwd/environment. Acceptance covers another directory,
@@ -32,8 +30,7 @@ missing prerequisites and occupied ports. Default construction also exercises re
 The build disables dotenv and bunfig autoloading in the compiled executable; see
 [Bun executables](https://bun.com/docs/bundler/executables).
 
-Legacy ownership: CLI main/runtime/operator remains in CLI. This slice adds only argument,
-output and diagnostic execution. Remote transport and all lifecycle mutation are deferred.
+Legacy ownership: CLI main/runtime/operator remains in CLI. This slice owns argument, output and diagnostic/planning execution. Remote transport and activation are deferred.
 
 ## Development and candidate delivery
 
