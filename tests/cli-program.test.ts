@@ -96,6 +96,11 @@ class CliTests {
       writeFileSync(join(fixture.bundle,'archives/plugin.tgz'),'tampered');const blocked=program.run(['platform','plan','--file',configuration,'--json']);expect(blocked.status).toBe(3);const rejected=JSON.parse(blocked.stdout) as CliEnvelope;expect(rejected.result).toBeNull();expect(rejected.references).toEqual([]);expect(readdirSync(join(fixture.installation,'.cordis/plans'))).toEqual([plan.id+'.json']);
     }finally{fixture.close();program.close();}
   }
+  async installationPaths():Promise<void> {
+    const program=new CliProgramFixture(),fixture=await new PreparedReleaseFixture().prepare(await this.port());
+    const installation=join(fixture.root,'installation with spaces Ω');
+    try {const file=join(program.cwd,'desired path.json');writeFileSync(file,JSON.stringify({...fixture.configuration,installationDirectory:installation}));const result=program.run(['platform','plan','--file',file,'--json']);const qualified=/^VERSION_ID="?26\.04/m.test(readFileSync('/etc/os-release','utf8'))&&process.arch==='x64';if(!qualified&&process.env.CORDIS_REQUIRE_PLAN!=='1'){expect(result.status).toBe(3);expect(existsSync(installation)).toBe(false);return;}expect(result.status).toBe(0);const plan=PlatformSchemas.plan.parse(JSON.parse(result.stdout).result);expect(plan.configuration.installationDirectory).toBe(installation);expect(readdirSync(installation)).toEqual(['.cordis']);expect(existsSync(join(installation,'.cordis/plans',plan.id+'.json'))).toBe(true);}finally{fixture.close();program.close();}
+  }
   async invalidPlans():Promise<void> {
     const fixture=new CliProgramFixture();
     try {
@@ -124,3 +129,5 @@ test('unit: parser help, version and error classifications',suite.parser.bind(su
 test('smoke: plan_changes_no_runtime using real prepared artifacts',suite.plan_changes_no_runtime.bind(suite));
 
 test('smoke: invalid and duplicate planning inputs never echo secrets or claim saved state',suite.invalidPlans.bind(suite));
+
+test('smoke: plan new installation directory with spaces and Unicode',suite.installationPaths.bind(suite));
