@@ -75,7 +75,7 @@ export class CliOutput {
     if(envelope.result&&'checks' in envelope.result) {
       for(const check of envelope.result.checks)process.stdout.write(`${check.status}: ${check.id} [${check.code}] ${check.message}\n`);
     }
-    if(envelope.result&&'id' in envelope.result){process.stdout.write(`Plan ${envelope.result.id} (${envelope.result.digest}) saved. Future effects only.\n`);for(const effect of envelope.result.effects)process.stdout.write(`${effect.kind}: ${effect.target}\n`);for(const reference of envelope.references)process.stdout.write(reference+'\n');}
+    if(envelope.result&&'id' in envelope.result){process.stdout.write(`Plan ${envelope.result.id} (${envelope.result.digest}) saved. Future effects only.\n`);process.stdout.write(`Origin: ${envelope.result.configuration.origin}\nEngine: ${envelope.result.expectedEngine.context} (${envelope.result.expectedEngine.daemonId})\n`);for(const [name,service] of Object.entries(envelope.result.recipe.services)){process.stdout.write(`Service ${name}: ${service.image}\n`);for(const mount of service.volumes??[])process.stdout.write(`  Volume ${mount.source} -> ${mount.target}\n`);for(const port of service.ports??[])process.stdout.write(`  Port ${port.host_ip}:${port.published} -> ${port.target}/tcp\n`);}for(const effect of envelope.result.effects)process.stdout.write(`${effect.kind}: ${effect.target}\n`);for(const reference of envelope.references)process.stdout.write(reference+'\n');}
     for(const blocker of envelope.blockers)if(envelope.command==='platform.plan')process.stderr.write(`${blocker.code}: ${blocker.message}\n`);
     if(envelope.problem)process.stderr.write(`${envelope.problem.code}: ${envelope.problem.detail}\n`);
   }
