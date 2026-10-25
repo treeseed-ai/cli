@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Render human command results through reusable UI providers and accept extensible plans (#317).
+
 ### Added
 
 - Cli: deliver Task 3C typed providers and mobile-first UI integration (#317).
