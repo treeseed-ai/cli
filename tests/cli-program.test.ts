@@ -32,7 +32,7 @@ class CliTests {
     const fixture=new CliProgramFixture();
     try {
       for(const binary of [fixture.binary,fixture.symlink]) {
-        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.4\n');expect(version.stderr).toBe('');
+        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.5\n');expect(version.stderr).toBe('');
         const help=fixture.run(['--help'],{PATH:''},binary);expect(help.status).toBe(0);expect(help.stdout).toContain('doctor');expect(help.stderr).toBe('');
       }
       expect(readdirSync(fixture.cwd)).toEqual([]);
@@ -98,7 +98,7 @@ class CliTests {
       const repeat=program.run(['platform','plan','--file',configuration,'--json']);expect(repeat.status).toBe(0);expect(repeat.stdout).toBe(result.stdout);
       const dockerOnly=join(program.root,'docker-only');mkdirSync(dockerOnly);let docker:string|null=null;for(const directory of (process.env.PATH??'').split(':')){const path=join(directory,'docker');if(existsSync(path)){docker=path;break;}}expect(docker).not.toBeNull();symlinkSync(docker!,join(dockerOnly,'docker'));const standalone=program.run(['platform','plan','--file',configuration,'--json'],{PATH:dockerOnly});expect(standalone.status).toBe(0);expect(standalone.stdout).toBe(result.stdout);
       expect(readdirSync(fixture.installation)).toEqual(['.cordis']);expect(existsSync(join(fixture.installation,'.cordis/credentials'))).toBe(false);expect(existsSync(join(fixture.root,'SCRIPT_CANARY'))).toBe(false);expect(this.snapshot()).toBe(before);
-      const human=program.run(['platform','plan','--file',configuration]);expect(human.status).toBe(0);expect(human.stdout).toContain('Future effects only');expect(human.stdout).toContain('Volume data -> /data');
+      const human=program.run(['platform','plan','--file',configuration]);expect(human.status).toBe(0);expect(human.stdout).toContain('Future effects only');expect(human.stdout).toContain('Volume mounts');expect(human.stdout).toContain('application | data | /data | Read/write');
       const doctor=program.run(['doctor','--json','--installation',fixture.installation,'--port',String(plan.configuration.origin.split(':').pop())]);expect(doctor.status).toBe(0);
       writeFileSync(join(fixture.bundle,'archives/plugin.tgz'),'tampered');const blocked=program.run(['platform','plan','--file',configuration,'--json']);expect(blocked.status).toBe(3);const rejected=JSON.parse(blocked.stdout) as CliEnvelope;expect(rejected.result).toBeNull();expect(rejected.references).toEqual([]);expect(readdirSync(join(fixture.installation,'.cordis/plans'))).toEqual([plan.id+'.json']);
     }finally{fixture.close();program.close();}
