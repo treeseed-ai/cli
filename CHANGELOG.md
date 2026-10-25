@@ -4,6 +4,8 @@
 
 ### Added
 
+- Qualify compiled format-3 installed operations through the public durable host (#317).
+
 - Qualify extensible built CLI planning on Ubuntu 26.04 without runtime effects (#317).
 
 ### Changed

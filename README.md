@@ -84,7 +84,7 @@ Plans bind normalized configuration, configuration/release/lock/recipe digests, 
 
 CLI exits: 0 verified saved plan; 1 sanitized runtime/I/O failure; 2 invalid arguments/JSON/schema; 3 prerequisites/artifact/authority/state blockers. Blocked responses have result null, structured blockers and no saved reference. Never echo invalid input, archive content, credentials or engine stderr. SDK PlanningBlockedError carries only validated safe blockers. Seven remote operation IDs remain unchanged; platform.plan stays a write operation because saving a plan needs local ownership.
 
-Verification: documentation first; outside-in built-program failure before implementation; exact read-back/modes/determinism; immutable/architecture/graph/recipe/secret/path/journal negative cases; no-runtime snapshots; actual default construction; all owner check/build/unit/integration/smoke gates plus assembled acceptance. Test fixtures are not a production application composition. CI must run a positive plan on ubuntu-26.04 and fail visibly if prerequisites are absent. No container starts, even in tests.
+Verification: documentation first; outside-in built-program failure before implementation; exact read-back/modes/determinism; immutable/architecture/graph/recipe/secret/path/journal negative cases; no-runtime snapshots; actual default construction; all owner check/build/unit/integration/smoke gates plus assembled acceptance. Test fixtures are not a production application composition. CI must run a positive plan on ubuntu-26.04 and fail visibly if prerequisites are absent. These Task 2 planning scenes start no containers. Task 3C installed-operation acceptance below uses isolated, disposable fixture services.
 
 Tracked in #311; parent integration treeseed-ai/platform#697. Issues remain open until authorized release.
 
@@ -167,3 +167,21 @@ public fixture/export, saves and repeats identical format-3 bytes, renders reusa
 service tables and runs with Docker-only PATH. It leaves Docker resources, listeners,
 credentials and the import/script canary unchanged. Tampered input returns a blocked envelope
 without a saved reference. These are planning checks, not installed activation evidence.
+
+
+## Built format-3 installed-operation qualification
+
+The real `trsd` executable must plan a genuine prepared format-3 fixture bundle, submit its exact
+saved plan, recover the same application after the submitting CLI process exits, and read status
+and application through the durable standalone Deployment worker. The bundle contains a worker
+produced before planning through Deployment's public `ServiceWorkerBuild`; CLI neither builds a
+worker during apply nor implements a second coordinator. Apply/status/application run from a
+foreign directory with only Docker on PATH, closed stdin and the executable reached by symlink.
+
+Exit zero from apply remains durable acceptance. Only subsequent verified application/status
+read-back establishes readiness. Repeated submission with the same idempotency key returns the
+same application, including after the source bundle is removed. JSON continues through SDK
+schemas; human output continues through UI terminal providers. Qualification creates and cleans
+only uniquely labelled fixture containers/volumes/networks and its exact selected worker process.
+Graceful worker disposal preserves installed resources; a later apply must report repair rather
+than silently restart that worker. Original services remain outside this fixture.
