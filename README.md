@@ -145,3 +145,12 @@ scope. Built-program tests use an empty or Docker-only PATH and retain Task 1 ch
 Configuration and output accept the new format-3 service contracts through exact public
 SDK/Deployment archives, preserving historical format-1/2 input/readers. This presentation
 slice adds no installer commands or activation policy; those follow under this same Task 3C.
+
+### Built format-3 acceptance gate
+
+Owner CI runs on Ubuntu 26.04 with `CORDIS_REQUIRE_PLAN=1`: missing prerequisites fail visibly.
+The built standalone CLI plans a genuine prepared five-instance bundle through Deployment's
+public fixture/export, saves and repeats identical format-3 bytes, renders reusable human
+service tables and runs with Docker-only PATH. It leaves Docker resources, listeners,
+credentials and the import/script canary unchanged. Tampered input returns a blocked envelope
+without a saved reference. These are planning checks, not installed activation evidence.

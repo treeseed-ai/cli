@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Qualify extensible built CLI planning on Ubuntu 26.04 without runtime effects (#317).
+
 ### Changed
 
 - Render human command results through reusable UI providers and accept extensible plans (#317).
