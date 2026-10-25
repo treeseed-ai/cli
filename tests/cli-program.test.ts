@@ -293,7 +293,7 @@ class InstalledProgramTests {
       this.signal('SIGTERM'); const closeDeadline = Date.now() + 15000; while (existsSync(join(fixture.installation, '.cordis/writer.lock')) && Date.now() < closeDeadline) await new Promise(InstalledProgramTests.delay);
       expect(existsSync(join(fixture.installation, '.cordis/writer.lock'))).toBe(false); const refused = program.run(apply, environment, program.symlink); expect(refused.status).toBe(3); expect(ServiceSchemas.envelope.parse(JSON.parse(refused.stdout)).success).toBe(false); expect(existsSync(join(fixture.installation, '.cordis/writer.lock'))).toBe(false);
     } finally {
-      if (!this.worker) { try { const owner = JSON.parse(readFileSync(join(fixture.installation, '.cordis/launch/child.json'), 'utf8')) as { pid: number }, file = statSync(join(fixture.installation, '.cordis/worker')), process = statSync('/proc/' + owner.pid + '/exe'); if (process.dev === file.dev && process.ino === file.ino) this.worker = { pid: owner.pid, dev: process.dev, ino: process.ino }; } catch { } }
+      if (!this.worker) { try { const owner = JSON.parse(readFileSync(join(fixture.installation, '.cordis/launch/child.json'), 'utf8')) as { pid: number }, file = statSync(join(fixture.installation, '.cordis/worker')), observed = statSync('/proc/' + owner.pid + '/exe'); if (observed.dev === file.dev && observed.ino === file.ino) this.worker = { pid: owner.pid, dev: observed.dev, ino: observed.ino }; } catch { } }
       this.signal('SIGKILL'); fixture.close(); program.close();
     }
   }
