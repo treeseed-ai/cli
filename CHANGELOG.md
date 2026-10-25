@@ -4,6 +4,16 @@
 
 ### Added
 
+- Qualify extensible built CLI planning on Ubuntu 26.04 without runtime effects (#317).
+
+### Changed
+
+- Render human command results through reusable UI providers and accept extensible plans (#317).
+
+### Added
+
+- Cli: deliver Task 3C typed providers and mobile-first UI integration (#317).
+
 - Submit and observe durable installed applications (#315).
 - Compose standalone CLI with native Cordis provider selection (#313).
 - Expose non-activating platform plans (#311).

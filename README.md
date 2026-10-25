@@ -126,3 +126,31 @@ Task 3B is authorized after the maintainer reviewed the isolated setup. Tracking
 Development: Bun 1.4.4, Node 24.19.0, TypeScript 5.9.3, native Cordis 4.0.0-rc.12. Run bun run verify (semantic class/source check, strict compiler, build and nonempty unit/integration/program smoke). Installed acceptance uses genuine exact package/OCI bytes, real identity/database/API/HTTPS and explicit isolated certificate trust. No global trust mutation or legacy service changes. All handwritten source, tools and tests are strict TypeScript classes.
 
 All capabilities that can be plugins, including container services, are native Cordis class plugins with typed swappable contracts. No parallel DI graph. Keep independent repository/public package boundaries, exact archive pins and original licenses. Migration PRs target cordis with Part of issue references. All issues remain open until authorized release; installer/Agent/generalized recovery are later tasks.
+
+## Task 3C contract
+
+Owner issue: https://github.com/treeseed-ai/cli/issues/317. Follow the approved Platform Task 3C service/provider/UI plan through exact public archives. Preserve independent repository ownership, strict TypeScript classes, native Cordis lifecycle, historical formats and all seven SDK operations. Expected-generation/idempotency, resource/credential/TLS retention and explicit unsafe restart/migration gates are mandatory. All issues remain open until release.
+
+Every visual component must be mobile-first from 320 CSS pixels to widescreen monitors; test 320/375/768/1024/1440/1920/2560 widths, long content, keyboard/touch and 200% text resizing. Keep authored controls at least 44×44 CSS pixels, required actions visible, logical/fluid dimensions and no page overflow (labeled local semantic-table overflow is permitted). UI owns components/styles/renderers; consumers retain domain behavior and Identity retains Keycloak authority.
+
+### Reusable terminal presentation
+
+Human output maps diagnostics, plans, installation state, applications and safe errors into
+UI-owned text/status/table/feedback/stack view models. The native CLI output plugin consumes
+UI's public terminal renderer; formatting and reusable presentation live in UI. Human plan
+output contains explicit service, volume, port and future-effect tables. JSON envelope bytes,
+exit meanings and stdout/stderr ownership stay with CLI; machine JSON does not create a UI
+scope. Built-program tests use an empty or Docker-only PATH and retain Task 1 checks.
+
+Configuration and output accept the new format-3 service contracts through exact public
+SDK/Deployment archives, preserving historical format-1/2 input/readers. This presentation
+slice adds no installer commands or activation policy; those follow under this same Task 3C.
+
+### Built format-3 acceptance gate
+
+Owner CI runs on Ubuntu 26.04 with `CORDIS_REQUIRE_PLAN=1`: missing prerequisites fail visibly.
+The built standalone CLI plans a genuine prepared five-instance bundle through Deployment's
+public fixture/export, saves and repeats identical format-3 bytes, renders reusable human
+service tables and runs with Docker-only PATH. It leaves Docker resources, listeners,
+credentials and the import/script canary unchanged. Tampered input returns a blocked envelope
+without a saved reference. These are planning checks, not installed activation evidence.
