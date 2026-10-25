@@ -24,11 +24,15 @@ class CliTests {
   listen(resolvePort:(port:number)=>void):void {this.resolvePort=resolvePort;this.server=createServer();this.server.listen(0,'127.0.0.1',this.listening.bind(this));}
   listening():void {const address=this.server!.address();if(address&&typeof address==='object')this.resolvePort!(address.port);}
   async port(occupied=false):Promise<number> {const port=await new Promise<number>(this.listen.bind(this));if(!occupied)this.server!.close();return port;}
+  installedArguments():void {
+    const fixture=new CliProgramFixture();
+    try{for(const command of ["apply","status","application"]){const result=fixture.run(["platform",command,"--json"],{PATH:""});expect(result.status).toBe(2);expect(result.stderr).toBe("");expect(JSON.parse(result.stdout).problem.code).toBe("INVALID_ARGUMENTS");}}finally{fixture.close();}
+  }
   identity():void {
     const fixture=new CliProgramFixture();
     try {
       for(const binary of [fixture.binary,fixture.symlink]) {
-        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.3\n');expect(version.stderr).toBe('');
+        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.4\n');expect(version.stderr).toBe('');
         const help=fixture.run(['--help'],{PATH:''},binary);expect(help.status).toBe(0);expect(help.stdout).toContain('doctor');expect(help.stderr).toBe('');
       }
       expect(readdirSync(fixture.cwd)).toEqual([]);
@@ -68,7 +72,7 @@ class CliTests {
       for(const args of [['secret-canary'],['doctor','--secret-canary'],['doctor','--port'],['doctor','--port','0'],['doctor','--port','1.5'],['doctor','--context','a','--context','b']]) {
         const result=fixture.run(args);expect(result.status).toBe(2);expect(result.stderr).toContain('--help');expect(result.stdout+result.stderr).not.toContain('secret-canary');
       }
-      const unsupported=fixture.run(['platform','apply']);expect(unsupported.status).toBe(3);expect(unsupported.stderr).toContain('UNSUPPORTED_COMMAND');
+      const unsupported=fixture.run(['platform','install']);expect(unsupported.status).toBe(3);expect(unsupported.stderr).toContain('UNSUPPORTED_COMMAND');
     }finally{fixture.close();}
   }
   async defaultComposition():Promise<void> {
@@ -245,3 +249,5 @@ test('smoke: installed provider byte and dependency failures block before import
 
 test('smoke: provider constructors and failed disposal cannot report successful CLI completion',compositionSuite.lifecycleFailures.bind(compositionSuite));
 test('smoke: prepared-provider metadata scope ownership and closure are checked before activation',compositionSuite.metadataFailures.bind(compositionSuite));
+
+test('smoke: installed commands validate arguments before contacting worker',suite.installedArguments.bind(suite));

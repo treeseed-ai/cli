@@ -116,3 +116,13 @@ verified external package closure, while disabling dotenv, bunfig and tsconfig a
 This is required by Bun 1.4.4; [Bun documents the flag](https://bun.sh/docs/bundler/executables#automatic-config-loading)
 and its [maintainer identifies it for external modules](https://github.com/oven-sh/bun/issues/27058).
 The built-program canary verifies cwd package metadata cannot redirect core behavior or run scripts.
+
+## Task 3B: Installed application commands
+
+platform apply --installation DIR --plan ID --digest SHA --idempotency-key KEY --json submits through the selected public Deployment capability. platform status --installation DIR --json and platform application --installation DIR --id ID --json read durable state. Exit zero for apply means accepted, not ready. The same standalone executable contains a fixed internal worker entry; it accepts only validated private installation state. No CLI-owned controller, provider catalog or concrete Deployment construction is introduced.
+
+Task 3B is authorized after the maintainer reviewed the isolated setup. Tracking: #315. Detailed integration plan: https://github.com/treeseed-ai/platform/blob/cordis/docs/superpowers/plans/2026-10-24-task3b-installed-composition.md. Implementation evidence is recorded separately; these requirements are not a passing-test claim.
+
+Development: Bun 1.4.4, Node 24.19.0, TypeScript 5.9.3, native Cordis 4.0.0-rc.12. Run bun run verify (semantic class/source check, strict compiler, build and nonempty unit/integration/program smoke). Installed acceptance uses genuine exact package/OCI bytes, real identity/database/API/HTTPS and explicit isolated certificate trust. No global trust mutation or legacy service changes. All handwritten source, tools and tests are strict TypeScript classes.
+
+All capabilities that can be plugins, including container services, are native Cordis class plugins with typed swappable contracts. No parallel DI graph. Keep independent repository/public package boundaries, exact archive pins and original licenses. Migration PRs target cordis with Part of issue references. All issues remain open until authorized release; installer/Agent/generalized recovery are later tasks.
