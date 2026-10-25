@@ -7,7 +7,9 @@ import { createServer, type Server } from 'node:net';
 import { createHash } from 'node:crypto';
 import { PreparedReleaseFixture } from '@treeseed-cordis/deployment/testing';
 import { CliApplication } from '../src/main.js';
-import { PlatformSchemas, type CliEnvelope } from '@treeseed-cordis/sdk';
+import { ServiceRuntimeFixture } from '@treeseed-cordis/deployment/testing/runtime';
+import { ServiceWorkerBuild } from '@treeseed-cordis/deployment';
+import { ServiceSchemas, PlatformSchemas, type CliEnvelope } from '@treeseed-cordis/sdk';
 
 class CliProgramFixture {
   readonly root=mkdtempSync(join(tmpdir(),'cordis cli '));
@@ -262,3 +264,42 @@ class ExtensiblePlanProgramTests extends CliTests {
  async plan():Promise<void>{const {ServiceReleaseFixture}=await import('@treeseed-cordis/deployment/testing'),{ServiceSchemas}=await import('@treeseed-cordis/sdk'),fixture=await new ServiceReleaseFixture().services(),program=new CliProgramFixture();try{const port=await this.port();fixture.configuration.origin='https://localhost:'+port;fixture.release.composition.services[0]!.definition.ports[0]!.publication!.port=port;fixture.recipe.services['instance-0']!.ports![0]!.published=port;fixture.refreshService();const path=join(program.cwd,'service-config.json');writeFileSync(path,JSON.stringify(fixture.configuration));const before=this.snapshot(),listeners=this.listeners(),result=program.run(['platform','plan','--file',path,'--json']);expect(result.status).toBe(0);expect(result.stderr).toBe('');const plan=ServiceSchemas.plan.parse(JSON.parse(result.stdout).result);expect(plan.formatVersion).toBe(3);expect(plan.composition.services).toHaveLength(5);expect(plan.changes).toHaveLength(5);expect(plan.blockers).toEqual([]);const saved=join(fixture.installation,'.cordis/plans',plan.id+'.json');expect(ServiceSchemas.plan.parse(JSON.parse(readFileSync(saved,'utf8')))).toEqual(plan);expect(statSync(saved).mode&0o777).toBe(0o600);const again=program.run(['platform','plan','--file',path,'--json']);expect(again.status).toBe(0);expect(again.stdout).toBe(result.stdout);const human=program.run(['platform','plan','--file',path]);expect(human.status).toBe(0);expect(human.stdout).toContain('Services\nService | Image');expect(human.stdout).toContain('instance-4');expect(human.stdout).toContain('Future effects only');const tools=join(program.root,'docker-only');mkdirSync(tools);let docker:string|null=null;for(const directory of(process.env.PATH??'').split(':'))if(existsSync(join(directory,'docker'))){docker=join(directory,'docker');break;}expect(docker).not.toBeNull();symlinkSync(docker!,join(tools,'docker'));const standalone=program.run(['platform','plan','--file',path,'--json'],{PATH:tools});expect(standalone.status).toBe(0);expect(standalone.stdout).toBe(result.stdout);expect(this.snapshot()).toBe(before);expect(this.listeners()).toBe(listeners);expect(existsSync(join(fixture.installation,'.cordis/credentials'))).toBe(false);expect(existsSync(join(fixture.root,'SCRIPT_CANARY'))).toBe(false);writeFileSync(join(fixture.bundle,'archives/plugin.tgz'),'tampered');const blocked=program.run(['platform','plan','--file',path,'--json']);expect(blocked.status).toBe(3);const envelope=JSON.parse(blocked.stdout);expect(envelope.result).toBeNull();expect(envelope.references).toEqual([]);expect(readdirSync(join(fixture.installation,'.cordis/plans'))).toEqual([plan.id+'.json']);}finally{fixture.close();program.close();}}
 }
 const extensiblePlan=new ExtensiblePlanProgramTests();test('smoke: standalone CLI plans genuine five-instance format3 bundle deterministically without runtime effects',extensiblePlan.plan.bind(extensiblePlan),60000);
+
+
+class InstalledProgramTests {
+  private worker: { pid: number; dev: number; ino: number } | null = null;
+  async installed(): Promise<void> {
+    const fixture = new ServiceRuntimeFixture(), program = new CliProgramFixture();
+    try {
+      await fixture.running(); const output = join(fixture.root, 'worker-build'); mkdirSync(output, { mode: 0o700 });
+      const descriptor = ServiceWorkerBuild.produce(output); copyFileSync(join(output, descriptor.path), join(fixture.bundle, 'worker'));
+      fixture.release.composition.worker = { ...descriptor, path: 'worker' }; fixture.refreshService();
+      const input = join(fixture.root, 'configuration.json'); writeFileSync(input, JSON.stringify(fixture.configuration));
+      const planResult = this.json(program, ['platform', 'plan', '--file', input, '--json']), plan = ServiceSchemas.plan.parse(planResult.result);
+      const docker = spawnSync('which', ['docker'], { encoding: 'utf8' }); if (docker.status !== 0 || !docker.stdout.trim().startsWith('/')) throw new Error('Docker prerequisite missing');
+      const path = join(fixture.root, 'docker-only'); mkdirSync(path, { mode: 0o700 }); symlinkSync(docker.stdout.trim(), join(path, 'docker'));
+      const environment = { PATH: path }, apply = ['platform', 'apply', '--installation', fixture.installation, '--plan', plan.id, '--digest', plan.digest, '--idempotency-key', 'compiled-format3-program', '--json'];
+      const first = PlatformSchemas.apply.parse(this.json(program, apply, environment).result), owner = JSON.parse(readFileSync(join(fixture.installation, '.cordis/writer.lock/owner.json'), 'utf8')) as { pid: number }, executable = statSync(join(fixture.installation, '.cordis/worker')), running = statSync('/proc/' + owner.pid + '/exe');
+      if (running.dev !== executable.dev || running.ino !== executable.ino) throw new Error('Wrong worker process'); this.worker = { pid: owner.pid, dev: running.dev, ino: running.ino };
+      expect(PlatformSchemas.apply.parse(this.json(program, apply, environment).result).id).toBe(first.id);
+      const applicationArgs = ['platform', 'application', '--installation', fixture.installation, '--id', first.id, '--json'], deadline = Date.now() + 120000;
+      let application = ServiceSchemas.applicationRecord.parse(this.json(program, applicationArgs, environment).result);
+      while (!['completed', 'failed', 'cancelled'].includes(application.phase) && Date.now() < deadline) { await new Promise(InstalledProgramTests.delay); application = ServiceSchemas.applicationRecord.parse(this.json(program, applicationArgs, environment).result); }
+      expect(application.phase).toBe('completed'); expect(application.result).toBe('ready');
+      const statusArgs = ['platform', 'status', '--installation', fixture.installation, '--json'], status = ServiceSchemas.status.parse(this.json(program, statusArgs, environment).result);
+      expect(status.ready).toBe(true); expect(status.services.length).toBe(5); expect(status.activeComposition).toBe(plan.compositionGeneration);
+      const human = program.run(['platform', 'status', '--installation', fixture.installation], environment, program.symlink); expect(human.status).toBe(0); expect(human.stderr).toBe(''); expect(human.stdout).toContain('Installed services'); for (const service of status.services) expect(human.stdout).toContain(service.serviceId);
+      rmSync(fixture.bundle, { recursive: true }); expect(PlatformSchemas.apply.parse(this.json(program, apply, environment).result).id).toBe(first.id); expect(ServiceSchemas.status.parse(this.json(program, statusArgs, environment).result).ready).toBe(true);
+      this.signal('SIGTERM'); const closeDeadline = Date.now() + 15000; while (existsSync(join(fixture.installation, '.cordis/writer.lock')) && Date.now() < closeDeadline) await new Promise(InstalledProgramTests.delay);
+      expect(existsSync(join(fixture.installation, '.cordis/writer.lock'))).toBe(false); const refused = program.run(apply, environment, program.symlink); expect(refused.status).toBe(3); expect(ServiceSchemas.envelope.parse(JSON.parse(refused.stdout)).success).toBe(false); expect(existsSync(join(fixture.installation, '.cordis/writer.lock'))).toBe(false);
+    } finally {
+      if (!this.worker) { try { const owner = JSON.parse(readFileSync(join(fixture.installation, '.cordis/launch/child.json'), 'utf8')) as { pid: number }, file = statSync(join(fixture.installation, '.cordis/worker')), process = statSync('/proc/' + owner.pid + '/exe'); if (process.dev === file.dev && process.ino === file.ino) this.worker = { pid: owner.pid, dev: process.dev, ino: process.ino }; } catch { } }
+      this.signal('SIGKILL'); fixture.close(); program.close();
+    }
+  }
+  private json(program: CliProgramFixture, args: string[], environment: NodeJS.ProcessEnv = {}): ReturnType<typeof ServiceSchemas.envelope.parse> { const result = program.run(args, environment, program.symlink); if (result.status !== 0) throw new Error('Compiled installed command failed: ' + result.stdout + result.stderr); expect(result.stderr).toBe(''); return ServiceSchemas.envelope.parse(JSON.parse(result.stdout)); }
+  private signal(signal: NodeJS.Signals): void { if (!this.worker) return; try { const current = statSync('/proc/' + this.worker.pid + '/exe'); if (current.dev === this.worker.dev && current.ino === this.worker.ino) process.kill(this.worker.pid, signal); } catch { } }
+  private static delay(done: (value: void) => void): void { setTimeout(done, 100); }
+}
+const installedPrograms = new InstalledProgramTests();
+test('smoke: standalone CLI applies and observes five format3 services through its default durable host', installedPrograms.installed.bind(installedPrograms), 240000);
