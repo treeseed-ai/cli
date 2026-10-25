@@ -121,7 +121,7 @@ The built-program canary verifies cwd package metadata cannot redirect core beha
 
 platform apply --installation DIR --plan ID --digest SHA --idempotency-key KEY --json submits through the selected public Deployment capability. platform status --installation DIR --json and platform application --installation DIR --id ID --json read durable state. Exit zero for apply means accepted, not ready. The same standalone executable contains a fixed internal worker entry; it accepts only validated private installation state. No CLI-owned controller, provider catalog or concrete Deployment construction is introduced.
 
-Task 3B is authorized after the maintainer reviewed the isolated setup. Tracking: #315. Detailed integration plan: https://github.com/treeseed-ai/platform/blob/feature/713-task3b-initialization/docs/superpowers/plans/2026-10-24-task3b-installed-composition.md. Implementation evidence is recorded separately; these requirements are not a passing-test claim.
+Task 3B is authorized after the maintainer reviewed the isolated setup. Tracking: #315. Detailed integration plan: https://github.com/treeseed-ai/platform/blob/cordis/docs/superpowers/plans/2026-10-24-task3b-installed-composition.md. Implementation evidence is recorded separately; these requirements are not a passing-test claim.
 
 Development: Bun 1.4.4, Node 24.19.0, TypeScript 5.9.3, native Cordis 4.0.0-rc.12. Run bun run verify (semantic class/source check, strict compiler, build and nonempty unit/integration/program smoke). Installed acceptance uses genuine exact package/OCI bytes, real identity/database/API/HTTPS and explicit isolated certificate trust. No global trust mutation or legacy service changes. All handwritten source, tools and tests are strict TypeScript classes.
 

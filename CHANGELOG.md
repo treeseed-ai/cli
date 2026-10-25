@@ -4,8 +4,7 @@
 
 ### Added
 
-- Installed application commands (#315).
-### Added
+- Submit and observe durable installed applications (#315).
 - Compose standalone CLI with native Cordis provider selection (#313).
 - Expose non-activating platform plans (#311).
 
