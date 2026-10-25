@@ -7,6 +7,7 @@
 - Qualify extensible built CLI planning on Ubuntu 26.04 without runtime effects (#317).
 
 ### Changed
+- Qualify CLI with exact current SDK UI and Deployment archives (#317).
 
 - Render human command results through reusable UI providers and accept extensible plans (#317).
 

@@ -1,6 +1,6 @@
-# Cordis diagnostic and planning executable
+# Cordis executable
 
-`trsd-linux-x64` is a standalone diagnostic and non-activating planning front door. Run it without Node/Bun or a
+`trsd-linux-x64` is the standalone diagnostic, planning and installed-operation front door. Run it without Node/Bun or a
 project checkout. Supported commands:
 
 ```text
@@ -8,6 +8,9 @@ trsd --help
 trsd --version
 trsd doctor [--json] [--context NAME] [--installation ABSOLUTE_PATH] [--port INTEGER]
 trsd platform plan --file CONFIG [--json]
+trsd platform apply --installation DIR --plan ID --digest SHA --idempotency-key KEY [--json]
+trsd platform status --installation DIR [--json]
+trsd platform application --installation DIR --id ID [--json]
 ```
 
 `CliApplication` parses arguments and calls the public packaged `DeploymentHost` contract;
@@ -20,8 +23,18 @@ JSON stdout is exactly one envelope: command, success, result, problem, blockers
 Doctor result follows the SDK DiagnosticReport schema. Human output uses concise checks;
 human errors go to stderr. Errors never echo unknown argument values or raw Docker stderr.
 Exit0 means success;1 runtime failure;2 invalid command/flag/value (with actionable help);
-3 unmet prerequisites or explicitly unsupported lifecycle commands. `platform plan` is the only implemented platform binding; `apply`, `status`, `install`, `open`, `recover` and other lifecycle verbs remain unsupported. Remote SDK bindings remain contract-only.
-Duplicate/missing flags and positional arguments fail validation. JSON is supported on doctor and platform plan, including validation failures. Version is `trsd 0.0.0-cordis.2`.
+3 unmet prerequisites or explicitly unsupported lifecycle commands. Implemented platform bindings
+are `plan`, `apply`, `status` and `application` read-back. Apply acknowledges durable acceptance;
+application/status determine readiness. `plugin install`, `open` and `recover` remain unsupported
+in this candidate. Remote SDK bindings remain contract-only.
+Duplicate/missing flags and positional arguments fail validation. JSON is supported on doctor and
+implemented platform commands, including validation failures. Version is `trsd 0.0.0-cordis.6`.
+
+This candidate consumes exact SDK `.12`, UI `.14` and Deployment `.24` archives. Source/byte
+receipts are recorded in `package.json.cordisCandidate`, the lockfile and vendor archives.
+Human presentation stays UI-owned and machine envelopes/exit codes stay CLI-owned. Default
+Deployment selects the saved installation format; format-3 application and readonly observations
+use its native standalone host without an ambient Node/Bun/package manager during apply.
 
 `CliProgramFixture.run(args)` spawns the compiled artifact with closed stdin, captures output
 and exit status, and supports fixture cwd/environment. Acceptance covers another directory,
