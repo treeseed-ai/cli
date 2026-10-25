@@ -251,3 +251,8 @@ test('smoke: provider constructors and failed disposal cannot report successful 
 test('smoke: prepared-provider metadata scope ownership and closure are checked before activation',compositionSuite.metadataFailures.bind(compositionSuite));
 
 test('smoke: installed commands validate arguments before contacting worker',suite.installedArguments.bind(suite));
+
+class UiOutputProgramTests {
+ human():void{const fixture=new CliProgramFixture();try{const result=fixture.run(['doctor','--installation',join(fixture.root,'new')],{PATH:''});expect(result.status).toBe(3);expect(result.stdout).toContain('Diagnostic checks');expect(result.stdout).toContain('Check | Result | Code | Detail');expect(result.stderr).toContain('PREREQUISITES_UNMET');expect(result.stdout+result.stderr).not.toContain('\u001b');}finally{fixture.close();}}
+}
+const uiOutput=new UiOutputProgramTests();test('smoke: built CLI renders structured diagnostic models through reusable terminal providers',uiOutput.human.bind(uiOutput));
