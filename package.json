@@ -35,8 +35,8 @@
     },
     "deployment": {
       "repository": "https://github.com/treeseed-ai/deployment.git",
-      "commit": "42a53501a460389fe87547869d4ff35e87595783",
-      "sha256": "17301c9c81339e72aefe3135be2eef7858e0634d94f305f94c1b3d105de37d53"
+      "commit": "3db1427e6f70ddd1fdb35dd2a41a5e4d1837660d",
+      "sha256": "95f93b0076582c8af554a46b59a1b98dce7942abea4a91314cfa403325e6ccd7"
     },
     "ui": {
       "repository": "https://github.com/treeseed-ai/ui.git",
