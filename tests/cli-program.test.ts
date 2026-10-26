@@ -26,6 +26,21 @@ class CliTests {
   listen(resolvePort:(port:number)=>void):void {this.resolvePort=resolvePort;this.server=createServer();this.server.listen(0,'127.0.0.1',this.listening.bind(this));}
   listening():void {const address=this.server!.address();if(address&&typeof address==='object')this.resolvePort!(address.port);}
   async port(occupied=false):Promise<number> {const port=await new Promise<number>(this.listen.bind(this));if(!occupied)this.server!.close();return port;}
+  pluginArguments():void {
+    const fixture=new CliProgramFixture();
+    try {
+      for(const args of [
+        ['plugin','install','--json'],
+        ['plugin','install','@fixture/example','--installation','relative','--json'],
+        ['plugin','select','probe.service','example.probe','--installation',fixture.root,'--json'],
+        ['plugin','inspect','--installation',fixture.root,'--json'],
+        ['plugin','list','--installation',fixture.root,'--target','secret-canary','--json'],
+        ['plugin','install','@fixture/example','--installation',fixture.root,'--binding','invalid','--json']
+      ]) {const result=fixture.run(args,{PATH:''});expect(result.status).toBe(2);expect(result.stderr).toBe('');const envelope=JSON.parse(result.stdout);expect(envelope.command).toBe('plugin.'+args[1]);expect(envelope.result).toBeNull();expect(envelope.problem.code).toBe('INVALID_ARGUMENTS');expect(result.stdout).not.toContain('secret-canary');}
+      const help=fixture.run(['--help'],{PATH:''});expect(help.stdout).toContain('plugin install');expect(help.stdout).toContain('--restart');
+      const empty=fixture.run(['plugin','list','--installation',join(fixture.root,'missing'),'--json'],{PATH:''});expect(empty.status).toBe(3);expect(JSON.parse(empty.stdout).result).toBeNull();expect(existsSync(join(fixture.root,'missing'))).toBe(false);
+    } finally {fixture.close();}
+  }
   installedArguments():void {
     const fixture=new CliProgramFixture();
     try{for(const command of ["apply","status","application"]){const result=fixture.run(["platform",command,"--json"],{PATH:""});expect(result.status).toBe(2);expect(result.stderr).toBe("");expect(JSON.parse(result.stdout).problem.code).toBe("INVALID_ARGUMENTS");}}finally{fixture.close();}
@@ -303,3 +318,5 @@ class InstalledProgramTests {
 }
 const installedPrograms = new InstalledProgramTests();
 test('smoke: standalone CLI applies and observes five format3 services through its default durable host', installedPrograms.installed.bind(installedPrograms), 240000);
+
+test('smoke: built plugin commands validate arguments with safe SDK JSON envelopes and do not create missing installations', suite.pluginArguments.bind(suite));
