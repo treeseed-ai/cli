@@ -185,3 +185,28 @@ schemas; human output continues through UI terminal providers. Qualification cre
 only uniquely labelled fixture containers/volumes/networks and its exact selected worker process.
 Graceful worker disposal preserves installed resources; a later apply must report repair rather
 than silently restart that worker. Original services remain outside this fixture.
+
+## Installed plugin management
+
+`trsd plugin install <NPM package|HTTPS Git repository> --installation DIR` requests installation
+and activation when the selected target is qualified. Use `--target deployment --service ID` for a
+private container instance, `--provider ID` for an explicit provider and `--binding PORT=ID` for
+explicit typed bindings. `--configuration FILE` loads a strict JSON object. `--idempotency-key KEY`
+replays the exact accepted request; omission creates and reports a new key. `--scope installation`
+is the default; client scope remains action-required until qualified. Ambiguous targets never
+activate implicitly. Approved exact helpers and source/build policy belong to the installation.
+
+`trsd plugin select CAPABILITY PROVIDER --installation DIR --target TARGET [--service ID]`
+selects an already registered provider through the same Deployment authority.
+`trsd plugin list --installation DIR [--target TARGET]` and
+`trsd plugin inspect REQUEST --installation DIR` read the current owner or verified cold records.
+Cold records cannot establish active health. None of these commands invents a remote API endpoint.
+Human output is rendered entirely by the reusable UI terminal providers; JSON emits the SDK
+plugin envelope. Exit 0 for install/select requires active or already-active; pending/prepared or
+blocked/action-required returns 3, invalid arguments/configuration returns 2 and unexpected I/O
+returns 1. Read-only list/inspect success uses exit 0 without upgrading record health claims.
+
+`platform apply ... --restart SERVICE` explicitly authorizes each required restart scope from
+the reviewed plan. Repeat the flag for multiple service IDs; duplicate or unrelated scopes fail.
+No restart is inferred from install, readiness or an arbitrary configuration change. Keycloak
+issuer, identities, sessions and grants remain under their existing owner/provider authority.

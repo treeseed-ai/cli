@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Expose native installed plugin management and explicit plan restart scopes using reusable UI presentation (#317).
+
+### Added
 
 - Qualify compiled format-3 installed operations through the public durable host (#317).
 
