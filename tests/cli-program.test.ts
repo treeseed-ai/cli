@@ -363,10 +363,12 @@ class InstalledPluginCliTests {
     expect(file.dev).toBe(running.dev);expect(file.ino).toBe(running.ino);expect(file.uid).toBe(process.getuid!());this.worker={pid:child.pid,dev:running.dev,ino:running.ino};
   }
   private signal(signal: NodeJS.Signals): void {if(!this.worker)return;try{const current=statSync('/proc/'+this.worker.pid+'/exe');if(current.dev===this.worker.dev&&current.ino===this.worker.ino)process.kill(this.worker.pid,signal);}catch{}}
-  async program(): Promise<void> {
+  async git():Promise<void>{await this.program('git');}
+  async gitBuild():Promise<void>{await this.program('build');}
+  async program(source:'npm'|'git'|'build'='npm'): Promise<void> {
     const fixture=new PluginInstallationFixture(),program=new CliProgramFixture();
     try {
-      await fixture.prepare();await fixture.startRegistry();
+      await fixture.prepare();if(source==='npm')await fixture.startRegistry();else await fixture.startGit(source==='build');
       const file=join(program.cwd,'plugins.json');writeFileSync(file,JSON.stringify(fixture.configuration));const planned=program.run(['platform','plan','--file',file,'--json']);expect(planned.status).toBe(0);expect(planned.stderr).toBe('');expect(ServiceSchemas.plan.parse(JSON.parse(planned.stdout).result).composition.services).toHaveLength(4);
       const tools=join(program.root,'managed-only');mkdirSync(tools);let docker:string|undefined;for(const directory of(process.env.PATH??'').split(':'))if(existsSync(join(directory,'docker'))){docker=join(directory,'docker');break;}expect(docker).toBeDefined();symlinkSync(docker!,join(tools,'docker'));
       const originalPath=process.env.PATH;process.env.PATH=tools;
@@ -377,12 +379,12 @@ class InstalledPluginCliTests {
         await this.direct(store,'cli-addon-one');
         const human=program.run(['plugin','inspect','cli-first','--installation',fixture.installation]);expect(human.status).toBe(0);expect(human.stderr).toBe('');expect(human.stdout).toContain('active');expect(human.stdout).toContain('Accepted references');expect(human.stdout).toContain('cli-first');
         const already=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,[...args.slice(0,-1),'cli-already']).result));expect(already.state).toBe('already-active');expect(already.applicationId).toBe(first.applicationId);
-        const applications=store.records().length,unsafeArgs=['install',fixture.source('2.0.0'),'--installation',fixture.installation,'--target','deployment','--service','cli-addon-one','--idempotency-key','cli-unsafe'],unsafe=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,unsafeArgs).result));
-        expect(unsafe.state).toBe('prepared');expect(unsafe.nextActions).toContain('review-migration');expect(unsafe.applicationId).toBeNull();expect(store.records().length).toBe(applications);expect(PluginManagementSchemas.result.parse(this.request(program,unsafeArgs,3).result)).toEqual(unsafe);this.same(store,before,files);
+        if(source==='npm'){const applications=store.records().length,unsafeArgs=['install',fixture.source('2.0.0'),'--installation',fixture.installation,'--target','deployment','--service','cli-addon-one','--idempotency-key','cli-unsafe'],unsafe=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,unsafeArgs).result));
+        expect(unsafe.state).toBe('prepared');expect(unsafe.nextActions).toContain('review-migration');expect(unsafe.applicationId).toBeNull();expect(store.records().length).toBe(applications);expect(PluginManagementSchemas.result.parse(this.request(program,unsafeArgs,3).result)).toEqual(unsafe);this.same(store,before,files);}
         const secondArgs=['install',fixture.source(),'--installation',fixture.installation,'--target','deployment','--service','cli-addon-two','--idempotency-key','cli-second'],second=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,secondArgs).result));expect(second.state).toBe('active');this.same(store,before,files);await this.direct(store,'cli-addon-two');
         expect(this.receipts(store).size).toBeGreaterThan(before.size);const historical=PluginManagementSchemas.result.parse(this.request(program,['inspect','cli-first','--installation',fixture.installation],0).result);expect(historical.activeGeneration).toBeNull();expect(historical.acknowledgements).toEqual([]);
         await fixture.stopRegistry();expect(PluginManagementSchemas.result.parse(this.request(program,secondArgs,0).result)).toEqual(second);
-        const listed=this.request(program,['list','--installation',fixture.installation],0);expect(Array.isArray(listed.result)).toBe(true);expect((listed.result as PluginInstallResult[]).length).toBe(4);
+        const listed=this.request(program,['list','--installation',fixture.installation],0);expect(Array.isArray(listed.result)).toBe(true);expect((listed.result as PluginInstallResult[]).length).toBe(source==='npm'?4:3);
         expect(existsSync(join(fixture.root,'MUST_NOT_RUN'))).toBe(false);this.signal('SIGTERM');const deadline=Date.now()+15000;while(existsSync(join(fixture.installation,'.cordis/writer.lock'))&&Date.now()<deadline)await new Promise(InstalledPluginCliTests.delay);expect(existsSync(join(fixture.installation,'.cordis/writer.lock'))).toBe(false);this.worker=null;
         const cold=PluginManagementSchemas.result.parse(this.request(program,['inspect','cli-second','--installation',fixture.installation],0).result);expect(cold.state).toBe('recovery-required');expect(cold.activeGeneration).toBeNull();expect(cold.acknowledgements).toEqual([]);
       } finally {process.env.PATH=originalPath;}
@@ -391,3 +393,6 @@ class InstalledPluginCliTests {
 }
 const installedPlugins=new InstalledPluginCliTests();
 test('smoke: built CLI installs two typed plugin instances with retained credentials and safe UI readback using exact public fixtures',installedPlugins.program.bind(installedPlugins),420000);
+
+test('smoke: built CLI installs packaged HTTPS Git with managed helpers',installedPlugins.git.bind(installedPlugins),420000);
+test('smoke: built CLI installs approved source-only HTTPS Git with managed helpers',installedPlugins.gitBuild.bind(installedPlugins),420000);
