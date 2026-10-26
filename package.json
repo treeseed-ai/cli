@@ -1,6 +1,6 @@
 {
   "name": "@treeseed-cordis/cli",
-  "version": "0.0.0-cordis.7",
+  "version": "0.0.0-cordis.8",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -35,8 +35,8 @@
     },
     "deployment": {
       "repository": "https://github.com/treeseed-ai/deployment.git",
-      "commit": "3db1427e6f70ddd1fdb35dd2a41a5e4d1837660d",
-      "sha256": "95f93b0076582c8af554a46b59a1b98dce7942abea4a91314cfa403325e6ccd7"
+      "commit": "5cc3f3cc655ae318d195746ad3c85a2742bd3c6c",
+      "sha256": "3fdcdcf0199aa82c2fc30cf5ff95c0b9dce49f138764366fb99638d10b087576"
     },
     "ui": {
       "repository": "https://github.com/treeseed-ai/ui.git",

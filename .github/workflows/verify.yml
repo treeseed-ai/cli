@@ -7,7 +7,21 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
+  programs:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: foundation
+            pattern: "^(unit:|integration:|smoke: (?!built CLI installs))"
+          - group: npm
+            pattern: "^smoke: built CLI installs two typed"
+          - group: git
+            pattern: "^smoke: built CLI installs packaged"
+          - group: git-build
+            pattern: "^smoke: built CLI installs approved"
+          - group: live
+            pattern: "^smoke: built CLI installs and selects"
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     env:
@@ -21,4 +35,14 @@ jobs:
         with:
           node-version: 24.19.0
       - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run verify
+      - run: bun run check && bun run build
+      - run: bun test ./tests --timeout 60000 --test-name-pattern "${{ matrix.pattern }}"
+
+  verify:
+    if: always()
+    needs: programs
+    runs-on: ubuntu-26.04
+    steps:
+      - env:
+          RESULT: ${{ needs.programs.result }}
+        run: test "$RESULT" = success

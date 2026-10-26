@@ -30,7 +30,7 @@ in this candidate. Remote SDK bindings remain contract-only.
 Duplicate/missing flags and positional arguments fail validation. JSON is supported on doctor and
 implemented platform commands, including validation failures. Version is `trsd 0.0.0-cordis.6`.
 
-This candidate consumes exact SDK `.12`, UI `.14` and Deployment `.24` archives. Source/byte
+This candidate consumes exact SDK `.16`, UI `.16` and Deployment `.73` archives. Source/byte
 receipts are recorded in `package.json.cordisCandidate`, the lockfile and vendor archives.
 Human presentation stays UI-owned and machine envelopes/exit codes stay CLI-owned. Default
 Deployment selects the saved installation format; format-3 application and readonly observations
@@ -70,7 +70,7 @@ release. Migration PRs target `cordis`; issues remain open until authorized rele
 
 ## Task 2: non-activating plans
 
-`trsd platform plan --file CONFIG [--json]` validates an explicitly prepared local release bundle. It never downloads, installs packages, imports plugin code, runs scripts, binds ports, loads images, creates credentials or starts containers. Apply remains unsupported. Successful plans describe future effects, not an active or healthy installation.
+`trsd platform plan --file CONFIG [--json]` validates an explicitly prepared local release bundle. It never downloads, installs packages, imports plugin code, runs scripts, binds ports, loads images, creates credentials or starts containers. Planning reports future effects; explicit saved-plan apply is a separate installed operation.
 
 Configuration retains installationId, engineContext, installationDirectory (absolute), origin (loopback), runtimeState, plugins (exact id/package/version/archive SHA-256) and credentialReferences (unique `secret://<slot>` values). Add `release: {directory: ABSOLUTE_PATH, manifestDigest: SHA256}`. The installation and bundle must be disjoint. JSON object keys and semantic sets normalize deterministically; artifact byte identities remain exact.
 
