@@ -37,6 +37,9 @@ class CliTests {
         ['plugin','list','--installation',fixture.root,'--target','secret-canary','--json'],
         ['plugin','install','@fixture/example','--installation',fixture.root,'--binding','invalid','--json']
       ]) {const result=fixture.run(args,{PATH:''});expect(result.status).toBe(2);expect(result.stderr).toBe('');const envelope=JSON.parse(result.stdout);expect(envelope.command).toBe('plugin.'+args[1]);expect(envelope.result).toBeNull();expect(envelope.problem.code).toBe('INVALID_ARGUMENTS');expect(result.stdout).not.toContain('secret-canary');}
+      const configuration=join(fixture.root,'provider.json'),installation=join(fixture.root,'uncreated');
+      for(const bytes of ['{"enabled":true,"enabled":false}','{"__proto__":{"secret":"secret-canary"}}','[1,2]','malformed secret-canary']){writeFileSync(configuration,bytes);const result=fixture.run(['plugin','install','@fixture/example','--installation',installation,'--configuration',configuration,'--json'],{PATH:''});expect(result.status).toBe(2);expect(JSON.parse(result.stdout).problem.code).toBe('INVALID_ARGUMENTS');expect(result.stdout+result.stderr).not.toContain('secret-canary');expect(existsSync(installation)).toBe(false);}
+      const digest='0'.repeat(64),restart=fixture.run(['platform','apply','--installation',installation,'--plan','plan-'+digest,'--digest',digest,'--idempotency-key','explicit-restart','--restart','example','--json'],{PATH:''});expect(restart.status).toBe(3);expect(JSON.parse(restart.stdout).problem.code).not.toBe('INVALID_ARGUMENTS');expect(existsSync(installation)).toBe(false);
       const help=fixture.run(['--help'],{PATH:''});expect(help.stdout).toContain('plugin install');expect(help.stdout).toContain('--restart');
       const empty=fixture.run(['plugin','list','--installation',join(fixture.root,'missing'),'--json'],{PATH:''});expect(empty.status).toBe(3);expect(JSON.parse(empty.stdout).result).toBeNull();expect(existsSync(join(fixture.root,'missing'))).toBe(false);
     } finally {fixture.close();}
@@ -49,7 +52,7 @@ class CliTests {
     const fixture=new CliProgramFixture();
     try {
       for(const binary of [fixture.binary,fixture.symlink]) {
-        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.6\n');expect(version.stderr).toBe('');
+        const version=fixture.run(['--version'],{PATH:''},binary);expect(version.status).toBe(0);expect(version.stdout).toBe('trsd 0.0.0-cordis.7\n');expect(version.stderr).toBe('');
         const help=fixture.run(['--help'],{PATH:''},binary);expect(help.status).toBe(0);expect(help.stdout).toContain('doctor');expect(help.stderr).toBe('');
       }
       expect(readdirSync(fixture.cwd)).toEqual([]);
