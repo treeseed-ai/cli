@@ -224,3 +224,10 @@ source transport, lifecycle scheduler or container implementation.
 CI partitions built-program scenes into independent required jobs to preserve the existing
 time budget; every test file/scene remains included. JSON exits and Keycloak authority remain
 unchanged. This candidate is an unpublished Cordis review artifact.
+
+The final built source gate also selects two new registered instances after the packaged and
+approved-build Git source is shut down. Selection rebases the complete retained closure without
+reacquisition and preserves earlier endpoints/private resources. NPM's deliberately registered
+stateful second version makes that provider ID ambiguous; source-free selection must refuse it
+without changing the active composition. Explicit source/version installation remains distinct
+from selecting an unambiguous registered provider ID.
