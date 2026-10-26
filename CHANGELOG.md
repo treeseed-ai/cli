@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Qualify built plugin commands against exact packaged Git, approved Git build and native live probe installation artifacts (#317).
+
 ### Added
 - Expose native installed plugin management and explicit plan restart scopes using reusable UI presentation (#317).
 

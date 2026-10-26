@@ -210,3 +210,17 @@ returns 1. Read-only list/inspect success uses exit 0 without upgrading record h
 the reviewed plan. Repeat the flag for multiple service IDs; duplicate or unrelated scopes fail.
 No restart is inferred from install, readiness or an arbitrary configuration change. Keycloak
 issuer, identities, sessions and grants remain under their existing owner/provider authority.
+
+## Final source and live-provider command gate
+
+The built command gate consumes Deployment's exact public NPM, packaged HTTPS Git, approved
+source-only Git and live-probe fixtures. It runs installation, read-back and source-free retry
+with only Docker on caller PATH. Registered selection uses retained archive bytes. An explicit
+probe installation names an existing service and provider; only the accepted previous/next
+qualification may activate it. The independent worker keeps its PID and physical resources;
+unqualified reverse selection remains prepared for explicit restart review. CLI supplies no
+source transport, lifecycle scheduler or container implementation.
+
+CI partitions built-program scenes into independent required jobs to preserve the existing
+time budget; every test file/scene remains included. JSON exits and Keycloak authority remain
+unchanged. This candidate is an unpublished Cordis review artifact.
