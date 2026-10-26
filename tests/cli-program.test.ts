@@ -331,6 +331,8 @@ class InstalledPluginCliTests {
   private static hash(bytes: Uint8Array): string { return createHash('sha256').update(bytes).digest('hex'); }
   private request(program: CliProgramFixture, args: string[], expected?: number): ReturnType<typeof PluginManagementSchemas.envelope.parse> {
     const result=program.run(['plugin',...args,'--json']);
+    if(result.status===null)throw new Error('Built CLI terminated without an exit status');
+    if(expected!==undefined&&result.status!==expected){const envelope=PluginManagementSchemas.envelope.parse(JSON.parse(result.stdout));const codes:string[]=[];for(const blocker of envelope.blockers)codes.push(blocker.code);throw new Error('CLI_PLUGIN_READBACK:'+args[0]+':'+result.status+':'+envelope.problem?.code+':'+codes.join(','));}
     if(expected===undefined)expect([0,3]).toContain(result.status);else expect(result.status).toBe(expected);
     expect(result.stderr).toBe('');expect(result.stdout).not.toContain('NEVER_INHERIT');return PluginManagementSchemas.envelope.parse(JSON.parse(result.stdout));
   }
