@@ -29,6 +29,6 @@
     {"from":"tests/cli-program.test.ts","to":"tests/integration/command-classification.test.ts","tier":"integration","name":"unit: parser help, version and error classifications","currentName":"integration: parser help, version and error classifications"}
   ],
   "mapping": {
-    "tests/cli-program.test.ts": ["tests/acceptance/cli-program.test.ts", "tests/integration/cli-program.test.ts", "tests/unit/cli-program.test.ts"]
+    "tests/cli-program.test.ts": ["tests/acceptance/cli-program.test.ts", "tests/integration/cli-program.test.ts", "tests/integration/command-classification.test.ts"]
   }
 }

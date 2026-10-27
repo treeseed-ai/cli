@@ -11,7 +11,8 @@ import { ServiceRuntimeFixture } from '@treeseed-cordis/deployment/testing/runti
 import { ServiceWorkerBuild, ServicePlanStore } from '@treeseed-cordis/deployment';
 import { PluginInstallationFixture } from '@treeseed-cordis/deployment/testing/plugins';
 import { CanonicalJson, ServiceSchemas, PlatformSchemas, PluginManagementSchemas, type PluginInstallResult, type ServiceResourceReceipt, type CliEnvelope } from '@treeseed-cordis/sdk';
-import {CliProgramFixture,CliTests,ProviderFixture,ExtensiblePlanProgramTests,InstalledProgramTests,InstalledPluginCliTests,LivePluginCliTests} from '../support/cli-program-test-support.js';
+import {CliProgramFixture} from '../support/cli-program-test-support.js';
+import {CliTests,ProviderFixture,ExtensiblePlanProgramTests,InstalledProgramTests,InstalledPluginCliTests,LivePluginCliTests} from './cli-program-contract.js';
 class CliTestsAcceptance extends CliTests {
 
   pluginArguments():void {
