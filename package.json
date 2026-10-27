@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "check": "bun run check:test-layout && bun scripts/build-cli.ts check",
+    "check": "bun run check:readability && bun run check:test-layout && bun scripts/build-cli.ts check",
     "build": "bun scripts/build-cli.ts build",
     "test:unit": "bun test ./tests/unit --pass-with-no-tests",
     "test:integration": "bun test ./tests/integration --timeout 30000",
@@ -14,7 +14,8 @@
     "verify": "bun run check && bun run build && bun run test:acceptance && bun run test:regression && bun run test:integration && bun run test:unit",
     "check:test-layout": "bun .agents/skills/release-workflow/scripts/test-layout.ts",
     "test:regression": "bun test ./tests/regression",
-    "test:acceptance": "bun test ./tests/acceptance --timeout 60000"
+    "test:acceptance": "bun test ./tests/acceptance --timeout 60000",
+    "check:readability": "bun .agents/skills/release-workflow/scripts/source-readability.ts"
   },
   "dependencies": {
     "@treeseed-cordis/sdk": "file:vendor/sdk.tgz",
@@ -28,7 +29,8 @@
     "@types/bun": "1.4.4",
     "@types/node": "24.10.1",
     "cordis": "4.0.0-rc.12",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "prettier": "3.6.2"
   },
   "cordisCandidate": {
     "sdk": {
