@@ -32,3 +32,7 @@ checks, build, CI and assembled-artifact smoke evidence. Report missing prerequi
 explicitly. A green unit suite or policy prose alone is never sufficient.
 
 
+
+Assertion-bearing reusable acceptance contracts live in `tests/acceptance/`; shared support
+contains fixture setup and program inputs. Moving a case must also move its shared behavioral
+assertions, rather than hiding the scenario in a support base class.
