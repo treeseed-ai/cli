@@ -231,3 +231,10 @@ reacquisition and preserves earlier endpoints/private resources. NPM's deliberat
 stateful second version makes that provider ID ambiguous; source-free selection must refuse it
 without changing the active composition. Explicit source/version installation remains distinct
 from selecting an unambiguous registered provider ID.
+
+The built Git acquisition and registered-selection qualifications run as separate required
+program cases. Each retains the 420-second case limit and the existing CI job budget.
+Registered selection starts from a genuine accepted installed archive, stops the source,
+then activates two further instances and verifies exact replay, direct protocols and retained
+resources/private bytes. Acquisition still independently installs two named instances and
+checks cold/source-free read-back. Splitting bounds verification; it does not weaken admission.
