@@ -365,7 +365,7 @@ class InstalledPluginCliTests {
   private signal(signal: NodeJS.Signals): void {if(!this.worker)return;try{const current=statSync('/proc/'+this.worker.pid+'/exe');if(current.dev===this.worker.dev&&current.ino===this.worker.ino)process.kill(this.worker.pid,signal);}catch{}}
   async git():Promise<void>{await this.program('git');}
   async gitBuild():Promise<void>{await this.program('build');}
-  async program(source:'npm'|'git'|'build'='npm'): Promise<void> {
+  async program(source:'npm'|'git'|'build'='npm',registeredOnly=false): Promise<void> {
     const fixture=new PluginInstallationFixture(),program=new CliProgramFixture();
     try {
       await fixture.prepare();if(source==='npm')await fixture.startRegistry();else await fixture.startGit(source==='build');
@@ -379,14 +379,22 @@ class InstalledPluginCliTests {
         await this.direct(store,'cli-addon-one');
         const human=program.run(['plugin','inspect','cli-first','--installation',fixture.installation]);expect(human.status).toBe(0);expect(human.stderr).toBe('');expect(human.stdout).toContain('active');expect(human.stdout).toContain('Accepted references');expect(human.stdout).toContain('cli-first');
         const already=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,[...args.slice(0,-1),'cli-already']).result));expect(already.state).toBe('already-active');expect(already.applicationId).toBe(first.applicationId);
+        let latest='cli-second';
+        if(registeredOnly){await fixture.stopRegistry();
+        const selectedPlan=store.read(first.planId!,first.planId!.slice(5));let provider:string|undefined;for(const service of selectedPlan.composition.services)if(service.serviceId==='cli-addon-one')provider=service.provider.providerId;expect(provider).toBeDefined();
+        for(const id of ['cli-addon-two','cli-addon-three']){const key='cli-registered-'+id,args=['select','container.service',provider!,'--installation',fixture.installation,'--target','deployment','--service',id,'--idempotency-key',key],selection=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,args).result));expect(selection.state).toBe('active');expect(selection.activeGeneration).not.toBeNull();this.same(store,before,files);await this.direct(store,id);expect(PluginManagementSchemas.result.parse(this.request(program,args,0).result)).toEqual(selection);latest=key;}
+        }else{
         if(source==='npm'){const applications=store.records().length,unsafeArgs=['install',fixture.source('2.0.0'),'--installation',fixture.installation,'--target','deployment','--service','cli-addon-one','--idempotency-key','cli-unsafe'],unsafe=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,unsafeArgs).result));
         expect(unsafe.state).toBe('prepared');expect(unsafe.nextActions).toContain('review-migration');expect(unsafe.applicationId).toBeNull();expect(store.records().length).toBe(applications);expect(PluginManagementSchemas.result.parse(this.request(program,unsafeArgs,3).result)).toEqual(unsafe);this.same(store,before,files);}
         const secondArgs=['install',fixture.source(),'--installation',fixture.installation,'--target','deployment','--service','cli-addon-two','--idempotency-key','cli-second'],second=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,secondArgs).result));expect(second.state).toBe('active');this.same(store,before,files);await this.direct(store,'cli-addon-two');
         expect(this.receipts(store).size).toBeGreaterThan(before.size);const historical=PluginManagementSchemas.result.parse(this.request(program,['inspect','cli-first','--installation',fixture.installation],0).result);expect(historical.activeGeneration).toBeNull();expect(historical.acknowledgements).toEqual([]);
         await fixture.stopRegistry();expect(PluginManagementSchemas.result.parse(this.request(program,secondArgs,0).result)).toEqual(second);
-        let latest='cli-second';const selectedPlan=store.read(second.planId!,second.planId!.slice(5));let provider:string|undefined;for(const service of selectedPlan.composition.services)if(service.serviceId==='cli-addon-two')provider=service.provider.providerId;expect(provider).toBeDefined();
-        for(const id of ['cli-addon-three','cli-addon-four']){const key='cli-registered-'+id,args=['select','container.service',provider!,'--installation',fixture.installation,'--target','deployment','--service',id,'--idempotency-key',key],selection=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,args).result));if(source==='npm'){expect(selection.state).toBe('blocked');expect(selection.blockers[0]!.code).toBe('AMBIGUOUS_REGISTERED_PROVIDER');expect(selection.applicationId).toBeNull();this.same(store,before,files);break;}expect(selection.state).toBe('active');expect(selection.activeGeneration).not.toBeNull();this.same(store,before,files);await this.direct(store,id);expect(PluginManagementSchemas.result.parse(this.request(program,args,0).result)).toEqual(selection);latest=key;}
-        const listed=this.request(program,['list','--installation',fixture.installation],0);expect(Array.isArray(listed.result)).toBe(true);expect((listed.result as PluginInstallResult[]).length).toBe(5);
+        if(source==='npm'){
+        const selectedPlan=store.read(second.planId!,second.planId!.slice(5));let provider:string|undefined;for(const service of selectedPlan.composition.services)if(service.serviceId==='cli-addon-two')provider=service.provider.providerId;expect(provider).toBeDefined();
+        for(const id of ['cli-addon-three']){const key='cli-registered-'+id,args=['select','container.service',provider!,'--installation',fixture.installation,'--target','deployment','--service',id,'--idempotency-key',key],selection=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.request(program,args).result));if(source==='npm'){expect(selection.state).toBe('blocked');expect(selection.blockers[0]!.code).toBe('AMBIGUOUS_REGISTERED_PROVIDER');expect(selection.applicationId).toBeNull();this.same(store,before,files);break;}expect(selection.state).toBe('active');expect(selection.activeGeneration).not.toBeNull();this.same(store,before,files);await this.direct(store,id);expect(PluginManagementSchemas.result.parse(this.request(program,args,0).result)).toEqual(selection);latest=key;}
+        }
+        }
+        const listed=this.request(program,['list','--installation',fixture.installation],0);expect(Array.isArray(listed.result)).toBe(true);expect((listed.result as PluginInstallResult[]).length).toBe(registeredOnly?4:source==='npm'?5:3);
 
         expect(existsSync(join(fixture.root,'MUST_NOT_RUN'))).toBe(false);this.signal('SIGTERM');const deadline=Date.now()+15000;while(existsSync(join(fixture.installation,'.cordis/writer.lock'))&&Date.now()<deadline)await new Promise(InstalledPluginCliTests.delay);expect(existsSync(join(fixture.installation,'.cordis/writer.lock'))).toBe(false);this.worker=null;
         const cold=PluginManagementSchemas.result.parse(this.request(program,['inspect',latest,'--installation',fixture.installation],0).result);expect(cold.state).toBe('recovery-required');expect(cold.activeGeneration).toBeNull();expect(cold.acknowledgements).toEqual([]);
@@ -395,10 +403,12 @@ class InstalledPluginCliTests {
   }
 }
 const installedPlugins=new InstalledPluginCliTests();
-test('smoke: built CLI installs two typed plugin instances with retained credentials and safe UI readback using exact public fixtures',installedPlugins.program.bind(installedPlugins,'npm'),420000);
+test('smoke: built CLI installs two typed plugin instances with retained credentials and safe UI readback using exact public fixtures',installedPlugins.program.bind(installedPlugins,'npm',false),420000);
 
 test('smoke: built CLI installs packaged HTTPS Git with managed helpers',installedPlugins.git.bind(installedPlugins),420000);
 test('smoke: built CLI installs approved source-only HTTPS Git with managed helpers',installedPlugins.gitBuild.bind(installedPlugins),420000);
+test('smoke: built CLI selects registered packaged Git instances with sources stopped',installedPlugins.program.bind(installedPlugins,'git',true),420000);
+test('smoke: built CLI selects registered built Git instances with sources stopped',installedPlugins.program.bind(installedPlugins,'build',true),420000);
 
 class LivePluginCliTests {
   private static pause(done:(value:void)=>void):void{setTimeout(done,50);}

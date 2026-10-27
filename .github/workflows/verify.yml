@@ -13,13 +13,17 @@ jobs:
       matrix:
         include:
           - group: foundation
-            pattern: "^(unit:|integration:|smoke: (?!built CLI installs))"
+            pattern: "^(unit:|integration:|smoke: (?!built CLI (installs|selects registered)))"
           - group: npm
             pattern: "^smoke: built CLI installs two typed"
           - group: git
             pattern: "^smoke: built CLI installs packaged"
           - group: git-build
             pattern: "^smoke: built CLI installs approved"
+          - group: git-registered
+            pattern: "^smoke: built CLI selects registered packaged"
+          - group: build-registered
+            pattern: "^smoke: built CLI selects registered built"
           - group: live
             pattern: "^smoke: built CLI installs and selects"
     runs-on: ubuntu-26.04
