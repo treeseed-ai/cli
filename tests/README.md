@@ -36,3 +36,8 @@ explicitly. A green unit suite or policy prose alone is never sufficient.
 Assertion-bearing reusable acceptance contracts live in `tests/acceptance/`; shared support
 contains fixture setup and program inputs. Moving a case must also move its shared behavioral
 assertions, rather than hiding the scenario in a support base class.
+
+Complete tier commands use `bun test ./tests/<tier>` with only non-filtering timeout or
+empty-tier reporting options. Individual-file selectors and shell wrappers do not prove
+complete discovery. Name-filtered CI matrices must cover each registered case exactly once
+and every partition must be nonempty; the shared layout guard verifies that inventory.
