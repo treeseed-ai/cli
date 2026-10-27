@@ -7,9 +7,29 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
-    runs-on: ubuntu-24.04
+  programs:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: foundation
+            pattern: "^(unit:|integration:|smoke: (?!built CLI (installs|selects registered)))"
+          - group: npm
+            pattern: "^smoke: built CLI installs two typed"
+          - group: git
+            pattern: "^smoke: built CLI installs packaged"
+          - group: git-build
+            pattern: "^smoke: built CLI installs approved"
+          - group: git-registered
+            pattern: "^smoke: built CLI selects registered packaged"
+          - group: build-registered
+            pattern: "^smoke: built CLI selects registered built"
+          - group: live
+            pattern: "^smoke: built CLI installs and selects"
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
+    env:
+      CORDIS_REQUIRE_PLAN: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
@@ -18,5 +38,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24.19.0
-      - run: bun install --frozen-lockfile
-      - run: bun run verify
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run check && bun run build
+      - run: bun test ./tests --timeout 60000 --test-name-pattern "${{ matrix.pattern }}"
+
+  verify:
+    if: always()
+    needs: programs
+    runs-on: ubuntu-26.04
+    steps:
+      - env:
+          RESULT: ${{ needs.programs.result }}
+        run: test "$RESULT" = success

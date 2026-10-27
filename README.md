@@ -1,6 +1,6 @@
-# Cordis diagnostic and planning executable
+# Cordis executable
 
-`trsd-linux-x64` is a standalone diagnostic and non-activating planning front door. Run it without Node/Bun or a
+`trsd-linux-x64` is the standalone diagnostic, planning and installed-operation front door. Run it without Node/Bun or a
 project checkout. Supported commands:
 
 ```text
@@ -8,6 +8,9 @@ trsd --help
 trsd --version
 trsd doctor [--json] [--context NAME] [--installation ABSOLUTE_PATH] [--port INTEGER]
 trsd platform plan --file CONFIG [--json]
+trsd platform apply --installation DIR --plan ID --digest SHA --idempotency-key KEY [--json]
+trsd platform status --installation DIR [--json]
+trsd platform application --installation DIR --id ID [--json]
 ```
 
 `CliApplication` parses arguments and calls the public packaged `DeploymentHost` contract;
@@ -20,8 +23,18 @@ JSON stdout is exactly one envelope: command, success, result, problem, blockers
 Doctor result follows the SDK DiagnosticReport schema. Human output uses concise checks;
 human errors go to stderr. Errors never echo unknown argument values or raw Docker stderr.
 Exit0 means success;1 runtime failure;2 invalid command/flag/value (with actionable help);
-3 unmet prerequisites or explicitly unsupported lifecycle commands. `platform plan` is the only implemented platform binding; `apply`, `status`, `install`, `open`, `recover` and other lifecycle verbs remain unsupported. Remote SDK bindings remain contract-only.
-Duplicate/missing flags and positional arguments fail validation. JSON is supported on doctor and platform plan, including validation failures. Version is `trsd 0.0.0-cordis.2`.
+3 unmet prerequisites or explicitly unsupported lifecycle commands. Implemented platform bindings
+are `plan`, `apply`, `status` and `application` read-back. Apply acknowledges durable acceptance;
+application/status determine readiness. `plugin install`, `open` and `recover` remain unsupported
+in this candidate. Remote SDK bindings remain contract-only.
+Duplicate/missing flags and positional arguments fail validation. JSON is supported on doctor and
+implemented platform commands, including validation failures. Version is `trsd 0.0.0-cordis.6`.
+
+This candidate consumes exact SDK `.16`, UI `.16` and Deployment `.73` archives. Source/byte
+receipts are recorded in `package.json.cordisCandidate`, the lockfile and vendor archives.
+Human presentation stays UI-owned and machine envelopes/exit codes stay CLI-owned. Default
+Deployment selects the saved installation format; format-3 application and readonly observations
+use its native standalone host without an ambient Node/Bun/package manager during apply.
 
 `CliProgramFixture.run(args)` spawns the compiled artifact with closed stdin, captures output
 and exit status, and supports fixture cwd/environment. Acceptance covers another directory,
@@ -57,7 +70,7 @@ release. Migration PRs target `cordis`; issues remain open until authorized rele
 
 ## Task 2: non-activating plans
 
-`trsd platform plan --file CONFIG [--json]` validates an explicitly prepared local release bundle. It never downloads, installs packages, imports plugin code, runs scripts, binds ports, loads images, creates credentials or starts containers. Apply remains unsupported. Successful plans describe future effects, not an active or healthy installation.
+`trsd platform plan --file CONFIG [--json]` validates an explicitly prepared local release bundle. It never downloads, installs packages, imports plugin code, runs scripts, binds ports, loads images, creates credentials or starts containers. Planning reports future effects; explicit saved-plan apply is a separate installed operation.
 
 Configuration retains installationId, engineContext, installationDirectory (absolute), origin (loopback), runtimeState, plugins (exact id/package/version/archive SHA-256) and credentialReferences (unique `secret://<slot>` values). Add `release: {directory: ABSOLUTE_PATH, manifestDigest: SHA256}`. The installation and bundle must be disjoint. JSON object keys and semantic sets normalize deterministically; artifact byte identities remain exact.
 
@@ -71,7 +84,7 @@ Plans bind normalized configuration, configuration/release/lock/recipe digests, 
 
 CLI exits: 0 verified saved plan; 1 sanitized runtime/I/O failure; 2 invalid arguments/JSON/schema; 3 prerequisites/artifact/authority/state blockers. Blocked responses have result null, structured blockers and no saved reference. Never echo invalid input, archive content, credentials or engine stderr. SDK PlanningBlockedError carries only validated safe blockers. Seven remote operation IDs remain unchanged; platform.plan stays a write operation because saving a plan needs local ownership.
 
-Verification: documentation first; outside-in built-program failure before implementation; exact read-back/modes/determinism; immutable/architecture/graph/recipe/secret/path/journal negative cases; no-runtime snapshots; actual default construction; all owner check/build/unit/integration/smoke gates plus assembled acceptance. Test fixtures are not a production application composition. CI must run a positive plan on ubuntu-26.04 and fail visibly if prerequisites are absent. No container starts, even in tests.
+Verification: documentation first; outside-in built-program failure before implementation; exact read-back/modes/determinism; immutable/architecture/graph/recipe/secret/path/journal negative cases; no-runtime snapshots; actual default construction; all owner check/build/unit/integration/smoke gates plus assembled acceptance. Test fixtures are not a production application composition. CI must run a positive plan on ubuntu-26.04 and fail visibly if prerequisites are absent. These Task 2 planning scenes start no containers. Task 3C installed-operation acceptance below uses isolated, disposable fixture services.
 
 Tracked in #311; parent integration treeseed-ai/platform#697. Issues remain open until authorized release.
 
@@ -126,3 +139,102 @@ Task 3B is authorized after the maintainer reviewed the isolated setup. Tracking
 Development: Bun 1.4.4, Node 24.19.0, TypeScript 5.9.3, native Cordis 4.0.0-rc.12. Run bun run verify (semantic class/source check, strict compiler, build and nonempty unit/integration/program smoke). Installed acceptance uses genuine exact package/OCI bytes, real identity/database/API/HTTPS and explicit isolated certificate trust. No global trust mutation or legacy service changes. All handwritten source, tools and tests are strict TypeScript classes.
 
 All capabilities that can be plugins, including container services, are native Cordis class plugins with typed swappable contracts. No parallel DI graph. Keep independent repository/public package boundaries, exact archive pins and original licenses. Migration PRs target cordis with Part of issue references. All issues remain open until authorized release; installer/Agent/generalized recovery are later tasks.
+
+## Task 3C contract
+
+Owner issue: https://github.com/treeseed-ai/cli/issues/317. Follow the approved Platform Task 3C service/provider/UI plan through exact public archives. Preserve independent repository ownership, strict TypeScript classes, native Cordis lifecycle, historical formats and all seven SDK operations. Expected-generation/idempotency, resource/credential/TLS retention and explicit unsafe restart/migration gates are mandatory. All issues remain open until release.
+
+Every visual component must be mobile-first from 320 CSS pixels to widescreen monitors; test 320/375/768/1024/1440/1920/2560 widths, long content, keyboard/touch and 200% text resizing. Keep authored controls at least 44×44 CSS pixels, required actions visible, logical/fluid dimensions and no page overflow (labeled local semantic-table overflow is permitted). UI owns components/styles/renderers; consumers retain domain behavior and Identity retains Keycloak authority.
+
+### Reusable terminal presentation
+
+Human output maps diagnostics, plans, installation state, applications and safe errors into
+UI-owned text/status/table/feedback/stack view models. The native CLI output plugin consumes
+UI's public terminal renderer; formatting and reusable presentation live in UI. Human plan
+output contains explicit service, volume, port and future-effect tables. JSON envelope bytes,
+exit meanings and stdout/stderr ownership stay with CLI; machine JSON does not create a UI
+scope. Built-program tests use an empty or Docker-only PATH and retain Task 1 checks.
+
+Configuration and output accept the new format-3 service contracts through exact public
+SDK/Deployment archives, preserving historical format-1/2 input/readers. This presentation
+slice adds no installer commands or activation policy; those follow under this same Task 3C.
+
+### Built format-3 acceptance gate
+
+Owner CI runs on Ubuntu 26.04 with `CORDIS_REQUIRE_PLAN=1`: missing prerequisites fail visibly.
+The built standalone CLI plans a genuine prepared five-instance bundle through Deployment's
+public fixture/export, saves and repeats identical format-3 bytes, renders reusable human
+service tables and runs with Docker-only PATH. It leaves Docker resources, listeners,
+credentials and the import/script canary unchanged. Tampered input returns a blocked envelope
+without a saved reference. These are planning checks, not installed activation evidence.
+
+
+## Built format-3 installed-operation qualification
+
+The real `trsd` executable must plan a genuine prepared format-3 fixture bundle, submit its exact
+saved plan, recover the same application after the submitting CLI process exits, and read status
+and application through the durable standalone Deployment worker. The bundle contains a worker
+produced before planning through Deployment's public `ServiceWorkerBuild`; CLI neither builds a
+worker during apply nor implements a second coordinator. Apply/status/application run from a
+foreign directory with only Docker on PATH, closed stdin and the executable reached by symlink.
+
+Exit zero from apply remains durable acceptance. Only subsequent verified application/status
+read-back establishes readiness. Repeated submission with the same idempotency key returns the
+same application, including after the source bundle is removed. JSON continues through SDK
+schemas; human output continues through UI terminal providers. Qualification creates and cleans
+only uniquely labelled fixture containers/volumes/networks and its exact selected worker process.
+Graceful worker disposal preserves installed resources; a later apply must report repair rather
+than silently restart that worker. Original services remain outside this fixture.
+
+## Installed plugin management
+
+`trsd plugin install <NPM package|HTTPS Git repository> --installation DIR` requests installation
+and activation when the selected target is qualified. Use `--target deployment --service ID` for a
+private container instance, `--provider ID` for an explicit provider and `--binding PORT=ID` for
+explicit typed bindings. `--configuration FILE` loads a strict JSON object. `--idempotency-key KEY`
+replays the exact accepted request; omission creates and reports a new key. `--scope installation`
+is the default; client scope remains action-required until qualified. Ambiguous targets never
+activate implicitly. Approved exact helpers and source/build policy belong to the installation.
+
+`trsd plugin select CAPABILITY PROVIDER --installation DIR --target TARGET [--service ID]`
+selects an already registered provider through the same Deployment authority.
+`trsd plugin list --installation DIR [--target TARGET]` and
+`trsd plugin inspect REQUEST --installation DIR` read the current owner or verified cold records.
+Cold records cannot establish active health. None of these commands invents a remote API endpoint.
+Human output is rendered entirely by the reusable UI terminal providers; JSON emits the SDK
+plugin envelope. Exit 0 for install/select requires active or already-active; pending/prepared or
+blocked/action-required returns 3, invalid arguments/configuration returns 2 and unexpected I/O
+returns 1. Read-only list/inspect success uses exit 0 without upgrading record health claims.
+
+`platform apply ... --restart SERVICE` explicitly authorizes each required restart scope from
+the reviewed plan. Repeat the flag for multiple service IDs; duplicate or unrelated scopes fail.
+No restart is inferred from install, readiness or an arbitrary configuration change. Keycloak
+issuer, identities, sessions and grants remain under their existing owner/provider authority.
+
+## Final source and live-provider command gate
+
+The built command gate consumes Deployment's exact public NPM, packaged HTTPS Git, approved
+source-only Git and live-probe fixtures. It runs installation, read-back and source-free retry
+with only Docker on caller PATH. Registered selection uses retained archive bytes. An explicit
+probe installation names an existing service and provider; only the accepted previous/next
+qualification may activate it. The independent worker keeps its PID and physical resources;
+unqualified reverse selection remains prepared for explicit restart review. CLI supplies no
+source transport, lifecycle scheduler or container implementation.
+
+CI partitions built-program scenes into independent required jobs to preserve the existing
+time budget; every test file/scene remains included. JSON exits and Keycloak authority remain
+unchanged. This candidate is an unpublished Cordis review artifact.
+
+The final built source gate also selects two new registered instances after the packaged and
+approved-build Git source is shut down. Selection rebases the complete retained closure without
+reacquisition and preserves earlier endpoints/private resources. NPM's deliberately registered
+stateful second version makes that provider ID ambiguous; source-free selection must refuse it
+without changing the active composition. Explicit source/version installation remains distinct
+from selecting an unambiguous registered provider ID.
+
+The built Git acquisition and registered-selection qualifications run as separate required
+program cases. Each retains the 420-second case limit and the existing CI job budget.
+Registered selection starts from a genuine accepted installed archive, stops the source,
+then activates two further instances and verifies exact replay, direct protocols and retained
+resources/private bytes. Acquisition still independently installs two named instances and
+checks cold/source-free read-back. Splitting bounds verification; it does not weaken admission.
