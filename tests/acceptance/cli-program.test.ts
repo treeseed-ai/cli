@@ -6,27 +6,14 @@ import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { createServer, type Server } from 'node:net';
 import { createHash } from 'node:crypto';
 import { PreparedReleaseFixture } from '@treeseed-cordis/deployment/testing';
-import { CliApplication } from '../src/main.js';
+import { CliApplication } from '../../src/main.js';
 import { ServiceRuntimeFixture } from '@treeseed-cordis/deployment/testing/runtime';
 import { ServiceWorkerBuild, ServicePlanStore } from '@treeseed-cordis/deployment';
 import { PluginInstallationFixture } from '@treeseed-cordis/deployment/testing/plugins';
 import { CanonicalJson, ServiceSchemas, PlatformSchemas, PluginManagementSchemas, type PluginInstallResult, type ServiceResourceReceipt, type CliEnvelope } from '@treeseed-cordis/sdk';
+import {CliProgramFixture,CliTests,ProviderFixture,ExtensiblePlanProgramTests,InstalledProgramTests,InstalledPluginCliTests,LivePluginCliTests} from '../support/cli-program-test-support.js';
+class CliTestsAcceptance extends CliTests {
 
-class CliProgramFixture {
-  readonly root=mkdtempSync(join(tmpdir(),'cordis cli '));
-  readonly cwd=join(this.root,'foreign cwd');
-  readonly binary=join(this.root,'path with spaces','trsd');
-  readonly symlink=join(this.root,'trsd-link');
-  constructor() {mkdirSync(this.cwd);mkdirSync(join(this.root,'path with spaces'));copyFileSync(resolve('dist/trsd-linux-x64'),this.binary);symlinkSync(this.binary,this.symlink);}
-  run(args:string[],environment:NodeJS.ProcessEnv={},binary=this.binary):SpawnSyncReturns<string> {return spawnSync(binary,args,{cwd:this.cwd,env:{...process.env,...environment},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:15000});}
-  close():void {rmSync(this.root,{recursive:true,force:true});}
-}
-class CliTests {
-  server:Server|null=null;
-  resolvePort:((port:number)=>void)|null=null;
-  listen(resolvePort:(port:number)=>void):void {this.resolvePort=resolvePort;this.server=createServer();this.server.listen(0,'127.0.0.1',this.listening.bind(this));}
-  listening():void {const address=this.server!.address();if(address&&typeof address==='object')this.resolvePort!(address.port);}
-  async port(occupied=false):Promise<number> {const port=await new Promise<number>(this.listen.bind(this));if(!occupied)this.server!.close();return port;}
   pluginArguments():void {
     const fixture=new CliProgramFixture();
     try {
@@ -45,10 +32,12 @@ class CliTests {
       const empty=fixture.run(['plugin','list','--installation',join(fixture.root,'missing'),'--json'],{PATH:''});expect(empty.status).toBe(3);expect(JSON.parse(empty.stdout).result).toBeNull();expect(existsSync(join(fixture.root,'missing'))).toBe(false);
     } finally {fixture.close();}
   }
+
   installedArguments():void {
     const fixture=new CliProgramFixture();
     try{for(const command of ["apply","status","application"]){const result=fixture.run(["platform",command,"--json"],{PATH:""});expect(result.status).toBe(2);expect(result.stderr).toBe("");expect(JSON.parse(result.stdout).problem.code).toBe("INVALID_ARGUMENTS");}}finally{fixture.close();}
   }
+
   identity():void {
     const fixture=new CliProgramFixture();
     try {
@@ -59,6 +48,7 @@ class CliTests {
       expect(readdirSync(fixture.cwd)).toEqual([]);
     }finally{fixture.close();}
   }
+
   async diagnosis():Promise<void> {
     const fixture=new CliProgramFixture();
     try {
@@ -75,6 +65,7 @@ class CliTests {
       if(envelope.result&&'host' in envelope.result&&envelope.result.host.distribution==='ubuntu'&&envelope.result.host.release==='26.04') {expect(result.status).toBe(0);expect(envelope.success).toBe(true);} else {expect(result.status).toBe(3);expect(envelope.success).toBe(false);}
     }finally{fixture.close();}
   }
+
   async blockers():Promise<void> {
     const fixture=new CliProgramFixture();
     try {
@@ -87,6 +78,7 @@ class CliTests {
       expect(existsSync(join(fixture.root,'new'))).toBe(false);
     }finally{fixture.close();}
   }
+
   invalidProgram():void {
     const fixture=new CliProgramFixture();
     try {
@@ -96,14 +88,7 @@ class CliTests {
       const unsupported=fixture.run(['platform','install']);expect(unsupported.status).toBe(3);expect(unsupported.stderr).toContain('UNSUPPORTED_COMMAND');
     }finally{fixture.close();}
   }
-  async defaultComposition():Promise<void> {
-    const root=mkdtempSync(join(tmpdir(),'cordis-default-'));
-    try {const result=await new CliApplication().execute(['doctor','--installation',join(root,'new'),'--port',String(await this.port())]);expect(result.envelope.result).not.toBeNull();expect(result.envelope.command).toBe('doctor');expect(result.envelope.result&&'host' in result.envelope.result).toBe(true);expect(readdirSync(root)).toEqual([]);}
-    finally {rmSync(root,{recursive:true,force:true});}
-  }
-  snapshot():string {
-    const rows:string[]=[];for(const args of [['ps','-aq'],['image','ls','--no-trunc','-q'],['volume','ls','-q'],['network','ls','-q']]){const result=spawnSync('docker',['--context','default',...args],{encoding:'utf8'});expect(result.status).toBe(0);rows.push(result.stdout.split('\n').sort().join('\n'));}return JSON.stringify(rows);
-  }
+
   async plan_changes_no_runtime():Promise<void> {
     const program=new CliProgramFixture(),fixture=await new PreparedReleaseFixture().prepare(await this.port());
     try {
@@ -124,11 +109,13 @@ class CliTests {
       writeFileSync(join(fixture.bundle,'archives/plugin.tgz'),'tampered');const blocked=program.run(['platform','plan','--file',configuration,'--json']);expect(blocked.status).toBe(3);const rejected=JSON.parse(blocked.stdout) as CliEnvelope;expect(rejected.result).toBeNull();expect(rejected.references).toEqual([]);expect(readdirSync(join(fixture.installation,'.cordis/plans'))).toEqual([plan.id+'.json']);
     }finally{fixture.close();program.close();}
   }
+
   async installationPaths():Promise<void> {
     const program=new CliProgramFixture(),fixture=await new PreparedReleaseFixture().prepare(await this.port());
     const installation=join(fixture.root,'installation with spaces Ω');
     try {const file=join(program.cwd,'desired path.json');writeFileSync(file,JSON.stringify({...fixture.configuration,installationDirectory:installation}));const result=program.run(['platform','plan','--file',file,'--json']);const qualified=/^VERSION_ID="?26\.04/m.test(readFileSync('/etc/os-release','utf8'))&&process.arch==='x64';if(!qualified&&process.env.CORDIS_REQUIRE_PLAN!=='1'){expect(result.status).toBe(3);expect(existsSync(installation)).toBe(false);return;}expect(result.status).toBe(0);const plan=PlatformSchemas.plan.parse(JSON.parse(result.stdout).result);expect(plan.configuration.installationDirectory).toBe(installation);expect(readdirSync(installation)).toEqual(['.cordis']);expect(existsSync(join(installation,'.cordis/plans',plan.id+'.json'))).toBe(true);}finally{fixture.close();program.close();}
   }
+
   async invalidPlans():Promise<void> {
     const fixture=new CliProgramFixture();
     try {
@@ -139,102 +126,20 @@ class CliTests {
       for(const args of [['platform','plan','--json'],['platform','plan','--file',file,'--file',file,'--json'],['platform','plan','--file',file,'--apply','--json']]){const result=fixture.run(args);expect(result.status).toBe(2);expect(JSON.parse(result.stdout).command).toBe('platform.plan');}
     }finally{fixture.close();}
   }
-  async parser():Promise<void> {
-    const app=new CliApplication();
-    expect((await app.execute(['--help'])).code).toBe(0);expect((await app.execute(['--version'])).code).toBe(0);
-    expect((await app.execute(['doctor','--json','--port','bad'])).code).toBe(2);
-    expect((await app.execute(['apply'])).code).toBe(3);
-  }
 }
-const suite=new CliTests();
-test('smoke: standalone identity from spaces, symlink, foreign cwd and closed stdin',suite.identity.bind(suite));
-test('smoke: doctor JSON and no filesystem/container mutation or cwd autoload',suite.diagnosis.bind(suite));
-test('smoke: wrong engine, missing Docker, foreign installation and occupied port',suite.blockers.bind(suite));
-test('smoke: invalid arguments and unsupported commands are actionable',suite.invalidProgram.bind(suite));
-test('integration: default CLI construction uses real packaged diagnostics',suite.defaultComposition.bind(suite));
-test('unit: parser help, version and error classifications',suite.parser.bind(suite));
+class CompositionProgramTestsAcceptance {
 
-test('smoke: plan_changes_no_runtime using real prepared artifacts',suite.plan_changes_no_runtime.bind(suite));
-
-test('smoke: invalid and duplicate planning inputs never echo secrets or claim saved state',suite.invalidPlans.bind(suite));
-
-test('smoke: plan new installation directory with spaces and Unicode',suite.installationPaths.bind(suite));
-
-class ProviderFixture {
-  readonly root=mkdtempSync(join(tmpdir(),'cordis installed provider Ω '));
-  tree=join(this.root,'prepared package');
-  readonly marker=join(this.root,'live-effect');
-  readonly importMarker=join(this.root,'module-imported');
-  get file():string{return join(this.tree,'composition.json');}
-  readonly declaration={id:'fixture-one',pluginId:'fixture',capability:'deployment',contractVersion:'0.3.0-cordis.1',target:'cli',provide:['deployment'],inject:[]};
-  digest='';
-  constructor(readonly label='one') {}
-  static sha(value:Uint8Array|string):string {return createHash('sha256').update(value).digest('hex');}
-  copy(source:string,destination:string):void {
-    mkdirSync(destination,{recursive:true});
-    for(const entry of readdirSync(source,{withFileTypes:true})) {
-      const from=join(source,entry.name),to=join(destination,entry.name);
-      if(entry.isDirectory())this.copy(from,to);else if(entry.isFile())copyFileSync(from,to);else throw new Error('Fixture dependency is not a regular package tree');
-    }
-  }
-  async prepare():Promise<this> {
-    mkdirSync(this.tree);this.declaration.id='fixture-'+this.label;
-    // These are real pinned installed third-party packages, copied as fixture bytes, not mocked modules.
-    for(const name of ['cordis','cosmokit','@standard-schema/spec'])this.copy(resolve('node_modules',name),join(this.tree,'node_modules',name));
-    const helper=join(this.tree,'node_modules/@fixture/helper');mkdirSync(helper,{recursive:true});
-    writeFileSync(join(helper,'package.json'),JSON.stringify({name:'@fixture/helper',version:'1.0.0',type:'module',exports:'./index.js'}));
-    const helperSource=join(this.root,'helper.ts');writeFileSync(helperSource,'export class Helper {static label():string{return "ordinary-dependency";}}');
-    let build=spawnSync('bun',['build',helperSource,'--target=node','--outfile',join(helper,'index.js')],{encoding:'utf8'});expect(build.status).toBe(0);
-    const source=join(this.root,'provider.ts');
-    writeFileSync(source,`import {Context} from 'cordis';import {Helper} from '@fixture/helper';import {writeFileSync,unlinkSync} from 'node:fs';
-class ImportCanary {static run(){writeFileSync(${JSON.stringify(this.importMarker)},'imported');}}ImportCanary.run();
-class Configuration {static validate(value:unknown){return value&&typeof value==='object'&&Object.keys(value).length===0?{value}:{issues:[{message:'Invalid configuration'}]};}}
-export class Provider {
-static readonly declaration=${JSON.stringify(this.declaration)};
-static readonly provide=Provider.declaration.provide;static readonly inject=Provider.declaration.inject;
-static readonly Config={'~standard':{version:1,vendor:'fixture',validate:Configuration.validate.bind(Configuration)}};
-constructor(readonly ctx:Context){if(!Context.is(ctx)||ctx.registry.get(Provider)!==ctx[Context.root].registry.get(Provider))throw new Error('not native shared graph');writeFileSync(${JSON.stringify(this.marker)},'active');ctx.provide('deployment',this);ctx.effect(this.effect.bind(this));if(${JSON.stringify(this.label)}==='constructor-fail')throw new Error('secret-constructor-canary');}
-effect(){return this.close.bind(this);}close(){unlinkSync(${JSON.stringify(this.marker)});if(${JSON.stringify(this.label)}==='cleanup-fail')throw new Error('secret-cleanup-canary');}
-async diagnose(){return {ready:true,host:{os:'fixture',architecture:'x64',distribution:'fixture',release:'1'},engine:{context:${JSON.stringify(this.label)},endpoint:null,serverVersion:null,serverArchitecture:null,composeVersion:null,cpus:null,memoryBytes:null},installation:{path:'/fixture',exists:false,freeBytes:null},port:8443,checks:[{id:'native-provider',status:'pass',code:'FIXTURE',message:Helper.label()}]};}
-async plan(){throw new Error('fixture is diagnosis-only');}}
-`);
-    build=spawnSync('bun',['build',source,'--target=node','--external','cordis','--external','@fixture/helper','--outfile',join(this.tree,'index.js')],{encoding:'utf8'});expect(build.status).toBe(0);
-    writeFileSync(join(this.tree,'package.json'),JSON.stringify({name:'@fixture/provider',version:'1.0.0',type:'module',exports:'./index.js',dependencies:{cordis:'4.0.0-rc.12','@fixture/helper':'1.0.0'},cordis:this.declaration}));
-    this.refresh();return this;
-  }
-  inventory(directory=this.tree,prefix=''):Array<{path:string;sha256:string}> {
-    const files:Array<{path:string;sha256:string}>=[];
-    for(const entry of readdirSync(directory,{withFileTypes:true}).sort(ProviderFixture.order)){
-      if(directory===this.tree&&entry.name==='composition.json')continue;
-      const path=join(directory,entry.name),relative=prefix+entry.name;
-      if(entry.isDirectory())files.push(...this.inventory(path,relative+'/'));else files.push({path:relative,sha256:ProviderFixture.sha(readFileSync(path))});
-    }
-    return files;
-  }
-  static order(a:{name:string},b:{name:string}):number {return a.name.localeCompare(b.name);}
-  permissions(directory:string,locked:boolean):void {chmodSync(directory,0o700);for(const entry of readdirSync(directory,{withFileTypes:true})){const path=join(directory,entry.name);if(entry.isSymbolicLink())continue;if(entry.isDirectory())this.permissions(path,locked);else chmodSync(path,locked?0o400:0o600);}chmodSync(directory,locked?0o500:0o700);}
-  refresh():void {
-    this.permissions(this.tree,false);
-    const manifest={formatVersion:1,contractVersion:'0.3.0-cordis.1',target:'cli',scopeId:'local-cli',providerId:this.declaration.id,package:{name:'@fixture/provider',version:'1.0.0'},entry:'index.js',configuration:{},files:this.inventory()};
-    writeFileSync(this.file,JSON.stringify(manifest));this.address();this.permissions(this.tree,true);
-  }
-  address():void {this.digest=ProviderFixture.sha(readFileSync(this.file));const destination=join(this.root,this.digest);if(destination!==this.tree){renameSync(this.tree,destination);this.tree=destination;}}
-  run(extra:string[]=[]):SpawnSyncReturns<string> {
-    const binary=join(this.root,'trsd link');if(!existsSync(binary))symlinkSync(resolve('dist/trsd-linux-x64'),binary);
-    return spawnSync(binary,['doctor','--json','--composition',this.file,'--composition-digest',this.digest,...extra],{encoding:'utf8',cwd:this.root,env:{...process.env,PATH:''},timeout:15000});
-  }
-  close():void {this.permissions(this.tree,false);rmSync(this.root,{recursive:true,force:true});}
-}
-class CompositionProgramTests {
   async selected():Promise<void> {
     for(const label of ['one','two']){
       const fixture=await new ProviderFixture(label).prepare();
       try {const result=fixture.run();expect(result.status).toBe(0);expect(result.stderr).toBe('');const envelope=JSON.parse(String(result.stdout));expect(envelope.result.engine.context).toBe(label);expect(envelope.result.checks).toContainEqual({id:'native-provider',status:'pass',code:'FIXTURE',message:'ordinary-dependency'});expect(existsSync(fixture.marker)).toBe(false);const repeat=fixture.run();expect(repeat.status).toBe(0);expect(repeat.stdout).toBe(result.stdout);expect(existsSync(fixture.marker)).toBe(false);}finally{fixture.close();}
     }
   }
+
   async lifecycleFailures():Promise<void> {
     for(const label of ['constructor-fail','cleanup-fail']){const fixture=await new ProviderFixture(label).prepare();try{const result=fixture.run();expect(result.status).toBe(1);expect(JSON.parse(result.stdout).success).toBe(false);expect(JSON.parse(result.stdout).result).toBeNull();expect(result.stdout+result.stderr).not.toContain('canary');expect(existsSync(fixture.marker)).toBe(false);}finally{fixture.close();}}
   }
+
   async metadataFailures():Promise<void> {
     for(const kind of ['hash','duplicate','schema','symlink','extra','configuration','address','closure','scope','file-mode','directory-mode','capability']){
       const fixture=await new ProviderFixture().prepare();
@@ -254,6 +159,7 @@ class CompositionProgramTests {
       }finally{fixture.close();}
     }
   }
+
   async rejected():Promise<void> {
     const fixture=await new ProviderFixture().prepare();
     try {
@@ -264,29 +170,16 @@ class CompositionProgramTests {
     try {missing.permissions(missing.tree,false);rmSync(join(missing.tree,'node_modules/@fixture/helper'),{recursive:true});const result=missing.run();expect(result.status).toBe(3);expect(existsSync(missing.marker)).toBe(false);}finally{missing.close();}
   }
 }
-const compositionSuite=new CompositionProgramTests();
-test('smoke: compiled_cli_uses_cordis_and_selected_deployment_provider without Node Bun or cwd modules',compositionSuite.selected.bind(compositionSuite));
-test('smoke: installed provider byte and dependency failures block before import',compositionSuite.rejected.bind(compositionSuite));
+class UiOutputProgramTestsAcceptance {
 
-test('smoke: provider constructors and failed disposal cannot report successful CLI completion',compositionSuite.lifecycleFailures.bind(compositionSuite));
-test('smoke: prepared-provider metadata scope ownership and closure are checked before activation',compositionSuite.metadataFailures.bind(compositionSuite));
-
-test('smoke: installed commands validate arguments before contacting worker',suite.installedArguments.bind(suite));
-
-class UiOutputProgramTests {
  human():void{const fixture=new CliProgramFixture();try{const result=fixture.run(['doctor','--installation',join(fixture.root,'new')],{PATH:''});expect(result.status).toBe(3);expect(result.stdout).toContain('Diagnostic checks');expect(result.stdout).toContain('Check | Result | Code | Detail');expect(result.stderr).toContain('PREREQUISITES_UNMET');expect(result.stdout+result.stderr).not.toContain('\u001b');}finally{fixture.close();}}
 }
-const uiOutput=new UiOutputProgramTests();test('smoke: built CLI renders structured diagnostic models through reusable terminal providers',uiOutput.human.bind(uiOutput));
+class ExtensiblePlanProgramTestsAcceptance extends ExtensiblePlanProgramTests {
 
-class ExtensiblePlanProgramTests extends CliTests {
- private listeners():string{const rows:string[]=[];for(const path of ['/proc/net/tcp','/proc/net/tcp6'])for(const line of readFileSync(path,'utf8').trim().split('\n').slice(1)){const fields=line.trim().split(/\s+/);if(fields[3]==='0A')rows.push(fields[1]!);}return rows.sort().join('\n');}
  async plan():Promise<void>{const {ServiceReleaseFixture}=await import('@treeseed-cordis/deployment/testing'),{ServiceSchemas}=await import('@treeseed-cordis/sdk'),fixture=await new ServiceReleaseFixture().services(),program=new CliProgramFixture();try{const port=await this.port();fixture.configuration.origin='https://localhost:'+port;fixture.release.composition.services[0]!.definition.ports[0]!.publication!.port=port;fixture.recipe.services['instance-0']!.ports![0]!.published=port;fixture.refreshService();const path=join(program.cwd,'service-config.json');writeFileSync(path,JSON.stringify(fixture.configuration));const before=this.snapshot(),listeners=this.listeners(),result=program.run(['platform','plan','--file',path,'--json']);expect(result.status).toBe(0);expect(result.stderr).toBe('');const plan=ServiceSchemas.plan.parse(JSON.parse(result.stdout).result);expect(plan.formatVersion).toBe(3);expect(plan.composition.services).toHaveLength(5);expect(plan.changes).toHaveLength(5);expect(plan.blockers).toEqual([]);const restart=program.run(['platform','apply','--installation',fixture.installation,'--plan',plan.id,'--digest',plan.digest,'--idempotency-key','not-an-additive-restart','--restart','instance-0','--json']);expect(restart.status).toBe(3);expect(JSON.parse(restart.stdout).blockers[0].code).toBe('RESTART_SCOPE_NOT_QUALIFIED');expect(existsSync(join(fixture.installation,'.cordis/launch'))).toBe(false);const saved=join(fixture.installation,'.cordis/plans',plan.id+'.json');expect(ServiceSchemas.plan.parse(JSON.parse(readFileSync(saved,'utf8')))).toEqual(plan);expect(statSync(saved).mode&0o777).toBe(0o600);const again=program.run(['platform','plan','--file',path,'--json']);expect(again.status).toBe(0);expect(again.stdout).toBe(result.stdout);const human=program.run(['platform','plan','--file',path]);expect(human.status).toBe(0);expect(human.stdout).toContain('Services\nService | Image');expect(human.stdout).toContain('instance-4');expect(human.stdout).toContain('Future effects only');const tools=join(program.root,'docker-only');mkdirSync(tools);let docker:string|null=null;for(const directory of(process.env.PATH??'').split(':'))if(existsSync(join(directory,'docker'))){docker=join(directory,'docker');break;}expect(docker).not.toBeNull();symlinkSync(docker!,join(tools,'docker'));const standalone=program.run(['platform','plan','--file',path,'--json'],{PATH:tools});expect(standalone.status).toBe(0);expect(standalone.stdout).toBe(result.stdout);expect(this.snapshot()).toBe(before);expect(this.listeners()).toBe(listeners);expect(existsSync(join(fixture.installation,'.cordis/credentials'))).toBe(false);expect(existsSync(join(fixture.root,'SCRIPT_CANARY'))).toBe(false);writeFileSync(join(fixture.bundle,'archives/plugin.tgz'),'tampered');const blocked=program.run(['platform','plan','--file',path,'--json']);expect(blocked.status).toBe(3);const envelope=JSON.parse(blocked.stdout);expect(envelope.result).toBeNull();expect(envelope.references).toEqual([]);expect(readdirSync(join(fixture.installation,'.cordis/plans'))).toEqual([plan.id+'.json']);}finally{fixture.close();program.close();}}
 }
-const extensiblePlan=new ExtensiblePlanProgramTests();test('smoke: standalone CLI plans genuine five-instance format3 bundle deterministically without runtime effects',extensiblePlan.plan.bind(extensiblePlan),60000);
+class InstalledProgramTestsAcceptance extends InstalledProgramTests {
 
-
-class InstalledProgramTests {
-  private worker: { pid: number; dev: number; ino: number } | null = null;
   async installed(): Promise<void> {
     const fixture = new ServiceRuntimeFixture(), program = new CliProgramFixture();
     try {
@@ -316,55 +209,13 @@ class InstalledProgramTests {
       this.signal('SIGKILL'); fixture.close(); program.close();
     }
   }
-  private json(program: CliProgramFixture, args: string[], environment: NodeJS.ProcessEnv = {}): ReturnType<typeof ServiceSchemas.envelope.parse> { const result = program.run(args, environment, program.symlink); if (result.status !== 0) throw new Error('Compiled installed command failed: ' + result.stdout + result.stderr); expect(result.stderr).toBe(''); return ServiceSchemas.envelope.parse(JSON.parse(result.stdout)); }
-  private signal(signal: NodeJS.Signals): void { if (!this.worker) return; try { const current = statSync('/proc/' + this.worker.pid + '/exe'); if (current.dev === this.worker.dev && current.ino === this.worker.ino) process.kill(this.worker.pid, signal); } catch { } }
-  private static delay(done: (value: void) => void): void { setTimeout(done, 100); }
 }
-const installedPrograms = new InstalledProgramTests();
-test('smoke: standalone CLI applies and observes five format3 services through its default durable host', installedPrograms.installed.bind(installedPrograms), 240000);
+class InstalledPluginCliTestsAcceptance extends InstalledPluginCliTests {
 
-test('smoke: built plugin commands validate arguments with safe SDK JSON envelopes and do not create missing installations', suite.pluginArguments.bind(suite),30000);
-
-class InstalledPluginCliTests {
-  private worker: { pid: number; dev: number; ino: number } | null = null;
-  private static delay(done: (value: void) => void): void { setTimeout(done, 50); }
-  private static hash(bytes: Uint8Array): string { return createHash('sha256').update(bytes).digest('hex'); }
-  private request(program: CliProgramFixture, args: string[], expected?: number): ReturnType<typeof PluginManagementSchemas.envelope.parse> {
-    const result=program.run(['plugin',...args,'--json']);
-    if(result.status===null)throw new Error('Built CLI terminated without an exit status');
-    if(expected!==undefined&&result.status!==expected){const envelope=PluginManagementSchemas.envelope.parse(JSON.parse(result.stdout));const codes:string[]=[];for(const blocker of envelope.blockers)codes.push(blocker.code);throw new Error('CLI_PLUGIN_READBACK:'+args[0]+':'+result.status+':'+envelope.problem?.code+':'+codes.join(','));}
-    if(expected===undefined)expect([0,3]).toContain(result.status);else expect(result.status).toBe(expected);
-    expect(result.stderr).toBe('');expect(result.stdout).not.toContain('NEVER_INHERIT');return PluginManagementSchemas.envelope.parse(JSON.parse(result.stdout));
-  }
-  private async settled(program: CliProgramFixture, installation: string, input: PluginInstallResult): Promise<PluginInstallResult> {
-    let result=input;const deadline=Date.now()+150000;
-    while(result.state==='pending'&&Date.now()<deadline){await new Promise(InstalledPluginCliTests.delay);result=PluginManagementSchemas.result.parse(this.request(program,['inspect',result.requestId,'--installation',installation],0).result);}
-    return result;
-  }
-  private receipts(store: ServicePlanStore): Map<string, ServiceResourceReceipt> {
-    const result=new Map<string, ServiceResourceReceipt>();const all=store.resources();
-    for(const receipt of all)for(const binding of store.current()!.resources)if(receipt.resourceId===binding.resourceId){const prior=result.get(receipt.resourceId);if(!prior||prior.references.length<receipt.references.length)result.set(receipt.resourceId,receipt);}
-    return result;
-  }
-  private same(store: ServicePlanStore, before: Map<string, ServiceResourceReceipt>, files: Map<string,string>): void {
-    const current=this.receipts(store);
-    for(const [id,receipt]of before){const next=current.get(id);expect(next).toBeDefined();expect(next!.actualId).toBe(receipt.actualId);expect(next!.creatingGeneration).toBe(receipt.creatingGeneration);expect(next!.definitionDigest).toBe(receipt.definitionDigest);expect(next!.contentDigest).toBe(receipt.contentDigest);expect(next!.path).toBe(receipt.path);}
-    for(const [path,digest]of files)expect(InstalledPluginCliTests.hash(readFileSync(join(store.path,path)))).toBe(digest);
-  }
-  private async direct(store: ServicePlanStore, id: string): Promise<void> {
-    for(const receipt of this.receipts(store).values())if(receipt.kind==='container'&&receipt.serviceId===id&&receipt.actualId){
-      const inspected=spawnSync('docker',['container','inspect','--format','{{json .NetworkSettings.Networks}}',receipt.actualId],{encoding:'utf8'});expect(inspected.status).toBe(0);const networks=JSON.parse(inspected.stdout) as Record<string,{IPAddress:string}>;let address:string|undefined;for(const network of Object.values(networks))address=network.IPAddress;expect(address).toBeDefined();
-      const response=await fetch('http://'+address+':8080/'),body=await response.json() as {serviceId:string;passwordPresent:boolean;volumeMarker:string};expect(response.ok).toBe(true);expect(body.serviceId).toBe(id);expect(body.passwordPresent).toBe(true);expect(body.volumeMarker).toBe(id);return;
-    }
-    throw new Error('Installed CLI fixture endpoint missing');
-  }
-  private identify(installation: string): void {
-    const child=JSON.parse(readFileSync(join(installation,'.cordis/launch/child.json'),'utf8')),file=statSync(join(installation,'.cordis/worker')),running=statSync('/proc/'+child.pid+'/exe');
-    expect(file.dev).toBe(running.dev);expect(file.ino).toBe(running.ino);expect(file.uid).toBe(process.getuid!());this.worker={pid:child.pid,dev:running.dev,ino:running.ino};
-  }
-  private signal(signal: NodeJS.Signals): void {if(!this.worker)return;try{const current=statSync('/proc/'+this.worker.pid+'/exe');if(current.dev===this.worker.dev&&current.ino===this.worker.ino)process.kill(this.worker.pid,signal);}catch{}}
   async git():Promise<void>{await this.program('git');}
+
   async gitBuild():Promise<void>{await this.program('build');}
+
   async program(source:'npm'|'git'|'build'='npm',registeredOnly=false): Promise<void> {
     const fixture=new PluginInstallationFixture(),program=new CliProgramFixture();
     try {
@@ -402,22 +253,36 @@ class InstalledPluginCliTests {
     } finally {if(!this.worker){try{this.identify(fixture.installation);}catch{}}this.signal('SIGTERM');if(this.worker){const deadline=Date.now()+15000;while(existsSync(join(fixture.installation,'.cordis/writer.lock'))&&Date.now()<deadline)await new Promise(InstalledPluginCliTests.delay);this.signal('SIGKILL');}await fixture.close();program.close();}
   }
 }
-const installedPlugins=new InstalledPluginCliTests();
-test('smoke: built CLI installs two typed plugin instances with retained credentials and safe UI readback using exact public fixtures',installedPlugins.program.bind(installedPlugins,'npm',false),420000);
+class LivePluginCliTestsAcceptance extends LivePluginCliTests {
 
-test('smoke: built CLI installs packaged HTTPS Git with managed helpers',installedPlugins.git.bind(installedPlugins),420000);
-test('smoke: built CLI installs approved source-only HTTPS Git with managed helpers',installedPlugins.gitBuild.bind(installedPlugins),420000);
-test('smoke: built CLI selects registered packaged Git instances with sources stopped',installedPlugins.program.bind(installedPlugins,'git',true),420000);
-test('smoke: built CLI selects registered built Git instances with sources stopped',installedPlugins.program.bind(installedPlugins,'build',true),420000);
-
-class LivePluginCliTests {
-  private static pause(done:(value:void)=>void):void{setTimeout(done,50);}
-  private run(program:CliProgramFixture,args:string[],code?:number):ReturnType<typeof PluginManagementSchemas.envelope.parse>{const output=program.run(['plugin',...args,'--json']);expect(output.stderr).toBe('');if(code!==undefined)expect(output.status).toBe(code);else expect([0,3]).toContain(output.status!);expect(output.stdout).not.toContain('NEVER_INHERIT');return PluginManagementSchemas.envelope.parse(JSON.parse(output.stdout));}
-  private async settled(program:CliProgramFixture,installation:string,input:PluginInstallResult):Promise<PluginInstallResult>{let result=input;const until=Date.now()+180000;while(result.state==='pending'&&Date.now()<until){await new Promise(LivePluginCliTests.pause);result=PluginManagementSchemas.result.parse(this.run(program,['inspect',result.requestId,'--installation',installation],0).result);}return result;}
-  private static physical(receipt:ServiceResourceReceipt):string{const {references,...identity}=receipt;return JSON.stringify(identity);}
-  private static digest(digest:string,receipt:ServiceResourceReceipt):boolean{return CanonicalJson.digest(receipt)===digest;}
-  private static next(service:{serviceId:string;observations:string[]}):boolean{return service.serviceId==='instance-2'&&service.observations.includes('fixture.live.next');}
   async program():Promise<void>{const{LiveProbeFixture}=await import('@treeseed-cordis/deployment/testing/live'),fixture=await new LiveProbeFixture().prepareLive(),program=new CliProgramFixture(),path=process.env.PATH,token=process.env.NPM_TOKEN;try{await fixture.startRegistry();const configuration=join(program.cwd,'live.json');writeFileSync(configuration,JSON.stringify(fixture.configuration));const planned=program.run(['platform','plan','--file',configuration,'--json']);expect(planned.status).toBe(0);const plan=ServiceSchemas.plan.parse(JSON.parse(planned.stdout).result),tools=join(program.root,'docker-only');mkdirSync(tools);let docker:string|undefined;for(const dir of(path??'').split(':'))if(existsSync(join(dir,'docker'))){docker=join(dir,'docker');break;}expect(docker).toBeDefined();symlinkSync(docker!,join(tools,'docker'));process.env.PATH=tools;process.env.NPM_TOKEN='NEVER_INHERIT';const{ComposeDeploymentHost,ServiceWorkerOwnerClient}=await import('@treeseed-cordis/deployment'),host=new ComposeDeploymentHost(),owner=new ServiceWorkerOwnerClient({installationDirectory:fixture.installation}),accepted=await host.apply(plan.id,plan.digest,{installationDirectory:fixture.installation,idempotencyKey:'cli-live-base'});let application=await owner.application(accepted.id);const until=Date.now()+180000;while(!['completed','failed'].includes(application.phase)&&Date.now()<until){await new Promise(LivePluginCliTests.pause);application=await owner.application(accepted.id);}expect(application.result).toBe('ready');const store=new ServicePlanStore(fixture.installation),before=store.current()!,physical=new Map<string,string>(),files=new Map<string,string>();for(const binding of before.resources){const receipt=store.resources().find(LivePluginCliTests.digest.bind(null,binding.receiptDigest))!;physical.set(receipt.resourceId,LivePluginCliTests.physical(receipt));if(receipt.path&&existsSync(join(fixture.installation,receipt.path)))files.set(receipt.path,createHash('sha256').update(readFileSync(join(fixture.installation,receipt.path))).digest('hex'));}const child=JSON.parse(readFileSync(join(fixture.installation,'.cordis/launch/child.json'),'utf8')),provider=plan.composition.services[2]!.readiness,config=join(program.cwd,'probe.json');writeFileSync(config,JSON.stringify(provider.configuration));const args=['install',fixture.source(),'--installation',fixture.installation,'--target','deployment','--service','instance-2','--provider','fixture-live.next','--configuration',config,'--idempotency-key','cli-live-install'],live=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.run(program,args).result));expect(live.state).toBe('active');expect(live.applicationId).not.toBeNull();expect(live.acknowledgements.length).toBeGreaterThan(0);for(const binding of store.current()!.resources){const receipt=store.resources().find(LivePluginCliTests.digest.bind(null,binding.receiptDigest))!;expect(LivePluginCliTests.physical(receipt)).toBe(physical.get(receipt.resourceId)!);}for(const[file,hash]of files)expect(createHash('sha256').update(readFileSync(join(fixture.installation,file))).digest('hex')).toBe(hash);expect((await owner.status()).services.find(LivePluginCliTests.next)).toBeDefined();renameSync(fixture.bundle,join(fixture.root,'source-bundle-offline'));await fixture.stopRegistry();expect(PluginManagementSchemas.result.parse(this.run(program,args,0).result)).toEqual(live);const select=['select','probe.service','fixture-live.next','--installation',fixture.installation,'--target','deployment','--service','instance-2','--configuration',config,'--idempotency-key','cli-live-current'],current=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.run(program,select).result));expect(current.state).toBe('already-active');const count=store.records().length;select[2]='fixture-live.old';select[select.length-1]='cli-unsafe-reverse';const unsafe=await this.settled(program,fixture.installation,PluginManagementSchemas.result.parse(this.run(program,select).result));expect(unsafe.state).toBe('prepared');expect(unsafe.nextActions).toContain('review-restart');expect(unsafe.applicationId).toBeNull();expect(store.records().length).toBe(count);expect((await owner.status()).services.find(LivePluginCliTests.next)).toBeDefined();expect(JSON.parse(readFileSync(join(fixture.installation,'.cordis/launch/child.json'),'utf8')).pid).toBe(child.pid);expect(fixture.authorization).toBe(false);}finally{process.env.PATH=path;if(token===undefined)delete process.env.NPM_TOKEN;else process.env.NPM_TOKEN=token;await fixture.dispose();program.close();}}
 }
-const livePlugins=new LivePluginCliTests();
-test('smoke: built CLI installs and selects a qualified live probe with offline exact replay and unsafe reverse refusal',livePlugins.program.bind(livePlugins),420000);
+const suite=new CliTestsAcceptance();
+const compositionSuite=new CompositionProgramTestsAcceptance();
+const uiOutput=new UiOutputProgramTestsAcceptance();
+const extensiblePlan=new ExtensiblePlanProgramTestsAcceptance();
+const installedPrograms=new InstalledProgramTestsAcceptance();
+const installedPlugins=new InstalledPluginCliTestsAcceptance();
+const livePlugins=new LivePluginCliTestsAcceptance();
+test("acceptance: standalone identity from spaces, symlink, foreign cwd and closed stdin",suite.identity.bind(suite));
+test("acceptance: doctor JSON and no filesystem/container mutation or cwd autoload",suite.diagnosis.bind(suite));
+test("acceptance: wrong engine, missing Docker, foreign installation and occupied port",suite.blockers.bind(suite));
+test("acceptance: invalid arguments and unsupported commands are actionable",suite.invalidProgram.bind(suite));
+test("acceptance: plan_changes_no_runtime using real prepared artifacts",suite.plan_changes_no_runtime.bind(suite));
+test("acceptance: invalid and duplicate planning inputs never echo secrets or claim saved state",suite.invalidPlans.bind(suite));
+test("acceptance: plan new installation directory with spaces and Unicode",suite.installationPaths.bind(suite));
+test("acceptance: compiled_cli_uses_cordis_and_selected_deployment_provider without Node Bun or cwd modules",compositionSuite.selected.bind(compositionSuite));
+test("acceptance: installed provider byte and dependency failures block before import",compositionSuite.rejected.bind(compositionSuite));
+test("acceptance: provider constructors and failed disposal cannot report successful CLI completion",compositionSuite.lifecycleFailures.bind(compositionSuite));
+test("acceptance: prepared-provider metadata scope ownership and closure are checked before activation",compositionSuite.metadataFailures.bind(compositionSuite));
+test("acceptance: installed commands validate arguments before contacting worker",suite.installedArguments.bind(suite));
+test("acceptance: built CLI renders structured diagnostic models through reusable terminal providers",uiOutput.human.bind(uiOutput));
+test("acceptance: standalone CLI plans genuine five-instance format3 bundle deterministically without runtime effects",extensiblePlan.plan.bind(extensiblePlan),60000);
+test("acceptance: standalone CLI applies and observes five format3 services through its default durable host", installedPrograms.installed.bind(installedPrograms), 240000);
+test("acceptance: built plugin commands validate arguments with safe SDK JSON envelopes and do not create missing installations", suite.pluginArguments.bind(suite),30000);
+test("acceptance: built CLI installs two typed plugin instances with retained credentials and safe UI readback using exact public fixtures",installedPlugins.program.bind(installedPlugins,'npm',false),420000);
+test("acceptance: built CLI installs packaged HTTPS Git with managed helpers",installedPlugins.git.bind(installedPlugins),420000);
+test("acceptance: built CLI installs approved source-only HTTPS Git with managed helpers",installedPlugins.gitBuild.bind(installedPlugins),420000);
+test("acceptance: built CLI selects registered packaged Git instances with sources stopped",installedPlugins.program.bind(installedPlugins,'git',true),420000);
+test("acceptance: built CLI selects registered built Git instances with sources stopped",installedPlugins.program.bind(installedPlugins,'build',true),420000);
+test("acceptance: built CLI installs and selects a qualified live probe with offline exact replay and unsafe reverse refusal",livePlugins.program.bind(livePlugins),420000);
