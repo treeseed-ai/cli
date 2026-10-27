@@ -18,5 +18,5 @@ export class CliNetworkFixture {
   listen(resolvePort:(port:number)=>void):void {this.resolvePort=resolvePort;this.server=createServer();this.server.listen(0,'127.0.0.1',this.listening.bind(this));}
   listening():void {const address=this.server!.address();if(address&&typeof address==='object')this.resolvePort!(address.port);}
   async port(occupied=false):Promise<number> {const port=await new Promise<number>(this.listen.bind(this));if(!occupied)this.server!.close();return port;}
-  
+
 }
