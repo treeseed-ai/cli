@@ -6,12 +6,15 @@
   "license": "Apache-2.0",
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "check": "bun scripts/build-cli.ts check",
+    "check": "bun run check:test-layout && bun scripts/build-cli.ts check",
     "build": "bun scripts/build-cli.ts build",
-    "test:unit": "bun test ./tests --test-name-pattern '^unit:'",
-    "test:integration": "bun test ./tests --timeout 30000 --test-name-pattern '^integration:'",
-    "test:smoke": "bun test ./tests --timeout 60000 --test-name-pattern '^smoke:'",
-    "verify": "bun run check && bun run build && bun run test:unit && bun run test:integration && bun run test:smoke"
+    "test:unit": "bun test ./tests/unit --pass-with-no-tests",
+    "test:integration": "bun test ./tests/integration --timeout 30000",
+    "test:smoke": "bun run test:acceptance",
+    "verify": "bun run check && bun run build && bun run test:acceptance && bun run test:regression && bun run test:integration && bun run test:unit",
+    "check:test-layout": "bun .agents/skills/release-workflow/scripts/test-layout.ts",
+    "test:regression": "bun test ./tests/regression",
+    "test:acceptance": "bun test ./tests/acceptance --timeout 60000"
   },
   "dependencies": {
     "@treeseed-cordis/sdk": "file:vendor/sdk.tgz",

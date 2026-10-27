@@ -13,19 +13,19 @@ jobs:
       matrix:
         include:
           - group: foundation
-            pattern: "^(unit:|integration:|smoke: (?!built CLI (installs|selects registered)))"
+            pattern: "^(regression:|unit:|integration:|acceptance: (?!built CLI (installs|selects registered)))"
           - group: npm
-            pattern: "^smoke: built CLI installs two typed"
+            pattern: "^acceptance: built CLI installs two typed"
           - group: git
-            pattern: "^smoke: built CLI installs packaged"
+            pattern: "^acceptance: built CLI installs packaged"
           - group: git-build
-            pattern: "^smoke: built CLI installs approved"
+            pattern: "^acceptance: built CLI installs approved"
           - group: git-registered
-            pattern: "^smoke: built CLI selects registered packaged"
+            pattern: "^acceptance: built CLI selects registered packaged"
           - group: build-registered
-            pattern: "^smoke: built CLI selects registered built"
+            pattern: "^acceptance: built CLI selects registered built"
           - group: live
-            pattern: "^smoke: built CLI installs and selects"
+            pattern: "^acceptance: built CLI installs and selects"
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     env:
