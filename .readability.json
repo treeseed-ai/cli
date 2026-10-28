@@ -1,0 +1,407 @@
+{
+  "formatVersion": 1,
+  "baselineCommit": "7225330dd8d78a6953849886fa873b5ba0216a1f",
+  "violations": [
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestLayout.inspect",
+      "fingerprint": "bfff01a3fe612610a72c2bcc0f00c92fdb5abbe557d2b876614a24990d557a0c"
+    },
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestLayout.check",
+      "fingerprint": "aec11cb99ea6438078fa6cbf353bbf8c4b5f5803a1e0102c86b725180f20e669"
+    },
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestLayout.discovery",
+      "fingerprint": "771becf2a0f493fa9ee054d98379140581968b2134e1ccfd778ac1618eb4074b"
+    },
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestLayout.partitions",
+      "fingerprint": "95cef1faa4182536c0be52904c7525d3ed245bac04f22d969ea73307ef0fa2bd"
+    },
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestLayout.directory",
+      "fingerprint": "fb2f15a07b290e17c566adedf0e37dd7b4093a59a6085ebbf4f787474f6adb0a"
+    },
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestRegistrationVisitor.inspect",
+      "fingerprint": "ccbfb614b5e447bf0eb3230ba9a80b6a369bae7ec130ef5e134c087a2d0c7058"
+    },
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestRegistrationVisitor.visit",
+      "fingerprint": "8740012694378c96522cedfa0f69377ee1f26c18d316baaee9050fcb4d6e752d"
+    },
+    {
+      "file": ".agents/skills/release-workflow/scripts/test-layout.ts",
+      "symbol": "TestRegistrationVisitor.test",
+      "fingerprint": "facc0ab411b33f7d001b6f8e5852eebf4ff02716394b318b20ec046794e30fe1"
+    },
+    {
+      "file": "scripts/build-cli.ts",
+      "symbol": "CliBuild.static run",
+      "fingerprint": "b204ac0f3e040a37e6323df25148031e53c5625531bcf3cc54be6f66ef6cbb2c"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliArguments.static plan",
+      "fingerprint": "9896e7907d86155e23cecab04a30bbb98a2b402a1660dee14bd949bc70f97558"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliArguments.static installed",
+      "fingerprint": "ad62ce51b4f7a20f0845b99b28fc11ccaf1b3ed3849895e001453885fa16b757"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliArguments.static doctor",
+      "fingerprint": "08b977260660e131c8e3330256eb53c6563dc1c1cc5c0d8d8b5d07ed14ff3bf7"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "ConfigurationFile.property",
+      "fingerprint": "d6c47f58fa55ef31148a6b38605ce61dab9f9268f4e50e9b085691d52a8eede3"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "ConfigurationFile.value",
+      "fingerprint": "770f623d67da32f3cde8263ecf193b89b8c2755ee34bb8259ff058e298d5448b"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "ConfigurationFile.read",
+      "fingerprint": "6119b9d6f71ab13821dbcada322bcee251d4ddba35303e3c54e37a1e84cf504d"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "ConfigurationFile.object",
+      "fingerprint": "4c47f7499b8e2332eb1b276087295cde7e278f06700997e79f1b3b6cb4ab5e52"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliCommands.execute",
+      "fingerprint": "98528d5aa3a3a47759e2376a32a97b477ea47cc59a941f406e777e3aa39fce44"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "TerminalPresentation.render",
+      "fingerprint": "ddc3d1087c3f5f9c57b6ba6a5e6782ea9f5e1ebe64fc04939661b982cb7fbd02"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliViews.static primary",
+      "fingerprint": "dc70d947f1abb9f76f7c52617c7854bd35a722ba15bb516ec0e07bab63a4ac24"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliViews.static errors",
+      "fingerprint": "d678c5c70b3437746310a6e4f3d19bce8b97f5000e49e5a07e00c0dc9ecff200"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliOutput.render",
+      "fingerprint": "fbfcc9284e72fe24b222f6267ac12181ef5c7232c200d13a87e127446ae91f8e"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "NativeStreams.static write",
+      "fingerprint": "ff4fd8b2812c6e1325da9a21a5853cfff18a0bb9ab5e9d879d2fa1ff151acc12"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CapabilityValidation.parse",
+      "fingerprint": "95cfc1daceea571d0fb7dc3fd881e8df081f106f224c14ca2be10f4abc4eb7dd"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliComposition.static core",
+      "fingerprint": "36e4a2ce91ff859f2d7168b0c5f3997292d92058b32e15781ff663b88b03f81a"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliComposition.static prepared",
+      "fingerprint": "ddf96731c002ee3fba55015c394aedf0e0151dabec6b4c6f5ef9a25f423f65dd"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliApplication.invoke",
+      "fingerprint": "6ee7a4bb8895baea9849eedc29c5661101c28ca161877092bfa82ea9b7456022"
+    },
+    {
+      "file": "src/main.ts",
+      "symbol": "CliApplication.static start",
+      "fingerprint": "09bed38cf49d367102c0b1f53b99eddbe3116d0096eaec3f6d2ceac967948312"
+    },
+    {
+      "file": "src/plugins.ts",
+      "symbol": "PluginArgumentsReader.static read",
+      "fingerprint": "c566a08c28d4e84939f50a20a16b3af1002dba371c3f99228bf3f4db34cede4e"
+    },
+    {
+      "file": "src/plugins.ts",
+      "symbol": "InstalledPluginCommands.execute",
+      "fingerprint": "ec7f0351651cc442d753a99d735a683f7fe9b4f741ce9a5f0707d5eb204cb369"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "CliTests.snapshot",
+      "fingerprint": "e63f548fd497b3b7c848278aafcf4bab7488a8782b2a38bf680f301c412c2ba9"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.copy",
+      "fingerprint": "5dd502f5c132dffad97fe0d40a46426ce4b14f3151351a3e40fe19429b590265"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.prepare",
+      "fingerprint": "8fbcc2ddc11a723027eba54a6754467a3b195f7e4c9183027c7fe3c280b1718b"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.inventory",
+      "fingerprint": "64d7e88942e708e57ac83e5bd973b86a2748a575c790ed91b30a3600777ff787"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.permissions",
+      "fingerprint": "842711724a63a9b88f3ecb96599d70d9c54b3fb9be815a6ecbe79660e7854a6e"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.refresh",
+      "fingerprint": "67591c68cde904a4ed987184fb48cf61fb58957784dfe2e090de128042c70471"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.address",
+      "fingerprint": "62aab529844e20d7a263873f9d9d030609633f4075121e766368601dabbab689"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.run",
+      "fingerprint": "a39fb5e653f167cb15eaceb7fa552369418f8c3c4b21540f604575a72a4f7399"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ProviderFixture.close",
+      "fingerprint": "20d2794fb3cf2a7d58bfb562c260eed9eebbe0a44048903f33540516ca39aa3e"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "ExtensiblePlanProgramTests.listeners",
+      "fingerprint": "1db722c800a659a6612fc0a34c54c5f49f90c618ade8bc12f83a6c582acb2831"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledProgramTests.json",
+      "fingerprint": "b0c414193d2e64e2cd4d9208dccdb1cde8996e7363b0f29db3ada673f9c09436"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledProgramTests.signal",
+      "fingerprint": "bf553370209847ba835fc86b7cef9db5be405202b913e4740acd9bd32ea6c02f"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledPluginCliTests.request",
+      "fingerprint": "c5ccace2ac7652b346f1c9249b544d4d0ebf8213b368f0e938f1fe85461eaedb"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledPluginCliTests.settled",
+      "fingerprint": "0dc1b08866946fd1c6e81be0f27ef2fa21a0aaef8308c7aa508cd3a35e21b3f6"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledPluginCliTests.receipts",
+      "fingerprint": "910bb7037f9f85c0dca4e87dbae634ebe83f4958fa06a0dae033aedd9c4841d8"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledPluginCliTests.same",
+      "fingerprint": "5329d1f488907a6b8b955e772ab3bca4a3522d0ed0d2c710bc4c2d3413f0f0b4"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledPluginCliTests.direct",
+      "fingerprint": "f583523c00faa6d64dd7d7c6f183d93a87c96365d55cc5e899610cde4161e3c7"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledPluginCliTests.identify",
+      "fingerprint": "fe7995fc92084dee540a7845ff123fcfd029e3c2753d365984ee3f5edda47727"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "InstalledPluginCliTests.signal",
+      "fingerprint": "be927c59663fa7706cdcde14be9fd1f6f6d8340bcffc69446edcaa8eb986c7ac"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "LivePluginCliTests.run",
+      "fingerprint": "ef12d9e013ae5a5fc34f062b2507cdfd7d86524b1e0fc7c76297ab8343c3330e"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "LivePluginCliTests.settled",
+      "fingerprint": "7dd1ae2c3a08865ef9dcc0a9292345cc2d5d65acce3d16f83ef1bc58bc15154f"
+    },
+    {
+      "file": "tests/acceptance/cli-program-contract.ts",
+      "symbol": "LivePluginCliTests.static physical",
+      "fingerprint": "03f8e7f3d23d39d839dcd165ec81e3d5188257562c44162d3bbea1044f815240"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.pluginArguments",
+      "fingerprint": "54374bac2fb0756b43efe1a0e83fec85e27700e5ab10e9395899e1ff8e40eb8a"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.installedArguments",
+      "fingerprint": "e7441587f18dbdf9668c4807bafe6895a41c86974fe7fc6e5271b2a70776244c"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.identity",
+      "fingerprint": "964d21391c93e2fb12027fa5bb956e504dfa27e9cd079188a235ee1ad3310dc0"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.diagnosis",
+      "fingerprint": "ab8a7d0930b13820c6b11b926e808657f12a49cd5f6046d2c29ea8708079b346"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.blockers",
+      "fingerprint": "837a6811265aece0ccd9a5cafabe850864ecf8b6098717e18820906feec56216"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.invalidProgram",
+      "fingerprint": "adf458d5aa60b789884580b097cd2f39eb601464e3f616d18f7033b3f2cceb33"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.plan_changes_no_runtime",
+      "fingerprint": "90db06b5f10668c507b46330077fbedc52bc34737b92ca719312cdb2dac797b3"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.installationPaths",
+      "fingerprint": "e24729300562274f01ff72e759fa943b89e61078d487046931ddb398b01115c7"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CliTestsAcceptance.invalidPlans",
+      "fingerprint": "bd09ed92bf50329a240d75cfb134086b97281310db1ea5e678c1c9f8834fee6d"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CompositionProgramTestsAcceptance.selected",
+      "fingerprint": "63ea8b66981aa4db2517ea44cf440dfd77ab93e891d4ec646a6130fae3c98284"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CompositionProgramTestsAcceptance.lifecycleFailures",
+      "fingerprint": "8fc16d8acf7228be4d2cedd1366e5d9ee407c0226822e30c7534f4df147e2879"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CompositionProgramTestsAcceptance.metadataFailures",
+      "fingerprint": "8ada1d23540531fa07b91146bd98a9d98a6ce9b5293d87768b8dbf31505e3b1a"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "CompositionProgramTestsAcceptance.rejected",
+      "fingerprint": "e194c722af9aa2a6e69123456ee124185525df0d5b176bc2922d82e3a66b9efe"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "UiOutputProgramTestsAcceptance.human",
+      "fingerprint": "7c74ed6e73cfa927439a8b6cdc0438d4c6ced0cd1ba75a23b61b6b7c0017648c"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "ExtensiblePlanProgramTestsAcceptance.plan",
+      "fingerprint": "8ab40ee190996332ee3a3ff29b6e9a8a1b3a45e411954224ddc75b6a4db74eb2"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "InstalledProgramTestsAcceptance.installed",
+      "fingerprint": "f323bdac986747f515c04de260c41b2df4b987b3d007d865cd989d4caeda87fc"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "InstalledPluginCliTestsAcceptance.program",
+      "fingerprint": "0127133eb4b9973777813897b4b46a023b80b6210c9923d2efcd4653a3aeb140"
+    },
+    {
+      "file": "tests/acceptance/cli-program.test.ts",
+      "symbol": "LivePluginCliTestsAcceptance.program",
+      "fingerprint": "d443698c6c319a048fd72c76d02e8b80acf8f0a5ca90dc8a202db36ac4201ef7"
+    },
+    {
+      "file": "tests/integration/cli-program.test.ts",
+      "symbol": "CliTestsIntegration.defaultComposition",
+      "fingerprint": "0751390132903c5f4337b170864e2ed7d65f9b289abf5e67de2b3a69c66e9014"
+    },
+    {
+      "file": "tests/integration/command-classification.test.ts",
+      "symbol": "CliTestsIntegration.parser",
+      "fingerprint": "7c79d79862e48693aafc50cfeb614476358a0d50994f4561913df303ed1f64f9"
+    },
+    {
+      "file": "tests/regression/test-layout.test.ts",
+      "symbol": "TestLayoutRegression.check",
+      "fingerprint": "58a1e54d5b4d5e806480547f2c44fc7fd4a30b548e11033ce1aec339518628f4"
+    },
+    {
+      "file": "tests/regression/test-layout.test.ts",
+      "symbol": "TestLayoutRegression.discovery",
+      "fingerprint": "9a2d5796d031c1f6b33cfe9b537b6ebaacb870e3bcdf578110c016bbc44dca2d"
+    },
+    {
+      "file": "tests/regression/test-layout.test.ts",
+      "symbol": "TestLayoutRegression.matrix",
+      "fingerprint": "ec2572e83c489f133b4c787afaaa99cc1106c22b8e76a2cbbc5dae077a23c0c5"
+    },
+    {
+      "file": "tests/regression/test-layout.test.ts",
+      "symbol": "TestLayoutRegression.partitions",
+      "fingerprint": "99923590bc7eb9c1f0b70fd32403786ecdc51b98ed1eec4241ae1a0693c17dcd"
+    },
+    {
+      "file": "tests/regression/test-layout.test.ts",
+      "symbol": "TestLayoutRegression.support",
+      "fingerprint": "e933ea0a60e46f10d31f0368c7d6413a5b60d3e5b392dca3f3c18daa81cb0966"
+    },
+    {
+      "file": "tests/support/cli-program-test-support.ts",
+      "symbol": "CliProgramFixture.constructor",
+      "fingerprint": "e7ca425ee932d322f9b863a14d30018193f605ee56263c7024a74a53e0befe7f"
+    },
+    {
+      "file": "tests/support/cli-program-test-support.ts",
+      "symbol": "CliNetworkFixture.listen",
+      "fingerprint": "11c894b7edac93b9d2a6d56b483595efea49d4bbf4dd134ebf0e4fdf7e517f38"
+    },
+    {
+      "file": "tests/support/cli-program-test-support.ts",
+      "symbol": "CliNetworkFixture.listening",
+      "fingerprint": "e3ce299407d99592d5ef419bb01783fd4bb30d141d18b931b5a15f740ff6f525"
+    },
+    {
+      "file": "tests/support/cli-program-test-support.ts",
+      "symbol": "CliNetworkFixture.port",
+      "fingerprint": "14be352ee488db287d91b52ad160aeea6fdeee419f4f0902e61a27ea6b2405b6"
+    }
+  ],
+  "exceptions": []
+}
